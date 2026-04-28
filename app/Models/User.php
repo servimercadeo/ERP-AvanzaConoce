@@ -22,6 +22,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'avanzaconoce_id',
+        'rol',
+        'activo',
+        'ultimo_sso_at',
     ];
 
     /**
@@ -43,7 +47,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'activo'            => 'boolean',
+            'ultimo_sso_at'     => 'datetime',
         ];
     }
 }
