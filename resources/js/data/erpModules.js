@@ -1,74 +1,103 @@
 export const ERP_MODULES = [
   {
-    id: 'rrhh',
-    label: 'Recursos Humanos',
+    id: 'sedes',
+    label: 'Sedes',
     icon: '',
     color: '#1a9b8c',
-    desc: 'Gestión completa del talento humano, nómina, contratos y bienestar laboral.',
-    submods: [
-      { id: 'empleados',   label: 'Empleados',      icon: '', desc: 'Gestión de empleados y contratos.' },
-      { id: 'nomina',      label: 'Nómina',         icon: '', desc: 'Liquidación y pago de salarios.' },
-      { id: 'vacaciones',  label: 'Vacaciones',     icon: '', desc: 'Solicitudes y aprobaciones de vacaciones.' },
+    desc: 'Gestión de sedes.',
+    submods: [],
+    archivos: [
+      { id: 'sedes_file', label: 'Sedes' },
+      { id: 'relacion', label: 'Relación Almacenista - Secretaria Sedes' }
     ]
   },
   {
-    id: 'finanzas',
-    label: 'Finanzas',
+    id: 'administrativo',
+    label: 'Administrativo',
     icon: '',
     color: '#f5a623',
-    desc: 'Control financiero, contabilidad, presupuesto y reportes económicos.',
-    submods: [
-      { id: 'contabilidad', label: 'Contabilidad',  icon: '', desc: 'Registro de cuentas y movimientos.' },
-      { id: 'presupuesto',  label: 'Presupuesto',   icon: '', desc: 'Planificación y control presupuestal.' },
-      { id: 'tesoreria',    label: 'Tesorería',     icon: '', desc: 'Flujo de caja y pagos.' },
+    desc: 'Gestión administrativa.',
+    submods: [],
+    archivos: [
+      { id: 'empleados', label: 'Empleados' },
+      { id: 'vehiculos', label: 'Vehículos' }
     ]
   },
   {
-    id: 'compras',
-    label: 'Compras',
+    id: 'inventarios',
+    label: 'Inventarios',
     icon: '',
     color: '#27ae60',
-    desc: 'Gestión de proveedores, órdenes de compra y control de inventario.',
+    desc: 'Control de inventario y stock.',
     submods: [
-      { id: 'proveedores',  label: 'Proveedores',   icon: '', desc: 'Registro y evaluación de proveedores.' },
-      { id: 'ordenes',      label: 'Órdenes',       icon: '', desc: 'Órdenes de compra y aprobaciones.' },
-      { id: 'inventario',   label: 'Inventario',    icon: '', desc: 'Control de stock y almacén.' },
-    ]
+      {
+        id: 'productos', label: 'Productos', icon: '', desc: 'Gestión de productos',
+        archivos: [
+          { id: 'productos_file', label: 'Productos' },
+          { id: 'productos_serializados', label: 'Productos Serializados' },
+          { id: 'tipo_producto', label: 'Tipo de Producto Serializado' }
+        ]
+      }
+    ],
+    archivos: []
   },
   {
-    id: 'sst',
-    label: 'SST',
+    id: 'pedidos_compras',
+    label: 'Pedidos y Compras',
     icon: '',
     color: '#e74c3c',
-    desc: 'Seguridad y salud en el trabajo, novedades, incidentes y cumplimiento normativo.',
+    desc: 'Gestión de proveedores y órdenes de compra.',
     submods: [
-      { id: 'novedades',    label: 'Novedades SST', icon: '', desc: 'Registro de novedades y riesgos.' },
-      { id: 'incidencias',  label: 'Incidencias',   icon: '', desc: 'Gestión de accidentes e incidentes.' },
-      { id: 'aprobaciones', label: 'Aprobaciones',  icon: '', desc: 'Flujo de aprobación SST.' },
-    ]
+      {
+        id: 'pedidos', label: 'Pedidos', icon: '', desc: 'Gestión de pedidos',
+        archivos: [
+          { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
+        ]
+      },
+      {
+        id: 'compras', label: 'Compras', icon: '', desc: 'Gestión de compras',
+        archivos: [
+          { id: 'ver_crear_orden', label: 'Ver y Crear Orden de Compra' }
+        ]
+      },
+      {
+        id: 'parametros', label: 'Parametros', icon: '', desc: 'Parámetros de pedidos y compras',
+        archivos: [
+          { id: 'clases_pedidos', label: 'Clases de Pedidos' },
+          { id: 'conceptos_pedidos', label: 'Conceptos de Pedidos' },
+          { id: 'responsables', label: 'Responsables de Aprobación General de Pedidos' }
+        ]
+      }
+    ],
+    archivos: []
   },
   {
-    id: 'tic',
-    label: 'Soporte TIC',
+    id: 'parametros',
+    label: 'Parametros',
     icon: '',
     color: '#8e44ad',
-    desc: 'Mesa de ayuda tecnológica, gestión de activos y soporte a usuarios.',
+    desc: 'Configuración y parámetros del sistema.',
     submods: [
-      { id: 'tickets',    label: 'Tickets',         icon: '', desc: 'Solicitudes y soporte técnico.' },
-      { id: 'activos',    label: 'Activos TIC',     icon: '', desc: 'Inventario de equipos y licencias.' },
-      { id: 'induccion',  label: 'Inducción',       icon: '', desc: 'Material de formación y onboarding.' },
-    ]
+      {
+        id: 'comerciales_tecnicos', label: 'Comerciales y Técnicos', icon: '', desc: 'Parámetros comerciales y técnicos',
+        archivos: [
+          { id: 'tipo_productos', label: 'Tipo de Productos' }
+        ]
+      }
+    ],
+    archivos: []
   },
   {
-    id: 'reportes',
-    label: 'Reportes',
+    id: 'usuarios',
+    label: 'Usuarios',
     icon: '',
     color: '#2980b9',
-    desc: 'Dashboards, indicadores de gestión y exportación de informes ejecutivos.',
-    submods: [
-      { id: 'dashboard',  label: 'Dashboard',       icon: '', desc: 'Indicadores clave de gestión.' },
-      { id: 'informes',   label: 'Informes',        icon: '', desc: 'Generación y descarga de informes.' },
-      { id: 'powerbi',    label: 'Power BI',        icon: '', desc: 'Análisis avanzado con Power BI.' },
+    desc: 'Administración de usuarios y roles.',
+    submods: [],
+    archivos: [
+      { id: 'usuarios_sistema', label: 'Usuarios del Sistema' },
+      { id: 'grupos_usuarios', label: 'Grupos de Usuarios' },
+      { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' }
     ]
-  },
+  }
 ];

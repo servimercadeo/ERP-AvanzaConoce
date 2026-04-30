@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { ERP_MODULES } from '../data/erpModules';
@@ -6,6 +6,7 @@ import { ERP_MODULES } from '../data/erpModules';
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -14,6 +15,12 @@ export default function Header() {
 
   return (
     <header className="header">
+      <div className="header-mobile-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+
       <Link className="header-logo" to="/dashboard">
         <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
           <ellipse cx="18" cy="22" rx="10" ry="10" fill="#1a9b8c" opacity="0.18"/>
@@ -24,22 +31,48 @@ export default function Header() {
         <span>ERP</span>
       </Link>
 
-      <nav className="nav">
+      <nav className={`nav ${isMenuOpen ? 'mobile-active' : ''}`}>
         {ERP_MODULES.map(mod => (
           <div key={mod.id} className="nav-item">
             <Link className="nav-link" to={`/module/${mod.id}`}>
-              <span>{mod.icon}</span>
+              {mod.icon && <span>{mod.icon}</span>}
               <span>{mod.label}</span>
-              <span className="arrow">▾</span>
+              {(mod.submods?.length > 0 || mod.archivos?.length > 0) && <span className="arrow">▾</span>}
             </Link>
-            <div className="dropdown">
-              {mod.submods.map(sub => (
-                <Link key={sub.id} to={`/module/${mod.id}/submodule/${sub.id}`}>
-                  <span className="sub-icon">{sub.icon}</span>
-                  {sub.label}
-                </Link>
-              ))}
-            </div>
+            {(mod.submods?.length > 0 || mod.archivos?.length > 0) && (
+              <div className="dropdown">
+                {mod.submods?.length > 0 ? (
+                  mod.submods.map(sub => (
+                    <div key={sub.id} className="dropdown-nested">
+                      <Link to={`/module/${mod.id}/submodule/${sub.id}`}>
+                        <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                          {sub.icon && <span className="sub-icon">{sub.icon}</span>}
+                          <span>{sub.label}</span>
+                          {sub.archivos?.length > 0 && <span className="arrow right" style={{ marginLeft: 'auto' }}>▸</span>}
+                        </div>
+                      </Link>
+                      {sub.archivos?.length > 0 && (
+                        <div className="sub-dropdown">
+                          {sub.archivos.map(archivo => (
+                            <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}`}>
+                              <span className="sub-icon">📄</span>
+                              <span>{archivo.label}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  mod.archivos?.map(archivo => (
+                    <Link key={archivo.id} to={`/module/${mod.id}`}>
+                      <span className="sub-icon">📄</span>
+                      <span>{archivo.label}</span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         ))}
       </nav>
