@@ -12,4 +12,6 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth');
 Route::get('/sso/login', [SsoController::class, 'login']);
 
 // ── SPA: React maneja todas las demás rutas ────────────────────────────────────
-Route::get('/{any?}', fn() => view('app'))->where('any', '^(?!sso|login|logout).*$');
+// Solo excluimos /sso/* porque tiene lógica de servidor.
+// /login y /logout GET los maneja React (son rutas del frontend).
+Route::get('/{any?}', fn() => view('app'))->where('any', '^(?!sso).*$');
