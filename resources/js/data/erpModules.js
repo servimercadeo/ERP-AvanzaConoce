@@ -47,10 +47,91 @@ export const ERP_MODULES = [
     icon: '',
     color: '#f5a623',
     desc: 'Gestión administrativa.',
-    submods: [],
+    submods: [
+      {
+        id: 'admin_contratos',
+        label: 'Administración de Contratos',
+        icon: '',
+        desc: 'Gestión de contratos',
+        archivos: [
+          { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
+          { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
+          { id: 'empleadores', label: 'Empleadores' },
+          { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
+          { id: 'importar_contratos_activos', label: 'Importar Contratos Laborales Activos' }
+        ]
+      },
+      {
+        id: 'requisicion_personal',
+        label: 'Requisición de Personal',
+        icon: '',
+        desc: 'Gestión de requisiciones',
+        archivos: [
+          { id: 'ver_crear_requisiciones', label: 'Ver y Crear Requisiciones' },
+          { id: 'atencion_requisiciones', label: 'Atención de Requisiciones' }
+        ]
+      },
+      {
+        id: 'work_orders',
+        label: 'Work Orders',
+        icon: '',
+        desc: 'Gestión de work orders',
+        archivos: [
+          { id: 'consultar_work_orders', label: 'Consultar Work Orders' },
+          { id: 'modificar_perimetro_wo', label: 'Modificar Perímetro y Cobro de WO' },
+          { id: 'consultar_garantia_ibs', label: 'Consultar Estado de Garantía de IBS' },
+          { id: 'registro_material_instalado', label: 'Registro de Material Instalado' },
+          { id: 'finalizar_wo_sin_material', label: 'Finalizar Work Order sin Material' },
+          { id: 'importar_cierre_masivo', label: 'Importar Cierre y Descargue Masivo' },
+          { id: 'importar_wo_programadas', label: 'Importar Work Order Programadas' },
+          { id: 'importar_wo_atendidas', label: 'Importar Work Order Atendidas' },
+          { id: 'importar_wo_finalizadas', label: 'Importar Work Order Finalizadas' },
+          { id: 'importar_wo_canceladas', label: 'Importar Work Order Canceladas' },
+          { id: 'importar_wo_pagas_directiv', label: 'Importar Work Order Pagas por Directiv' },
+          { id: 'envio_contratos', label: 'Envió de Contratos' },
+          { id: 'sol_modificacion_envio_contrato', label: 'Sol. de Modificación Envió Contrato por Aprobar' }
+        ]
+      },
+      {
+        id: 'solicitud_dias',
+        label: 'Solicitud de Dias',
+        icon: '',
+        desc: 'Gestión de solicitudes',
+        archivos: [
+          { id: 'ver_crear_solicitudes', label: 'Ver y Crear Solicitudes' },
+          { id: 'solicitudes_por_aprobar', label: 'Solicitudes por Aprobar' },
+          { id: 'ver_calendario_ausentismos', label: 'Ver Calendario de Ausentismos' }
+        ]
+      },
+      {
+        id: 'consignacion_wo',
+        label: 'Consignación de Work Orders',
+        icon: '',
+        desc: 'Consignaciones',
+        archivos: [
+          { id: 'consignacion_work_orders', label: 'Consignación de Work Orders' },
+          { id: 'sol_modificacion_consignaciones', label: 'Sol. de Modificación Consignaciones por Aprobar' }
+        ]
+      },
+      {
+        id: 'liquidacion_pagos',
+        label: 'Liquidación de Pagos',
+        icon: '',
+        desc: 'Gestión de pagos',
+        archivos: [
+          { id: 'servicios_liquidar_tecnicos', label: 'Servicios por Liquidar Técnicos' },
+          { id: 'liquidaciones_registradas_tecnicos', label: 'Liquidaciones Registradas Técnicos' }
+        ]
+      }
+    ],
     archivos: [
       { id: 'empleados', label: 'Empleados' },
-      { id: 'vehiculos', label: 'Vehículos' }
+      { id: 'importar_codigos_directv', label: 'Importar Códigos DirecTv a Empleados' },
+      { id: 'importar_empleados', label: 'Importar Empleados' },
+      { id: 'vehiculos', label: 'Vehículos' },
+      { id: 'entrega_tecnicos', label: 'Entrega Técnicos' },
+      { id: 'devolucion_material', label: 'Devolución de Material' },
+      { id: 'capacitaciones', label: 'Capacitaciones' }
     ]
   },
   {
@@ -61,11 +142,67 @@ export const ERP_MODULES = [
     desc: 'Control de inventario y stock.',
     submods: [
       {
-        id: 'productos', label: 'Productos', icon: '', desc: 'Gestión de productos',
+        id: 'productos',
+        label: 'Productos',
+        icon: '',
+        desc: 'Gestión de productos',
         archivos: [
           { id: 'productos_file', label: 'Productos' },
           { id: 'productos_serializados', label: 'Productos Serializados' },
-          { id: 'tipo_producto', label: 'Tipo de Producto Serializado' }
+          { id: 'tipo_producto_serializado', label: 'Tipo de Producto Serializado' },
+          { id: 'trasladar_serial', label: 'Trasladar Serial' },
+          { id: 'importar_codigos_directv_productos', label: 'Importar Códigos DirecTv a Productos' }
+        ]
+      },
+      {
+        id: 'entradas',
+        label: 'Entradas',
+        icon: '',
+        desc: 'Gestión de entradas',
+        archivos: [
+          { id: 'entradas_inventario', label: 'Entradas de Inventario' },
+          { id: 'entradas_por_confirmar', label: 'Entradas por Confirmar' }
+        ]
+      },
+      {
+        id: 'traslados',
+        label: 'Traslados',
+        icon: '',
+        desc: 'Gestión de traslados',
+        archivos: [
+          { id: 'traslados_inventario', label: 'Traslados de Inventario' },
+          { id: 'traslados_insumos', label: 'Traslados de Insumos' },
+          { id: 'traslados_por_confirmar', label: 'Traslados por Confirmar' },
+          { id: 'traslados_por_aprobar', label: 'Traslados por Aprobar' },
+          { id: 'traslados_anulados', label: 'Traslados Anulados' }
+        ]
+      },
+      {
+        id: 'salidas',
+        label: 'Salidas',
+        icon: '',
+        desc: 'Gestión de salidas',
+        archivos: [
+          { id: 'salidas_inventario', label: 'Salidas de Inventario' }
+        ]
+      },
+      {
+        id: 'consultas',
+        label: 'Consultas',
+        icon: '',
+        desc: 'Gestión de consultas y reportes',
+        archivos: [
+          { id: 'kardex_sede_producto', label: 'Kardex por Sede - Producto' },
+          { id: 'kardex_sede_general', label: 'Kardex por Sede - General' },
+          { id: 'kardex_tecnico_productos', label: 'Kardex por Técnico - Productos' },
+          { id: 'kardex_tecnico_general', label: 'Kardex por Técnico - General' },
+          { id: 'kardex_serializados', label: 'Kardex Serializados' },
+          { id: 'inventario_no_serializado_sede', label: 'Inventario No Serializado por Sede' },
+          { id: 'inventario_serializado_sede', label: 'Inventario Serializado por Sede' },
+          { id: 'inventario_global_no_serializado', label: 'Inventario Global No Serializado' },
+          { id: 'inventario_global_serializado', label: 'Inventario Global Serializado' },
+          { id: 'disponibilidad_producto', label: 'Disponibilidad de Producto' },
+          { id: 'saldos_inventario_general', label: 'Saldos de Inventario - General' }
         ]
       }
     ],
@@ -79,26 +216,80 @@ export const ERP_MODULES = [
     desc: 'Gestión de proveedores y órdenes de compra.',
     submods: [
       {
-        id: 'pedidos', label: 'Pedidos', icon: '', desc: 'Gestión de pedidos',
+        id: 'pedidos',
+        label: 'Pedidos',
+        icon: '',
+        desc: 'Gestión de pedidos',
         archivos: [
           { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
         ]
       },
       {
-        id: 'compras', label: 'Compras', icon: '', desc: 'Gestión de compras',
+        id: 'pedidos_internos',
+        label: 'Pedidos Internos',
+        icon: '',
+        desc: 'Gestión de pedidos internos',
         archivos: [
-          { id: 'ver_crear_orden', label: 'Ver y Crear Orden de Compra' }
+          { id: 'pedidos_aprobar_lider_proceso', label: 'Pedidos por Aprobar Líder de Proceso' },
+          { id: 'pedidos_aprobar_lider_principal', label: 'Pedidos por Aprobar Líder Principal' },
+          { id: 'traslado_pedidos', label: 'Traslado de Pedidos' },
+          { id: 'entrega_pedidos_solicitantes', label: 'Entrega de Pedidos a Solicitantes' }
         ]
       },
       {
-        id: 'parametros', label: 'Parametros', icon: '', desc: 'Parámetros de pedidos y compras',
+        id: 'pedidos_serviexpress',
+        label: 'Pedidos Serviexpress',
+        icon: '',
+        desc: 'Gestión de pedidos serviexpress',
+        archivos: [
+          { id: 'pedidos_aprobar_lider_serviexpress', label: 'Pedidos por Aprobar Líder' },
+          { id: 'traslado_pedido_serviexpress', label: 'Traslado de Pedido' },
+          { id: 'entrega_pedidos_solicitante_serviexpress', label: 'Entrega de Pedidos a Solicitante' }
+        ]
+      },
+      {
+        id: 'compras',
+        label: 'Compras',
+        icon: '',
+        desc: 'Gestión de compras',
+        archivos: [
+          { id: 'ver_crear_orden_compra', label: 'Ver y Crear Orden de Compra' },
+          { id: 'recibir_orden_compra', label: 'Recibir Orden de Compra' },
+          { id: 'cambiar_accion_item_pedido', label: 'Cambiar Acción del Ítem Pedido' }
+        ]
+      },
+      {
+        id: 'parametros',
+        label: 'Parametros',
+        icon: '',
+        desc: 'Parámetros de pedidos y compras',
         archivos: [
           { id: 'clases_pedidos', label: 'Clases de Pedidos' },
           { id: 'conceptos_pedidos', label: 'Conceptos de Pedidos' },
-          { id: 'responsables', label: 'Responsables de Aprobación General de Pedidos' }
+          { id: 'responsables_aprobacion_general_pedidos', label: 'Responsables de Aprobación General de Pedidos' },
+          { id: 'proveedores', label: 'Proveedores' },
+          { id: 'formas_pago', label: 'Formas de Pago' }
         ]
       }
     ],
+    archivos: []
+  },
+  {
+    id: 'ventas',
+    label: 'Ventas',
+    icon: '',
+    color: '#f39c12',
+    desc: 'Gestión de ventas y facturación.',
+    submods: [],
+    archivos: []
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    icon: '',
+    color: '#16a085',
+    desc: 'Gestión de relaciones con clientes.',
+    submods: [],
     archivos: []
   },
   {
@@ -129,5 +320,14 @@ export const ERP_MODULES = [
       { id: 'grupos_usuarios', label: 'Grupos de Usuarios' },
       { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' }
     ]
+  },
+  {
+    id: 'liquidacion_comisiones',
+    label: 'Liquidación Comisiones',
+    icon: '',
+    color: '#d35400',
+    desc: 'Cálculo y gestión de comisiones.',
+    submods: [],
+    archivos: []
   }
 ];
