@@ -170,7 +170,7 @@ export default function Module() {
             )}
 
             {/* ── Tab bar ── */}
-            <div style={S.tabBar}>
+            <div className="tab-bar" style={S.tabBar}>
               {archivosDirectos.map(archivo => {
                 const activa  = archivo.id === tabActiva;
                 const hasCrud = !!resolveCrud(moduleId, archivo.id);
@@ -240,7 +240,6 @@ const S = {
     borderBottom: '2px solid var(--border)',
     flexWrap: 'nowrap',
     overflowX: 'auto',
-    scrollbarWidth: 'thin',
     paddingBottom: '2px',
   },
   tab: {

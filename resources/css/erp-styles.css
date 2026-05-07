@@ -20,19 +20,67 @@
 }
 
 /* ── PRETTY SCROLLBAR ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(26, 155, 140, 0.2) transparent;
+}
 ::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+  height: 3px;
+  width: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 10px;
+  background: rgba(26, 155, 140, 0.35);
+  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-light);
+  background: #1A9B8C;
+}
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-button:start:decrement,
+::-webkit-scrollbar-button:end:increment,
+::-webkit-scrollbar-button:start:increment,
+::-webkit-scrollbar-button:end:decrement,
+::-webkit-scrollbar-button:horizontal:start:decrement,
+::-webkit-scrollbar-button:horizontal:end:increment,
+::-webkit-scrollbar-button:vertical:start:decrement,
+::-webkit-scrollbar-button:vertical:end:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── TAB BAR SCROLLBAR ── */
+.tab-bar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(26, 155, 140, 0.25) transparent;
+}
+.tab-bar::-webkit-scrollbar {
+  height: 2px;
+}
+.tab-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tab-bar::-webkit-scrollbar-thumb {
+  background: rgba(26, 155, 140, 0.4);
+  border-radius: 99px;
+}
+.tab-bar::-webkit-scrollbar-thumb:hover {
+  background: #1A9B8C;
+}
+.tab-bar::-webkit-scrollbar-button,
+.tab-bar::-webkit-scrollbar-button:start:decrement,
+.tab-bar::-webkit-scrollbar-button:end:increment,
+.tab-bar::-webkit-scrollbar-button:horizontal:start:decrement,
+.tab-bar::-webkit-scrollbar-button:horizontal:end:increment {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
