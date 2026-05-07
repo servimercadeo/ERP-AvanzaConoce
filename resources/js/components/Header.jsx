@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, NavLink } from 'react-router-dom';
 import { ERP_MODULES } from '../data/erpModules';
 
 export default function Header() {
@@ -34,11 +34,11 @@ export default function Header() {
       <nav className={`nav ${isMenuOpen ? 'mobile-active' : ''}`}>
         {ERP_MODULES.map(mod => (
           <div key={mod.id} className="nav-item">
-            <Link className="nav-link" to={`/module/${mod.id}`}>
+            <NavLink className="nav-link" to={`/module/${mod.id}`}>
               {mod.icon && <span>{mod.icon}</span>}
               <span>{mod.label}</span>
               {(mod.submods?.length > 0 || mod.archivos?.length > 0) && <span className="arrow">▾</span>}
-            </Link>
+            </NavLink>
             {(mod.submods?.length > 0 || mod.archivos?.length > 0) && (
               <div className="dropdown">
                 {mod.submods?.length > 0 ? (

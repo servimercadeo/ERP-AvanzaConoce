@@ -19,6 +19,22 @@
   --header-h: 64px;
 }
 
+/* ── PRETTY SCROLLBAR ── */
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-light);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -66,6 +82,15 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  padding-bottom: 2px;
+}
+.nav::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for header nav but keep functionality */
 }
 
 .nav-item {
@@ -92,6 +117,12 @@ body {
 .nav-link:hover, .nav-link.active {
   background: var(--primary-light);
   color: var(--primary-dark);
+}
+
+.nav-link.active {
+  box-shadow: 0 0 15px rgba(26, 155, 140, 0.2);
+  background: var(--primary);
+  color: white;
 }
 
 .nav-link .arrow {
@@ -231,13 +262,15 @@ body {
 
 /* ── CARD GRID ── */
 .card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  overflow-x: auto;
   gap: 20px;
+  padding: 10px 4px 20px;
 }
 
 .card-grid.cols-6 {
-  grid-template-columns: repeat(6, 1fr);
+  display: flex;
+  overflow-x: auto;
 }
 
 /* ── MODULE CARD ── */
@@ -255,6 +288,8 @@ body {
   color: var(--text);
   transition: all 0.22s ease;
   box-shadow: var(--shadow);
+  min-width: 180px;
+  flex: 0 0 auto;
 }
 
 .mod-card:hover {
@@ -483,9 +518,10 @@ body {
 
 /* ── MODULE PAGE ── */
 .mod-subgrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  overflow-x: auto;
   gap: 20px;
+  padding: 10px 4px 20px;
 }
 
 .submod-card {
@@ -502,6 +538,8 @@ body {
   color: var(--text);
   transition: all 0.22s ease;
   box-shadow: var(--shadow);
+  min-width: 220px;
+  flex: 0 0 auto;
 }
 
 .submod-card:hover {

@@ -4,11 +4,41 @@ export const ERP_MODULES = [
     label: 'Sedes',
     icon: '',
     color: '#1a9b8c',
-    desc: 'Gestión de sedes.',
-    submods: [],
+    desc: 'Gestión de sedes, regionales, subagentes y control de caja.',
+    submods: [
+      {
+        id: 'subagentes',
+        label: 'Subagentes',
+        icon: '',
+        desc: 'Gestión de subagentes, facturas y clientes',
+        archivos: [
+          { id: 'subagentes_file',        label: 'Subagentes' },
+          { id: 'facturas',               label: 'Facturas' },
+          { id: 'clientes_subagentes',    label: 'Clientes Subagentes' },
+          { id: 'productos_subagentes',   label: 'Productos Subagentes' },
+          { id: 'linea_producto',         label: 'Línea de Producto' },
+        ]
+      },
+      {
+        id: 'control_caja',
+        label: 'Control de Caja',
+        icon: '',
+        desc: 'Ingresos, egresos y cuadre de caja',
+        archivos: [
+          { id: 'ingresos_caja',   label: 'Ingresos a Caja' },
+          { id: 'egresos_caja',    label: 'Egresos a Caja' },
+          { id: 'cuadre_caja',     label: 'Cuadre de Caja' },
+          { id: 'conceptos_caja',  label: 'Conceptos de Caja' },
+        ]
+      }
+    ],
     archivos: [
-      { id: 'sedes_file', label: 'Sedes' },
-      { id: 'relacion', label: 'Relación Almacenista - Secretaria Sedes' }
+      { id: 'sedes_file',                      label: 'Sedes' },
+      { id: 'relacion',                         label: 'Relación Almacenista - Secretaria Sedes' },
+      { id: 'regionales',                       label: 'Regionales' },
+      { id: 'consultar_contratos',              label: 'Consultar Contratos' },
+      { id: 'importar_numeracion',              label: 'Importar Numeración de Contratos' },
+      { id: 'admin_contratos_vendedores',       label: 'Administración Contratos de Vendedores' },
     ]
   },
   {
