@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\SsoController;
@@ -25,4 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store']);
+
+    // CRUD completo de empleados
+    Route::apiResource('empleados', EmpleadoController::class);
 });
