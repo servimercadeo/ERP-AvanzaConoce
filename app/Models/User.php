@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -38,7 +39,7 @@ class User extends Authenticatable
         'tiene_cert_alturas', 'cert_alturas_vence',
 
         // Estado
-        'estado_empleado', 'codigo_directv', 'empresa', 'comentarios',
+        'estado_empleado', 'codigo_directv', 'empresa_id', 'comentarios',
 
         // Información Adicional
         'cargo', 'tipo_funcionario', 'tipo_vinculacion',
@@ -63,6 +64,11 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
     protected function casts(): array
     {
         return [

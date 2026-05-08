@@ -5,11 +5,15 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Models\Empresa;
 
 class EmpleadosSeeder extends Seeder
 {
     public function run(): void
     {
+        $empServMercadeo = Empresa::where('nombre', 'Servicios y Mercadeo COL')->value('id');
+        $empServimercadeo = Empresa::where('nombre', 'Servimercadeo COL')->value('id');
+
         $empleados = [
             [
                 // Acceso al sistema
@@ -57,7 +61,7 @@ class EmpleadosSeeder extends Seeder
                 // Estado
                 'estado_empleado' => 'Activo',
                 'codigo_directv'  => 'DTV-001',
-                'empresa'         => 'Servicios y Mercadeo S.A.S',
+                'empresa_id'      => $empServMercadeo,
                 'comentarios'     => 'Empleado con buen desempeño.',
 
                 // Información Adicional
@@ -114,7 +118,7 @@ class EmpleadosSeeder extends Seeder
 
                 'estado_empleado' => 'Activo',
                 'codigo_directv'  => 'DTV-002',
-                'empresa'         => 'Servicios y Mercadeo S.A.S',
+                'empresa_id'      => $empServMercadeo,
                 'comentarios'     => 'Coordinadora de área administrativa.',
 
                 'cargo'            => 'Coordinadora Administrativa',
@@ -169,7 +173,7 @@ class EmpleadosSeeder extends Seeder
 
                 'estado_empleado' => 'Activo',
                 'codigo_directv'  => 'DTV-003',
-                'empresa'         => 'Servicios y Mercadeo S.A.S',
+                'empresa_id'      => $empServimercadeo,
                 'comentarios'     => 'Operario de campo con experiencia en altura.',
 
                 'cargo'            => 'Técnico Electricista',
@@ -224,7 +228,7 @@ class EmpleadosSeeder extends Seeder
 
                 'estado_empleado' => 'Activo',
                 'codigo_directv'  => null,
-                'empresa'         => 'Servicios y Mercadeo S.A.S',
+                'empresa_id'      => $empServMercadeo,
                 'comentarios'     => 'Gestora de Recursos Humanos.',
 
                 'cargo'            => 'Jefa de Recursos Humanos',
@@ -279,7 +283,7 @@ class EmpleadosSeeder extends Seeder
 
                 'estado_empleado' => 'Activo',
                 'codigo_directv'  => 'DTV-005',
-                'empresa'         => 'Servicios y Mercadeo S.A.S',
+                'empresa_id'      => $empServimercadeo,
                 'comentarios'     => 'Gerente Regional con 10 años de experiencia.',
 
                 'cargo'            => 'Gerente Regional',

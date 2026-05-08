@@ -1,121 +1,259 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
-/* ─── Datos semilla ─────────────────────────────────────────────────── */
+/* ─── Catálogos ──────────────────────────────────────────────────────── */
+const SEDES        = ['Bogotá', 'Medellín', 'Cali', 'Bucaramanga', 'Barranquilla', 'Pereira', 'Manizales', 'Otra'];
+const GENEROS      = ['Masculino', 'Femenino', 'No binario', 'Prefiero no decir'];
+const EST_CIVIL    = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', 'Viudo/a', 'Por definir'];
+const ESCOLARIDAD  = ['Sin estudios', 'Primaria', 'Bachillerato', 'Técnico', 'Tecnólogo', 'Universitario', 'Especialización', 'Maestría', 'Doctorado'];
+const ESTRATOS     = ['PD', '1', '2', '3', '4', '5', '6'];
+const RH_LIST      = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+const EPS_LIST     = ['Sánitas', 'Compensar', 'Famisanar', 'Nueva EPS', 'Salud Total', 'Coomeva', 'Medimás', 'Coosalud', 'Asmet Salud', 'Otra'];
+const ARL_LIST     = ['Sura', 'Colmena', 'Positiva', 'Bolívar', 'Liberty', 'Equidad', 'Axa Colpatria', 'Otra'];
+const PENSIONES    = ['Porvenir', 'Protección', 'Colfondos', 'Old Mutual', 'Colpensiones', 'Otro'];
+const CAJAS        = ['Compensar', 'Colsubsidio', 'Cafam', 'Comfenalco', 'Comfamiliar', 'Otra'];
+const ESTADOS_EMP  = ['Activo', 'Inactivo', 'Retirado', 'Vacaciones', 'Incapacitado', 'Suspendido'];
+const CARGOS       = ['Coordinador/a Administrativo/a', 'Auxiliar de Almacén', 'Contador/a', 'Conductor/a', 'Asistente RRHH', 'Técnico de Mantenimiento', 'Gerente', 'Secretario/a', 'Asesor Comercial', 'Vendedor/a', 'Supervisor/a', 'Otro'];
+const TIPOS_FUNC   = ['Administrativo', 'Técnico', 'Vendedor', 'Supervisor', 'Gerente', 'Aprendiz', 'Otro'];
+const TIPOS_VINC   = ['Empleado directo', 'Contratista', 'Aprendiz SENA', 'Prestación de servicios', 'Temporal', 'Otro'];
+const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
+const BANCOS       = ['Bancolombia', 'Davivienda', 'BBVA', 'Banco de Bogotá', 'Banco Popular', 'Banco de Occidente', 'Banco Agrario', 'Citibank', 'Banco Caja Social', 'Finandina', 'Bancamía', 'Nequi', 'Daviplata', 'Otro'];
+
+/* ─── Datos semilla ──────────────────────────────────────────────────── */
 const INIT_EMPLEADOS = [
-  { id: 1, nombre: 'Ana María Torres', cedula: '1010234567', cargo: 'Coordinadora Administrativa', sede: 'Bogotá', contrato: 'Indefinido', estado: 'Activo', salario: 3800000, ingreso: '2021-03-15' },
-  { id: 2, nombre: 'Carlos Rueda', cedula: '1020345678', cargo: 'Auxiliar de Almacén', sede: 'Medellín', contrato: 'Fijo', estado: 'Activo', salario: 1800000, ingreso: '2022-07-01' },
-  { id: 3, nombre: 'Laura Sánchez', cedula: '1030456789', cargo: 'Contadora', sede: 'Cali', contrato: 'Indefinido', estado: 'Activo', salario: 4200000, ingreso: '2020-01-10' },
-  { id: 4, nombre: 'Miguel Ángel Pérez', cedula: '1040567890', cargo: 'Conductor', sede: 'Bucaramanga', contrato: 'Prestación', estado: 'Inactivo', salario: 1600000, ingreso: '2019-09-20' },
-  { id: 5, nombre: 'Sofía Martínez', cedula: '1050678901', cargo: 'Asistente RRHH', sede: 'Bogotá', contrato: 'Fijo', estado: 'Activo', salario: 2100000, ingreso: '2023-02-14' },
-  { id: 6, nombre: 'Diego Hernández', cedula: '1060789012', cargo: 'Técnico de Mantenimiento', sede: 'Medellín', contrato: 'Prestación', estado: 'Activo', salario: 2400000, ingreso: '2022-11-03' },
+  { id: 1, cedula: '1010234567', apellidos: 'Torres', nombres: 'Ana María', cargo: 'Coordinador/a Administrativo/a', sede: 'Bogotá', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'O+', eps: 'Sánitas', arl: 'Sura', fondo_pensiones: 'Porvenir', movil: '3001234567', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
+  { id: 2, cedula: '1020345678', apellidos: 'Rueda', nombres: 'Carlos Alberto', cargo: 'Auxiliar de Almacén', sede: 'Medellín', empresa_id: 1, estado_empleado: 'Activo', genero: 'Masculino', rh: 'A+', eps: 'Compensar', arl: 'Positiva', fondo_pensiones: 'Protección', movil: '3109876543', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Técnico' },
+  { id: 3, cedula: '1030456789', apellidos: 'Sánchez', nombres: 'Laura Sofía', cargo: 'Contador/a', sede: 'Cali', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'B+', eps: 'Famisanar', arl: 'Colmena', fondo_pensiones: 'Colfondos', movil: '3205678912', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
+  { id: 4, cedula: '1040567890', apellidos: 'Pérez', nombres: 'Miguel Ángel', cargo: 'Conductor/a', sede: 'Bucaramanga', empresa_id: 2, estado_empleado: 'Inactivo', genero: 'Masculino', rh: 'O-', eps: 'Nueva EPS', arl: 'Sura', fondo_pensiones: 'Porvenir', movil: '3154321098', tipo_vinculacion: 'Prestación de servicios', tipo_funcionario: 'Técnico' },
+  { id: 5, cedula: '1050678901', apellidos: 'Martínez', nombres: 'Sofía Isabel', cargo: 'Asistente RRHH', sede: 'Bogotá', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'AB+', eps: 'Sánitas', arl: 'Positiva', fondo_pensiones: 'Colpensiones', movil: '3012345678', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
+  { id: 6, cedula: '1060789012', apellidos: 'Hernández', nombres: 'Diego Felipe', cargo: 'Técnico de Mantenimiento', sede: 'Medellín', empresa_id: 2, estado_empleado: 'Activo', genero: 'Masculino', rh: 'A-', eps: 'Medimás', arl: 'Liberty', fondo_pensiones: 'Protección', movil: '3187654321', tipo_vinculacion: 'Contratista', tipo_funcionario: 'Técnico' },
 ];
 
-const CARGOS = ['Coordinadora Administrativa', 'Auxiliar de Almacén', 'Contadora', 'Conductor', 'Asistente RRHH', 'Técnico de Mantenimiento', 'Gerente', 'Secretaria', 'Asesor Comercial', 'Otro'];
-const SEDES = ['Bogotá', 'Medellín', 'Cali', 'Bucaramanga', 'Barranquilla', 'Otra'];
-const CONTRATOS = ['Indefinido', 'Fijo', 'Prestación', 'Aprendizaje'];
-const ESTADOS = ['Activo', 'Inactivo'];
+const EMPTY_FORM = {
+  cedula: '', apellidos: '', nombres: '', fotografia: '',
+  sede: '', fecha_nacimiento: '', lugar_nacimiento: '', raza: '',
+  genero: '', estado_civil: '', nivel_escolaridad: '', email: '', direccion_residencia: '',
+  movil: '', estrato: 'PD', barrio: '', numero_hijos: '', ingresos: '',
+  observaciones_medicas: '', alergias: '',
+  rh: '', eps: '', arl: '', fondo_pensiones: '',
+  caja_compensacion: '', licencia_carro: '', licencia_carro_vence: '',
+  licencia_moto: '', licencia_moto_vence: '',
+  tiene_cert_alturas: 'No', cert_alturas_vence: '',
+  estado_empleado: 'Activo', codigo_directv: '', empresa_id: '', comentarios: '',
+  contacto_emergencia_nombre: '', contacto_emergencia_telefono: '', contacto_emergencia_parentesco: '',
+  cargo: '', tipo_funcionario: '', tipo_vinculacion: '',
+  cuenta_bancaria: '', tipo_cuenta: '', banco: '',
+};
 
-const EMPTY_FORM = { nombre: '', cedula: '', cargo: '', sede: '', contrato: 'Indefinido', estado: 'Activo', salario: '', ingreso: '' };
+/* ─── Campo reutilizable dentro del modal ────────────────────────────── */
+function Field({ label, k, type = 'text', opts, req, span, form, errors, onChange }) {
+  const style = { ...S.formGroup, ...(span ? { gridColumn: `span ${span}` } : {}) };
+  const isObjOpts = opts && opts.length > 0 && typeof opts[0] === 'object';
+  return (
+    <div style={style}>
+      <label style={S.label}>{label}{req ? ' *' : ''}</label>
+      {opts ? (
+        <select style={{ ...S.input, ...(errors[k] ? S.inputErr : {}) }} value={form[k] ?? ''} onChange={onChange(k)}>
+          <option value="">Elige</option>
+          {isObjOpts
+            ? opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
+            : opts.map(o => <option key={o} value={o}>{o}</option>)
+          }
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea style={{ ...S.input, minHeight: 68, resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} />
+      ) : (
+        <input style={{ ...S.input, ...(errors[k] ? S.inputErr : {}) }} type={type} value={form[k] ?? ''} onChange={onChange(k)} />
+      )}
+      {errors[k] && <span style={S.err}>{errors[k]}</span>}
+    </div>
+  );
+}
 
-function fmt(num) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(num); }
+/* ─── Modal ──────────────────────────────────────────────────────────── */
+function Modal({ open, onClose, onSave, initial, title, empresas }) {
+  const [form, setForm]       = useState(initial);
+  const [errors, setErrors]   = useState({});
+  const [activeTab, setActive] = useState('general');
 
-/* ─── Modal ─────────────────────────────────────────────────────────── */
-function Modal({ open, onClose, onSave, initial, title }) {
-  const [form, setForm] = useState(initial);
-  const [errors, setErrors] = useState({});
+  React.useEffect(() => { setForm(initial); setErrors({}); setActive('general'); }, [initial, open]);
 
-  React.useEffect(() => { setForm(initial); setErrors({}); }, [initial, open]);
-
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const onChange = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const validate = () => {
     const e = {};
-    if (!form.nombre.trim()) e.nombre = 'Requerido';
-    if (!form.cedula.trim()) e.cedula = 'Requerido';
-    if (!form.cargo.trim()) e.cargo = 'Requerido';
-    if (!form.sede.trim()) e.sede = 'Requerido';
-    if (!form.salario || isNaN(form.salario)) e.salario = 'Salario inválido';
-    if (!form.ingreso) e.ingreso = 'Requerido';
+    if (!form.cedula?.trim())          e.cedula          = 'Requerido';
+    if (!form.apellidos?.trim())       e.apellidos       = 'Requerido';
+    if (!form.nombres?.trim())         e.nombres         = 'Requerido';
+    if (!form.sede?.trim())            e.sede            = 'Requerido';
+    if (!form.genero?.trim())          e.genero          = 'Requerido';
+    if (!form.movil?.trim())           e.movil           = 'Requerido';
+    if (!form.eps?.trim())             e.eps             = 'Requerido';
+    if (!form.arl?.trim())             e.arl             = 'Requerido';
+    if (!form.fondo_pensiones?.trim()) e.fondo_pensiones = 'Requerido';
+    if (!form.estado_empleado?.trim()) e.estado_empleado = 'Requerido';
+    if (!form.cargo?.trim())           e.cargo           = 'Requerido';
+    if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = 'Requerido';
+    if (!form.tipo_vinculacion?.trim()) e.tipo_vinculacion = 'Requerido';
     return e;
   };
 
   const handleSave = () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
+    if (Object.keys(e).length) {
+      setErrors(e);
+      const enAdicional = ['cargo', 'tipo_funcionario', 'tipo_vinculacion'];
+      const soloAdicional = Object.keys(e).every(k => enAdicional.includes(k));
+      if (soloAdicional) setActive('adicional');
+      return;
+    }
     onSave(form);
   };
 
   if (!open) return null;
 
+  const fp = { form, errors, onChange };
+
   return (
     <div style={S.overlay} onClick={onClose}>
-      <div style={S.modal} onClick={e => e.stopPropagation()}>
+      <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
+
+        {/* Cabecera */}
         <div style={S.modalHeader}>
           <span style={S.modalTitle}>{title}</span>
           <button style={S.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        <div style={S.modalBody}>
-          <div style={S.formGrid}>
-            {/* Nombre */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Nombre completo *</label>
-              <input style={{ ...S.input, ...(errors.nombre ? S.inputErr : {}) }} value={form.nombre} onChange={set('nombre')} placeholder="Ej. Ana Torres" />
-              {errors.nombre && <span style={S.err}>{errors.nombre}</span>}
-            </div>
-            {/* Cédula */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Cédula *</label>
-              <input style={{ ...S.input, ...(errors.cedula ? S.inputErr : {}) }} value={form.cedula} onChange={set('cedula')} placeholder="Ej. 1012345678" />
-              {errors.cedula && <span style={S.err}>{errors.cedula}</span>}
-            </div>
-            {/* Cargo */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Cargo *</label>
-              <select style={{ ...S.input, ...(errors.cargo ? S.inputErr : {}) }} value={form.cargo} onChange={set('cargo')}>
-                <option value="">— Seleccionar —</option>
-                {CARGOS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              {errors.cargo && <span style={S.err}>{errors.cargo}</span>}
-            </div>
-            {/* Sede */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Sede *</label>
-              <select style={{ ...S.input, ...(errors.sede ? S.inputErr : {}) }} value={form.sede} onChange={set('sede')}>
-                <option value="">— Seleccionar —</option>
-                {SEDES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              {errors.sede && <span style={S.err}>{errors.sede}</span>}
-            </div>
-            {/* Tipo contrato */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Tipo de contrato</label>
-              <select style={S.input} value={form.contrato} onChange={set('contrato')}>
-                {CONTRATOS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            {/* Estado */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Estado</label>
-              <select style={S.input} value={form.estado} onChange={set('estado')}>
-                {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            {/* Salario */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Salario (COP) *</label>
-              <input style={{ ...S.input, ...(errors.salario ? S.inputErr : {}) }} type="number" value={form.salario} onChange={set('salario')} placeholder="Ej. 2500000" />
-              {errors.salario && <span style={S.err}>{errors.salario}</span>}
-            </div>
-            {/* Fecha ingreso */}
-            <div style={S.formGroup}>
-              <label style={S.label}>Fecha de ingreso *</label>
-              <input style={{ ...S.input, ...(errors.ingreso ? S.inputErr : {}) }} type="date" value={form.ingreso} onChange={set('ingreso')} />
-              {errors.ingreso && <span style={S.err}>{errors.ingreso}</span>}
-            </div>
-          </div>
+        {/* Pestañas */}
+        <div className="tab-bar" style={S.tabBar}>
+          {[['general', 'Información General'], ['adicional', 'Información Adicional']].map(([key, lbl]) => (
+            <button key={key} style={activeTab === key ? S.tabActive : S.tab} onClick={() => setActive(key)}>
+              {lbl}
+            </button>
+          ))}
         </div>
 
+        {/* Cuerpo con scroll */}
+        <div style={S.modalBody}>
+
+          {/* ══ PESTAÑA: INFORMACIÓN GENERAL ══ */}
+          {activeTab === 'general' && (
+            <>
+              {/* Fila 1 – Identificación */}
+              <div style={S.grid4}>
+                <Field label="Cédula"     k="cedula"    req {...fp} />
+                <Field label="Apellidos"  k="apellidos" req {...fp} />
+                <Field label="Nombres"    k="nombres"   req {...fp} />
+                <div style={S.formGroup}>
+                  <label style={S.label}>Fotografía Empleado</label>
+                  <input
+                    type="file" accept="image/*"
+                    style={{ ...S.input, padding: '6px 10px', cursor: 'pointer' }}
+                    onChange={e => setForm(f => ({ ...f, fotografia: e.target.files[0]?.name ?? '' }))}
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2 – Lugar */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Sede a la que pertenece" k="sede"            opts={SEDES} req {...fp} />
+                <Field label="Fecha Nacimiento"        k="fecha_nacimiento" type="date"      {...fp} />
+                <Field label="Lugar Nacimiento"        k="lugar_nacimiento"                  {...fp} />
+                <Field label="Raza"                    k="raza"                              {...fp} />
+              </div>
+
+              {/* Fila 3 – Datos personales */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Género"           k="genero"          opts={GENEROS}     req {...fp} />
+                <Field label="Estado Civil"     k="estado_civil"    opts={EST_CIVIL}       {...fp} />
+                <Field label="Nivel Escolaridad" k="nivel_escolaridad" opts={ESCOLARIDAD}   {...fp} />
+                <Field label="Email"            k="email"           type="email"           {...fp} />
+              </div>
+
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Dirección Residencia" k="direccion_residencia" span={4} {...fp} />
+              </div>
+
+              {/* Fila 4 – Contacto */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Móvil"           k="movil"        req {...fp} />
+                <Field label="Estrato"         k="estrato"      opts={ESTRATOS} {...fp} />
+                <Field label="Barrio"          k="barrio"            {...fp} />
+                <Field label="Número de Hijos" k="numero_hijos" type="number" {...fp} />
+              </div>
+
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Ingresos $" k="ingresos" type="number" span={2} {...fp} />
+              </div>
+
+              {/* Fila 5 – Observaciones */}
+              <div style={{ ...S.grid2, marginTop: 16 }}>
+                <Field label="Observaciones Médicas" k="observaciones_medicas" type="textarea" {...fp} />
+                <Field label="Alergias"              k="alergias"             type="textarea" {...fp} />
+              </div>
+
+              {/* Fila 6 – Seguridad Social */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="RH"               k="rh"            opts={RH_LIST}  {...fp} />
+                <Field label="LPS Afiliado"     k="eps"           opts={EPS_LIST} req {...fp} />
+                <Field label="ARL"              k="arl"           opts={ARL_LIST} req {...fp} />
+                <Field label="Fondo de Pensiones" k="fondo_pensiones" opts={PENSIONES} req {...fp} />
+              </div>
+
+              {/* Fila 7 – Licencias */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Caja Compensación"  k="caja_compensacion"  opts={CAJAS} {...fp} />
+                <Field label="No. Licencia Carro" k="licencia_carro"          {...fp} />
+                <Field label="Vence"              k="licencia_carro_vence" type="date" {...fp} />
+                <div /> {/* espaciador */}
+                <Field label="No. Licencia Moto"  k="licencia_moto"           {...fp} />
+                <Field label="Vence"              k="licencia_moto_vence"  type="date" {...fp} />
+                <Field label="Tiene Cert. Alturas?" k="tiene_cert_alturas" opts={['Sí', 'No']} {...fp} />
+                <Field label="Vence"              k="cert_alturas_vence"   type="date" {...fp} />
+              </div>
+
+              {/* Fila 8 – Estado laboral */}
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Estado Empleado"  k="estado_empleado" opts={ESTADOS_EMP} req {...fp} />
+                <Field label="Código Directv"   k="codigo_directv"                         {...fp} />
+                <div /> {/* espaciador */}
+                <Field label="Empresa"          k="empresa_id"      opts={empresas.map(e => ({ value: e.id, label: e.nombre }))} {...fp} />
+              </div>
+
+              <div style={{ ...S.grid4, marginTop: 16 }}>
+                <Field label="Comentarios" k="comentarios" type="textarea" span={4} {...fp} />
+              </div>
+
+              {/* Contacto de emergencia */}
+              <div style={S.sectionHeader}>CONTACTO EN CASO DE EMERGENCIA</div>
+              <div style={{ ...S.grid4, marginTop: 12 }}>
+                <Field label="Nombre"            k="contacto_emergencia_nombre"      {...fp} />
+                <Field label="Teléfono contacto" k="contacto_emergencia_telefono"    {...fp} />
+                <Field label="Parentesco"        k="contacto_emergencia_parentesco"  {...fp} />
+                <div />
+              </div>
+            </>
+          )}
+
+          {/* ══ PESTAÑA: INFORMACIÓN ADICIONAL ══ */}
+          {activeTab === 'adicional' && (
+            <>
+              <div style={S.grid3}>
+                <Field label="Cargo"            k="cargo"            opts={CARGOS}       req {...fp} />
+                <Field label="Tipo Funcionario" k="tipo_funcionario" opts={TIPOS_FUNC}   req {...fp} />
+                <Field label="Tipo Vinculación" k="tipo_vinculacion" opts={TIPOS_VINC}   req {...fp} />
+              </div>
+
+              <div style={{ ...S.grid3, marginTop: 16 }}>
+                <Field label="No. de Cuenta Bancaria" k="cuenta_bancaria"                          {...fp} />
+                <Field label="Tipo de Cuenta"         k="tipo_cuenta"    opts={TIPOS_CUENTA}       {...fp} />
+                <Field label="Banco de la cuenta"     k="banco"          opts={BANCOS}             {...fp} />
+              </div>
+            </>
+          )}
+
+        </div>
+
+        {/* Pie */}
         <div style={S.modalFooter}>
           <button style={S.btnSecondary} onClick={onClose}>Cancelar</button>
           <button style={S.btnPrimary} onClick={handleSave}>Guardar</button>
@@ -152,65 +290,68 @@ function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
 
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
-  const [empleados, setEmpleados] = useState(INIT_EMPLEADOS);
-  const [search, setSearch] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('Todos');
-  const [filtroSede, setFiltroSede] = useState('Todas');
-  const [filtroCargo, setFiltroCargo] = useState('Todos');
-  const [filtroContrato, setFiltroContrato] = useState('Todos');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [empleados, setEmpleados]         = useState(INIT_EMPLEADOS);
+  const [search, setSearch]               = useState('');
+  const [filtroEstado, setFiltroEstado]   = useState('Todos');
+  const [filtroSede, setFiltroSede]       = useState('Todas');
+  const [filtroCargo, setFiltroCargo]     = useState('Todos');
+  const [filtroVinc, setFiltroVinc]       = useState('Todos');
+  const [filtroEmpresa, setFiltroEmpresa] = useState('Todas');
+  const [empresas, setEmpresas]           = useState([]);
+  const [modalOpen, setModalOpen]         = useState(false);
+  const [editTarget, setEditTarget]       = useState(null);
+  const [deleteTarget, setDeleteTarget]   = useState(null);
+  const [toast, setToast]                 = useState(null);
+  const [filterOpen, setFilterOpen]       = useState(false);
+
+  useEffect(() => {
+    fetch('/api/empresas')
+      .then(r => r.ok ? r.json() : [])
+      .then(setEmpresas)
+      .catch(() => {});
+  }, []);
 
   React.useEffect(() => {
-    if (modalOpen || isFilterMenuOpen || deleteTarget) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = (modalOpen || filterOpen || deleteTarget) ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
-  }, [modalOpen, isFilterMenuOpen, deleteTarget]);
+  }, [modalOpen, filterOpen, deleteTarget]);
 
   /* Filtrado */
   const filtered = useMemo(() => empleados.filter(e => {
-    const q = search.toLowerCase();
-    const matchQ = e.nombre.toLowerCase().includes(q) || e.cedula.includes(q) || e.cargo.toLowerCase().includes(q);
-    const matchE = filtroEstado === 'Todos' || e.estado === filtroEstado;
-    const matchS = filtroSede === 'Todas' || e.sede === filtroSede;
-    const matchC = filtroCargo === 'Todos' || e.cargo === filtroCargo;
-    const matchV = filtroContrato === 'Todos' || e.contrato === filtroContrato;
-    return matchQ && matchE && matchS && matchC && matchV;
-  }), [empleados, search, filtroEstado, filtroSede, filtroCargo, filtroContrato]);
+    const q     = search.toLowerCase();
+    const nombre = `${e.apellidos ?? ''} ${e.nombres ?? ''}`.toLowerCase();
+    const matchQ  = nombre.includes(q) || (e.cedula ?? '').includes(q) || (e.cargo ?? '').toLowerCase().includes(q);
+    const matchE  = filtroEstado  === 'Todos' || e.estado_empleado  === filtroEstado;
+    const matchS  = filtroSede    === 'Todas' || e.sede             === filtroSede;
+    const matchC  = filtroCargo   === 'Todos' || e.cargo            === filtroCargo;
+    const matchV  = filtroVinc    === 'Todos' || e.tipo_vinculacion  === filtroVinc;
+    const matchEm = filtroEmpresa === 'Todas' || String(e.empresa_id) === String(filtroEmpresa);
+    return matchQ && matchE && matchS && matchC && matchV && matchEm;
+  }), [empleados, search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa]);
 
   /* Stats */
-  const total = empleados.length;
-  const activos = empleados.filter(e => e.estado === 'Activo').length;
-  const masaSalarial = empleados.reduce((a, e) => a + Number(e.salario), 0);
-  const sedes = [...new Set(empleados.map(e => e.sede))].length;
+  const total    = empleados.length;
+  const activos  = empleados.filter(e => e.estado_empleado === 'Activo').length;
+  const numSedes = [...new Set(empleados.map(e => e.sede).filter(Boolean))].length;
+  const numEmp   = [...new Set(empleados.map(e => e.empresa_id).filter(Boolean))].length;
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const clearFilters = () => {
-    setSearch('');
-    setFiltroEstado('Todos');
-    setFiltroSede('Todas');
-    setFiltroCargo('Todos');
-    setFiltroContrato('Todos');
+    setSearch(''); setFiltroEstado('Todos'); setFiltroSede('Todas');
+    setFiltroCargo('Todos'); setFiltroVinc('Todos'); setFiltroEmpresa('Todas');
   };
 
-  /* CRUD handlers */
+  /* CRUD */
   const openCreate = () => { setEditTarget(null); setModalOpen(true); };
-  const openEdit = emp => { setEditTarget(emp); setModalOpen(true); };
+  const openEdit   = emp  => { setEditTarget(emp); setModalOpen(true); };
 
   const handleSave = form => {
     if (editTarget) {
-      setEmpleados(prev => prev.map(e => e.id === editTarget.id ? { ...form, id: editTarget.id, salario: Number(form.salario) } : e));
+      setEmpleados(prev => prev.map(e => e.id === editTarget.id ? { ...editTarget, ...form } : e));
       showToast('Empleado actualizado correctamente.');
     } else {
-      const newEmp = { ...form, id: Date.now(), salario: Number(form.salario) };
-      setEmpleados(prev => [...prev, newEmp]);
+      setEmpleados(prev => [...prev, { ...form, id: Date.now() }]);
       showToast('Empleado registrado correctamente.');
     }
     setModalOpen(false);
@@ -218,19 +359,16 @@ export default function EmpleadosCrud() {
 
   const handleDelete = () => {
     setEmpleados(prev => prev.filter(e => e.id !== deleteTarget.id));
-    showToast(`${deleteTarget.nombre} eliminado.`);
+    showToast(`${deleteTarget.apellidos} ${deleteTarget.nombres} eliminado.`);
     setDeleteTarget(null);
   };
 
   return (
     <div style={{ width: '100%' }}>
 
-      {/* ── Toast ── */}
-      {toast && (
-        <div style={S.toast}>{toast}</div>
-      )}
+      {toast && <div style={S.toast}>{toast}</div>}
 
-      {/* ── Stats ── */}
+      {/* Stats */}
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-num">{total}</div>
@@ -241,16 +379,16 @@ export default function EmpleadosCrud() {
           <div className="stat-label">Activos</div>
         </div>
         <div className="stat-card">
-          <div className="stat-num" style={{ color: 'var(--accent)' }}>{sedes}</div>
+          <div className="stat-num" style={{ color: 'var(--accent)' }}>{numSedes}</div>
           <div className="stat-label">Sedes con personal</div>
         </div>
         <div className="stat-card">
-          <div className="stat-num" style={{ fontSize: '1.15rem' }}>{fmt(masaSalarial)}</div>
-          <div className="stat-label">Masa salarial</div>
+          <div className="stat-num" style={{ color: 'var(--primary)' }}>{numEmp}</div>
+          <div className="stat-label">Empresas vinculadas</div>
         </div>
       </div>
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div style={S.toolbar}>
         <div style={S.filters}>
           <div style={S.searchWrap}>
@@ -262,25 +400,17 @@ export default function EmpleadosCrud() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-
-          {/* Botón de Filtros */}
-          <button
-            style={S.filterBtn}
-            onClick={() => setIsFilterMenuOpen(true)}
-          >
+          <button style={S.filterBtn} onClick={() => setFilterOpen(true)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
             Filtros
           </button>
         </div>
-
-        <button className="btn-primary" onClick={openCreate}>
-          + Nuevo empleado
-        </button>
+        <button className="btn-primary" onClick={openCreate}>+ Nuevo empleado</button>
       </div>
 
-      {/* ── Tabla ── */}
+      {/* Tabla */}
       <div style={S.tableWrap}>
         {filtered.length === 0 ? (
           <div style={S.empty}>
@@ -295,9 +425,8 @@ export default function EmpleadosCrud() {
                 <th>Cédula</th>
                 <th>Cargo</th>
                 <th>Sede</th>
-                <th>Contrato</th>
-                <th>Salario</th>
-                <th>Ingreso</th>
+                <th>Empresa</th>
+                <th>Vinculación</th>
                 <th>Estado</th>
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
@@ -307,36 +436,33 @@ export default function EmpleadosCrud() {
                 <tr key={emp.id}>
                   <td>
                     <div style={S.avatarCell}>
-                      <div style={S.avatar}>{emp.nombre.charAt(0)}</div>
-                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>{emp.nombre}</span>
+                      <div style={S.avatar}>{(emp.apellidos ?? '?').charAt(0).toUpperCase()}</div>
+                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+                        {emp.apellidos} {emp.nombres}
+                      </span>
                     </div>
                   </td>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{emp.cedula}</td>
                   <td>{emp.cargo}</td>
+                  <td><span style={S.badge('#e8f8f5', 'var(--primary-dark)')}>{emp.sede}</span></td>
+                  <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{empresas.find(e => e.id == emp.empresa_id)?.nombre ?? '—'}</td>
                   <td>
-                    <span style={S.badge('#e8f8f5', 'var(--primary-dark)')}>{emp.sede}</span>
+                    <span style={S.badge('#fff7e0', '#b7780c')}>{emp.tipo_vinculacion}</span>
                   </td>
-                  <td>
-                    <span style={S.badge(
-                      emp.contrato === 'Indefinido' ? '#e8f8f5' : emp.contrato === 'Fijo' ? '#fff7e0' : '#fef2f2',
-                      emp.contrato === 'Indefinido' ? 'var(--primary-dark)' : emp.contrato === 'Fijo' ? '#b7780c' : '#a33'
-                    )}>{emp.contrato}</span>
-                  </td>
-                  <td style={{ fontWeight: 700 }}>{fmt(emp.salario)}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{emp.ingreso}</td>
                   <td>
                     <span style={{
-                      ...S.badge(emp.estado === 'Activo' ? '#e0f7f4' : '#fce8e8', emp.estado === 'Activo' ? '#0d6e5a' : '#a33'),
-                      display: 'inline-flex', alignItems: 'center', gap: 5
+                      ...S.badge(emp.estado_empleado === 'Activo' ? '#e0f7f4' : '#fce8e8',
+                                 emp.estado_empleado === 'Activo' ? '#0d6e5a' : '#a33'),
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
                     }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: emp.estado === 'Activo' ? '#27ae60' : '#e74c3c', display: 'inline-block' }} />
-                      {emp.estado}
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: emp.estado_empleado === 'Activo' ? '#27ae60' : '#e74c3c', display: 'inline-block' }} />
+                      {emp.estado_empleado}
                     </span>
                   </td>
                   <td>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => openEdit(emp)}>✏️</button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => setDeleteTarget(emp)}>🗑️</button>
+                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar"    onClick={() => openEdit(emp)}>✏️</button>
+                      <button style={S.actionBtn('#fce8e8', '#a33')}                title="Eliminar"  onClick={() => setDeleteTarget(emp)}>🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -346,7 +472,6 @@ export default function EmpleadosCrud() {
         )}
       </div>
 
-      {/* Conteo */}
       <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 12, textAlign: 'right' }}>
         Mostrando {filtered.length} de {total} empleados
       </p>
@@ -356,32 +481,28 @@ export default function EmpleadosCrud() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
-        initial={editTarget ? { ...editTarget, salario: String(editTarget.salario) } : EMPTY_FORM}
+        initial={editTarget ? { ...EMPTY_FORM, ...editTarget } : EMPTY_FORM}
         title={editTarget ? 'Editar empleado' : 'Registrar nuevo empleado'}
+        empresas={empresas}
       />
+
       <ConfirmDialog
         open={!!deleteTarget}
-        nombre={deleteTarget?.nombre}
+        nombre={deleteTarget ? `${deleteTarget.apellidos} ${deleteTarget.nombres}` : ''}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {/* ── Modal de Filtros ── */}
-      {isFilterMenuOpen && (
-        <div style={S.overlay} onClick={() => setIsFilterMenuOpen(false)}>
+      {/* Modal de filtros */}
+      {filterOpen && (
+        <div style={S.overlay} onClick={() => setFilterOpen(false)}>
           <div style={{ ...S.modal, maxWidth: 900 }} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeaderGreen}>
               <span style={S.modalTitleWhite}>Filtros de Búsqueda</span>
-              <button style={S.closeBtnWhite} onClick={() => setIsFilterMenuOpen(false)}>✕</button>
+              <button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>✕</button>
             </div>
-            
             <div style={S.modalBody}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 24px' }}>
-                {/* Row 1 */}
-                <div style={S.formGroup}>
-                  <label style={S.label}>Filtrar por Nombre</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Sede</label>
                   <select style={S.input} value={filtroSede} onChange={e => setFiltroSede(e.target.value)}>
@@ -391,75 +512,24 @@ export default function EmpleadosCrud() {
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Empresa</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroEmpresa} onChange={e => setFiltroEmpresa(e.target.value)}>
+                    <option value="Todas">Elige</option>
+                    {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                  </select>
                 </div>
-
-                {/* Row 2 */}
                 <div style={S.formGroup}>
                   <label style={S.label}>Cédula</label>
                   <input style={S.input} type="text" disabled placeholder="Cédula" />
                 </div>
                 <div style={S.formGroup}>
-                  <label style={S.label}>Tipo</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>Tipo Vendedor</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-
-                {/* Row 3 */}
-                <div style={S.formGroup}>
-                  <label style={S.label}>Tipo Técnico</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>Supervisor</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>Subagente</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-
-                {/* Row 4 */}
-                <div style={S.formGroup}>
                   <label style={S.label}>Tipo Vinculación</label>
-                  <select style={S.input} value={filtroContrato} onChange={e => setFiltroContrato(e.target.value)}>
+                  <select style={S.input} value={filtroVinc} onChange={e => setFiltroVinc(e.target.value)}>
                     <option value="Todos">Elige</option>
-                    {CONTRATOS.map(c => <option key={c} value={c}>{c}</option>)}
+                    {TIPOS_VINC.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div style={S.formGroup}>
-                  <label style={S.label}>Fecha Ingreso ini</label>
-                  <input style={S.input} type="date" disabled />
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>Fecha ingreso fin</label>
-                  <input style={S.input} type="date" disabled />
-                </div>
-
-                {/* Row 5 */}
-                <div style={S.formGroup}>
-                  <label style={S.label}>RH</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>EPS Afiliado</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>ARL</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-
-                {/* Row 6 */}
-                <div style={S.formGroup}>
-                  <label style={S.label}>Fondo de Pensiones</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
-                </div>
-                <div style={S.formGroup}>
-                  <label style={S.label}>Caja Compensación</label>
+                  <label style={S.label}>Tipo Funcionario</label>
                   <select style={S.input} disabled><option>Elige</option></select>
                 </div>
                 <div style={S.formGroup}>
@@ -469,38 +539,52 @@ export default function EmpleadosCrud() {
                     {CARGOS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-
-                {/* Row 7 */}
+                <div style={S.formGroup}>
+                  <label style={S.label}>EPS Afiliado</label>
+                  <select style={S.input} disabled><option>Elige</option></select>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>ARL</label>
+                  <select style={S.input} disabled><option>Elige</option></select>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Fondo de Pensiones</label>
+                  <select style={S.input} disabled><option>Elige</option></select>
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>RH</label>
+                  <select style={S.input} disabled><option>Elige</option></select>
+                </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Estado</label>
                   <select style={S.input} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
                     <option value="Todos">Elige</option>
-                    <option value="Activo">Activos</option>
-                    <option value="Inactivo">Inactivos</option>
+                    {ESTADOS_EMP.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div style={S.formGroup}>
-                  <label style={S.label}>Fecha vencimiento documentos ini</label>
+                  <label style={S.label}>Fecha Ingreso ini</label>
                   <input style={S.input} type="date" disabled />
                 </div>
                 <div style={S.formGroup}>
-                  <label style={S.label}>Fecha vencimiento documentos fin</label>
+                  <label style={S.label}>Fecha Ingreso fin</label>
                   <input style={S.input} type="date" disabled />
                 </div>
-
-                {/* Row 8 */}
                 <div style={S.formGroup}>
-                  <label style={S.label}>Con usuario de acceso</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <label style={S.label}>Venc. documentos ini</label>
+                  <input style={S.input} type="date" disabled />
+                </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Venc. documentos fin</label>
+                  <input style={S.input} type="date" disabled />
                 </div>
               </div>
             </div>
-
             <div style={{ ...S.modalFooter, justifyContent: 'space-between' }}>
               <button style={S.btnSecondary} onClick={clearFilters}>Limpiar filtros</button>
               <div style={{ display: 'flex', gap: 12 }}>
-                <button style={S.btnSecondary} onClick={() => setIsFilterMenuOpen(false)}>Cancelar</button>
-                <button style={S.btnPrimaryGreen} onClick={() => setIsFilterMenuOpen(false)}>Buscar</button>
+                <button style={S.btnSecondary} onClick={() => setFilterOpen(false)}>Cancelar</button>
+                <button style={S.btnPrimaryGreen} onClick={() => setFilterOpen(false)}>Buscar</button>
               </div>
             </div>
           </div>
@@ -510,102 +594,64 @@ export default function EmpleadosCrud() {
   );
 }
 
-/* ─── Estilos inline (complementan el CSS global) ───────────────────── */
+/* ─── Estilos ────────────────────────────────────────────────────────── */
 const S = {
-  toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' },
-  filters: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 },
-  searchWrap: { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
-  searchIcon: { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' },
-  searchInput: {
-    width: '100%', padding: '9px 12px 9px 34px',
-    border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
-    fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)',
-    color: 'var(--text)', outline: 'none',
-  },
-  filterBtn: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '9px 16px', background: 'var(--white)',
-    border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
-    color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif',
-    cursor: 'pointer', outline: 'none', transition: 'all 0.15s',
-  },
-  modalHeaderGreen: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '22px 28px', background: 'var(--primary)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)'
-  },
-  modalTitleWhite: { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#fff' },
-  closeBtnWhite: { background: 'none', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '50%', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', cursor: 'pointer', color: '#fff', transition: 'background 0.2s' },
-  btnPrimaryGreen: {
-    padding: '10px 24px', background: 'var(--primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem',
-    fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif',
-    transition: 'background 0.18s',
-  },
-  tableWrap: {
-    background: 'var(--white)', border: '1.5px solid var(--border)',
-    borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', overflowX: 'auto',
-  },
-  avatarCell: { display: 'flex', alignItems: 'center', gap: 10 },
-  avatar: {
-    width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)',
-    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontWeight: 800, fontSize: '0.95rem', flexShrink: 0,
-  },
-  badge: (bg, color) => ({
-    background: bg, color, borderRadius: 20, padding: '3px 10px',
-    fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap',
-  }),
-  actions: { display: 'flex', gap: 6, justifyContent: 'center' },
-  actionBtn: (bg, color) => ({
-    background: bg, border: 'none', borderRadius: 6, padding: '5px 8px',
-    cursor: 'pointer', fontSize: '0.85rem', color, transition: 'opacity 0.15s',
-  }),
-  empty: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
-  /* Modal */
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(26,58,53,0.45)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, padding: 20,
-  },
-  modal: {
-    background: 'var(--white)', borderRadius: 'var(--radius)',
-    boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%',
-    maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column',
-    animation: 'fadeInUp 0.22s ease',
-  },
-  modalHeader: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '22px 28px', borderBottom: '1.5px solid var(--border)',
-  },
-  modalTitle: { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' },
-  closeBtn: { background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 },
-  modalBody: { padding: '24px 28px', overflowY: 'auto', flex: 1 },
-  modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '18px 28px', borderTop: '1.5px solid var(--border)' },
-  formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 },
-  formGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' },
-  input: {
-    padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
-    fontSize: '0.9rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text)',
-    background: 'var(--white)', outline: 'none', transition: 'border 0.15s',
-  },
-  inputErr: { borderColor: '#e74c3c' },
-  err: { color: '#e74c3c', fontSize: '0.78rem', marginTop: 2 },
-  btnPrimary: {
-    padding: '10px 24px', background: 'var(--primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem',
-    fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif',
-    transition: 'background 0.18s',
-  },
-  btnSecondary: {
-    padding: '10px 20px', background: 'var(--bg)', color: 'var(--text)',
-    border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
-    fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif',
-  },
-  toast: {
-    position: 'fixed', bottom: 28, right: 28, background: 'var(--primary)',
-    color: '#fff', borderRadius: 'var(--radius-sm)', padding: '13px 22px',
-    fontWeight: 700, fontSize: '0.92rem', zIndex: 9999,
-    boxShadow: '0 8px 28px rgba(26,155,140,0.35)',
-    animation: 'fadeInUp 0.22s ease',
-  },
+  /* Toolbar */
+  toolbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' },
+  filters:     { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 },
+  searchWrap:  { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
+  searchIcon:  { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' },
+  searchInput: { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },
+  filterBtn:   { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: 'pointer' },
+
+  /* Tabla */
+  tableWrap:   { background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', overflowX: 'auto' },
+  avatarCell:  { display: 'flex', alignItems: 'center', gap: 10 },
+  avatar:      { width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.95rem', flexShrink: 0 },
+  badge:       (bg, color) => ({ background: bg, color, borderRadius: 20, padding: '3px 10px', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap' }),
+  actions:     { display: 'flex', gap: 6, justifyContent: 'center' },
+  actionBtn:   (bg, color) => ({ background: bg, border: 'none', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: '0.85rem', color, transition: 'opacity 0.15s' }),
+  empty:       { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
+
+  /* Overlay / Modal */
+  overlay:     { position: 'fixed', inset: 0, background: 'rgba(26,58,53,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, padding: 20 },
+  modal:       { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column', animation: 'fadeInUp 0.22s ease' },
+  modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 28px', borderBottom: '1.5px solid var(--border)', flexShrink: 0 },
+  modalTitle:  { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' },
+  closeBtn:    { background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 },
+  modalBody:   { padding: '22px 28px 28px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
+  modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 28px', borderTop: '1.5px solid var(--border)', flexShrink: 0 },
+
+  /* Cabecera verde (filtros) */
+  modalHeaderGreen: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 28px', background: 'var(--primary)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)', flexShrink: 0 },
+  modalTitleWhite:  { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#fff' },
+  closeBtnWhite:    { background: 'none', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '50%', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', cursor: 'pointer', color: '#fff' },
+
+  /* Pestañas */
+  tabBar:    { display: 'flex', borderBottom: '2px solid var(--border)', padding: '0 28px', gap: 0, overflowX: 'auto', flexWrap: 'nowrap', flexShrink: 0 },
+  tab:       { padding: '11px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent', marginBottom: -2, fontSize: '0.88rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', color: 'var(--text-muted)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 0.15s, border-color 0.15s' },
+  tabActive: { padding: '11px 20px', background: 'transparent', border: 'none', borderBottom: '2px solid var(--primary)', marginBottom: -2, fontSize: '0.88rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', color: 'var(--primary)', cursor: 'pointer', whiteSpace: 'nowrap' },
+
+  /* Grids */
+  grid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 },
+  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 },
+  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 },
+
+  /* Sección */
+  sectionHeader: { marginTop: 24, marginBottom: 4, padding: '9px 14px', background: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.05em', textAlign: 'center' },
+
+  /* Campos */
+  formGroup: { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
+  label:     { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' },
+  input:     { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text)', background: 'var(--white)', outline: 'none', transition: 'border 0.15s' },
+  inputErr:  { borderColor: '#e74c3c' },
+  err:       { color: '#e74c3c', fontSize: '0.75rem', marginTop: 2 },
+
+  /* Botones */
+  btnPrimary:      { padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', transition: 'background 0.18s' },
+  btnPrimaryGreen: { padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif' },
+  btnSecondary:    { padding: '10px 20px', background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif' },
+
+  /* Toast */
+  toast: { position: 'fixed', bottom: 28, right: 28, background: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '13px 22px', fontWeight: 700, fontSize: '0.92rem', zIndex: 9999, boxShadow: '0 8px 28px rgba(26,155,140,0.35)', animation: 'fadeInUp 0.22s ease' },
 };

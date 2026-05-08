@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\SsoController;
 use Illuminate\Http\Request;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'app' => config('app.name')]);
 });
+
+Route::get('/empresas', [EmpresaController::class, 'index']);
 
 // Recibe usuarios desde AvanzaConoce (autenticado con X-ERP-Secret)
 Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanzaconoce']);
