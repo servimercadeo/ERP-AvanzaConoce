@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import api from '../api/axios';
 
 /* ─── Catálogos ──────────────────────────────────────────────────────── */
 const SEDES        = ['Bogotá', 'Medellín', 'Cali', 'Bucaramanga', 'Barranquilla', 'Pereira', 'Manizales', 'Otra'];
@@ -18,15 +19,27 @@ const TIPOS_VINC   = ['Empleado directo', 'Contratista', 'Aprendiz SENA', 'Prest
 const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
 const BANCOS       = ['Bancolombia', 'Davivienda', 'BBVA', 'Banco de Bogotá', 'Banco Popular', 'Banco de Occidente', 'Banco Agrario', 'Citibank', 'Banco Caja Social', 'Finandina', 'Bancamía', 'Nequi', 'Daviplata', 'Otro'];
 
-/* ─── Datos semilla ──────────────────────────────────────────────────── */
-const INIT_EMPLEADOS = [
-  { id: 1, cedula: '1010234567', apellidos: 'Torres', nombres: 'Ana María', cargo: 'Coordinador/a Administrativo/a', sede: 'Bogotá', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'O+', eps: 'Sánitas', arl: 'Sura', fondo_pensiones: 'Porvenir', movil: '3001234567', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
-  { id: 2, cedula: '1020345678', apellidos: 'Rueda', nombres: 'Carlos Alberto', cargo: 'Auxiliar de Almacén', sede: 'Medellín', empresa_id: 1, estado_empleado: 'Activo', genero: 'Masculino', rh: 'A+', eps: 'Compensar', arl: 'Positiva', fondo_pensiones: 'Protección', movil: '3109876543', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Técnico' },
-  { id: 3, cedula: '1030456789', apellidos: 'Sánchez', nombres: 'Laura Sofía', cargo: 'Contador/a', sede: 'Cali', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'B+', eps: 'Famisanar', arl: 'Colmena', fondo_pensiones: 'Colfondos', movil: '3205678912', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
-  { id: 4, cedula: '1040567890', apellidos: 'Pérez', nombres: 'Miguel Ángel', cargo: 'Conductor/a', sede: 'Bucaramanga', empresa_id: 2, estado_empleado: 'Inactivo', genero: 'Masculino', rh: 'O-', eps: 'Nueva EPS', arl: 'Sura', fondo_pensiones: 'Porvenir', movil: '3154321098', tipo_vinculacion: 'Prestación de servicios', tipo_funcionario: 'Técnico' },
-  { id: 5, cedula: '1050678901', apellidos: 'Martínez', nombres: 'Sofía Isabel', cargo: 'Asistente RRHH', sede: 'Bogotá', empresa_id: 1, estado_empleado: 'Activo', genero: 'Femenino', rh: 'AB+', eps: 'Sánitas', arl: 'Positiva', fondo_pensiones: 'Colpensiones', movil: '3012345678', tipo_vinculacion: 'Empleado directo', tipo_funcionario: 'Administrativo' },
-  { id: 6, cedula: '1060789012', apellidos: 'Hernández', nombres: 'Diego Felipe', cargo: 'Técnico de Mantenimiento', sede: 'Medellín', empresa_id: 2, estado_empleado: 'Activo', genero: 'Masculino', rh: 'A-', eps: 'Medimás', arl: 'Liberty', fondo_pensiones: 'Protección', movil: '3187654321', tipo_vinculacion: 'Contratista', tipo_funcionario: 'Técnico' },
-];
+/* ─── Conversión API ↔ formulario ────────────────────────────────────── */
+const toForm = emp => ({
+  ...EMPTY_FORM,
+  ...emp,
+  tiene_cert_alturas: emp.tiene_cert_alturas ? 'Sí' : 'No',
+  empresa_id:          emp.empresa_id         ?? '',
+  fecha_nacimiento:    emp.fecha_nacimiento    ?? '',
+  licencia_carro_vence:emp.licencia_carro_vence?? '',
+  licencia_moto_vence: emp.licencia_moto_vence ?? '',
+  cert_alturas_vence:  emp.cert_alturas_vence  ?? '',
+  ingresos:            emp.ingresos            ?? '',
+  numero_hijos:        emp.numero_hijos != null ? String(emp.numero_hijos) : '',
+});
+
+const toApi = form => ({
+  ...form,
+  tiene_cert_alturas: form.tiene_cert_alturas === 'Sí',
+  empresa_id:  form.empresa_id  !== '' ? Number(form.empresa_id)  : null,
+  numero_hijos:form.numero_hijos !== '' ? Number(form.numero_hijos): null,
+  ingresos:    form.ingresos    !== '' ? Number(form.ingresos)    : null,
+});
 
 const EMPTY_FORM = {
   cedula: '', apellidos: '', nombres: '', fotografia: '',
@@ -45,14 +58,15 @@ const EMPTY_FORM = {
 };
 
 /* ─── Campo reutilizable dentro del modal ────────────────────────────── */
-function Field({ label, k, type = 'text', opts, req, span, form, errors, onChange }) {
+function Field({ label, k, type = 'text', opts, req, span, form, errors, onChange, disabled }) {
   const style = { ...S.formGroup, ...(span ? { gridColumn: `span ${span}` } : {}) };
   const isObjOpts = opts && opts.length > 0 && typeof opts[0] === 'object';
+  const disabledStyle = disabled ? { background: 'var(--bg)', cursor: 'default', color: 'var(--text-muted)' } : {};
   return (
     <div style={style}>
-      <label style={S.label}>{label}{req ? ' *' : ''}</label>
+      <label style={S.label}>{label}{req && !disabled ? ' *' : ''}</label>
       {opts ? (
-        <select style={{ ...S.input, ...(errors[k] ? S.inputErr : {}) }} value={form[k] ?? ''} onChange={onChange(k)}>
+        <select style={{ ...S.input, ...(errors[k] ? S.inputErr : {}), ...disabledStyle }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
           <option value="">Elige</option>
           {isObjOpts
             ? opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
@@ -60,9 +74,9 @@ function Field({ label, k, type = 'text', opts, req, span, form, errors, onChang
           }
         </select>
       ) : type === 'textarea' ? (
-        <textarea style={{ ...S.input, minHeight: 68, resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} />
+        <textarea style={{ ...S.input, minHeight: 68, resize: disabled ? 'none' : 'vertical', ...disabledStyle }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       ) : (
-        <input style={{ ...S.input, ...(errors[k] ? S.inputErr : {}) }} type={type} value={form[k] ?? ''} onChange={onChange(k)} />
+        <input style={{ ...S.input, ...(errors[k] ? S.inputErr : {}), ...disabledStyle }} type={type} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       )}
       {errors[k] && <span style={S.err}>{errors[k]}</span>}
     </div>
@@ -70,34 +84,36 @@ function Field({ label, k, type = 'text', opts, req, span, form, errors, onChang
 }
 
 /* ─── Modal ──────────────────────────────────────────────────────────── */
-function Modal({ open, onClose, onSave, initial, title, empresas }) {
-  const [form, setForm]       = useState(initial);
-  const [errors, setErrors]   = useState({});
+function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = false }) {
+  const [form, setForm]        = useState(initial);
+  const [errors, setErrors]    = useState({});
   const [activeTab, setActive] = useState('general');
+  const [saving, setSaving]    = useState(false);
 
-  React.useEffect(() => { setForm(initial); setErrors({}); setActive('general'); }, [initial, open]);
+  React.useEffect(() => { setForm(initial); setErrors({}); setActive('general'); setSaving(false); }, [initial, open]);
 
   const onChange = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const validate = () => {
     const e = {};
-    if (!form.cedula?.trim())          e.cedula          = 'Requerido';
-    if (!form.apellidos?.trim())       e.apellidos       = 'Requerido';
-    if (!form.nombres?.trim())         e.nombres         = 'Requerido';
-    if (!form.sede?.trim())            e.sede            = 'Requerido';
-    if (!form.genero?.trim())          e.genero          = 'Requerido';
-    if (!form.movil?.trim())           e.movil           = 'Requerido';
-    if (!form.eps?.trim())             e.eps             = 'Requerido';
-    if (!form.arl?.trim())             e.arl             = 'Requerido';
-    if (!form.fondo_pensiones?.trim()) e.fondo_pensiones = 'Requerido';
-    if (!form.estado_empleado?.trim()) e.estado_empleado = 'Requerido';
-    if (!form.cargo?.trim())           e.cargo           = 'Requerido';
+    if (!form.cedula?.trim())           e.cedula           = 'Requerido';
+    if (!form.apellidos?.trim())        e.apellidos        = 'Requerido';
+    if (!form.nombres?.trim())          e.nombres          = 'Requerido';
+    if (!form.sede?.trim())             e.sede             = 'Requerido';
+    if (!form.genero?.trim())           e.genero           = 'Requerido';
+    if (!form.movil?.trim())            e.movil            = 'Requerido';
+    if (!form.email?.trim())            e.email            = 'Requerido';
+    if (!form.eps?.trim())              e.eps              = 'Requerido';
+    if (!form.arl?.trim())              e.arl              = 'Requerido';
+    if (!form.fondo_pensiones?.trim())  e.fondo_pensiones  = 'Requerido';
+    if (!form.estado_empleado?.trim())  e.estado_empleado  = 'Requerido';
+    if (!form.cargo?.trim())            e.cargo            = 'Requerido';
     if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = 'Requerido';
     if (!form.tipo_vinculacion?.trim()) e.tipo_vinculacion = 'Requerido';
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const e = validate();
     if (Object.keys(e).length) {
       setErrors(e);
@@ -106,12 +122,19 @@ function Modal({ open, onClose, onSave, initial, title, empresas }) {
       if (soloAdicional) setActive('adicional');
       return;
     }
-    onSave(form);
+    setSaving(true);
+    try {
+      await onSave(form);
+    } catch {
+      // parent handles error toast; modal stays open
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!open) return null;
 
-  const fp = { form, errors, onChange };
+  const fp = { form, errors, onChange, disabled: readOnly };
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -166,7 +189,7 @@ function Modal({ open, onClose, onSave, initial, title, empresas }) {
                 <Field label="Género"           k="genero"          opts={GENEROS}     req {...fp} />
                 <Field label="Estado Civil"     k="estado_civil"    opts={EST_CIVIL}       {...fp} />
                 <Field label="Nivel Escolaridad" k="nivel_escolaridad" opts={ESCOLARIDAD}   {...fp} />
-                <Field label="Email"            k="email"           type="email"           {...fp} />
+                <Field label="Email"            k="email"           type="email"   req     {...fp} />
               </div>
 
               <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -255,8 +278,16 @@ function Modal({ open, onClose, onSave, initial, title, empresas }) {
 
         {/* Pie */}
         <div style={S.modalFooter}>
-          <button style={S.btnSecondary} onClick={onClose}>Cancelar</button>
-          <button style={S.btnPrimary} onClick={handleSave}>Guardar</button>
+          {readOnly ? (
+            <button style={S.btnSecondary} onClick={onClose}>Cerrar</button>
+          ) : (
+            <>
+              <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
+              <button style={{ ...S.btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -288,21 +319,70 @@ function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
   );
 }
 
+/* ─── Modal de credenciales iniciales ───────────────────────────────── */
+function CredencialesModal({ open, credenciales, onClose }) {
+  const [copiado, setCopiado] = useState(false);
+  if (!open || !credenciales) return null;
+
+  const copiar = () => {
+    navigator.clipboard.writeText(
+      `Email: ${credenciales.email}\nContraseña: ${credenciales.password}`
+    ).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); });
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{ ...S.modal, maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={S.modalHeader}>
+          <span style={S.modalTitle}>Credenciales de acceso</span>
+          <button style={S.closeBtn} onClick={onClose}>✕</button>
+        </div>
+        <div style={{ padding: '28px 28px 20px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20, lineHeight: 1.6 }}>
+            Guarda estas credenciales y compártelas con el empleado. La contraseña no podrá recuperarse después de cerrar esta ventana.
+          </p>
+          <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Correo</span>
+              <div style={{ fontFamily: 'monospace', fontSize: '1rem', color: 'var(--text)', fontWeight: 600, marginTop: 4 }}>{credenciales.email}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Contraseña temporal</span>
+              <div style={{ fontFamily: 'monospace', fontSize: '1.3rem', color: 'var(--primary)', fontWeight: 800, letterSpacing: 3, marginTop: 4 }}>{credenciales.password}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ ...S.modalFooter, justifyContent: 'space-between' }}>
+          <button style={{ ...S.btnSecondary, gap: 8, display: 'flex', alignItems: 'center' }} onClick={copiar}>
+            {copiado ? '✓ Copiado' : 'Copiar credenciales'}
+          </button>
+          <button style={S.btnPrimary} onClick={onClose}>Entendido</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
-  const [empleados, setEmpleados]         = useState(INIT_EMPLEADOS);
-  const [search, setSearch]               = useState('');
-  const [filtroEstado, setFiltroEstado]   = useState('Todos');
-  const [filtroSede, setFiltroSede]       = useState('Todas');
-  const [filtroCargo, setFiltroCargo]     = useState('Todos');
-  const [filtroVinc, setFiltroVinc]       = useState('Todos');
-  const [filtroEmpresa, setFiltroEmpresa] = useState('Todas');
-  const [empresas, setEmpresas]           = useState([]);
-  const [modalOpen, setModalOpen]         = useState(false);
-  const [editTarget, setEditTarget]       = useState(null);
-  const [deleteTarget, setDeleteTarget]   = useState(null);
-  const [toast, setToast]                 = useState(null);
-  const [filterOpen, setFilterOpen]       = useState(false);
+  const [empleados, setEmpleados]               = useState([]);
+  const [loading, setLoading]                   = useState(true);
+  const [search, setSearch]                     = useState('');
+  const [filtroEstado, setFiltroEstado]         = useState('Todos');
+  const [filtroSede, setFiltroSede]             = useState('Todas');
+  const [filtroCargo, setFiltroCargo]           = useState('Todos');
+  const [filtroVinc, setFiltroVinc]             = useState('Todos');
+  const [filtroEmpresa, setFiltroEmpresa]       = useState('Todas');
+  const [empresas, setEmpresas]                 = useState([]);
+  const [modalOpen, setModalOpen]               = useState(false);
+  const [editTarget, setEditTarget]             = useState(null);
+  const [viewOpen, setViewOpen]                 = useState(false);
+  const [viewTarget, setViewTarget]             = useState(null);
+  const [deleteTarget, setDeleteTarget]         = useState(null);
+  const [toast, setToast]                       = useState(null);
+  const [filterOpen, setFilterOpen]             = useState(false);
+  const [credenciales, setCredenciales]         = useState(null);
+  const [credencialesOpen, setCredencialesOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/empresas')
@@ -311,10 +391,18 @@ export default function EmpleadosCrud() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setLoading(true);
+    api.get('/empleados')
+      .then(r => setEmpleados(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   React.useEffect(() => {
-    document.body.style.overflow = (modalOpen || filterOpen || deleteTarget) ? 'hidden' : '';
+    document.body.style.overflow = (modalOpen || filterOpen || deleteTarget || viewOpen || credencialesOpen) ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
-  }, [modalOpen, filterOpen, deleteTarget]);
+  }, [modalOpen, filterOpen, deleteTarget, viewOpen, credencialesOpen]);
 
   /* Filtrado */
   const filtered = useMemo(() => empleados.filter(e => {
@@ -344,22 +432,43 @@ export default function EmpleadosCrud() {
 
   /* CRUD */
   const openCreate = () => { setEditTarget(null); setModalOpen(true); };
-  const openEdit   = emp  => { setEditTarget(emp); setModalOpen(true); };
+  const openEdit   = emp => { setEditTarget(emp); setModalOpen(true); };
+  const openView   = emp => { setViewTarget(emp); setViewOpen(true); };
 
-  const handleSave = form => {
-    if (editTarget) {
-      setEmpleados(prev => prev.map(e => e.id === editTarget.id ? { ...editTarget, ...form } : e));
-      showToast('Empleado actualizado correctamente.');
-    } else {
-      setEmpleados(prev => [...prev, { ...form, id: Date.now() }]);
-      showToast('Empleado registrado correctamente.');
+  const handleSave = async form => {
+    const payload = toApi(form);
+    try {
+      if (editTarget) {
+        const { data } = await api.put(`/empleados/${editTarget.id}`, payload);
+        setEmpleados(prev => prev.map(e => e.id === editTarget.id ? data : e));
+        showToast('Empleado actualizado correctamente.');
+      } else {
+        const { data } = await api.post('/empleados', payload);
+        setEmpleados(prev => [...prev, data.empleado]);
+        // Mostrar credenciales generadas
+        setCredenciales(data.credenciales);
+        setCredencialesOpen(true);
+        showToast('Empleado registrado correctamente.');
+      }
+      setModalOpen(false);
+    } catch (err) {
+      const msgs = err.response?.data?.errors;
+      const msg = msgs
+        ? Object.values(msgs)[0][0]
+        : (err.response?.data?.message ?? 'Error al guardar. Revisa los datos.');
+      showToast(msg);
+      throw err;
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = () => {
-    setEmpleados(prev => prev.filter(e => e.id !== deleteTarget.id));
-    showToast(`${deleteTarget.apellidos} ${deleteTarget.nombres} eliminado.`);
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/empleados/${deleteTarget.id}`);
+      setEmpleados(prev => prev.filter(e => e.id !== deleteTarget.id));
+      showToast(`${deleteTarget.apellidos} ${deleteTarget.nombres} eliminado.`);
+    } catch {
+      showToast('Error al eliminar el empleado.');
+    }
     setDeleteTarget(null);
   };
 
@@ -412,12 +521,18 @@ export default function EmpleadosCrud() {
 
       {/* Tabla */}
       <div style={S.tableWrap}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={S.empty}>
+            <span style={{ fontSize: '2rem', opacity: 0.4 }}>⏳</span>
+            <p>Cargando empleados…</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={S.empty}>
             <span style={{ fontSize: '2.5rem' }}>🔎</span>
             <p>No se encontraron empleados con los filtros aplicados.</p>
           </div>
-        ) : (
+        ) : null}
+        {!loading && filtered.length > 0 && (
           <table className="data-table">
             <thead>
               <tr>
@@ -445,7 +560,7 @@ export default function EmpleadosCrud() {
                   <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{emp.cedula}</td>
                   <td>{emp.cargo}</td>
                   <td><span style={S.badge('#e8f8f5', 'var(--primary-dark)')}>{emp.sede}</span></td>
-                  <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{empresas.find(e => e.id == emp.empresa_id)?.nombre ?? '—'}</td>
+                  <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{emp.empresa?.nombre ?? '—'}</td>
                   <td>
                     <span style={S.badge('#fff7e0', '#b7780c')}>{emp.tipo_vinculacion}</span>
                   </td>
@@ -461,6 +576,7 @@ export default function EmpleadosCrud() {
                   </td>
                   <td>
                     <div style={S.actions}>
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver"     onClick={() => openView(emp)}>👁️</button>
                       <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar"    onClick={() => openEdit(emp)}>✏️</button>
                       <button style={S.actionBtn('#fce8e8', '#a33')}                title="Eliminar"  onClick={() => setDeleteTarget(emp)}>🗑️</button>
                     </div>
@@ -481,9 +597,19 @@ export default function EmpleadosCrud() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
-        initial={editTarget ? { ...EMPTY_FORM, ...editTarget } : EMPTY_FORM}
+        initial={editTarget ? toForm(editTarget) : EMPTY_FORM}
         title={editTarget ? 'Editar empleado' : 'Registrar nuevo empleado'}
         empresas={empresas}
+      />
+
+      <Modal
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        onSave={() => {}}
+        initial={viewTarget ? toForm(viewTarget) : EMPTY_FORM}
+        title="Ver empleado"
+        empresas={empresas}
+        readOnly
       />
 
       <ConfirmDialog
@@ -491,6 +617,12 @@ export default function EmpleadosCrud() {
         nombre={deleteTarget ? `${deleteTarget.apellidos} ${deleteTarget.nombres}` : ''}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <CredencialesModal
+        open={credencialesOpen}
+        credenciales={credenciales}
+        onClose={() => { setCredencialesOpen(false); setCredenciales(null); }}
       />
 
       {/* Modal de filtros */}
