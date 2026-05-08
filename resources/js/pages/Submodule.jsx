@@ -91,6 +91,89 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
         default: return null;
       }
 
+    /* ── VENTAS ─────────────────────────────────────────── */
+    case 'ventas':
+      switch (submoduleId) {
+        case 'importacion_archivos':
+          switch (archivoId) {
+            // case 'importar_ventas':                    return ImportarVentasCrud;
+            // case 'importar_ventas_masivas':            return ImportarVentasMasivasCrud;
+            // case 'importar_posibles_ventas_churn':     return ImportarChurnCrud;
+            // case 'importar_descuentos_churn_100':      return ImportarDescuentosChurnCrud;
+            // case 'importar_otros_descuentos_comercial':return ImportarOtrosDescuentosCrud;
+            // case 'relacion_pagos_direct_tv':           return RelacionPagosCrud;
+            // case 'contratos_devueltos':                return ContratosDevueltosCrud;
+            // case 'relacion_ventas_no_paga_direct_tv':  return RelacionVentasNoPagaCrud;
+            // case 'importar_ventas_anuladas':           return ImportarVentasAnuladasCrud;
+            // case 'importar_ibs_pagadas_comercial':     return ImportarIBSPagadasCrud;
+            default: return null;
+          }
+        case 'administracion_ventas':
+          switch (archivoId) {
+            // case 'admin_ventas':                      return AdminVentasCrud;
+            // case 'consignacion_ventas':               return ConsignacionVentasCrud;
+            // case 'sol_mod_consignacion_por_aprobar':  return SolModConsignacionCrud;
+            // case 'envio_contratos_ventas':            return EnvioContratosVentasCrud;
+            // case 'sol_mod_envio_contrato_por_aprobar':return SolModEnvioContratoCrud;
+            // case 'modificar_ventas':                  return ModificarVentasCrud;
+            // case 'sol_mod_por_aprobar':               return SolModPorAprobarCrud;
+            // case 'contratos_devueltos_consultas':     return ContratosDevueltosConsultasCrud;
+            // case 'consulta_posibles_ventas_churn':    return ConsultaChurnCrud;
+            // case 'clientes_off':                      return ClientesOffCrud;
+            // case 'descuentos_churn_100_dias':         return DescuentosChurnCrud;
+            // case 'otros_descuentos':                  return OtrosDescuentosCrud;
+            default: return null;
+          }
+        case 'ventas_contado_kit_prepago':
+          switch (archivoId) {
+            // case 'clientes_kit_prepago':              return ClientesKitPrepagosCrud;
+            // case 'ofertas':                           return OfertasCrud;
+            // case 'consulta_registro_ventas':          return ConsultaRegistroVentasCrud;
+            // case 'anulacion_ventas':                  return AnulacionVentasCrud;
+            // case 'devolucion_ventas':                 return DevolucionVentasCrud;
+            // case 'reporte_ventas_diario':             return ReporteVentasDiarioCrud;
+            // case 'bodegas_fortuner':                  return BodegasFortunerCrud;
+            // case 'centros_costos_fortuner':           return CentrosCostosFortunerCrud;
+            // case 'bancos_consignacion':               return BancosConsignacionCrud;
+            default: return null;
+          }
+        case 'consultar_cumplimiento_meta':
+          switch (archivoId) {
+            // case 'cumplimiento_por_regional':         return CumplimientoRegionalCrud;
+            // case 'cumplimiento_por_sede':             return CumplimientoSedeCrud;
+            // case 'cumplimiento_por_supervisor':       return CumplimientoSupervisorCrud;
+            // case 'cumplimiento_por_asesor':           return CumplimientoAsesorCrud;
+            default: return null;
+          }
+        default: return null;
+      }
+
+    /* ── CRM ─────────────────────────────────────────────── */
+    case 'crm':
+      switch (submoduleId) {
+        case 'crm_parametros':
+          switch (archivoId) {
+            // case 'tipo_llegada':                return TipoLlegadaCrud;
+            // case 'productos_gestion':           return ProductosGestionCrud;
+            // case 'planes_productos':            return PlanesProductosCrud;
+            // case 'importar_metas_empleados':    return ImportarMetasEmpleadosCrud;
+            // case 'tipo_gestion':                return TipoGestionCrud;
+            // case 'motivo_no_compra':            return MotivoNoCompraCrud;
+            // case 'estado_cliente_cotizacion':   return EstadoClienteCotizacionCrud;
+            // case 'actividades_externas':        return ActividadesExternasCrud;
+            // case 'motivos_cancelacion':         return MotivosCancelacionCrud;
+            // case 'parametro_dias_sin_gestion':  return ParametroDiasSinGestionCrud;
+            default: return null;
+          }
+        case 'crm_estadisticas':
+          switch (archivoId) {
+            // case 'nuevos_clientes_referidos':   return NuevosClientesReferidosCrud;
+            // case 'productos_cotizados':         return ProductosCotizadosCrud;
+            default: return null;
+          }
+        default: return null;
+      }
+
     /* ── PARÁMETROS ─────────────────────────────────────── */
     case 'parametros':
       switch (submoduleId) {

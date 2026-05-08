@@ -286,4 +286,112 @@ export const SUBMODULE_CONTENT = {
       ['SST indicadores', 'SST', '87', '25-04-2026', 'Activo'],
     ]
   },
+
+  // ── VENTAS ────────────────────────────────────────────────────────
+  importacion_archivos: {
+    stats: [
+      { num: '10',   label: 'Tipos de archivo' },
+      { num: '1.2K', label: 'Registros importados hoy' },
+      { num: '0',    label: 'Errores pendientes' },
+      { num: '100%', label: 'Procesados correctamente' },
+    ],
+    desc: 'Carga masiva de archivos de ventas, churn, descuentos, pagos Direct TV e IBS desde fuentes externas.',
+    features: [
+      'Importar ventas unitarias y masivas',
+      'Posibles ventas Churn',
+      'Descuentos x Churn 100 días',
+      'Otros descuentos comerciales',
+      'Relación Pagos Direct TV',
+      'Contratos devueltos',
+      'Ventas que no paga Direct TV',
+      'Ventas anuladas',
+      'IBS Pagadas Comercial',
+      'Historial de importaciones',
+    ],
+    cols: ['Archivo', 'Tipo', 'Registros', 'Fecha carga', 'Usuario', 'Estado'],
+    rows: [
+      ['ventas_abril.xlsx', 'Ventas', '340', '08-05-2026', 'Admin', 'Procesado'],
+      ['churn_mayo.csv',    'Churn',  '87',  '08-05-2026', 'Admin', 'Procesado'],
+      ['pagos_dtv.xlsx',    'Pagos',  '210', '07-05-2026', 'Admin', 'Procesado'],
+    ]
+  },
+
+  administracion_ventas: {
+    stats: [
+      { num: '524',  label: 'Ventas activas' },
+      { num: '18',   label: 'Contratos por aprobar' },
+      { num: '7',    label: 'Clientes Off' },
+      { num: '$98M', label: 'Valor total ventas mes' },
+    ],
+    desc: 'Gestión integral de ventas: administración, consignaciones, modificaciones, contratos y control de descuentos.',
+    features: [
+      'Administración de ventas',
+      'Consignación de ventas',
+      'Modificación y aprobación de ventas',
+      'Envío de contratos',
+      'Contratos devueltos - consultas',
+      'Consulta posibles ventas Churn',
+      'Clientes Off',
+      'Descuentos x Churn 100 días',
+      'Otros descuentos',
+    ],
+    cols: ['Contrato', 'Cliente', 'Asesor', 'Sede', 'Valor', 'Estado'],
+    rows: [
+      ['VT-2026-001', 'Carlos Roa',   'J. Pérez',  'Bogotá Centro', '$180.000', 'Activa'],
+      ['VT-2026-002', 'Ana Suárez',   'M. Castro', 'Medellín',      '$220.000', 'En revisión'],
+      ['VT-2026-003', 'Luis Herrera', 'D. López',  'Cali Norte',    '$195.000', 'Aprobada'],
+    ]
+  },
+
+  ventas_contado_kit_prepago: {
+    stats: [
+      { num: '86',   label: 'Ventas de contado hoy' },
+      { num: '12',   label: 'Kits prepago disponibles' },
+      { num: '$4.2M',label: 'Recaudado hoy' },
+      { num: '3',    label: 'Devoluciones pendientes' },
+    ],
+    desc: 'Gestión de ventas de contado y kit prepago: clientes, ofertas, registro, anulaciones, devoluciones y reportes diarios.',
+    features: [
+      'Gestión de clientes prepago',
+      'Catálogo de ofertas',
+      'Consulta y registro de ventas',
+      'Anulación de ventas',
+      'Devolución de ventas',
+      'Reporte de ventas diario',
+      'Bodegas Fortuner',
+      'Centros de costos Fortuner',
+      'Bancos de consignación',
+    ],
+    cols: ['Venta', 'Cliente', 'Kit', 'Banco consign.', 'Valor', 'Estado'],
+    rows: [
+      ['KP-001', 'Pedro Díaz',   'Kit Básico HD',   'Bancolombia', '$289.000', 'Activa'],
+      ['KP-002', 'Sofía Ramírez','Kit Plus 4K',     'Davivienda',  '$389.000', 'Activa'],
+      ['KP-003', 'Tomás Gil',    'Kit Básico HD',   'Nequi',       '$289.000', 'Devuelta'],
+    ]
+  },
+
+  consultar_cumplimiento_meta: {
+    stats: [
+      { num: '87%',  label: 'Cumplimiento global' },
+      { num: '4',    label: 'Regionales activas' },
+      { num: '23',   label: 'Sedes en seguimiento' },
+      { num: '142',  label: 'Asesores evaluados' },
+    ],
+    desc: 'Consulta del cumplimiento de metas de ventas por regional, sede, supervisor y asesor en tiempo real.',
+    features: [
+      'Cumplimiento por regional',
+      'Cumplimiento por sede',
+      'Cumplimiento por supervisor',
+      'Cumplimiento por asesor',
+      'Comparativo vs meta mensual',
+      'Semáforo de gestión',
+      'Exportar reporte',
+    ],
+    cols: ['Entidad', 'Tipo', 'Meta', 'Alcanzado', '% Cumplimiento', 'Estado'],
+    rows: [
+      ['Regional Bogotá',   'Regional',   '500', '447', '89%', 'En riesgo'],
+      ['Sede Chapinero',    'Sede',        '80',  '75', '94%', 'Cumplido'],
+      ['J. Pérez',          'Asesor',      '25',  '21', '84%', 'En riesgo'],
+    ]
+  },
 };

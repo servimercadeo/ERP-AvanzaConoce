@@ -60,6 +60,26 @@ function resolveCrud(moduleId, archivoId) {
         default: return null;
       }
 
+    /* ── VENTAS ─────────────────────────────────────────────── */
+    case 'ventas':
+      switch (archivoId) {
+        // (Ventas no tiene archivos directos en el módulo raíz,
+        //  todos están dentro de sus submódulos)
+        default: return null;
+      }
+
+    /* ── CRM ────────────────────────────────────────────────── */
+    case 'crm':
+      switch (archivoId) {
+        default: return null;
+      }
+
+    /* ── LIQUIDACIÓN COMISIONES ─────────────────────────────── */
+    case 'liquidacion_comisiones':
+      switch (archivoId) {
+        default: return null;
+      }
+
     /* ── PARÁMETROS ─────────────────────────────────────────── */
     case 'parametros':
       switch (archivoId) {

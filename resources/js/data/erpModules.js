@@ -280,7 +280,75 @@ export const ERP_MODULES = [
     icon: '',
     color: '#f39c12',
     desc: 'Gestión de ventas y facturación.',
-    submods: [],
+    submods: [
+      {
+        id: 'importacion_archivos',
+        label: 'Importación de Archivos',
+        icon: '',
+        desc: 'Importación masiva de archivos de ventas',
+        archivos: [
+          { id: 'importar_ventas',                      label: 'Importar Ventas' },
+          { id: 'importar_ventas_masivas',               label: 'Importar Ventas Masivas' },
+          { id: 'importar_posibles_ventas_churn',        label: 'Importar Posibles Ventas Churn' },
+          { id: 'importar_descuentos_churn_100',         label: 'Importar Descuentos x Churn 100 días' },
+          { id: 'importar_otros_descuentos_comercial',   label: 'Importar Otros Descuentos Comercial' },
+          { id: 'relacion_pagos_direct_tv',              label: 'Relación Pagos Direct TV' },
+          { id: 'contratos_devueltos',                   label: 'Contratos Devueltos' },
+          { id: 'relacion_ventas_no_paga_direct_tv',     label: 'Relación Ventas que no Paga Direct TV' },
+          { id: 'importar_ventas_anuladas',              label: 'Importar Ventas Anuladas' },
+          { id: 'importar_ibs_pagadas_comercial',        label: 'Importar IBS Pagadas Comercial' },
+        ]
+      },
+      {
+        id: 'administracion_ventas',
+        label: 'Administración de Ventas',
+        icon: '',
+        desc: 'Gestión y administración de ventas',
+        archivos: [
+          { id: 'admin_ventas',                          label: 'Administración de Ventas' },
+          { id: 'consignacion_ventas',                   label: 'Consignación de Ventas' },
+          { id: 'sol_mod_consignacion_por_aprobar',      label: 'Sol. de Modificación Consignación por Aprobar' },
+          { id: 'envio_contratos_ventas',                label: 'Envió de Contratos' },
+          { id: 'sol_mod_envio_contrato_por_aprobar',    label: 'Sol. de Modificación Envió Contrato por Aprobar' },
+          { id: 'modificar_ventas',                      label: 'Modificar Ventas' },
+          { id: 'sol_mod_por_aprobar',                   label: 'Sol. de Modificación por Aprobar' },
+          { id: 'contratos_devueltos_consultas',         label: 'Contratos Devueltos Consultas' },
+          { id: 'consulta_posibles_ventas_churn',        label: 'Consulta Posibles Ventas Churn' },
+          { id: 'clientes_off',                          label: 'Clientes Off' },
+          { id: 'descuentos_churn_100_dias',             label: 'Descuentos x Churn 100 Días' },
+          { id: 'otros_descuentos',                      label: 'Otros Descuentos' },
+        ]
+      },
+      {
+        id: 'ventas_contado_kit_prepago',
+        label: 'Ventas de Contado Kit Prepago',
+        icon: '',
+        desc: 'Ventas de contado y kit prepago',
+        archivos: [
+          { id: 'clientes_kit_prepago',                  label: 'Clientes' },
+          { id: 'ofertas',                               label: 'Ofertas' },
+          { id: 'consulta_registro_ventas',              label: 'Consulta y Registro de Ventas' },
+          { id: 'anulacion_ventas',                      label: 'Anulación de Ventas' },
+          { id: 'devolucion_ventas',                     label: 'Devolución de Ventas' },
+          { id: 'reporte_ventas_diario',                 label: 'Reporte de Ventas Diario' },
+          { id: 'bodegas_fortuner',                      label: 'Bodegas Fortuner' },
+          { id: 'centros_costos_fortuner',               label: 'Centros de Costos Fortuner' },
+          { id: 'bancos_consignacion',                   label: 'Bancos de Consignación' },
+        ]
+      },
+      {
+        id: 'consultar_cumplimiento_meta',
+        label: 'Consultar Cumplimiento Meta',
+        icon: '',
+        desc: 'Consultas de cumplimiento por regional, sede, supervisor y asesor',
+        archivos: [
+          { id: 'cumplimiento_por_regional',             label: 'Por Regional' },
+          { id: 'cumplimiento_por_sede',                 label: 'Por Sede' },
+          { id: 'cumplimiento_por_supervisor',           label: 'Por Supervisor' },
+          { id: 'cumplimiento_por_asesor',               label: 'Por Asesor' },
+        ]
+      }
+    ],
     archivos: []
   },
   {
@@ -288,9 +356,42 @@ export const ERP_MODULES = [
     label: 'CRM',
     icon: '',
     color: '#16a085',
-    desc: 'Gestión de relaciones con clientes.',
-    submods: [],
-    archivos: []
+    desc: 'Gestión de relaciones con clientes, seguimiento comercial y estadísticas.',
+    submods: [
+      {
+        id: 'crm_parametros',
+        label: 'Parametros',
+        icon: '',
+        desc: 'Configuración de parámetros del CRM',
+        archivos: [
+          { id: 'tipo_llegada',                       label: 'Tipo Llegada' },
+          { id: 'productos_gestion',                  label: 'Productos Gestión' },
+          { id: 'planes_productos',                   label: 'Planes Productos' },
+          { id: 'importar_metas_empleados',           label: 'Importar Metas Empleados' },
+          { id: 'tipo_gestion',                       label: 'Tipo Gestión' },
+          { id: 'motivo_no_compra',                   label: 'Motivo no Compra' },
+          { id: 'estado_cliente_cotizacion',          label: 'Estado Cliente Cotizacion' },
+          { id: 'actividades_externas',               label: 'Actividades Externas' },
+          { id: 'motivos_cancelacion',                label: 'Motivos de la Cancelacion' },
+          { id: 'parametro_dias_sin_gestion',         label: 'Parámetro Días Sin Gestión a Clientes' },
+        ]
+      },
+      {
+        id: 'crm_estadisticas',
+        label: 'Estadísticas',
+        icon: '',
+        desc: 'Estadísticas y reportes de gestión CRM',
+        archivos: [
+          { id: 'nuevos_clientes_referidos',          label: 'Nuevos clientes (Referidos)' },
+          { id: 'productos_cotizados',                label: 'Productos Cotizados' },
+        ]
+      }
+    ],
+    archivos: [
+      { id: 'gestiones_crm',      label: 'Gestiones CRM' },
+      { id: 'clientes_crm',       label: 'Clientes' },
+      { id: 'gestionar_clientes', label: 'Gestionar Clientes' },
+    ]
   },
   {
     id: 'parametros',
