@@ -266,21 +266,6 @@ export default function Module() {
                                         onClick={() => setTabActiva(archivo.id)}
                                     >
                                         {archivo.label}
-                                        {hasCrud && (
-                                            <span
-                                                style={{
-                                                    ...S.tabBadge,
-                                                    background: activa
-                                                        ? "var(--primary)"
-                                                        : "#cce8e4",
-                                                    color: activa
-                                                        ? "#fff"
-                                                        : "var(--primary-dark)",
-                                                }}
-                                            >
-                                                CRUD
-                                            </span>
-                                        )}
                                     </button>
                                 );
                             })}
