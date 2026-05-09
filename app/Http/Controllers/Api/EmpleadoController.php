@@ -27,6 +27,7 @@ class EmpleadoController extends Controller
     {
         $data = $request->validate($this->rules());
 
+        $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
         $data['rol']    = $data['rol'] ?? 'consultor';
         $data['activo'] = true;
@@ -55,6 +56,7 @@ class EmpleadoController extends Controller
     {
         $data = $request->validate($this->rules($empleado->id));
 
+        $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);
 
         $empleado->update($data);
@@ -67,6 +69,16 @@ class EmpleadoController extends Controller
         $empleado->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function normalizarNombres(array &$data): void
+    {
+        $campos = ['nombres', 'apellidos', 'cargo', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'];
+        foreach ($campos as $campo) {
+            if (isset($data[$campo])) {
+                $data[$campo] = mb_strtoupper($data[$campo], 'UTF-8');
+            }
+        }
     }
 
     private function rules(?int $ignoreId = null): array

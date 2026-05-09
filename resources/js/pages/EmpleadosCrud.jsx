@@ -8,14 +8,15 @@ const EST_CIVIL    = ['Soltero/a', 'Casado/a', 'Unión libre', 'Divorciado/a', '
 const ESCOLARIDAD  = ['Sin estudios', 'Primaria', 'Bachillerato', 'Técnico', 'Tecnólogo', 'Universitario', 'Especialización', 'Maestría', 'Doctorado'];
 const ESTRATOS     = ['PD', '1', '2', '3', '4', '5', '6'];
 const RH_LIST      = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-const EPS_LIST     = ['Sánitas', 'Compensar', 'Famisanar', 'Nueva EPS', 'Salud Total', 'Coomeva', 'Medimás', 'Coosalud', 'Asmet Salud', 'Otra'];
-const ARL_LIST     = ['Sura', 'Colmena', 'Positiva', 'Bolívar', 'Liberty', 'Equidad', 'Axa Colpatria', 'Otra'];
-const PENSIONES    = ['Porvenir', 'Protección', 'Colfondos', 'Old Mutual', 'Colpensiones', 'Otro'];
-const CAJAS        = ['Compensar', 'Colsubsidio', 'Cafam', 'Comfenalco', 'Comfamiliar', 'Otra'];
+const EPS_LIST     = ['SÁNITAS', 'COMPENSAR', 'FAMISANAR', 'NUEVA EPS', 'SALUD TOTAL', 'COOMEVA', 'MEDIMÁS', 'COOSALUD', 'ASMET SALUD', 'OTRA'];
+const ARL_LIST     = ['SURA', 'COLMENA', 'POSITIVA', 'BOLÍVAR', 'LIBERTY', 'EQUIDAD', 'AXA COLPATRIA', 'OTRA'];
+const PENSIONES    = ['PORVENIR', 'PROTECCIÓN', 'COLFONDOS', 'OLD MUTUAL', 'COLPENSIONES', 'OTRO'];
+const CAJAS        = ['COMPENSAR', 'COLSUBSIDIO', 'CAFAM', 'COMFENALCO', 'COMFAMILIAR', 'OTRA'];
 const ESTADOS_EMP  = ['Activo', 'Inactivo', 'Retirado', 'Vacaciones', 'Incapacitado', 'Suspendido'];
-const CARGOS       = ['Coordinador/a Administrativo/a', 'Auxiliar de Almacén', 'Contador/a', 'Conductor/a', 'Asistente RRHH', 'Técnico de Mantenimiento', 'Gerente', 'Secretario/a', 'Asesor Comercial', 'Vendedor/a', 'Supervisor/a', 'Otro'];
-const TIPOS_FUNC   = ['Administrativo', 'Técnico', 'Vendedor', 'Supervisor', 'Gerente', 'Aprendiz', 'Otro'];
+const CARGOS       = ['COORDINADOR/A ADMINISTRATIVO/A', 'AUXILIAR DE ALMACÉN', 'CONTADOR/A', 'CONDUCTOR/A', 'ASISTENTE RRHH', 'TÉCNICO DE MANTENIMIENTO', 'GERENTE', 'SECRETARIO/A', 'ASESOR COMERCIAL', 'VENDEDOR/A', 'SUPERVISOR/A', 'AUXILIAR DE SISTEMAS', 'ANALISTA ADMINISTRATIVO', 'OTRO'];
+const TIPOS_FUNC   = ['ADMINISTRATIVO', 'TÉCNICO', 'VENDEDOR', 'SUPERVISOR', 'GERENTE', 'APRENDIZ', 'DIRECTO', 'OTRO'];
 const TIPOS_VINC   = ['Empleado directo', 'Contratista', 'Aprendiz SENA', 'Prestación de servicios', 'Temporal', 'Otro'];
+const POR_PAGINA   = 5;
 const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
 const BANCOS       = ['Bancolombia', 'Davivienda', 'BBVA', 'Banco de Bogotá', 'Banco Popular', 'Banco de Occidente', 'Banco Agrario', 'Citibank', 'Banco Caja Social', 'Finandina', 'Bancamía', 'Nequi', 'Daviplata', 'Otro'];
 
@@ -58,10 +59,14 @@ const EMPTY_FORM = {
 };
 
 /* ─── Campo reutilizable dentro del modal ────────────────────────────── */
-function Field({ label, k, type = 'text', opts, req, span, form, errors, onChange, disabled }) {
+function Field({ label, k, type = 'text', opts, req, span, form, errors, onChange, disabled, uppercase }) {
   const style = { ...S.formGroup, ...(span ? { gridColumn: `span ${span}` } : {}) };
   const isObjOpts = opts && opts.length > 0 && typeof opts[0] === 'object';
   const disabledStyle = disabled ? { background: 'var(--bg)', cursor: 'default', color: 'var(--text-muted)' } : {};
+  const uppercaseStyle = uppercase ? { textTransform: 'uppercase' } : {};
+  const handleChange = uppercase
+    ? (key) => (e) => onChange(key)({ ...e, target: { ...e.target, value: e.target.value.toUpperCase() } })
+    : onChange;
   return (
     <div style={style}>
       <label style={S.label}>{label}{req && !disabled ? ' *' : ''}</label>
@@ -74,9 +79,9 @@ function Field({ label, k, type = 'text', opts, req, span, form, errors, onChang
           }
         </select>
       ) : type === 'textarea' ? (
-        <textarea style={{ ...S.input, minHeight: 68, resize: disabled ? 'none' : 'vertical', ...disabledStyle }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
+        <textarea style={{ ...S.input, minHeight: 68, resize: disabled ? 'none' : 'vertical', ...disabledStyle, ...uppercaseStyle }} value={form[k] ?? ''} onChange={handleChange(k)} disabled={disabled} />
       ) : (
-        <input style={{ ...S.input, ...(errors[k] ? S.inputErr : {}), ...disabledStyle }} type={type} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
+        <input style={{ ...S.input, ...(errors[k] ? S.inputErr : {}), ...disabledStyle, ...uppercaseStyle }} type={type} value={form[k] ?? ''} onChange={handleChange(k)} disabled={disabled} />
       )}
       {errors[k] && <span style={S.err}>{errors[k]}</span>}
     </div>
@@ -164,8 +169,8 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
               {/* Fila 1 – Identificación */}
               <div style={S.grid4}>
                 <Field label="Cédula"     k="cedula"    req {...fp} />
-                <Field label="Apellidos"  k="apellidos" req {...fp} />
-                <Field label="Nombres"    k="nombres"   req {...fp} />
+                <Field label="Apellidos"  k="apellidos" req uppercase {...fp} />
+                <Field label="Nombres"    k="nombres"   req uppercase {...fp} />
                 <div style={S.formGroup}>
                   <label style={S.label}>Fotografía Empleado</label>
                   <input
@@ -363,6 +368,20 @@ function CredencialesModal({ open, credenciales, onClose }) {
   );
 }
 
+/* ─── Calcula qué botones mostrar (ellipsis para datasets grandes) ────── */
+function getPaginasBotones(pagina, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const delta = 2;
+  const left  = pagina - delta;
+  const right = pagina + delta;
+  const pages = [1];
+  if (left > 2) pages.push('...');
+  for (let i = Math.max(2, left); i <= Math.min(total - 1, right); i++) pages.push(i);
+  if (right < total - 1) pages.push('...');
+  pages.push(total);
+  return pages;
+}
+
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
   const [empleados, setEmpleados]               = useState([]);
@@ -383,6 +402,7 @@ export default function EmpleadosCrud() {
   const [filterOpen, setFilterOpen]             = useState(false);
   const [credenciales, setCredenciales]         = useState(null);
   const [credencialesOpen, setCredencialesOpen] = useState(false);
+  const [pagina, setPagina]                     = useState(1);
 
   useEffect(() => {
     fetch('/api/empresas')
@@ -416,6 +436,15 @@ export default function EmpleadosCrud() {
     const matchEm = filtroEmpresa === 'Todas' || String(e.empresa_id) === String(filtroEmpresa);
     return matchQ && matchE && matchS && matchC && matchV && matchEm;
   }), [empleados, search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa]);
+
+  // Resetear a página 1 cuando cambian los filtros
+  useEffect(() => { setPagina(1); }, [search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  const paginated    = useMemo(
+    () => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
+    [filtered, pagina]
+  );
 
   /* Stats */
   const total    = empleados.length;
@@ -547,7 +576,7 @@ export default function EmpleadosCrud() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(emp => (
+              {paginated.map(emp => (
                 <tr key={emp.id}>
                   <td>
                     <div style={S.avatarCell}>
@@ -588,9 +617,30 @@ export default function EmpleadosCrud() {
         )}
       </div>
 
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 12, textAlign: 'right' }}>
-        Mostrando {filtered.length} de {total} empleados
-      </p>
+      {!loading && filtered.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+            Página {pagina} · Mostrando {Math.min(POR_PAGINA, filtered.length - (pagina - 1) * POR_PAGINA)} de {filtered.length}{filtered.length !== empleados.length ? ` (filtrados de ${empleados.length})` : ' empleados'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              onClick={() => setPagina(p => Math.max(1, p - 1))}
+              disabled={pagina === 1}
+              style={S.pageBtn(pagina === 1)}
+            >‹</button>
+            {getPaginasBotones(pagina, totalPaginas).map((n, i) =>
+              n === '...'
+                ? <span key={`ellipsis-${i}`} style={S.pageEllipsis}>…</span>
+                : <button key={n} onClick={() => setPagina(n)} style={n === pagina ? S.pageBtnActive : S.pageBtn(false)}>{n}</button>
+            )}
+            <button
+              onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+              disabled={pagina === totalPaginas}
+              style={S.pageBtn(pagina === totalPaginas)}
+            >›</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modales ── */}
       <Modal
@@ -778,6 +828,11 @@ const S = {
   input:     { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text)', background: 'var(--white)', outline: 'none', transition: 'border 0.15s' },
   inputErr:  { borderColor: '#e74c3c' },
   err:       { color: '#e74c3c', fontSize: '0.75rem', marginTop: 2 },
+
+  /* Paginación */
+  pageBtn:        (disabled) => ({ minWidth: 32, height: 32, padding: '0 8px', border: '1.5px solid var(--border)', borderRadius: 6, background: 'var(--white)', color: disabled ? 'var(--text-muted)' : 'var(--text)', fontSize: '0.88rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1, transition: 'all 0.15s' }),
+  pageBtnActive:  { minWidth: 32, height: 32, padding: '0 8px', border: '1.5px solid var(--primary)', borderRadius: 6, background: 'var(--primary)', color: '#fff', fontSize: '0.88rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: 'default' },
+  pageEllipsis:   { minWidth: 28, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', userSelect: 'none' },
 
   /* Botones */
   btnPrimary:      { padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', transition: 'background 0.18s' },
