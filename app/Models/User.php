@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -19,9 +20,33 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'email',
-        'password',
+        // Acceso al sistema
+        'name', 'email', 'password', 'avanzaconoce_id', 'rol', 'activo', 'ultimo_sso_at',
+
+        // Información General
+        'cedula', 'apellidos', 'nombres', 'fotografia',
+        'sede', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
+        'genero', 'estado_civil', 'nivel_escolaridad',
+        'direccion_residencia', 'movil', 'estrato', 'barrio',
+        'numero_hijos', 'ingresos', 'observaciones_medicas', 'alergias',
+
+        // Seguridad Social
+        'rh', 'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
+
+        // Licencias y certificaciones
+        'licencia_carro', 'licencia_carro_vence',
+        'licencia_moto', 'licencia_moto_vence',
+        'tiene_cert_alturas', 'cert_alturas_vence',
+
+        // Estado
+        'estado_empleado', 'codigo_directv', 'empresa_id', 'comentarios',
+
+        // Información Adicional
+        'cargo', 'tipo_funcionario', 'tipo_vinculacion',
+        'cuenta_bancaria', 'tipo_cuenta', 'banco',
+
+        // Contacto de emergencia
+        'contacto_emergencia_nombre', 'contacto_emergencia_telefono', 'contacto_emergencia_parentesco',
     ];
 
     /**
@@ -39,11 +64,24 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'    => 'datetime',
+            'password'             => 'hashed',
+            'activo'               => 'boolean',
+            'ultimo_sso_at'        => 'datetime',
+            'fecha_nacimiento'     => 'date',
+            'licencia_carro_vence' => 'date',
+            'licencia_moto_vence'  => 'date',
+            'cert_alturas_vence'   => 'date',
+            'tiene_cert_alturas'   => 'boolean',
+            'ingresos'             => 'decimal:2',
         ];
     }
 }

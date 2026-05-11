@@ -1,33 +1,54 @@
-import { useState, useEffect } from 'react'
-import api from '../api/axios'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from '../context/AuthContext'
+import PrivateRoute from './PrivateRoute'
+import Login     from '../pages/Login'
+import Dashboard from '../pages/Dashboard'
+import Module    from '../pages/Module'
+import Submodule from '../pages/Submodule'
 
-function App() {
-  const [status, setStatus] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    api.get('/health')
-      .then(res => setStatus(res.data))
-      .catch(() => setError('No se pudo conectar con la API.'))
-      .finally(() => setLoading(false))
-  }, [])
-
+export default function App() {
   return (
-    <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>ERP AvanzaConoce</h1>
-      <h2>Estado del Backend (Laravel)</h2>
-      {loading && <p>Conectando...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {status && (
-        <div style={{ background: '#e8f5e9', padding: '1rem', borderRadius: '8px' }}>
-          <p><strong>Estado:</strong> {status.status}</p>
-          <p><strong>App:</strong> {status.app}</p>
-          <p style={{ color: 'green' }}>Conexion React ↔ Laravel exitosa</p>
-        </div>
-      )}
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Raíz → redirige al dashboard (PrivateRoute decide si mandar a login) */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* Login público */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Dashboard protegido */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/module/:moduleId"
+            element={
+              <PrivateRoute>
+                <Module />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/module/:moduleId/submodule/:submoduleId"
+            element={
+              <PrivateRoute>
+                <Submodule />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Cualquier ruta desconocida → dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
-
-export default App
