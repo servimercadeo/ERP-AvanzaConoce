@@ -6,6 +6,7 @@ import { ERP_MODULES } from '../data/erpModules';
 // ── Importa aquí los CRUD de cada archivo ───────────────────────────────
 import EmpleadosCrud from './EmpleadosCrud';
 import ContratosCrud from './ContratosCrud';
+
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
 // import ClientesSubCrud     from './ClientesSubCrud';
