@@ -21,17 +21,20 @@ const TIPOS_CUENTA = ['Ahorros', 'Corriente'];
 const BANCOS       = ['Bancolombia', 'Davivienda', 'BBVA', 'Banco de Bogotá', 'Banco Popular', 'Banco de Occidente', 'Banco Agrario', 'Citibank', 'Banco Caja Social', 'Finandina', 'Bancamía', 'Nequi', 'Daviplata', 'Otro'];
 
 /* ─── Conversión API ↔ formulario ────────────────────────────────────── */
+// La API devuelve fechas como "1995-06-14T00:00:00.000000Z"; el <input type="date"> necesita "yyyy-MM-dd"
+const dateOnly = v => v ? String(v).split('T')[0] : '';
+
 const toForm = emp => ({
   ...EMPTY_FORM,
   ...emp,
-  tiene_cert_alturas: emp.tiene_cert_alturas ? 'Sí' : 'No',
-  empresa_id:          emp.empresa_id         ?? '',
-  fecha_nacimiento:    emp.fecha_nacimiento    ?? '',
-  licencia_carro_vence:emp.licencia_carro_vence?? '',
-  licencia_moto_vence: emp.licencia_moto_vence ?? '',
-  cert_alturas_vence:  emp.cert_alturas_vence  ?? '',
-  ingresos:            emp.ingresos            ?? '',
-  numero_hijos:        emp.numero_hijos != null ? String(emp.numero_hijos) : '',
+  tiene_cert_alturas:   emp.tiene_cert_alturas ? 'Sí' : 'No',
+  empresa_id:            emp.empresa_id          ?? '',
+  fecha_nacimiento:      dateOnly(emp.fecha_nacimiento),
+  licencia_carro_vence:  dateOnly(emp.licencia_carro_vence),
+  licencia_moto_vence:   dateOnly(emp.licencia_moto_vence),
+  cert_alturas_vence:    dateOnly(emp.cert_alturas_vence),
+  ingresos:              emp.ingresos            ?? '',
+  numero_hijos:          emp.numero_hijos != null ? String(emp.numero_hijos) : '',
 });
 
 const toApi = form => ({
@@ -89,7 +92,7 @@ function Field({ label, k, type = 'text', opts, req, span, form, errors, onChang
 }
 
 /* ─── Modal ──────────────────────────────────────────────────────────── */
-function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = false }) {
+function Modal({ open, onClose, onSave, initial, title, empresas, catalogs, readOnly = false }) {
   const [form, setForm]        = useState(initial);
   const [errors, setErrors]    = useState({});
   const [activeTab, setActive] = useState('general');
@@ -110,7 +113,6 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
     if (!form.email?.trim())            e.email            = 'Requerido';
     if (!form.eps?.trim())              e.eps              = 'Requerido';
     if (!form.arl?.trim())              e.arl              = 'Requerido';
-    if (!form.fondo_pensiones?.trim())  e.fondo_pensiones  = 'Requerido';
     if (!form.estado_empleado?.trim())  e.estado_empleado  = 'Requerido';
     if (!form.cargo?.trim())            e.cargo            = 'Requerido';
     if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = 'Requerido';
@@ -123,8 +125,8 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
     if (Object.keys(e).length) {
       setErrors(e);
       const enAdicional = ['cargo', 'tipo_funcionario', 'tipo_vinculacion'];
-      const soloAdicional = Object.keys(e).every(k => enAdicional.includes(k));
-      if (soloAdicional) setActive('adicional');
+      const hasGeneralErrors = Object.keys(e).some(k => !enAdicional.includes(k));
+      setActive(hasGeneralErrors ? 'general' : 'adicional');
       return;
     }
     setSaving(true);
@@ -146,9 +148,9 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
       <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
 
         {/* Cabecera */}
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>{title}</span>
-          <button style={S.closeBtn} onClick={onClose}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>{title}</span>
+          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
         </div>
 
         {/* Pestañas */}
@@ -183,7 +185,7 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
 
               {/* Fila 2 – Lugar */}
               <div style={{ ...S.grid4, marginTop: 16 }}>
-                <Field label="Sede a la que pertenece" k="sede"            opts={SEDES} req {...fp} />
+                <Field label="Sede a la que pertenece" k="sede"            opts={catalogs.sedes} req {...fp} />
                 <Field label="Fecha Nacimiento"        k="fecha_nacimiento" type="date"      {...fp} />
                 <Field label="Lugar Nacimiento"        k="lugar_nacimiento"                  {...fp} />
                 <Field label="Raza"                    k="raza"                              {...fp} />
@@ -221,15 +223,15 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
 
               {/* Fila 6 – Seguridad Social */}
               <div style={{ ...S.grid4, marginTop: 16 }}>
-                <Field label="RH"               k="rh"            opts={RH_LIST}  {...fp} />
-                <Field label="LPS Afiliado"     k="eps"           opts={EPS_LIST} req {...fp} />
-                <Field label="ARL"              k="arl"           opts={ARL_LIST} req {...fp} />
+                <Field label="RH"               k="rh"            opts={catalogs.tipos_rh}  {...fp} />
+                <Field label="EPS Afiliado"     k="eps"           opts={catalogs.eps} req {...fp} />
+                <Field label="ARL"              k="arl"           opts={catalogs.arls} req {...fp} />
                 <Field label="Fondo de Pensiones" k="fondo_pensiones" opts={PENSIONES} req {...fp} />
               </div>
 
               {/* Fila 7 – Licencias */}
               <div style={{ ...S.grid4, marginTop: 16 }}>
-                <Field label="Caja Compensación"  k="caja_compensacion"  opts={CAJAS} {...fp} />
+                <Field label="Caja Compensación"  k="caja_compensacion"  opts={catalogs.cajas} {...fp} />
                 <Field label="No. Licencia Carro" k="licencia_carro"          {...fp} />
                 <Field label="Vence"              k="licencia_carro_vence" type="date" {...fp} />
                 <div /> {/* espaciador */}
@@ -266,15 +268,15 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
           {activeTab === 'adicional' && (
             <>
               <div style={S.grid3}>
-                <Field label="Cargo"            k="cargo"            opts={CARGOS}       req {...fp} />
-                <Field label="Tipo Funcionario" k="tipo_funcionario" opts={TIPOS_FUNC}   req {...fp} />
-                <Field label="Tipo Vinculación" k="tipo_vinculacion" opts={TIPOS_VINC}   req {...fp} />
+                <Field label="Cargo"            k="cargo"            opts={catalogs.cargos}            req {...fp} />
+                <Field label="Tipo Funcionario" k="tipo_funcionario" opts={catalogs.tipos_funcionario} req {...fp} />
+                <Field label="Tipo Vinculación" k="tipo_vinculacion" opts={catalogs.tipos_vinculacion} req {...fp} />
               </div>
 
               <div style={{ ...S.grid3, marginTop: 16 }}>
-                <Field label="No. de Cuenta Bancaria" k="cuenta_bancaria"                          {...fp} />
-                <Field label="Tipo de Cuenta"         k="tipo_cuenta"    opts={TIPOS_CUENTA}       {...fp} />
-                <Field label="Banco de la cuenta"     k="banco"          opts={BANCOS}             {...fp} />
+                <Field label="No. de Cuenta Bancaria" k="cuenta_bancaria"                              {...fp} />
+                <Field label="Tipo de Cuenta"         k="tipo_cuenta"    opts={TIPOS_CUENTA}           {...fp} />
+                <Field label="Banco de la cuenta"     k="banco"          opts={catalogs.bancos}        {...fp} />
               </div>
             </>
           )}
@@ -305,9 +307,9 @@ function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
   return (
     <div style={S.overlay} onClick={onCancel}>
       <div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>Eliminar empleado</span>
-          <button style={S.closeBtn} onClick={onCancel}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>Eliminar empleado</span>
+          <button style={S.closeBtnWhite} onClick={onCancel}>✕</button>
         </div>
         <div style={{ padding: '28px 28px 0' }}>
           <p style={{ color: 'var(--text)', lineHeight: 1.7 }}>
@@ -338,9 +340,9 @@ function CredencialesModal({ open, credenciales, onClose }) {
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={{ ...S.modal, maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>Credenciales de acceso</span>
-          <button style={S.closeBtn} onClick={onClose}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>Credenciales de acceso</span>
+          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
         </div>
         <div style={{ padding: '28px 28px 20px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20, lineHeight: 1.6 }}>
@@ -393,6 +395,18 @@ export default function EmpleadosCrud() {
   const [filtroVinc, setFiltroVinc]             = useState('Todos');
   const [filtroEmpresa, setFiltroEmpresa]       = useState('Todas');
   const [empresas, setEmpresas]                 = useState([]);
+  const [filtroTipoFunc, setFiltroTipoFunc]     = useState('Todos');
+  const [filtroEps, setFiltroEps]               = useState('Todas');
+  const [filtroArl, setFiltroArl]               = useState('Todas');
+  const [filtroPensiones, setFiltroPensiones]   = useState('Todas');
+  const [filtroRH, setFiltroRH]                 = useState('Todos');
+  const [filtroCiudad, setFiltroCiudad]         = useState('Todas');
+  const [catalogs, setCatalogs]                 = useState({
+    sedes: SEDES, cargos: CARGOS, eps: EPS_LIST, arls: ARL_LIST,
+    cajas: CAJAS, bancos: BANCOS, tipos_rh: RH_LIST,
+    ciudades: [], sedes_por_ciudad: {},
+    tipos_funcionario: TIPOS_FUNC, tipos_vinculacion: TIPOS_VINC,
+  });
   const [modalOpen, setModalOpen]               = useState(false);
   const [editTarget, setEditTarget]             = useState(null);
   const [viewOpen, setViewOpen]                 = useState(false);
@@ -408,6 +422,13 @@ export default function EmpleadosCrud() {
     fetch('/api/empresas')
       .then(r => r.ok ? r.json() : [])
       .then(setEmpresas)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/catalogos')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCatalogs(data); })
       .catch(() => {});
   }, []);
 
@@ -428,17 +449,23 @@ export default function EmpleadosCrud() {
   const filtered = useMemo(() => empleados.filter(e => {
     const q     = search.toLowerCase();
     const nombre = `${e.apellidos ?? ''} ${e.nombres ?? ''}`.toLowerCase();
-    const matchQ  = nombre.includes(q) || (e.cedula ?? '').includes(q) || (e.cargo ?? '').toLowerCase().includes(q);
-    const matchE  = filtroEstado  === 'Todos' || e.estado_empleado  === filtroEstado;
-    const matchS  = filtroSede    === 'Todas' || e.sede             === filtroSede;
-    const matchC  = filtroCargo   === 'Todos' || e.cargo            === filtroCargo;
-    const matchV  = filtroVinc    === 'Todos' || e.tipo_vinculacion  === filtroVinc;
-    const matchEm = filtroEmpresa === 'Todas' || String(e.empresa_id) === String(filtroEmpresa);
-    return matchQ && matchE && matchS && matchC && matchV && matchEm;
-  }), [empleados, search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa]);
+    const matchQ   = nombre.includes(q) || (e.cedula ?? '').includes(q) || (e.cargo ?? '').toLowerCase().includes(q);
+    const matchE   = filtroEstado    === 'Todos' || e.estado_empleado  === filtroEstado;
+    const matchS   = filtroSede      === 'Todas' || e.sede             === filtroSede;
+    const matchC   = filtroCargo     === 'Todos' || e.cargo            === filtroCargo;
+    const matchV   = filtroVinc      === 'Todos' || e.tipo_vinculacion === filtroVinc;
+    const matchEm  = filtroEmpresa   === 'Todas' || String(e.empresa_id) === String(filtroEmpresa);
+    const matchTF  = filtroTipoFunc  === 'Todos' || e.tipo_funcionario === filtroTipoFunc;
+    const matchEps = filtroEps       === 'Todas' || e.eps              === filtroEps;
+    const matchArl = filtroArl       === 'Todas' || e.arl              === filtroArl;
+    const matchPen = filtroPensiones === 'Todas' || e.fondo_pensiones  === filtroPensiones;
+    const matchRH  = filtroRH        === 'Todos' || e.rh               === filtroRH;
+    const matchCiu = filtroCiudad    === 'Todas' || (catalogs.sedes_por_ciudad?.[filtroCiudad]?.includes(e.sede) ?? false);
+    return matchQ && matchE && matchS && matchC && matchV && matchEm && matchTF && matchEps && matchArl && matchPen && matchRH && matchCiu;
+  }), [empleados, search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa, filtroTipoFunc, filtroEps, filtroArl, filtroPensiones, filtroRH, filtroCiudad, catalogs.sedes_por_ciudad]);
 
   // Resetear a página 1 cuando cambian los filtros
-  useEffect(() => { setPagina(1); }, [search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa]);
+  useEffect(() => { setPagina(1); }, [search, filtroEstado, filtroSede, filtroCargo, filtroVinc, filtroEmpresa, filtroTipoFunc, filtroEps, filtroArl, filtroPensiones, filtroRH, filtroCiudad]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
   const paginated    = useMemo(
@@ -457,6 +484,8 @@ export default function EmpleadosCrud() {
   const clearFilters = () => {
     setSearch(''); setFiltroEstado('Todos'); setFiltroSede('Todas');
     setFiltroCargo('Todos'); setFiltroVinc('Todos'); setFiltroEmpresa('Todas');
+    setFiltroTipoFunc('Todos'); setFiltroEps('Todas'); setFiltroArl('Todas');
+    setFiltroPensiones('Todas'); setFiltroRH('Todos'); setFiltroCiudad('Todas');
   };
 
   /* CRUD */
@@ -580,18 +609,20 @@ export default function EmpleadosCrud() {
                 <tr key={emp.id}>
                   <td>
                     <div style={S.avatarCell}>
-                      <div style={S.avatar}>{(emp.apellidos ?? '?').charAt(0).toUpperCase()}</div>
+                      <div style={S.avatar}>{((emp.apellidos || emp.name) ?? '?').charAt(0).toUpperCase()}</div>
                       <span style={{ fontWeight: 700, color: 'var(--text)' }}>
-                        {emp.apellidos} {emp.nombres}
+                        {emp.apellidos && emp.nombres ? `${emp.apellidos} ${emp.nombres}` : emp.name}
                       </span>
                     </div>
                   </td>
                   <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{emp.cedula}</td>
-                  <td>{emp.cargo}</td>
-                  <td><span style={S.badge('#e8f8f5', 'var(--primary-dark)')}>{emp.sede}</span></td>
+                  <td>{emp.cargo ?? '—'}</td>
+                  <td>{emp.sede ? <span style={S.badge('#e8f8f5', 'var(--primary-dark)')}>{emp.sede}</span> : '—'}</td>
                   <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{emp.empresa?.nombre ?? '—'}</td>
                   <td>
-                    <span style={S.badge('#fff7e0', '#b7780c')}>{emp.tipo_vinculacion}</span>
+                    {emp.tipo_vinculacion
+                      ? <span style={S.badge('#fff7e0', '#b7780c')}>{emp.tipo_vinculacion}</span>
+                      : '—'}
                   </td>
                   <td>
                     <span style={{
@@ -650,6 +681,7 @@ export default function EmpleadosCrud() {
         initial={editTarget ? toForm(editTarget) : EMPTY_FORM}
         title={editTarget ? 'Editar empleado' : 'Registrar nuevo empleado'}
         empresas={empresas}
+        catalogs={catalogs}
       />
 
       <Modal
@@ -659,6 +691,7 @@ export default function EmpleadosCrud() {
         initial={viewTarget ? toForm(viewTarget) : EMPTY_FORM}
         title="Ver empleado"
         empresas={empresas}
+        catalogs={catalogs}
         readOnly
       />
 
@@ -686,10 +719,17 @@ export default function EmpleadosCrud() {
             <div style={S.modalBody}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 24px' }}>
                 <div style={S.formGroup}>
+                  <label style={S.label}>Ciudad</label>
+                  <select style={S.input} value={filtroCiudad} onChange={e => setFiltroCiudad(e.target.value)}>
+                    <option value="Todas">Elige</option>
+                    {catalogs.ciudades.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={S.formGroup}>
                   <label style={S.label}>Sede</label>
                   <select style={S.input} value={filtroSede} onChange={e => setFiltroSede(e.target.value)}>
                     <option value="Todas">Elige</option>
-                    {SEDES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catalogs.sedes.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div style={S.formGroup}>
@@ -700,10 +740,6 @@ export default function EmpleadosCrud() {
                   </select>
                 </div>
                 <div style={S.formGroup}>
-                  <label style={S.label}>Cédula</label>
-                  <input style={S.input} type="text" disabled placeholder="Cédula" />
-                </div>
-                <div style={S.formGroup}>
                   <label style={S.label}>Tipo Vinculación</label>
                   <select style={S.input} value={filtroVinc} onChange={e => setFiltroVinc(e.target.value)}>
                     <option value="Todos">Elige</option>
@@ -712,30 +748,45 @@ export default function EmpleadosCrud() {
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Tipo Funcionario</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroTipoFunc} onChange={e => setFiltroTipoFunc(e.target.value)}>
+                    <option value="Todos">Elige</option>
+                    {catalogs.tipos_funcionario.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Cargo</label>
                   <select style={S.input} value={filtroCargo} onChange={e => setFiltroCargo(e.target.value)}>
                     <option value="Todos">Elige</option>
-                    {CARGOS.map(c => <option key={c} value={c}>{c}</option>)}
+                    {catalogs.cargos.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>EPS Afiliado</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroEps} onChange={e => setFiltroEps(e.target.value)}>
+                    <option value="Todas">Elige</option>
+                    {catalogs.eps.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>ARL</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroArl} onChange={e => setFiltroArl(e.target.value)}>
+                    <option value="Todas">Elige</option>
+                    {catalogs.arls.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Fondo de Pensiones</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroPensiones} onChange={e => setFiltroPensiones(e.target.value)}>
+                    <option value="Todas">Elige</option>
+                    {PENSIONES.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>RH</label>
-                  <select style={S.input} disabled><option>Elige</option></select>
+                  <select style={S.input} value={filtroRH} onChange={e => setFiltroRH(e.target.value)}>
+                    <option value="Todos">Elige</option>
+                    {catalogs.tipos_rh.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
                 <div style={S.formGroup}>
                   <label style={S.label}>Estado</label>

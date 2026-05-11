@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\SsoController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 // ── Público ──────────────────────────────────────────────────────────────────
@@ -13,6 +14,33 @@ Route::get('/health', function () {
 });
 
 Route::get('/empresas', [EmpresaController::class, 'index']);
+
+Route::get('/catalogos', function () {
+    $sedesPorCiudad = DB::table('sedes')
+        ->join('ciudades', 'sedes.id_ciudad', '=', 'ciudades.id')
+        ->select('ciudades.nombre as ciudad', 'sedes.nombre as sede')
+        ->orderBy('ciudades.nombre')
+        ->get()
+        ->groupBy('ciudad')
+        ->map(fn($g) => $g->pluck('sede')->values()->toArray())
+        ->toArray();
+
+    $ciudades = array_keys($sedesPorCiudad);
+
+    return response()->json([
+        'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'ciudades'          => $ciudades,
+        'sedes_por_ciudad'  => $sedesPorCiudad,
+        'tipos_funcionario' => DB::table('users')->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->select('tipo_funcionario')->distinct()->orderBy('tipo_funcionario')->pluck('tipo_funcionario'),
+        'tipos_vinculacion' => DB::table('users')->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->select('tipo_vinculacion')->distinct()->orderBy('tipo_vinculacion')->pluck('tipo_vinculacion'),
+    ]);
+});
 
 // Recibe usuarios desde AvanzaConoce (autenticado con X-ERP-Secret)
 Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanzaconoce']);
