@@ -16,5 +16,8 @@ class DatabaseSeeder extends Seeder
 
         // 3. Contratos vinculados a esos empleados
         $this->call(ContratosSeeder::class);
+
+        // 4. Sedes (importadas desde database/seeders/data/Aliados.csv)
+        $this->call(SedesSeeder::class);
     }
 }

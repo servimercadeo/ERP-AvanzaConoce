@@ -212,38 +212,10 @@ export default function Module() {
                 </div>
 
                 {/* ══════════════════════════════════════════════════════
-            SECCIÓN 1 — Submódulos como tarjetas (si los hay)
-        ══════════════════════════════════════════════════════ */}
-                {mod.submods && mod.submods.length > 0 && (
-                    <div style={{ marginTop: 28 }}>
-                        <p className="section-title">Submódulos</p>
-                        <div className="mod-subgrid" id="submod-grid">
-                            {mod.submods.map((sub) => (
-                                <Link
-                                    key={sub.id}
-                                    className="submod-card"
-                                    to={`/module/${mod.id}/submodule/${sub.id}`}
-                                >
-                                    <span className="sc-icon">
-                                        {sub.icon || "📂"}
-                                    </span>
-                                    <span className="sc-label">
-                                        {sub.label}
-                                    </span>
-                                    <span className="sc-desc">{sub.desc}</span>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* ══════════════════════════════════════════════════════
-            SECCIÓN 2 — Archivos directos con BARRA DE PESTAÑAS
+            SECCIÓN 1 — Archivos directos con BARRA DE PESTAÑAS
         ══════════════════════════════════════════════════════ */}
                 {archivosDirectos.length > 0 && (
-                    <div
-                        style={{ marginTop: mod.submods?.length > 0 ? 36 : 28 }}
-                    >
+                    <div style={{ marginTop: 28 }}>
                         {mod.submods?.length > 0 && (
                             <p className="section-title">Archivos del módulo</p>
                         )}
@@ -332,6 +304,32 @@ export default function Module() {
                                     </span>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════
+            SECCIÓN 2 — Submódulos como tarjetas (si los hay)
+        ══════════════════════════════════════════════════════ */}
+                {mod.submods && mod.submods.length > 0 && (
+                    <div style={{ marginTop: 36 }}>
+                        <p className="section-title">Submódulos</p>
+                        <div className="mod-subgrid" id="submod-grid">
+                            {mod.submods.map((sub) => (
+                                <Link
+                                    key={sub.id}
+                                    className="submod-card"
+                                    to={`/module/${mod.id}/submodule/${sub.id}`}
+                                >
+                                    <span className="sc-icon">
+                                        {sub.icon || "📂"}
+                                    </span>
+                                    <span className="sc-label">
+                                        {sub.label}
+                                    </span>
+                                    <span className="sc-desc">{sub.desc}</span>
+                                </Link>
+                            ))}
                         </div>
                     </div>
                 )}

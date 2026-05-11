@@ -146,9 +146,9 @@ function Modal({ open, onClose, onSave, initial, title, empresas, readOnly = fal
       <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
 
         {/* Cabecera */}
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>{title}</span>
-          <button style={S.closeBtn} onClick={onClose}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>{title}</span>
+          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
         </div>
 
         {/* Pestañas */}
@@ -305,9 +305,9 @@ function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
   return (
     <div style={S.overlay} onClick={onCancel}>
       <div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>Eliminar empleado</span>
-          <button style={S.closeBtn} onClick={onCancel}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>Eliminar empleado</span>
+          <button style={S.closeBtnWhite} onClick={onCancel}>✕</button>
         </div>
         <div style={{ padding: '28px 28px 0' }}>
           <p style={{ color: 'var(--text)', lineHeight: 1.7 }}>
@@ -338,9 +338,9 @@ function CredencialesModal({ open, credenciales, onClose }) {
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={{ ...S.modal, maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-        <div style={S.modalHeader}>
-          <span style={S.modalTitle}>Credenciales de acceso</span>
-          <button style={S.closeBtn} onClick={onClose}>✕</button>
+        <div style={S.modalHeaderGreen}>
+          <span style={S.modalTitleWhite}>Credenciales de acceso</span>
+          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
         </div>
         <div style={{ padding: '28px 28px 20px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20, lineHeight: 1.6 }}>
