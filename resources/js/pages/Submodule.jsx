@@ -5,6 +5,7 @@ import { ERP_MODULES } from '../data/erpModules';
 
 // ── Importa aquí los CRUD de cada archivo ───────────────────────────────
 import EmpleadosCrud from './EmpleadosCrud';
+import ContratosCrud from './ContratosCrud';
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
 // import ClientesSubCrud     from './ClientesSubCrud';
@@ -26,6 +27,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── ADMINISTRATIVO ─────────────────────────────────── */
     case 'administrativo':
       switch (submoduleId) {
+        case 'admin_contratos':
+          switch (archivoId) {
+            case 'ver_crear_contratos': return ContratosCrud;
+            default: return null;
+          }
         default: return null;
       }
 
