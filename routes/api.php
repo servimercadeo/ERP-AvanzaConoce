@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\UserController;
@@ -57,4 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // CRUD completo de empleados
     Route::apiResource('empleados', EmpleadoController::class);
+
+    // CRUD completo de contratos
+    Route::apiResource('contratos', ContratoController::class);
 });
