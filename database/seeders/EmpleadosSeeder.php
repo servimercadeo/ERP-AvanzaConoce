@@ -148,7 +148,28 @@ class EmpleadosSeeder extends Seeder
         $arlsMap     = DB::table('arls')->pluck('nombre', 'id')->toArray();
         $cajasMap    = DB::table('cajas_compensacion')->pluck('nombre', 'id')->toArray();
 
-        $handle = fopen($csvPath, 'r');
+        $count1 = $this->importarCsv($csvPath, $sedesMap, $empresasMap, $cargosMap, $epsMap, $rhMap, $ecMap, $bancosMap, $arlsMap, $cajasMap);
+        $this->command->info("✓ {$count1} usuarios importados desde Users.csv");
+
+        // ── IMPORTAR DESDE Users2.csv ──────────────────────────────────────
+        $csvPath2 = database_path('seeders/data/Users2.csv');
+
+        if (!file_exists($csvPath2)) {
+            $this->command->warn("CSV no encontrado: {$csvPath2} (omitido)");
+            return;
+        }
+
+        $count2 = $this->importarCsv($csvPath2, $sedesMap, $empresasMap, $cargosMap, $epsMap, $rhMap, $ecMap, $bancosMap, $arlsMap, $cajasMap);
+        $this->command->info("✓ {$count2} usuarios importados desde Users2.csv");
+    }
+
+    private function importarCsv(
+        string $path,
+        array $sedesMap, array $empresasMap, array $cargosMap,
+        array $epsMap, array $rhMap, array $ecMap,
+        array $bancosMap, array $arlsMap, array $cajasMap
+    ): int {
+        $handle = fopen($path, 'r');
         fgetcsv($handle); // saltar cabecera
 
         $nullOrVal   = fn($v) => ($v === '' || strtoupper((string) $v) === 'NULL' || $v === '-') ? null : $v;
@@ -157,28 +178,26 @@ class EmpleadosSeeder extends Seeder
         $dateOrNull  = fn($v) => ($v === '' || strtoupper((string) $v) === 'NULL' || $v === '1970-01-01' || $v === '-') ? null : $v;
         $upper       = fn($v) => $v !== null ? mb_strtoupper($v, 'UTF-8') : null;
         $boolAlturas = fn($v) => !(strtolower(trim((string) $v)) === 'no' || $v === '' || strtoupper((string) $v) === 'NULL');
-        // Convierte columna ID a nombre usando el mapa correspondiente
-        $id2name = fn(array $map, array $r, int $col): ?string =>
+        $id2name     = fn(array $map, array $r, int $col): ?string =>
             isset($r[$col]) && is_numeric($r[$col]) ? ($map[(int) $r[$col]] ?? null) : null;
 
         $count = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (!isset($row[0]) || !is_numeric($row[0])) continue;
-            if (empty(trim($row[2] ?? ''))) continue; // requiere email
+            if (empty(trim($row[2] ?? ''))) continue;
 
             $rowData = [
                 'avanzaconoce_id'                => (int) $row[0],
                 'name'                           => trim($row[1] ?? ''),
                 'email'                          => strtolower(trim($row[2] ?? '')),
-                'password'                       => $row[4] ?? '',   // bcrypt ya hasheado
+                'password'                       => $row[4] ?? '',
                 'rol'                            => 'consultor',
                 'activo'                         => strtolower(trim($row[32] ?? '')) === 'activo',
                 'cedula'                         => $nullOrVal($row[11] ?? null),
                 'apellidos'                      => $upper($nullOrVal($row[49] ?? null)),
                 'nombres'                        => $upper($nullOrVal($row[77] ?? null)),
                 'movil'                          => $nullOrVal($row[10] ?? null),
-                // Lookups de catálogo (col ID → nombre del catálogo)
                 'sede'                           => $id2name($sedesMap,  $row, 34),
                 'empresa_id'                     => ($empresaNom = trim($row[75] ?? '')) !== ''
                                                         ? ($empresasMap[$empresaNom] ?? null) : null,
@@ -189,7 +208,6 @@ class EmpleadosSeeder extends Seeder
                 'banco'                          => $id2name($bancosMap, $row, 76),
                 'arl'                            => $id2name($arlsMap,   $row, 36),
                 'caja_compensacion'              => $id2name($cajasMap,  $row, 39),
-                // Campos directos
                 'fecha_nacimiento'               => $dateOrNull($row[41] ?? null),
                 'lugar_nacimiento'               => $nullOrVal($row[42] ?? null),
                 'raza'                           => $nullOrVal($row[43] ?? null),
@@ -222,19 +240,35 @@ class EmpleadosSeeder extends Seeder
             ];
 
             try {
-                // Actualiza si ya existe por avanzaconoce_id; inserta si es nuevo
-                DB::table('users')->updateOrInsert(
-                    ['avanzaconoce_id' => $rowData['avanzaconoce_id']],
-                    $rowData
-                );
+                $existePorId = DB::table('users')
+                    ->where('avanzaconoce_id', $rowData['avanzaconoce_id'])
+                    ->exists();
+
+                if ($existePorId) {
+                    DB::table('users')
+                        ->where('avanzaconoce_id', $rowData['avanzaconoce_id'])
+                        ->update($rowData);
+                } else {
+                    // Puede que exista por email (ej: insertado manualmente sin avanzaconoce_id)
+                    $existePorEmail = DB::table('users')
+                        ->where('email', $rowData['email'])
+                        ->exists();
+
+                    if ($existePorEmail) {
+                        DB::table('users')
+                            ->where('email', $rowData['email'])
+                            ->update($rowData);
+                    } else {
+                        DB::table('users')->insert($rowData);
+                    }
+                }
                 $count++;
             } catch (\Exception) {
-                // Omite si hay conflicto de email/cedula con otro usuario existente
+                // Omite conflictos inesperados
             }
         }
 
         fclose($handle);
-
-        $this->command->info("✓ {$count} usuarios importados desde Users.csv");
+        return $count;
     }
 }

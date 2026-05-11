@@ -29,8 +29,13 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    await api.post('/logout', {}, { baseURL: '/' })
-    setUser(null)
+    try {
+      await api.post('/logout', {}, { baseURL: '/' })
+    } catch {
+      // Si la sesión ya expiró en el servidor igualmente limpiamos el estado local
+    } finally {
+      setUser(null)
+    }
   }
 
   return (
