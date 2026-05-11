@@ -447,9 +447,15 @@ export default function EmpleadosCrud() {
 
   /* Filtrado */
   const filtered = useMemo(() => empleados.filter(e => {
-    const q     = search.toLowerCase();
-    const nombre = `${e.apellidos ?? ''} ${e.nombres ?? ''}`.toLowerCase();
-    const matchQ   = nombre.includes(q) || (e.cedula ?? '').includes(q) || (e.cargo ?? '').toLowerCase().includes(q);
+    const palabras = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const haystack = [
+      e.nombres   ?? '',
+      e.apellidos ?? '',
+      e.name      ?? '',
+      e.cedula    ?? '',
+      e.cargo     ?? '',
+    ].join(' ').toLowerCase();
+    const matchQ = palabras.length === 0 || palabras.every(p => haystack.includes(p));
     const matchE   = filtroEstado    === 'Todos' || e.estado_empleado  === filtroEstado;
     const matchS   = filtroSede      === 'Todas' || e.sede             === filtroSede;
     const matchC   = filtroCargo     === 'Todos' || e.cargo            === filtroCargo;
