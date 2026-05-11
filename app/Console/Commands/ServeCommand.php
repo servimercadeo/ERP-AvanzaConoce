@@ -42,17 +42,4 @@ class ServeCommand extends BaseServeCommand
         // Espera breve para que Vite arranque antes de que Laravel empiece a imprimir
         sleep(2);
     }
-
-    protected function port()
-    {
-        $port = $this->input->getOption('port');
-
-        if (is_null($port)) {
-            [, $port] = $this->getHostAndPort();
-        }
-
-        $port = $port ?: 8000;
-
-        return (int) $port + (int) $this->portOffset;
-    }
 }

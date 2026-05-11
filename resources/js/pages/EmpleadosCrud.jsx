@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
+import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch } from '../components/Icons';
 
 /* ─── Catálogos ──────────────────────────────────────────────────────── */
 const SEDES        = ['Bogotá', 'Medellín', 'Cali', 'Bucaramanga', 'Barranquilla', 'Pereira', 'Manizales', 'Otra'];
@@ -150,7 +151,7 @@ function Modal({ open, onClose, onSave, initial, title, empresas, catalogs, read
         {/* Cabecera */}
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>{title}</span>
-          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
+          <button style={S.closeBtnWhite} onClick={onClose}><IconClose size={14} /></button>
         </div>
 
         {/* Pestañas */}
@@ -309,7 +310,7 @@ function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
       <div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>Eliminar empleado</span>
-          <button style={S.closeBtnWhite} onClick={onCancel}>✕</button>
+          <button style={S.closeBtnWhite} onClick={onCancel}><IconClose size={14} /></button>
         </div>
         <div style={{ padding: '28px 28px 0' }}>
           <p style={{ color: 'var(--text)', lineHeight: 1.7 }}>
@@ -342,7 +343,7 @@ function CredencialesModal({ open, credenciales, onClose }) {
       <div style={{ ...S.modal, maxWidth: 480 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>Credenciales de acceso</span>
-          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
+          <button style={S.closeBtnWhite} onClick={onClose}><IconClose size={14} /></button>
         </div>
         <div style={{ padding: '28px 28px 20px' }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20, lineHeight: 1.6 }}>
@@ -447,9 +448,15 @@ export default function EmpleadosCrud() {
 
   /* Filtrado */
   const filtered = useMemo(() => empleados.filter(e => {
-    const q     = search.toLowerCase();
-    const nombre = `${e.apellidos ?? ''} ${e.nombres ?? ''}`.toLowerCase();
-    const matchQ   = nombre.includes(q) || (e.cedula ?? '').includes(q) || (e.cargo ?? '').toLowerCase().includes(q);
+    const palabras = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const haystack = [
+      e.nombres   ?? '',
+      e.apellidos ?? '',
+      e.name      ?? '',
+      e.cedula    ?? '',
+      e.cargo     ?? '',
+    ].join(' ').toLowerCase();
+    const matchQ = palabras.length === 0 || palabras.every(p => haystack.includes(p));
     const matchE   = filtroEstado    === 'Todos' || e.estado_empleado  === filtroEstado;
     const matchS   = filtroSede      === 'Todas' || e.sede             === filtroSede;
     const matchC   = filtroCargo     === 'Todos' || e.cargo            === filtroCargo;
@@ -559,7 +566,12 @@ export default function EmpleadosCrud() {
       <div style={S.toolbar}>
         <div style={S.filters}>
           <div style={S.searchWrap}>
-            <span style={S.searchIcon}>🔍</span>
+            <span style={S.searchIcon}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
             <input
               style={S.searchInput}
               placeholder="Buscar por nombre, cédula o cargo…"
@@ -586,7 +598,7 @@ export default function EmpleadosCrud() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={S.empty}>
-            <span style={{ fontSize: '2.5rem' }}>🔎</span>
+            <IconEmptySearch size={44} />
             <p>No se encontraron empleados con los filtros aplicados.</p>
           </div>
         ) : null}
@@ -636,9 +648,9 @@ export default function EmpleadosCrud() {
                   </td>
                   <td>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver"     onClick={() => openView(emp)}>👁️</button>
-                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar"    onClick={() => openEdit(emp)}>✏️</button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')}                title="Eliminar"  onClick={() => setDeleteTarget(emp)}>🗑️</button>
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver"     onClick={() => openView(emp)}><IconEye /></button>
+                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar"    onClick={() => openEdit(emp)}><IconEdit /></button>
+                      <button style={S.actionBtn('#fce8e8', '#a33')}                title="Eliminar"  onClick={() => setDeleteTarget(emp)}><IconTrash /></button>
                     </div>
                   </td>
                 </tr>
@@ -714,7 +726,7 @@ export default function EmpleadosCrud() {
           <div style={{ ...S.modal, maxWidth: 900 }} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeaderGreen}>
               <span style={S.modalTitleWhite}>Filtros de Búsqueda</span>
-              <button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>✕</button>
+              <button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}><IconClose size={14} /></button>
             </div>
             <div style={S.modalBody}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 24px' }}>
@@ -833,7 +845,7 @@ const S = {
   toolbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' },
   filters:     { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 },
   searchWrap:  { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
-  searchIcon:  { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' },
+  searchIcon:  { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput: { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },
   filterBtn:   { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: 'pointer' },
 

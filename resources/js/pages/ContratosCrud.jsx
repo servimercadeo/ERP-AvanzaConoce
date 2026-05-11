@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
+import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch } from '../components/Icons';
 
 const POR_PAGINA = 5;
 
@@ -146,7 +147,7 @@ function Modal({ open, onClose, onSave, initial, title, empleados, catalogs, rea
       <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>{title}</span>
-          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
+          <button style={S.closeBtnWhite} onClick={onClose}><IconClose size={14} /></button>
         </div>
 
         <div className="tab-bar" style={S.tabBar}>
@@ -231,7 +232,7 @@ function Modal({ open, onClose, onSave, initial, title, empleados, catalogs, rea
                     <Field label="Centro de Costos" k={`cc_${i}_name`} form={{[`cc_${i}_name`]: cc.centro_costos}} onChange={() => e => updateCentroCosto(i, 'centro_costos', e.target.value)} errors={{}} disabled={readOnly} />
                     <div style={{ display: 'flex', gap: 10, alignItems: 'end' }}>
                       <Field label="Porcentaje %" k={`cc_${i}_pct`} type="number" form={{[`cc_${i}_pct`]: cc.porcentaje}} onChange={() => e => updateCentroCosto(i, 'porcentaje', e.target.value)} errors={{}} disabled={readOnly} />
-                      {!readOnly && <button style={{ ...S.actionBtn('#fce8e8', '#a33'), height: 38 }} onClick={() => removeCentroCosto(i)}>🗑️</button>}
+                      {!readOnly && <button style={{ ...S.actionBtn('#fce8e8', '#a33'), height: 38 }} onClick={() => removeCentroCosto(i)}><IconTrash size={14} /></button>}
                     </div>
                   </div>
                 ))}
@@ -246,7 +247,7 @@ function Modal({ open, onClose, onSave, initial, title, empleados, catalogs, rea
                     <Field label="Valor $" k={`a_${i}_val`} type="number" form={{[`a_${i}_val`]: anexo.valor}} onChange={() => e => updateAnexo(i, 'valor', e.target.value)} errors={{}} disabled={readOnly} />
                     <div style={{ display: 'flex', gap: 10, alignItems: 'end' }}>
                       <Field label="Fecha Entrega/Firma" k={`a_${i}_date`} type="date" form={{[`a_${i}_date`]: dateOnly(anexo.fecha_entrega_firma)}} onChange={() => e => updateAnexo(i, 'fecha_entrega_firma', e.target.value)} errors={{}} disabled={readOnly} />
-                      {!readOnly && <button style={{ ...S.actionBtn('#fce8e8', '#a33'), height: 38 }} onClick={() => removeAnexo(i)}>🗑️</button>}
+                      {!readOnly && <button style={{ ...S.actionBtn('#fce8e8', '#a33'), height: 38 }} onClick={() => removeAnexo(i)}><IconTrash size={14} /></button>}
                     </div>
                   </div>
                 ))}
@@ -380,7 +381,7 @@ export default function ContratosCrud() {
       <div style={S.toolbar}>
         <div style={S.filters}>
           <div style={S.searchWrap}>
-            <span style={S.searchIcon}>🔍</span>
+            <span style={S.searchIcon}><IconSearch size={15} /></span>
             <input style={S.searchInput} placeholder="Buscar por empleado, cédula o cargo…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <button style={S.filterBtn} onClick={() => setFilterOpen(true)}>
@@ -395,7 +396,7 @@ export default function ContratosCrud() {
         {loading ? (
           <div style={S.empty}>⏳<p>Cargando contratos…</p></div>
         ) : filtered.length === 0 ? (
-          <div style={S.empty}>🔎<p>No se encontraron contratos.</p></div>
+          <div style={S.empty}><IconEmptySearch size={44} /><p>No se encontraron contratos.</p></div>
         ) : (
           <table className="data-table">
             <thead>
@@ -431,9 +432,9 @@ export default function ContratosCrud() {
                   </td>
                   <td>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} onClick={() => { setViewTarget(c); setViewOpen(true); }}>👁️</button>
-                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} onClick={() => { setEditTarget(c); setModalOpen(true); }}>✏️</button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')} onClick={() => setDeleteTarget(c)}>🗑️</button>
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver" onClick={() => { setViewTarget(c); setViewOpen(true); }}><IconEye /></button>
+                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => { setEditTarget(c); setModalOpen(true); }}><IconEdit /></button>
+                      <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => setDeleteTarget(c)}><IconTrash /></button>
                     </div>
                   </td>
                 </tr>
@@ -446,7 +447,7 @@ export default function ContratosCrud() {
       {filterOpen && (
         <div style={S.overlay} onClick={() => setFilterOpen(false)}>
           <div style={{ ...S.modal, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
-            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Filtros</span><button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>✕</button></div>
+            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Filtros</span><button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}><IconClose size={14} /></button></div>
             <div style={S.modalBody}>
               <div style={S.formGroup}>
                 <label style={S.label}>Estado</label>
@@ -494,7 +495,7 @@ export default function ContratosCrud() {
       {deleteTarget && (
         <div style={S.overlay} onClick={() => setDeleteTarget(null)}>
           <div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Eliminar</span><button style={S.closeBtnWhite} onClick={() => setDeleteTarget(null)}>✕</button></div>
+            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Eliminar</span><button style={S.closeBtnWhite} onClick={() => setDeleteTarget(null)}><IconClose size={14} /></button></div>
             <div style={{ padding: 28 }}><p>¿Seguro de eliminar el contrato de <b>{deleteTarget.empleado?.apellidos}</b>?</p></div>
             <div style={S.modalFooter}>
               <button style={S.btnSecondary} onClick={() => setDeleteTarget(null)}>Cancelar</button>
@@ -511,7 +512,7 @@ const S = {
   toolbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' },
   filters:     { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 },
   searchWrap:  { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
-  searchIcon:  { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem', pointerEvents: 'none' },
+  searchIcon:  { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput: { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },
   filterBtn:   { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: 'pointer' },
   tableWrap:   { background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', overflowX: 'auto' },
