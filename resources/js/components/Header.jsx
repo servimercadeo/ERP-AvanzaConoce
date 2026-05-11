@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IconFile } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, NavLink } from 'react-router-dom';
 import { ERP_MODULES } from '../data/erpModules';
@@ -10,8 +11,11 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await logout();
+    } finally {
+      navigate('/login');
+    }
   };
 
   return (
@@ -56,7 +60,7 @@ export default function Header() {
                         <div className="sub-dropdown">
                           {sub.archivos.map(archivo => (
                             <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}`}>
-                              <span className="sub-icon">📄</span>
+                              <span className="sub-icon"><IconFile size={14} /></span>
                               <span>{archivo.label}</span>
                             </Link>
                           ))}
@@ -67,7 +71,7 @@ export default function Header() {
                 ) : (
                   mod.archivos?.map(archivo => (
                     <Link key={archivo.id} to={`/module/${mod.id}`}>
-                      <span className="sub-icon">📄</span>
+                      <span className="sub-icon"><IconFile size={14} /></span>
                       <span>{archivo.label}</span>
                     </Link>
                   ))

@@ -17,8 +17,8 @@ class EmpleadoController extends Controller
             User::with('empresa')
                 ->whereNotNull('cedula')
                 ->where('cedula', '!=', '')
-                ->orderBy('apellidos')
-                ->orderBy('nombres')
+                ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
+                ->orderByRaw('nombres IS NULL ASC, nombres ASC')
                 ->get()
         );
     }
@@ -94,7 +94,7 @@ class EmpleadoController extends Controller
             'email'            => ['required', 'email', Rule::unique('users', 'email')->ignore($ignoreId)],
             'eps'              => 'required|string|max:100',
             'arl'              => 'required|string|max:100',
-            'fondo_pensiones'  => 'required|string|max:100',
+            'fondo_pensiones'  => 'nullable|string|max:100',
             'estado_empleado'  => 'required|string|max:50',
             'cargo'            => 'required|string|max:150',
             'tipo_funcionario' => 'required|string|max:100',
