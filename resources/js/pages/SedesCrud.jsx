@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
+import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch, IconLoading } from '../components/Icons';
 
 const POR_PAGINA = 5;
 
@@ -125,7 +126,7 @@ function Modal({ open, onClose, onSave, initial, title, options, readOnly = fals
       <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>{title}</span>
-          <button style={S.closeBtnWhite} onClick={onClose}>✕</button>
+          <button style={S.closeBtnWhite} onClick={onClose}><IconClose size={14} /></button>
         </div>
 
         <div style={S.modalBody}>
@@ -319,7 +320,7 @@ export default function SedesCrud() {
       <div style={S.toolbar}>
         <div style={S.filters}>
           <div style={S.searchWrap}>
-            <span style={S.searchIcon}>🔍</span>
+            <span style={S.searchIcon}><IconSearch size={15} /></span>
             <input style={S.searchInput} placeholder="Buscar sede o código…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <button style={S.filterBtn} onClick={() => setFilterOpen(true)}>
@@ -332,9 +333,9 @@ export default function SedesCrud() {
 
       <div style={S.tableWrap}>
         {loading ? (
-          <div style={S.empty}>⏳<p>Cargando sedes…</p></div>
+          <div style={S.empty}><IconLoading size={32} /><p>Cargando sedes…</p></div>
         ) : filtered.length === 0 ? (
-          <div style={S.empty}>🔎<p>No se encontraron sedes.</p></div>
+          <div style={S.empty}><IconEmptySearch size={44} /><p>No se encontraron sedes.</p></div>
         ) : (
           <table className="data-table">
             <thead>
@@ -369,9 +370,9 @@ export default function SedesCrud() {
                   <td style={{ fontSize: '0.85rem' }}>{s.almacenista ? `${s.almacenista.nombres || ''} ${s.almacenista.apellidos || s.almacenista.name}` : '—'}</td>
                   <td>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} onClick={() => { setViewTarget(s); setViewOpen(true); }}>👁️</button>
-                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} onClick={() => { setEditTarget(s); setModalOpen(true); }}>✏️</button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')} onClick={() => setDeleteTarget(s)}>🗑️</button>
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} onClick={() => { setViewTarget(s); setViewOpen(true); }}><IconEye /></button>
+                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} onClick={() => { setEditTarget(s); setModalOpen(true); }}><IconEdit /></button>
+                      <button style={S.actionBtn('#fce8e8', '#a33')} onClick={() => setDeleteTarget(s)}><IconTrash /></button>
                     </div>
                   </td>
                 </tr>
@@ -410,7 +411,7 @@ export default function SedesCrud() {
       {filterOpen && (
         <div style={S.overlay} onClick={() => setFilterOpen(false)}>
           <div style={{ ...S.modal, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
-            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Filtros</span><button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>✕</button></div>
+            <div style={S.modalHeaderGreen}><span style={S.modalTitleWhite}>Filtros</span><button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}><IconClose size={14} /></button></div>
             <div style={S.modalBody}>
               <div style={S.formGroup}>
                 <label style={S.label}>Sede</label>
@@ -462,7 +463,7 @@ export default function SedesCrud() {
       {deleteTarget && (
         <div style={S.overlay} onClick={() => setDeleteTarget(null)}>
           <div style={{ ...S.modal, maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div style={{ ...S.modalHeaderGreen, background: '#e74c3c' }}><span style={S.modalTitleWhite}>Eliminar</span><button style={S.closeBtnWhite} onClick={() => setDeleteTarget(null)}>✕</button></div>
+            <div style={{ ...S.modalHeaderGreen, background: '#e74c3c' }}><span style={S.modalTitleWhite}>Eliminar</span><button style={S.closeBtnWhite} onClick={() => setDeleteTarget(null)}><IconClose size={14} /></button></div>
             <div style={{ padding: 28 }}><p>¿Seguro de eliminar la sede <b>{deleteTarget.nombre}</b>?</p></div>
             <div style={S.modalFooter}>
               <button style={S.btnSecondary} onClick={() => setDeleteTarget(null)}>Cancelar</button>

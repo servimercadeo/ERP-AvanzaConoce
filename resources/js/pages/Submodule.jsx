@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { ERP_MODULES } from '../data/erpModules';
+import { MODULE_ICONS, IconFolder, IconUnderConstruction } from '../components/Icons';
 
 // ── Importa aquí los CRUD de cada archivo ───────────────────────────────
 import EmpleadosCrud from './EmpleadosCrud';
@@ -229,16 +230,21 @@ export default function Submodule() {
         <div className="breadcrumb" id="breadcrumb">
           <Link to="/dashboard">Inicio</Link>
           <span className="sep">›</span>
-          <Link to={`/module/${mod.id}`}>{mod.icon} {mod.label}</Link>
+          <Link to={`/module/${mod.id}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 13 })} {mod.label}
+          </Link>
           <span className="sep">›</span>
-          <span>{sub.icon} {sub.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 13 })} {sub.label}
+          </span>
         </div>
 
         {/* ── Encabezado ──────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 0 }}>
           <div>
-            <p className="page-title" style={{ textAlign: 'left', marginBottom: 4 }}>
-              {sub.icon} {sub.label}
+            <p className="page-title" style={{ textAlign: 'left', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: 'var(--primary)' }}>{React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 22 })}</span>
+              {sub.label}
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 0 }}>
               {mod.label} · {sub.desc}
@@ -293,7 +299,7 @@ export default function Submodule() {
           ) : (
             /* ── Sin CRUD aún: placeholder ── */
             <div style={S.placeholder}>
-              <div style={S.placeholderIcon}>🚧</div>
+              <div style={S.placeholderIcon}><IconUnderConstruction size={56} /></div>
               <h3 style={{ fontFamily: "'Poppins', sans-serif", color: 'var(--primary)', marginBottom: 8 }}>
                 {archivoActual?.label}
               </h3>

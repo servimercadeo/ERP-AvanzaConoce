@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconFile } from './Icons';
+import { IconFile, MODULE_ICONS, IconFolder } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, NavLink } from 'react-router-dom';
 import { ERP_MODULES } from '../data/erpModules';
@@ -40,7 +40,7 @@ export default function Header() {
         {ERP_MODULES.map(mod => (
           <div key={mod.id} className="nav-item">
             <NavLink className="nav-link" to={`/module/${mod.id}`}>
-              {mod.icon && <span>{mod.icon}</span>}
+              {mod.icon && <span className="nav-icon">{React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 16 })}</span>}
               <span>{mod.label}</span>
               {(mod.submods?.length > 0 || mod.archivos?.length > 0) && <span className="arrow">▾</span>}
             </NavLink>
@@ -51,7 +51,7 @@ export default function Header() {
                     <div key={sub.id} className="dropdown-nested">
                       <Link to={`/module/${mod.id}/submodule/${sub.id}`}>
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                          {sub.icon && <span className="sub-icon">{sub.icon}</span>}
+                          {sub.icon && <span className="sub-icon">{React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 14 })}</span>}
                           <span>{sub.label}</span>
                           {sub.archivos?.length > 0 && <span className="arrow right" style={{ marginLeft: 'auto' }}>▸</span>}
                         </div>
