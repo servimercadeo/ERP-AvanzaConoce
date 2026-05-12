@@ -1013,6 +1013,7 @@ export default function EmpleadosCrud() {
     const [credenciales, setCredenciales] = useState(null);
     const [credencialesOpen, setCredencialesOpen] = useState(false);
     const [pagina, setPagina] = useState(1);
+    const [sedesActivas, setSedesActivas] = useState([]);
 
     useEffect(() => {
         fetch("/api/empresas")
@@ -1026,6 +1027,18 @@ export default function EmpleadosCrud() {
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
                 if (data) setCatalogs(data);
+            })
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        fetch("/api/sedes")
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data) => {
+                const activas = Array.isArray(data)
+                    ? data.filter((s) => s.estado === "Activa")
+                    : [];
+                setSedesActivas(activas);
             })
             .catch(() => {});
     }, []);
@@ -1161,8 +1174,11 @@ export default function EmpleadosCrud() {
     const activos = empleados.filter(
         (e) => e.estado_empleado === "Activo",
     ).length;
-    const numSedes = [...new Set(empleados.map((e) => e.sede).filter(Boolean))]
-        .length;
+    // Sedes activas que tienen al menos un empleado asignado
+    const sedesConEmpleado = new Set(empleados.map((e) => e.sede).filter(Boolean));
+    const numSedes = sedesActivas.length > 0
+        ? sedesActivas.filter((s) => sedesConEmpleado.has(s.nombre)).length
+        : sedesConEmpleado.size;
     const numEmp = [
         ...new Set(empleados.map((e) => e.empresa_id).filter(Boolean)),
     ].length;

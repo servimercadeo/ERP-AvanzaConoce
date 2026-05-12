@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ERP_MODULES } from "../data/erpModules";
@@ -122,6 +122,14 @@ export default function Module() {
     const [tabActiva, setTabActiva] = useState(() =>
         tieneArchivos ? (mod?.archivos?.[0]?.id ?? null) : null,
     );
+
+    /* ── Auto-selección: cuando cambia de módulo, abrir el 1er archivo ── */
+    useEffect(() => {
+        const currentMod = ERP_MODULES.find((m) => m.id === moduleId);
+        const primerArchivo = currentMod?.archivos?.[0]?.id ?? null;
+        setTabActiva(primerArchivo);
+    }, [moduleId]);
+
 
     if (!mod) {
         return (
