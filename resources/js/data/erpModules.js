@@ -398,28 +398,95 @@ export const ERP_MODULES = [
     label: 'Parametros',
     icon: 'parametros',
     color: '#8e44ad',
-    desc: 'Configuración y parámetros del sistema.',
+    desc: 'Configuración y parámetros generales, administrativos y técnicos del sistema.',
     submods: [
       {
-        id: 'comerciales_tecnicos', label: 'Comerciales y Técnicos', icon: 'comerciales_tecnicos', desc: 'Parámetros comerciales y técnicos',
+        id: 'par_generales',
+        label: 'Generales',
+        icon: 'config',
+        desc: 'Parámetros básicos del sistema',
         archivos: [
-          { id: 'tipo_productos', label: 'Tipo de Productos' }
+          { id: 'conceptos_entrada_salida', label: 'Conceptos de Entrada y Salida' },
+          { id: 'unidades_medida',          label: 'Unidades de Medida' },
+          { id: 'marcas',                   label: 'Marcas' },
+          { id: 'bancos',                   label: 'Bancos' },
+          { id: 'perimetros',               label: 'Perímetros' },
+        ]
+      },
+      {
+        id: 'par_administrativos',
+        label: 'Administrativos',
+        icon: 'administrativo',
+        desc: 'Parámetros de gestión administrativa y RRHH',
+        archivos: [
+          { id: 'cargos',                   label: 'Cargos' },
+          { id: 'tipos_tecnico',            label: 'Tipos de Técnico' },
+          { id: 'tipo_vendedor',            label: 'Tipo de Vendedor' },
+          { id: 'eps',                      label: 'EPS' },
+          { id: 'arl',                      label: 'ARL' },
+          { id: 'fondo_pensiones',          label: 'Fondo de Pensiones' },
+          { id: 'caja_compensacion',        label: 'Caja de Compensación' },
+          { id: 'temas_capacitacion',       label: 'Temas de Capacitación' },
+          { id: 'fondo_cesantias',          label: 'Fondo Cesantias' },
+          { id: 'tipos_solicitud_dias',     label: 'Tipos Solicitud Dias' },
+          { id: 'centros_costos',           label: 'Centros de costos' },
+          { id: 'origen_seguimiento',       label: 'Origen de Seguimiento' },
+          { id: 'estados_origen_seg',       label: 'Estados Origen Seguimiento' },
+        ]
+      },
+      {
+        id: 'par_comerciales_tecnicos',
+        label: 'Comerciales y Técnicos',
+        icon: 'comerciales_tecnicos',
+        desc: 'Parámetros técnicos, comerciales y de liquidación',
+        archivos: [
+          { id: 'tipo_productos',           label: 'Tipo de Productos' },
+          { id: 'planes_venta',             label: 'Planes de Venta' },
+          { id: 'liq_pagos_comercial',      label: 'Liquidación de Pagos Comercial' },
+          { id: 'liq_pagos_tecnicos',       label: 'Liquidación de Pagos Técnicos' },
+          { id: 'liq_pagos_compania',       label: 'Liquidación de Pagos Compañía' },
+          { id: 'liq_pagos_subagentes',     label: 'Liquidación de Pagos Subagentes' },
+          { id: 'params_dias_garantia',     label: 'Parámetros Días Garantía' },
+          { id: 'param_fecha_cierre_log',   label: 'Parámetro Fecha de Cierre Logístico' },
+          { id: 'precios_mantenimientos',   label: 'Precios Mantenimientos y Servicios' },
+          { id: 'servicios_cobran_wo',      label: 'Servicios que se cobran en Work Order' },
+          { id: 'motivos_anulacion_cont',   label: 'Motivos Anulación de Contratos' },
+          { id: 'tipos_plan',               label: 'Tipos de Plan' },
+          { id: 'subproductos',             label: 'Subproductos' },
+          { id: 'importar_subproductos',    label: 'Importar Subproductos' },
+          { id: 'importar_max_servicios',   label: 'Importar Productos Máximos por Tipo de Servicios' },
+          { id: 'wo_excentas_control',      label: 'Work Orders Excentas de Control de Material' },
+        ]
+      },
+      {
+        id: 'par_auxilio_movilidad',
+        label: 'Parámetros Auxilio de Movilidad',
+        icon: 'vehiculos',
+        desc: 'Configuración de auxilios de movilidad y tarifas',
+        archivos: [
+          { id: 'importar_tarifas_movilidad', label: 'Importar Tarifas Auxilio de Movilidad' },
+          { id: 'tecnicos_excentos_pago',     label: 'Técnicos Excentos de Pagos Auxilio de Movilidad' },
+          { id: 'importar_servicios_auxilio', label: 'Importar Servicios que Aplican al Auxilio de Movilidad' },
         ]
       }
     ],
-    archivos: []
+    archivos: [
+      { id: 'lineas_vehiculos', label: 'Líneas Vehículos' },
+      { id: 'transportadoras',  label: 'Transportadoras' },
+    ]
   },
   {
     id: 'usuarios',
     label: 'Usuarios',
     icon: 'usuarios',
     color: '#2980b9',
-    desc: 'Administración de usuarios y roles.',
+    desc: 'Administración de usuarios, roles y auditoría.',
     submods: [],
     archivos: [
       { id: 'usuarios_sistema', label: 'Usuarios del Sistema' },
       { id: 'grupos_usuarios', label: 'Grupos de Usuarios' },
-      { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' }
+      { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' },
+      { id: 'auditoria_usuarios', label: 'Auditoria de Usuarios' },
     ]
   },
   {
@@ -427,8 +494,25 @@ export const ERP_MODULES = [
     label: 'Liquidación Comisiones',
     icon: 'liquidacion_comisiones',
     color: '#d35400',
-    desc: 'Cálculo y gestión de comisiones.',
-    submods: [],
+    desc: 'Cálculo y gestión de comisiones de subagentes.',
+    submods: [
+      {
+        id: 'liq_subagentes',
+        label: 'Subagentes',
+        icon: 'subagentes',
+        desc: 'Liquidación de comisiones para subagentes',
+        archivos: [
+          { id: 'liq_params_generales',    label: 'Parametros Generales' },
+          { id: 'liq_importar_valores',    label: 'Importar Valores Comisiones' },
+          { id: 'liq_indicador_satisf',    label: 'Indicador Satisfacciones' },
+          { id: 'liq_indicador_optimus',   label: 'Indicador Optimus' },
+          { id: 'liq_importar_relacion',   label: 'Importar Relacion Pagos Directv' },
+          { id: 'liq_params_perimetros',   label: 'Parametros perímetros IBS' },
+          { id: 'liq_generar_liquidacion', label: 'Generar Liquidacion de Comisiones' },
+          { id: 'liq_aprobadas',           label: 'Liquidaciones Aprobadas' },
+        ]
+      }
+    ],
     archivos: []
   }
 ];

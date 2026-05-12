@@ -82,26 +82,26 @@ export default function Header() {
         ))}
       </nav>
 
-      <div className="header-right" style={{ position: 'relative' }}>
+      <div className="header-right">
         <div 
           className="header-user-toggle"
           onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 12px', borderRadius: 'var(--radius-sm)', transition: 'background 0.2s', background: isUserMenuOpen ? 'rgba(0,0,0,0.05)' : 'transparent' }}
         >
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem' }}>
-            {user?.name?.charAt(0)?.toUpperCase()}
-          </div>
-          <span className="header-user" style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>
-            {user?.name?.toUpperCase()}
+          <span className="header-user-name">
+            {(() => {
+              if (!user?.name) return '';
+              const parts = user.name.split(' ').filter(Boolean);
+              return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : user.name;
+            })()}
           </span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>▼</span>
+          <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>▼</span>
         </div>
 
         {isUserMenuOpen && (
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 8, background: '#fff', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', padding: 16, width: 260, zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
-            <div style={{ borderBottom: '1.5px solid var(--border)', paddingBottom: 12, marginBottom: 12 }}>
-              <p style={{ margin: 0, fontWeight: 800, color: 'var(--text)', fontSize: '0.95rem' }}>{user?.name}</p>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 2 }}>{user?.email}</p>
+          <div className="user-dropdown">
+            <div style={{ borderBottom: '1.5px solid var(--border)', paddingBottom: 16, marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 800, color: 'var(--primary)', fontSize: '1rem' }}>{user?.name}</p>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: 4 }}>{user?.email}</p>
             </div>
             
             <button onClick={handleLogout} style={{

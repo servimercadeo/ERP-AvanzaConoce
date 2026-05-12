@@ -145,9 +145,7 @@ export default function Module() {
 
     return (
         <Layout>
-            <div
-                style={{ width: "100%", maxWidth: "1200px", margin: "0 auto" }}
-            >
+            <div style={{ width: '100%', maxWidth: '100%', margin: '0 auto' }}>
                 {/* ── Breadcrumb ─────────────────────────────────────── */}
                 <div className="breadcrumb" id="breadcrumb">
                     <Link to="/dashboard">Inicio</Link>
@@ -312,9 +310,9 @@ export default function Module() {
                 )}
 
                 {/* ══════════════════════════════════════════════════════
-            SECCIÓN 2 — Submódulos como tarjetas (si los hay)
+            SECCIÓN 2 — Submódulos como tarjetas (si los hay y NO hay archivos directos)
         ══════════════════════════════════════════════════════ */}
-                {mod.submods && mod.submods.length > 0 && (
+                {mod.submods && mod.submods.length > 0 && !tieneArchivos && (
                     <div style={{ marginTop: 36 }}>
                         <p className="section-title">Submódulos</p>
                         <div className="mod-subgrid" id="submod-grid">

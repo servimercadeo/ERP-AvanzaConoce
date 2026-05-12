@@ -185,11 +185,19 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── PARÁMETROS ─────────────────────────────────────── */
     case 'parametros':
       switch (submoduleId) {
-        case 'comerciales_tecnicos':
-          switch (archivoId) {
-            // case 'tipo_productos': return TipoProductosCrud;
-            default: return null;
-          }
+        case 'par_generales':
+        case 'par_administrativos':
+        case 'par_comerciales_tecnicos':
+        case 'par_auxilio_movilidad':
+          return null;
+        default: return null;
+      }
+
+    /* ── LIQUIDACIÓN COMISIONES ──────────────────────────── */
+    case 'liquidacion_comisiones':
+      switch (submoduleId) {
+        case 'liq_subagentes':
+          return null;
         default: return null;
       }
 
@@ -224,7 +232,7 @@ export default function Submodule() {
 
   return (
     <Layout>
-      <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ width: '100%', maxWidth: '100%', margin: '0 auto' }}>
 
         {/* ── Breadcrumb ──────────────────────────────────── */}
         <div className="breadcrumb" id="breadcrumb">
