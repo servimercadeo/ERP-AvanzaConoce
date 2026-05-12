@@ -108,14 +108,14 @@ function Modal({ open, onClose, onSave, initial, title, options, readOnly = fals
     }
   };
 
-  if (!open) return null;
-
-  const fp = { form, errors, onChange, disabled: readOnly };
-
   const departamentos = useMemo(() => {
     const deps = new Set(options.ciudades.map(c => c.id_departamento).filter(Boolean));
     return Array.from(deps).map(d => ({ value: d, label: `Departamento ${d}` }));
   }, [options.ciudades]);
+
+  if (!open) return null;
+
+  const fp = { form, errors, onChange, disabled: readOnly };
 
   const ciudadesFiltradas = form.departamento
     ? options.ciudades.filter(c => c.id_departamento == form.departamento)
