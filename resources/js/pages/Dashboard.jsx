@@ -21,10 +21,51 @@ export default function Dashboard() {
                     Navega por los módulos desde el menú superior o selecciona
                     uno de los accesos directos a continuación.
                 </p>
-                <span className="badge">Sistema ERP v1.0 · 2026</span>
+
             </div>
 
-            <div className="info-section">
+            <p
+                className="home-modules-title"
+                style={{
+                    fontFamily: "'Poppins', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "1.1rem",
+                    color: "var(--primary)",
+                    marginBottom: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginTop: "40px"
+                }}
+            >
+                Módulos del Sistema
+                <span
+                    style={{
+                        flex: 1,
+                        height: "1.5px",
+                        background: "var(--border)",
+                        borderRadius: "2px",
+                        marginLeft: "8px",
+                    }}
+                ></span>
+            </p>
+
+            <div className="dashboard-modules-grid">
+                {ERP_MODULES.map((mod) => (
+                    <Link
+                        key={mod.id}
+                        className="mod-card-simple"
+                        to={`/module/${mod.id}`}
+                    >
+                        <span className="mod-icon-circle">
+                            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 30 })}
+                        </span>
+                        <span className="mod-label">{mod.label}</span>
+                    </Link>
+                ))}
+            </div>
+
+            <div className="info-section" style={{ marginTop: 60 }}>
                 <h2>¿Para qué sirve este ERP?</h2>
                 <div className="info-cards">
                     <div className="info-card">
@@ -88,46 +129,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <p
-                className="home-modules-title"
-                style={{
-                    fontFamily: "'Poppins', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.05rem",
-                    color: "var(--primary)",
-                    marginBottom: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                }}
-            >
-                Módulos disponibles
-                <span
-                    style={{
-                        flex: 1,
-                        height: "1.5px",
-                        background: "var(--border)",
-                        borderRadius: "2px",
-                        marginLeft: "8px",
-                    }}
-                ></span>
-            </p>
-
-            <div className="card-grid cols-6" id="mod-grid">
-                {ERP_MODULES.map((mod) => (
-                    <Link
-                        key={mod.id}
-                        className="mod-card"
-                        to={`/module/${mod.id}`}
-                    >
-                        <span className="card-icon-svg">
-                            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 28 })}
-                        </span>
-                        <span className="card-label">{mod.label}</span>
-                    </Link>
-                ))}
             </div>
         </Layout>
     );
