@@ -61,4 +61,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // CRUD completo de contratos
     Route::apiResource('contratos', ContratoController::class);
+
+    // Opciones y CRUD de sedes
+    Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
+    Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 });

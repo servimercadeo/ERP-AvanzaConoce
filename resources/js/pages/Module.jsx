@@ -6,7 +6,7 @@ import { ERP_MODULES } from "../data/erpModules";
 // ── Importa aquí los CRUD de cada módulo ─────────────────────────────────
 import EmpleadosCrud from "./EmpleadosCrud";
 // import VehiculosCrud           from './VehiculosCrud';          // Administrativo
-// import SedesCrud               from './SedesCrud';              // Sedes
+import SedesCrud               from './SedesCrud';              // Sedes
 // import RelacionCrud            from './RelacionCrud';           // Sedes
 // import RegionalesCrud          from './RegionalesCrud';         // Sedes
 // import ConsultarContratosCrud  from './ConsultarContratosCrud'; // Sedes
@@ -35,7 +35,7 @@ function resolveCrud(moduleId, archivoId) {
         /* ── SEDES ──────────────────────────────────────────────── */
         case "sedes":
             switch (archivoId) {
-                // case 'sedes_file':                return SedesCrud;
+                case 'sedes_file':                return SedesCrud;
                 // case 'relacion':                  return RelacionCrud;
                 // case 'regionales':                return RegionalesCrud;
                 // case 'consultar_contratos':       return ConsultarContratosCrud;
