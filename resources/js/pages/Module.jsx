@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ERP_MODULES } from "../data/erpModules";
+import { MODULE_ICONS, IconFolder, IconUnderConstruction } from "../components/Icons";
 
 // ── Importa aquí los CRUD de cada módulo ─────────────────────────────────
 import EmpleadosCrud from "./EmpleadosCrud";
@@ -151,8 +152,9 @@ export default function Module() {
                 <div className="breadcrumb" id="breadcrumb">
                     <Link to="/dashboard">Inicio</Link>
                     <span className="sep">›</span>
-                    <span>
-                        {mod.icon} {mod.label}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 14 })}
+                        {mod.label}
                     </span>
                     {tabActiva && archivoActual && (
                         <>
@@ -176,9 +178,10 @@ export default function Module() {
                     <div>
                         <p
                             className="page-title"
-                            style={{ textAlign: "left", marginBottom: 4 }}
+                            style={{ textAlign: "left", marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}
                         >
-                            {mod.icon} {mod.label}
+                            <span style={{ color: 'var(--primary)' }}>{React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 22 })}</span>
+                            {mod.label}
                         </p>
                         <p
                             style={{
@@ -274,7 +277,7 @@ export default function Module() {
                                 </>
                             ) : (
                                 <div style={S.placeholder}>
-                                    <div style={S.placeholderIcon}>🚧</div>
+                                    <div style={S.placeholderIcon}><IconUnderConstruction size={56} /></div>
                                     <h3
                                         style={{
                                             fontFamily: "'Poppins', sans-serif",
@@ -322,7 +325,7 @@ export default function Module() {
                                     to={`/module/${mod.id}/submodule/${sub.id}`}
                                 >
                                     <span className="sc-icon">
-                                        {sub.icon || "📂"}
+                                        {React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 22 })}
                                     </span>
                                     <span className="sc-label">
                                         {sub.label}

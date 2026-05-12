@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
-import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch } from '../components/Icons';
+import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch, IconLoading } from '../components/Icons';
 
 const POR_PAGINA = 5;
 
@@ -394,7 +394,7 @@ export default function ContratosCrud() {
 
       <div style={S.tableWrap}>
         {loading ? (
-          <div style={S.empty}>⏳<p>Cargando contratos…</p></div>
+          <div style={S.empty}><IconLoading size={32} /><p>Cargando contratos…</p></div>
         ) : filtered.length === 0 ? (
           <div style={S.empty}><IconEmptySearch size={44} /><p>No se encontraron contratos.</p></div>
         ) : (
