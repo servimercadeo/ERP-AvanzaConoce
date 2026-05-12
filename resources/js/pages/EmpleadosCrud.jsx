@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import api from '../api/axios';
-import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch } from '../components/Icons';
+import { IconSearch, IconEye, IconEdit, IconTrash, IconClose, IconEmptySearch, IconLoading } from '../components/Icons';
 
 /* ─── Catálogos ──────────────────────────────────────────────────────── */
 const SEDES        = ['Bogotá', 'Medellín', 'Cali', 'Bucaramanga', 'Barranquilla', 'Pereira', 'Manizales', 'Otra'];
@@ -593,7 +593,7 @@ export default function EmpleadosCrud() {
       <div style={S.tableWrap}>
         {loading ? (
           <div style={S.empty}>
-            <span style={{ fontSize: '2rem', opacity: 0.4 }}>⏳</span>
+            <IconLoading size={32} />
             <p>Cargando empleados…</p>
           </div>
         ) : filtered.length === 0 ? (

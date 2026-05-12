@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ERP_MODULES } from "../data/erpModules";
+import { MODULE_ICONS, IconFolder, IconLayers, IconParametros, IconVentas } from "../components/Icons";
 
 export default function Dashboard() {
     return (
@@ -27,7 +28,7 @@ export default function Dashboard() {
                 <h2>¿Para qué sirve este ERP?</h2>
                 <div className="info-cards">
                     <div className="info-card">
-                        <div className="ic-icon"></div>
+                        <div className="ic-icon"><IconLayers size={28} /></div>
                         <div>
                             <h3>Integración total</h3>
                             <p>
@@ -37,7 +38,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"></div>
+                        <div className="ic-icon"><IconParametros size={28} /></div>
                         <div>
                             <h3>Automatización</h3>
                             <p>
@@ -47,7 +48,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"></div>
+                        <div className="ic-icon"><IconVentas size={28} /></div>
                         <div>
                             <h3>Toma de decisiones</h3>
                             <p>
@@ -121,7 +122,9 @@ export default function Dashboard() {
                         className="mod-card"
                         to={`/module/${mod.id}`}
                     >
-                        <span className="card-icon-emoji">{mod.icon}</span>
+                        <span className="card-icon-svg">
+                            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 28 })}
+                        </span>
                         <span className="card-label">{mod.label}</span>
                     </Link>
                 ))}

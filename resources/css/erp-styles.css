@@ -226,9 +226,11 @@ body {
 }
 
 .dropdown a .sub-icon {
-  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
-  text-align: center;
+  color: var(--primary);
 }
 
 /* ── SUB DROPDOWN ── */
@@ -352,9 +354,17 @@ body {
   object-fit: contain;
 }
 
-.mod-card .card-icon-emoji {
-  font-size: 2.8rem;
-  line-height: 1;
+.mod-card .card-icon-svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  margin-bottom: 5px;
+}
+
+.mod-card .card-icon-svg svg {
+  width: 48px;
+  height: 48px;
 }
 
 .mod-card .card-label {
@@ -439,7 +449,10 @@ body {
 }
 
 .info-card .ic-icon {
-  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -597,8 +610,16 @@ body {
 }
 
 .submod-card .sc-icon {
-  font-size: 3rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  margin-bottom: 5px;
+}
+
+.submod-card .sc-icon svg {
+  width: 40px;
+  height: 40px;
 }
 
 .submod-card .sc-label {
@@ -643,7 +664,10 @@ body {
 }
 
 .archivo-card .ac-icon {
-  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
   opacity: 0.85;
 }
 
