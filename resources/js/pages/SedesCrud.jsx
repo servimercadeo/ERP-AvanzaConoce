@@ -615,13 +615,13 @@ export default function SedesCrud() {
                     </button>
                 </div>
                 <button
-                    style={{ ...S.btnPrimaryGreen, background: "#27ae60" }}
+                    className="btn-primary"
                     onClick={() => {
                         setEditTarget(null);
                         setModalOpen(true);
                     }}
                 >
-                    Nuevo
+                    + Nueva sede
                 </button>
             </div>
 

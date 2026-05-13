@@ -927,6 +927,10 @@ export default function ContratosCrud() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        setPagina(1);
+    }, [search, filtroEstado, filtroSede]);
+
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
@@ -1102,13 +1106,13 @@ export default function ContratosCrud() {
                                     <td>
                                         <div style={S.avatarCell}>
                                             <div style={S.avatar}>
-                                                {(c.empleado?.apellidos || "?")
+                                                {(c.empleado?.nombres || "?")
                                                     .charAt(0)
                                                     .toUpperCase()}
                                             </div>
                                             <span style={{ fontWeight: 700 }}>
-                                                {c.empleado?.apellidos}{" "}
-                                                {c.empleado?.nombres}
+                                                {c.empleado?.nombres}{" "}
+                                                {c.empleado?.apellidos}
                                             </span>
                                         </div>
                                     </td>
@@ -1190,6 +1194,68 @@ export default function ContratosCrud() {
                     </table>
                 )}
             </div>
+
+            {!loading && filtered.length > 0 && (
+                <div style={S.paginationBar}>
+                    <span style={S.paginationInfo}>
+                        Mostrando{" "}
+                        {(pagina - 1) * POR_PAGINA + 1}–
+                        {Math.min(pagina * POR_PAGINA, filtered.length)}{" "}
+                        de {filtered.length} contratos
+                    </span>
+                    <div style={S.paginationBtns}>
+                        <button
+                            style={S.pageBtn(pagina === 1, false)}
+                            disabled={pagina === 1}
+                            onClick={() => setPagina((p) => p - 1)}
+                        >
+                            ‹
+                        </button>
+                        {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                            .filter(
+                                (p) =>
+                                    p === 1 ||
+                                    p === totalPaginas ||
+                                    Math.abs(p - pagina) <= 1,
+                            )
+                            .reduce((acc, p, idx, arr) => {
+                                if (idx > 0 && p - arr[idx - 1] > 1)
+                                    acc.push("…");
+                                acc.push(p);
+                                return acc;
+                            }, [])
+                            .map((item, idx) =>
+                                item === "…" ? (
+                                    <span
+                                        key={`e${idx}`}
+                                        style={{
+                                            padding: "0 4px",
+                                            color: "var(--text-muted)",
+                                            fontWeight: 700,
+                                        }}
+                                    >
+                                        …
+                                    </span>
+                                ) : (
+                                    <button
+                                        key={item}
+                                        style={S.pageBtn(false, item === pagina)}
+                                        onClick={() => setPagina(item)}
+                                    >
+                                        {item}
+                                    </button>
+                                ),
+                            )}
+                        <button
+                            style={S.pageBtn(pagina === totalPaginas, false)}
+                            disabled={pagina === totalPaginas}
+                            onClick={() => setPagina((p) => p + 1)}
+                        >
+                            ›
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
@@ -1598,6 +1664,42 @@ const S = {
         cursor: "pointer",
         fontFamily: "Nunito,sans-serif",
     },
+    paginationBar: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 4px",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    paginationInfo: {
+        fontSize: "0.84rem",
+        color: "var(--text-muted)",
+        fontWeight: 600,
+    },
+    paginationBtns: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+    },
+    pageBtn: (disabled, active) => ({
+        minWidth: 32,
+        height: 32,
+        padding: "0 8px",
+        border: active ? "none" : "1.5px solid var(--border)",
+        borderRadius: 6,
+        background: active
+            ? "var(--primary)"
+            : disabled
+              ? "var(--bg)"
+              : "var(--white)",
+        color: active ? "#fff" : disabled ? "var(--text-muted)" : "var(--text)",
+        fontWeight: 700,
+        fontSize: "0.88rem",
+        cursor: disabled ? "default" : "pointer",
+        fontFamily: "Nunito,sans-serif",
+        opacity: disabled ? 0.5 : 1,
+    }),
     toast: {
         position: "fixed",
         bottom: 28,
