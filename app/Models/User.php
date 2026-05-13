@@ -39,7 +39,7 @@ class User extends Authenticatable
         'tiene_cert_alturas', 'cert_alturas_vence',
 
         // Estado
-        'estado_empleado', 'codigo_directv', 'empresa_id', 'comentarios',
+        'estado_empleado', 'codigo_directv', 'empresa_id', 'empleador', 'jefe_inmediato', 'comentarios',
 
         // Información Adicional
         'cargo', 'tipo_funcionario', 'tipo_vinculacion',

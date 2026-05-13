@@ -1256,7 +1256,7 @@ export default function EmpleadosCrud() {
                 prev.filter((e) => e.id !== deleteTarget.id),
             );
             showToast(
-                `${deleteTarget.apellidos} ${deleteTarget.nombres} eliminado.`,
+                `${deleteTarget.nombres} ${deleteTarget.apellidos} eliminado.`,
             );
         } catch {
             showToast("Error al eliminar el empleado.");
@@ -1389,7 +1389,7 @@ export default function EmpleadosCrud() {
                                         <div style={S.avatarCell}>
                                             <div style={S.avatar}>
                                                 {(
-                                                    (emp.apellidos ||
+                                                    (emp.nombres ||
                                                         emp.name) ??
                                                     "?"
                                                 )
@@ -1403,7 +1403,7 @@ export default function EmpleadosCrud() {
                                                 }}
                                             >
                                                 {emp.apellidos && emp.nombres
-                                                    ? `${emp.apellidos} ${emp.nombres}`
+                                                    ? `${emp.nombres} ${emp.apellidos}`
                                                     : emp.name}
                                             </span>
                                         </div>
@@ -1635,7 +1635,7 @@ export default function EmpleadosCrud() {
                 open={!!deleteTarget}
                 nombre={
                     deleteTarget
-                        ? `${deleteTarget.apellidos} ${deleteTarget.nombres}`
+                        ? `${deleteTarget.nombres} ${deleteTarget.apellidos}`
                         : ""
                 }
                 onConfirm={handleDelete}
