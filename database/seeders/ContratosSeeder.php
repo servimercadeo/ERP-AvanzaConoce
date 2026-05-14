@@ -217,11 +217,18 @@ class ContratosSeeder extends Seeder
     {
         if (!$v || strtoupper(trim($v)) === 'NULL' || trim($v) === '') return null;
 
-        // Corrige años erróneos como 0215-05-30 → 2015-05-30
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($v), $m) && (int) $m[1] < 1900) {
-            return ((int) $m[1] + 2000) . '-' . $m[2] . '-' . $m[3];
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($v), $m)) return trim($v);
+
+        $year = (int) $m[1];
+
+        if ($year < 2) return null;           // 0001-01-01 → dato inválido
+
+        if ($year < 100) {                    // 0019 → 2019
+            $year += 2000;
+        } elseif ($year < 1000) {             // 0215 → 2015, 0202 → 2002, 0223 → 2023
+            $year += 1800;
         }
 
-        return trim($v);
+        return $year . '-' . $m[2] . '-' . $m[3];
     }
 }
