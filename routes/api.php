@@ -48,6 +48,16 @@ Route::get('/catalogos', function () {
     ]);
 });
 
+// Verifica si existe un usuario con el correo dado (para flujo de login en dos pasos)
+Route::post('/check-email', function (Request $request) {
+    $request->validate(['email' => 'required|email']);
+    $user = \App\Models\User::where('email', $request->email)->first();
+    if (!$user) {
+        return response()->json(['exists' => false], 200);
+    }
+    return response()->json(['exists' => true, 'name' => $user->name], 200);
+});
+
 // Recibe usuarios desde AvanzaConoce (autenticado con X-ERP-Secret)
 Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanzaconoce']);
 
