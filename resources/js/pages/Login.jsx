@@ -109,6 +109,8 @@ const styles = {
         fontSize: "0.95rem",
         marginBottom: "0.75rem",
         outline: "none",
+        color: "#111827",
+        background: "#ffffff",
     },
     btn: {
         marginTop: "0.5rem",

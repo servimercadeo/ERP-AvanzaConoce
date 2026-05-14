@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AppSettingController;
 use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\SsoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'app' => config('app.name')]);
 });
+
+// Configuración global (tema de color) — lectura pública
+Route::get('/settings', [AppSettingController::class, 'index']);
 
 Route::get('/empresas', [EmpresaController::class, 'index']);
 
@@ -51,6 +56,12 @@ Route::post('/sso/token', [SsoController::class, 'generarToken']);
 
 // ── Protegido (Sanctum) ───────────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
+    // Actualizar configuración global (tema de color)
+    Route::post('/settings', [AppSettingController::class, 'update']);
+
+    // Preferencias personales de apariencia por usuario
+    Route::get('/user/preferences',  [UserPreferenceController::class, 'show']);
+    Route::post('/user/preferences', [UserPreferenceController::class, 'update']);
     Route::get('/user', fn(Request $r) => $r->user()->only('id', 'name', 'email', 'rol'));
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce

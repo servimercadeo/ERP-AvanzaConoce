@@ -1,6 +1,7 @@
 import React from 'react';
 import Header from './Header';
 import Footer from './Footer';
+import ThemePickerButton from './ThemePickerButton';
 import '../../css/erp-styles.css';
 
 export default function Layout({ children }) {
@@ -11,6 +12,7 @@ export default function Layout({ children }) {
         {children}
       </main>
       <Footer />
+      <ThemePickerButton />
     </div>
   );
 }
