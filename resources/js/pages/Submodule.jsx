@@ -7,6 +7,7 @@ import { MODULE_ICONS, IconFolder, IconUnderConstruction } from '../components/I
 // ── Importa aquí los CRUD de cada archivo ───────────────────────────────
 import EmpleadosCrud from './EmpleadosCrud';
 import ContratosCrud from './ContratosCrud';
+import SeleccionCrud from './SeleccionCrud';
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -29,9 +30,14 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── ADMINISTRATIVO ─────────────────────────────────── */
     case 'administrativo':
       switch (submoduleId) {
-        case 'admin_contratos':
+        case 'seleccion':
           switch (archivoId) {
-            case 'ver_crear_contratos': return ContratosCrud;
+            case 'proceso_seleccion': return SeleccionCrud;
+            default: return null;
+          }
+      case 'admin_contratos':
+        switch (archivoId) {
+          case 'ver_crear_contratos': return ContratosCrud;
             default: return null;
           }
         default: return null;

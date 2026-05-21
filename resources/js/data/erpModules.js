@@ -49,6 +49,15 @@ export const ERP_MODULES = [
     desc: 'Gestión administrativa.',
     submods: [
       {
+        id: 'seleccion',
+        label: 'Selección',
+        icon: 'usuarios',
+        desc: 'Proceso de selección de personal',
+        archivos: [
+          { id: 'proceso_seleccion', label: 'Proceso de Selección' }
+        ]
+      },
+      {
         id: 'admin_contratos',
         label: 'Administración de Contratos',
         icon: 'admin_contratos',
