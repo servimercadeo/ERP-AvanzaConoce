@@ -7,7 +7,7 @@ export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    const [step, setStep] = useState("email"); // "email" | "password"
+    const [step, setStep] = useState("email");
     const [email, setEmail] = useState("");
     const [userName, setUserName] = useState("");
     const [password, setPassword] = useState("");
