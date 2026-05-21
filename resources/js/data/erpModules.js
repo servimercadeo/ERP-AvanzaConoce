@@ -54,7 +54,8 @@ export const ERP_MODULES = [
         icon: 'usuarios',
         desc: 'Proceso de selección de personal',
         archivos: [
-          { id: 'proceso_seleccion', label: 'Proceso de Selección' }
+          { id: 'proceso_seleccion', label: 'Proceso de Selección' },
+          { id: 'base_ingreso', label: 'Base de Ingreso' }
         ]
       },
       {

@@ -37,6 +37,19 @@ const MOCK_OPTS = {
   sino: ['Sí', 'No']
 };
 
+function getPaginasBotones(pagina, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const delta = 2;
+  const left = pagina - delta;
+  const right = pagina + delta;
+  const pages = [1];
+  if (left > 2) pages.push("...");
+  for (let i = Math.max(2, left); i <= Math.min(total - 1, right); i++) pages.push(i);
+  if (right < total - 1) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+
 export default function SeleccionCrud() {
   const [data, setData] = useState(() => {
     const saved = localStorage.getItem('seleccionData');
@@ -57,6 +70,12 @@ export default function SeleccionCrud() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create', 'edit', 'view'
   const [form, setForm] = useState({});
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 10;
+
+  useEffect(() => {
+    setPagina(1);
+  }, [searchTerm, estadoFilter]);
 
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
@@ -167,59 +186,55 @@ export default function SeleccionCrud() {
     return matchesSearch && matchesEstado;
   });
 
+  const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
+  const paginatedData = filteredData.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+
+  const getEstadoColors = (estado) => {
+    const e = estado ? estado.toLowerCase() : '';
+    if (e === 'abierta' || e === 'activa') return { bg: '#d1fae5', text: '#065f46' };
+    if (e === 'cerrada' || e === 'inactiva') return { bg: '#fee2e2', text: '#991b1b' };
+    return { bg: '#f3f4f6', text: '#374151' };
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
       
       {/* ── Top Controls ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg)', padding: '16px 20px', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+      <div style={S.toolbar}>
         
         {/* Left Side (Search & Filters) */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center' }}>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)' }}>Búsqueda:</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input
-                type="text"
-                placeholder=""
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={S.input}
-              />
-              <span style={{ position: 'absolute', right: '-24px', color: 'var(--text-muted)', fontSize: '1.1rem', cursor: 'pointer' }} title="Información de búsqueda">
-                ⓘ
-              </span>
-            </div>
+        <div style={S.filters}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Buscar requisición..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={S.searchInput}
+            />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '24px' }}>
-            <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-muted)', maxWidth: '120px', lineHeight: '1.2' }}>Filtro de estado de solicitudes:</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '2px 14px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280' }}>ESTADO:</label>
             <select
               value={estadoFilter}
               onChange={(e) => setEstadoFilter(e.target.value)}
-              style={S.input}
+              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.9rem', color: '#111827', fontWeight: 500, padding: '6px 0', cursor: 'pointer' }}
             >
+              <option value="Todas">Todas</option>
               <option value="Abierta">Abierta</option>
               <option value="Cerrada">Cerrada</option>
-              <option value="Todas">Todas</option>
             </select>
-          </div>
-          
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '10px' }}>
-            Número de coincidencias: {filteredData.length}
           </div>
         </div>
 
         {/* Right Side (Buttons) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '10px' }}>
-            Número de personas contratadas / requeridas para todos los cargos: <span style={{ fontWeight: 'bold' }}>0 / 1</span>
-          </div>
-          <button style={S.btnActualizar}>
+          <button style={{ ...S.btnFilter, background: '#f8fafc' }}>
             <span style={{ fontSize: '1.1rem' }}>↻</span> Actualizar
           </button>
           <button style={S.btnNuevo} onClick={() => handleOpenModal('create')}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>+</span> Crear nueva requisición
+            + Crear nueva requisición
           </button>
         </div>
 
@@ -230,59 +245,82 @@ export default function SeleccionCrud() {
         <table style={S.table}>
           <thead>
             <tr>
-              <th style={S.th}>Nro<br/>Identificación<br/>Proceso / ID<br/>interno</th>
-              <th style={S.th}>Estado</th>
-              <th style={S.th}>Cargo<br/>requerido</th>
-              <th style={S.th}>Fecha de<br/>solicitud</th>
-              <th style={S.th}>Número de<br/>personas<br/>contratadas<br/>/ requeridas</th>
-              <th style={S.th}>Proyecto</th>
-              <th style={S.th}>Tipo de<br/>solicitud</th>
-              <th style={S.th}>Responsable<br/>de solicitud</th>
-              <th style={S.th}>Proceso</th>
-              <th style={S.th}>Ciudad de<br/>operación</th>
-              <th style={S.th}>Acciones</th>
+              <th style={S.th}>ITEM</th>
+              <th style={S.th}>NRO. ID PROCESO</th>
+              <th style={S.th}>ESTADO</th>
+              <th style={S.th}>CARGO REQUERIDO</th>
+              <th style={S.th}>FECHA SOLICITUD</th>
+              <th style={S.th}>PROYECTO</th>
+              <th style={S.th}>TIPO SOLICITUD</th>
+              <th style={S.th}>CIUDAD OPERACIÓN</th>
+              <th style={{ ...S.th, textAlign: 'center' }}>ACCIONES</th>
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((row) => (
-              <tr key={row.id} style={S.tr}>
-                <td style={S.td}>{row.nro_identificacion_proceso}</td>
-                <td style={{ ...S.td, fontWeight: 700, color: row.estado === 'Abierta' ? '#27ae60' : 'var(--text)' }}>
-                  {row.estado}
-                </td>
-                <td style={S.td}>{row.cargo}</td>
-                <td style={S.td}>{row.fecha_solicitud}</td>
-                <td style={S.td}>{row.contratadas_requeridas}</td>
-                <td style={S.td}>{row.proyecto}</td>
-                <td style={S.td}>{row.tipo_solicitud}</td>
-                <td style={{ ...S.td, fontSize: '0.8rem', maxWidth: '160px', whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.responsable}</td>
-                <td style={S.td}>{row.proceso}</td>
-                <td style={S.td}>{row.ciudad}</td>
-                <td style={{ ...S.td, textAlign: 'center' }}>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                    <button style={S.actionBtn} title="Agregar">
-                      <span style={{ border: '1.5px solid currentColor', borderRadius: '3px', padding: '0 3px', fontSize: '10px', fontWeight: 'bold' }}>+</span>
-                    </button>
-                    <button style={S.actionBtn} title="Editar" onClick={() => handleOpenModal('edit', row)}>
-                      <IconEdit size={16} />
-                    </button>
-                    <button style={S.actionBtn} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
-                      <IconEye size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {paginatedData.map((row, index) => {
+              const itemIndex = (pagina - 1) * POR_PAGINA + index + 1;
+              const estColors = getEstadoColors(row.estado);
+              return (
+                <tr key={row.id} style={S.tr}>
+                  <td style={S.td}>{itemIndex}</td>
+                  <td style={S.td}>{row.nro_identificacion_proceso}</td>
+                  <td style={S.td}>
+                    <span style={S.badge(estColors.bg, estColors.text)}>
+                      {row.estado}
+                    </span>
+                  </td>
+                  <td style={S.td}>{row.cargo}</td>
+                  <td style={S.td}>{row.fecha_solicitud}</td>
+                  <td style={S.td}>{row.proyecto}</td>
+                  <td style={S.td}>{row.tipo_solicitud}</td>
+                  <td style={S.td}>{row.ciudad}</td>
+                  <td style={{ ...S.td, textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                      <button style={S.actionBtn('#3b82f6', '#eff6ff')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
+                        <IconEye size={16} />
+                      </button>
+                      <button style={S.actionBtn('#10b981', '#ecfdf5')} title="Editar" onClick={() => handleOpenModal('edit', row)}>
+                        <IconEdit size={16} />
+                      </button>
+                      <button style={S.actionBtn('#ef4444', '#fef2f2')} title="Eliminar">
+                        <IconTrash size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                  No hay requisiciones registradas.
+                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                  No hay requisiciones que coincidan con la búsqueda.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {filteredData.length > 0 && (
+        <div style={S.paginationWrap}>
+          <span style={S.pageInfo}>
+            Página {pagina} · Mostrando {Math.min(POR_PAGINA, filteredData.length - (pagina - 1) * POR_PAGINA)} de {filteredData.length} registros
+          </span>
+          <div style={S.pageControls}>
+            <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1} style={{ ...S.pageBtn(false), opacity: pagina === 1 ? 0.5 : 1 }}>‹</button>
+            {getPaginasBotones(pagina, totalPaginas).map((n, i) =>
+              n === "..." ? (
+                <span key={`ellipsis-${i}`} style={S.pageEllipsis}>…</span>
+              ) : (
+                <button key={n} onClick={() => setPagina(n)} style={S.pageBtn(n === pagina)}>
+                  {n}
+                </button>
+              )
+            )}
+            <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas} style={{ ...S.pageBtn(false), opacity: pagina === totalPaginas ? 0.5 : 1 }}>›</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal Crear/Editar/Ver Requisición ── */}
       {isModalOpen && (
@@ -292,7 +330,7 @@ export default function SeleccionCrud() {
               <span style={S.modalTitle}>
                 {modalMode === 'create' ? 'Crear nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}
               </span>
-              <button style={S.closeBtn} onClick={handleCloseModal}><IconClose size={16} /></button>
+              <button style={S.closeBtn} onClick={handleCloseModal}><IconClose size={18} /></button>
             </div>
             
             <div style={S.modalBody}>
@@ -342,27 +380,29 @@ export default function SeleccionCrud() {
 
 function Field({ label, k, type = "text", opts, req, span, form, onChange, disabled }) {
   const style = {
-    display: 'flex', flexDirection: 'column', gap: '8px',
+    display: 'flex', flexDirection: 'column', gap: '6px',
     ...(span ? { gridColumn: `span ${span}` } : {})
   };
   const inputStyle = {
-    padding: '10px 14px', borderRadius: '4px', border: '1px solid var(--border)',
+    padding: '10px 14px', borderRadius: '8px', border: '1px solid #e5e7eb',
     fontSize: '0.95rem', outline: 'none',
-    background: disabled ? '#f8f9fa' : '#fff',
-    color: disabled ? '#7f8c8d' : 'var(--text)',
-    fontFamily: 'inherit'
+    background: disabled ? '#f8fafc' : '#fff',
+    color: disabled ? '#6b7280' : '#111827',
+    fontFamily: 'inherit',
+    transition: 'border-color 0.2s',
+    width: '100%'
   };
 
   return (
     <div style={style}>
-      <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#2c3e50' }}>
+      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
         {label}
-        {req && <span style={{ color: '#e74c3c', marginLeft: '4px', fontWeight: 'bold' }}>*</span>}
+        {req && <span style={{ color: '#ef4444', marginLeft: '4px', fontWeight: 'bold' }}>*</span>}
       </label>
       {opts ? (
         <select style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
           <option value="">-- Selecciona --</option>
-          {opts.map(o => <option key={o} value={o}>{o}</option>)}
+          {opts.map(o => <option key={o} value={o}>{o.charAt ? o.charAt(0).toUpperCase() + o.slice(1) : o}</option>)}
         </select>
       ) : type === 'textarea' ? (
         <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
@@ -374,117 +414,70 @@ function Field({ label, k, type = "text", opts, req, span, form, onChange, disab
 }
 
 const S = {
-  input: {
-    padding: '8px 12px',
-    borderRadius: '4px',
-    border: '1px solid var(--border)',
-    background: 'var(--white)',
-    color: 'var(--text)',
-    outline: 'none',
-    fontSize: '0.9rem',
-    minWidth: '200px'
+  // Toolbar
+  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' },
+  filters: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
+  searchInput: {
+    padding: '10px 16px 10px 38px', borderRadius: '20px', border: '1px solid #e5e7eb',
+    fontSize: '0.9rem', outline: 'none', minWidth: '280px', background: '#fff',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'%3E%3C/path%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: '14px center', backgroundSize: '16px'
   },
-  btnActualizar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '8px 16px',
-    background: '#bdc3c7',
-    color: '#333',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 600,
-    fontSize: '0.9rem',
-    transition: 'background 0.2s'
+  btnFilter: {
+    padding: '10px 16px', borderRadius: '20px', border: '1px solid #e5e7eb', background: '#fff',
+    display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#374151', fontWeight: 500
   },
   btnNuevo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    background: '#1d4a86', // Navy blue from screenshot
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 600,
-    fontSize: '0.95rem',
-    transition: 'background 0.2s',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    padding: '10px 20px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '20px',
+    cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px',
+    boxShadow: '0 2px 4px rgba(13, 148, 136, 0.15)'
   },
+  
+  // Table
   tableContainer: {
-    width: '100%',
-    overflowX: 'auto',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    background: 'var(--white)',
+    width: '100%', overflowX: 'auto', border: '1px solid #f0fdfa', borderRadius: '12px', background: '#fff',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '1000px',
-  },
+  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1000px' },
   th: {
-    padding: '12px 10px',
-    background: 'var(--bg)',
-    color: '#2980b9', // Blue color for headers based on screenshot
-    fontWeight: 600,
-    fontSize: '0.78rem',
-    textAlign: 'center',
-    borderBottom: '2px solid var(--border)',
-    whiteSpace: 'nowrap',
-    verticalAlign: 'bottom'
+    padding: '16px 14px', background: '#f0fdfa', color: '#115e59', fontWeight: 600, fontSize: '0.75rem',
+    textAlign: 'left', borderBottom: '1px solid #ccfbf1', textTransform: 'uppercase', letterSpacing: '0.05em'
   },
-  tr: {
-    borderBottom: '1px solid var(--border)',
-    transition: 'background 0.2s',
-  },
-  td: {
-    padding: '12px 8px',
-    fontSize: '0.85rem',
-    color: 'var(--text)',
-    textAlign: 'center',
-    verticalAlign: 'middle'
-  },
-  actionBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#333',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '4px',
-    transition: 'color 0.2s',
-  },
-  overlay: {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-    overscrollBehavior: 'none'
-  },
-  modal: {
-    background: '#fff', borderRadius: '8px', width: '100%', maxWidth: '1000px',
-    display: 'flex', flexDirection: 'column',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)', maxHeight: '90vh', overflow: 'hidden'
-  },
-  modalHeader: {
-    padding: '16px 24px', background: 'var(--primary)', color: '#fff', // matching the blue header style
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-  },
-  modalTitle: { fontSize: '1.1rem', fontWeight: 600 },
-  closeBtn: { background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', padding: 0 },
-  modalBody: { padding: '32px 24px', overflowY: 'auto', flex: 1, maxHeight: 'calc(90vh - 130px)', overscrollBehavior: 'contain' },
-  modalFooter: {
-    padding: '16px 24px', borderTop: '1px solid var(--border)',
-    display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--bg)'
-  },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '30px 24px' },
-  btnCancel: {
-    padding: '8px 16px', background: '#fff', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, color: 'var(--text)'
-  },
-  btnSave: {
-    padding: '8px 16px', background: '#27ae60', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, color: '#fff'
-  }
+  tr: { borderBottom: '1px solid #f3f4f6', transition: 'background 0.2s' },
+  td: { padding: '14px', fontSize: '0.85rem', color: '#374151', textAlign: 'left', verticalAlign: 'middle' },
+  
+  // Badges
+  badge: (bg, text) => ({
+    padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600,
+    background: bg, color: text, display: 'inline-block', whiteSpace: 'nowrap'
+  }),
+  
+  // Action Buttons
+  actionBtn: (color, bg) => ({
+    background: bg, border: 'none', color: color, cursor: 'pointer', display: 'inline-flex',
+    alignItems: 'center', justifyContent: 'center', padding: '6px', borderRadius: '6px', transition: 'all 0.2s',
+  }),
+  
+  // Pagination
+  paginationWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', padding: '0 8px', flexWrap: 'wrap', gap: '10px' },
+  pageInfo: { color: '#6b7280', fontSize: '0.85rem' },
+  pageControls: { display: 'flex', alignItems: 'center', gap: '6px' },
+  pageBtn: (active) => ({
+    padding: '6px 12px', background: active ? '#0d9488' : '#fff', color: active ? '#fff' : '#374151',
+    border: `1px solid ${active ? '#0d9488' : '#e5e7eb'}`, borderRadius: '6px', cursor: 'pointer',
+    fontSize: '0.85rem', fontWeight: active ? 600 : 500, transition: 'all 0.2s', minWidth: '32px'
+  }),
+  pageEllipsis: { padding: '6px', color: '#9ca3af' },
+
+  // Modal
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overscrollBehavior: 'none', backdropFilter: 'blur(2px)' },
+  modal: { background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', maxHeight: '90vh', overflow: 'hidden' },
+  modalHeader: { padding: '20px 24px', background: '#0d9488', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { fontSize: '1.1rem', fontWeight: 600, letterSpacing: '0.02em' },
+  closeBtn: { background: 'none', border: 'none', color: '#ccfbf1', cursor: 'pointer', display: 'flex', padding: 4, transition: 'color 0.2s' },
+  modalBody: { padding: '32px 24px', overflowY: 'auto', flex: 1, maxHeight: 'calc(90vh - 140px)', overscrollBehavior: 'contain', background: '#f8fafc' },
+  modalFooter: { padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: '#fff' },
+  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' },
+  btnCancel: { padding: '10px 18px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#4b5563', fontSize: '0.9rem', transition: 'all 0.2s' },
+  btnSave: { padding: '10px 18px', background: '#0d9488', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#fff', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }
 };
