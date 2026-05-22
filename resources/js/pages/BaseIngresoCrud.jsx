@@ -155,15 +155,15 @@ export default function BaseIngresoCrud() {
         <table style={S.table}>
           <thead>
             <tr>
-              <th style={S.th}>ITEM</th>
-              <th style={S.th}>DOCUMENTO</th>
-              <th style={S.th}>NOMBRE COMPLETO</th>
-              <th style={S.th}>CARGO</th>
-              <th style={S.th}>EMPRESA</th>
-              <th style={S.th}>FECHA INGRESO</th>
-              <th style={S.th}>SALARIO BÁSICO</th>
-              <th style={S.th}>ESTADO</th>
-              <th style={{ ...S.th, textAlign: 'center' }}>ACCIONES</th>
+              <th style={S.th}>Item</th>
+              <th style={S.th}>Documento</th>
+              <th style={S.th}>Nombre completo</th>
+              <th style={S.th}>Cargo</th>
+              <th style={S.th}>Empresa</th>
+              <th style={S.th}>Fecha ingreso</th>
+              <th style={S.th}>Salario básico</th>
+              <th style={S.th}>Estado</th>
+              <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -245,36 +245,36 @@ export default function BaseIngresoCrud() {
             
             <div style={S.modalBody}>
               <div style={S.grid3}>
-                <Field label="FECHA DE AVAL" k="fecha_aval" type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="NÚMERO DE DOCUMENTO DE IDENTIFICACIÓN" k="documento_identificacion" req form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit'} />
-                <Field label="NOMBRE COMPLETO" k="nombre_completo" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Número de documento de identificación" k="documento_identificacion" req form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit'} />
+                <Field label="Nombre completo" k="nombre_completo" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="CARGO" k="cargo" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="CIUDAD" k="ciudad" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="EMPRESA" k="empresa" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Cargo" k="cargo" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Ciudad" k="ciudad" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Empresa" k="empresa" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="PROYECTO" k="proyecto" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="TELEFONO DE CONTACTO" k="telefono" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="CORREO ELECTRONICO" k="correo" type="email" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Proyecto" k="proyecto" req form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Teléfono de contacto" k="telefono" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="TIPO DE INGRESO" k="tipo_ingreso" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="LUGAR DE TRABAJO" k="lugar_trabajo" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="LIDER INMEDIATO" k="lider_inmediato" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Tipo de ingreso" k="tipo_ingreso" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Lugar de trabajo" k="lugar_trabajo" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="EMPLEADOR" k="empleador" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="FECHA PROGRAMACIÓN INGRESO" k="fecha_programacion_ingreso" req type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="FECHA DE CORRECCIÓN" k="fecha_correccion" type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Empleador" k="empleador" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Fecha programación ingreso" k="fecha_programacion_ingreso" req type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Fecha de corrección" k="fecha_correccion" type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="TASA DE RIESGO ARL" k="tasa_riesgo_arl" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="SALARIO BASICO" k="salario_basico" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="AUXILIO DE TRANSPORTE" k="auxilio_transporte" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Tasa de riesgo ARL" k="tasa_riesgo_arl" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Salario básico" k="salario_basico" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Auxilio de transporte" k="auxilio_transporte" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
 
-                <Field label="OTROSI VARIABLE" k="otrosi_variable" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="AUX. EXT. DE RODAMIENTO SEGURIDAD VIAL" k="auxilio_rodamiento" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="AUXILIO EXT. DE COMUNICACIÓN" k="auxilio_comunicacion" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                
-                <Field label="AUXILIO EXT. DE ALIMENTACIÓN" k="auxilio_alimentacion" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="ESTADO" k="estado" req opts={MOCK_OPTS.estados} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Otrosí variable" k="otrosi_variable" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Aux. ext. de rodamiento seguridad vial" k="auxilio_rodamiento" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Auxilio ext. de comunicación" k="auxilio_comunicacion" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+
+                <Field label="Auxilio ext. de alimentación" k="auxilio_alimentacion" type="number" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Estado" k="estado" req opts={MOCK_OPTS.estados} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
               </div>
             </div>
 

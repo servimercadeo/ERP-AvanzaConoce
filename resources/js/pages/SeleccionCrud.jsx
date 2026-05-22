@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  IconSearch,
   IconEye,
   IconEdit,
   IconTrash,
@@ -21,12 +20,12 @@ const INITIAL_DATA = [
     tipo_solicitud: 'RP: Reemplazo',
     responsable: 'JORGE EMILIO VARON - jorgevaron@servimercadeo.com',
     proceso: 'Administrativo',
-    ciudad: 'pereira'
+    ciudad: 'Pereira'
   }
 ];
 
 const MOCK_OPTS = {
-  responsables: ['JORGE EMILIO VARON', 'ANA GOMEZ', 'LUIS MARTINEZ'],
+  responsables: ['Jorge Emilio Varón', 'Ana Gómez', 'Luis Martínez'],
   procesos: ['Administrativo', 'Operativo', 'Comercial', 'Tecnología'],
   cargos: ['Analista de datos', 'Desarrollador', 'Gerente', 'Asistente'],
   tipos: ['RP: Reemplazo', 'CN: Cargo Nuevo'],
@@ -80,7 +79,7 @@ export default function SeleccionCrud() {
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
     if (mode === 'create') {
-      let nextReqNumber = 66; // Valor por defecto
+      let nextReqNumber = 66;
       if (data.length > 0) {
         const reqNumbers = data
           .map(d => parseInt(String(d.nro_identificacion_proceso).replace(/[^0-9]/g, ''), 10))
@@ -97,12 +96,11 @@ export default function SeleccionCrud() {
         solicitud_confidencial: 'No'
       });
     } else if (row) {
-      // Mapear datos de la fila (row) al formulario
       setForm({
-        id: row.id, // Guardar ID para la edición
-        nombre_responsable: row.responsable.split(' - ')[0], // Aproximación, depende de cómo se guarde
-        numero_identificacion: row.nro_identificacion || '123456789', 
-        cargo_solicitante: row.cargo || 'Coordinador', 
+        id: row.id,
+        nombre_responsable: row.responsable.split(' - ')[0],
+        numero_identificacion: row.nro_identificacion || '123456789',
+        cargo_solicitante: row.cargo || 'Coordinador',
         fecha_solicitud: row.fecha_solicitud,
         proceso: row.proceso,
         numero_identificacion_proceso: row.nro_identificacion_proceso,
@@ -110,9 +108,9 @@ export default function SeleccionCrud() {
         tipo_solicitud: row.tipo_solicitud,
         numero_personas: row.contratadas_requeridas.split(' / ')[1] || '1',
         proyecto: row.proyecto,
-        fecha_ingreso: '2026-05-25', // Mock
-        pais: 'Colombia', // Mock
-        fecha_cierre: '2026-06-15', // Mock
+        fecha_ingreso: '2026-05-25',
+        pais: 'Colombia',
+        fecha_cierre: '2026-06-15',
         ciudad: row.ciudad,
         observaciones: '',
         estado: row.estado,
@@ -170,7 +168,6 @@ export default function SeleccionCrud() {
     } else {
       document.body.style.overflow = 'auto';
     }
-    // Cleanup en caso de que el componente se desmonte
     return () => { document.body.style.overflow = 'auto'; };
   }, [isModalOpen]);
 
@@ -207,7 +204,7 @@ export default function SeleccionCrud() {
           <div style={{ position: 'relative' }}>
             <input
               type="text"
-              placeholder="Buscar requisición..."
+              placeholder="Buscar requisición, cargo o proyecto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={S.searchInput}
@@ -234,7 +231,7 @@ export default function SeleccionCrud() {
             <span style={{ fontSize: '1.1rem' }}>↻</span> Actualizar
           </button>
           <button style={S.btnNuevo} onClick={() => handleOpenModal('create')}>
-            + Crear nueva requisición
+            + Nueva requisición
           </button>
         </div>
 
@@ -245,15 +242,15 @@ export default function SeleccionCrud() {
         <table style={S.table}>
           <thead>
             <tr>
-              <th style={S.th}>ITEM</th>
-              <th style={S.th}>NRO. ID PROCESO</th>
-              <th style={S.th}>ESTADO</th>
-              <th style={S.th}>CARGO REQUERIDO</th>
-              <th style={S.th}>FECHA SOLICITUD</th>
-              <th style={S.th}>PROYECTO</th>
-              <th style={S.th}>TIPO SOLICITUD</th>
-              <th style={S.th}>CIUDAD OPERACIÓN</th>
-              <th style={{ ...S.th, textAlign: 'center' }}>ACCIONES</th>
+              <th style={S.th}>Item</th>
+              <th style={S.th}>Nro. ID proceso</th>
+              <th style={S.th}>Estado</th>
+              <th style={S.th}>Cargo requerido</th>
+              <th style={S.th}>Fecha solicitud</th>
+              <th style={S.th}>Proyecto</th>
+              <th style={S.th}>Tipo solicitud</th>
+              <th style={S.th}>Ciudad operación</th>
+              <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -328,7 +325,7 @@ export default function SeleccionCrud() {
           <div style={S.modal} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <span style={S.modalTitle}>
-                {modalMode === 'create' ? 'Crear nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}
+                {modalMode === 'create' ? 'Registrar nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}
               </span>
               <button style={S.closeBtn} onClick={handleCloseModal}><IconClose size={18} /></button>
             </div>
