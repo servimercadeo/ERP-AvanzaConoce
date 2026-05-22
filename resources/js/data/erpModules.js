@@ -2,14 +2,14 @@ export const ERP_MODULES = [
   {
     id: 'sedes',
     label: 'Sedes',
-    icon: '',
+    icon: 'sedes',
     color: '#1a9b8c',
     desc: 'Gestión de sedes, regionales, subagentes y control de caja.',
     submods: [
       {
         id: 'subagentes',
         label: 'Subagentes',
-        icon: '',
+        icon: 'subagentes',
         desc: 'Gestión de subagentes, facturas y clientes',
         archivos: [
           { id: 'subagentes_file',        label: 'Subagentes' },
@@ -22,7 +22,7 @@ export const ERP_MODULES = [
       {
         id: 'control_caja',
         label: 'Control de Caja',
-        icon: '',
+        icon: 'control_caja',
         desc: 'Ingresos, egresos y cuadre de caja',
         archivos: [
           { id: 'ingresos_caja',   label: 'Ingresos a Caja' },
@@ -44,14 +44,24 @@ export const ERP_MODULES = [
   {
     id: 'administrativo',
     label: 'Administrativo',
-    icon: '',
+    icon: 'administrativo',
     color: '#f5a623',
     desc: 'Gestión administrativa.',
     submods: [
       {
+        id: 'seleccion',
+        label: 'Selección',
+        icon: 'usuarios',
+        desc: 'Proceso de selección de personal',
+        archivos: [
+          { id: 'proceso_seleccion', label: 'Proceso de Selección' },
+          { id: 'base_ingreso', label: 'Base de Ingreso' }
+        ]
+      },
+      {
         id: 'admin_contratos',
         label: 'Administración de Contratos',
-        icon: '',
+        icon: 'admin_contratos',
         desc: 'Gestión de contratos',
         archivos: [
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
@@ -64,7 +74,7 @@ export const ERP_MODULES = [
       {
         id: 'requisicion_personal',
         label: 'Requisición de Personal',
-        icon: '',
+        icon: 'requisicion_personal',
         desc: 'Gestión de requisiciones',
         archivos: [
           { id: 'ver_crear_requisiciones', label: 'Ver y Crear Requisiciones' },
@@ -74,7 +84,7 @@ export const ERP_MODULES = [
       {
         id: 'work_orders',
         label: 'Work Orders',
-        icon: '',
+        icon: 'work_orders',
         desc: 'Gestión de work orders',
         archivos: [
           { id: 'consultar_work_orders', label: 'Consultar Work Orders' },
@@ -95,7 +105,7 @@ export const ERP_MODULES = [
       {
         id: 'solicitud_dias',
         label: 'Solicitud de Dias',
-        icon: '',
+        icon: 'solicitud_dias',
         desc: 'Gestión de solicitudes',
         archivos: [
           { id: 'ver_crear_solicitudes', label: 'Ver y Crear Solicitudes' },
@@ -106,7 +116,7 @@ export const ERP_MODULES = [
       {
         id: 'consignacion_wo',
         label: 'Consignación de Work Orders',
-        icon: '',
+        icon: 'consignacion_wo',
         desc: 'Consignaciones',
         archivos: [
           { id: 'consignacion_work_orders', label: 'Consignación de Work Orders' },
@@ -116,7 +126,7 @@ export const ERP_MODULES = [
       {
         id: 'liquidacion_pagos',
         label: 'Liquidación de Pagos',
-        icon: '',
+        icon: 'liquidacion_pagos',
         desc: 'Gestión de pagos',
         archivos: [
           { id: 'servicios_liquidar_tecnicos', label: 'Servicios por Liquidar Técnicos' },
@@ -137,14 +147,14 @@ export const ERP_MODULES = [
   {
     id: 'inventarios',
     label: 'Inventarios',
-    icon: '',
+    icon: 'inventarios',
     color: '#27ae60',
     desc: 'Control de inventario y stock.',
     submods: [
       {
         id: 'productos',
         label: 'Productos',
-        icon: '',
+        icon: 'productos',
         desc: 'Gestión de productos',
         archivos: [
           { id: 'productos_file', label: 'Productos' },
@@ -157,7 +167,7 @@ export const ERP_MODULES = [
       {
         id: 'entradas',
         label: 'Entradas',
-        icon: '',
+        icon: 'entradas',
         desc: 'Gestión de entradas',
         archivos: [
           { id: 'entradas_inventario', label: 'Entradas de Inventario' },
@@ -167,7 +177,7 @@ export const ERP_MODULES = [
       {
         id: 'traslados',
         label: 'Traslados',
-        icon: '',
+        icon: 'traslados',
         desc: 'Gestión de traslados',
         archivos: [
           { id: 'traslados_inventario', label: 'Traslados de Inventario' },
@@ -180,7 +190,7 @@ export const ERP_MODULES = [
       {
         id: 'salidas',
         label: 'Salidas',
-        icon: '',
+        icon: 'salidas',
         desc: 'Gestión de salidas',
         archivos: [
           { id: 'salidas_inventario', label: 'Salidas de Inventario' }
@@ -189,7 +199,7 @@ export const ERP_MODULES = [
       {
         id: 'consultas',
         label: 'Consultas',
-        icon: '',
+        icon: 'consultas',
         desc: 'Gestión de consultas y reportes',
         archivos: [
           { id: 'kardex_sede_producto', label: 'Kardex por Sede - Producto' },
@@ -211,14 +221,14 @@ export const ERP_MODULES = [
   {
     id: 'pedidos_compras',
     label: 'Pedidos y Compras',
-    icon: '',
+    icon: 'pedidos_compras',
     color: '#e74c3c',
     desc: 'Gestión de proveedores y órdenes de compra.',
     submods: [
       {
         id: 'pedidos',
         label: 'Pedidos',
-        icon: '',
+        icon: 'pedidos',
         desc: 'Gestión de pedidos',
         archivos: [
           { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
@@ -227,7 +237,7 @@ export const ERP_MODULES = [
       {
         id: 'pedidos_internos',
         label: 'Pedidos Internos',
-        icon: '',
+        icon: 'pedidos_internos',
         desc: 'Gestión de pedidos internos',
         archivos: [
           { id: 'pedidos_aprobar_lider_proceso', label: 'Pedidos por Aprobar Líder de Proceso' },
@@ -239,7 +249,7 @@ export const ERP_MODULES = [
       {
         id: 'pedidos_serviexpress',
         label: 'Pedidos Serviexpress',
-        icon: '',
+        icon: 'pedidos_serviexpress',
         desc: 'Gestión de pedidos serviexpress',
         archivos: [
           { id: 'pedidos_aprobar_lider_serviexpress', label: 'Pedidos por Aprobar Líder' },
@@ -250,7 +260,7 @@ export const ERP_MODULES = [
       {
         id: 'compras',
         label: 'Compras',
-        icon: '',
+        icon: 'compras',
         desc: 'Gestión de compras',
         archivos: [
           { id: 'ver_crear_orden_compra', label: 'Ver y Crear Orden de Compra' },
@@ -261,7 +271,7 @@ export const ERP_MODULES = [
       {
         id: 'parametros',
         label: 'Parametros',
-        icon: '',
+        icon: 'parametros',
         desc: 'Parámetros de pedidos y compras',
         archivos: [
           { id: 'clases_pedidos', label: 'Clases de Pedidos' },
@@ -277,14 +287,14 @@ export const ERP_MODULES = [
   {
     id: 'ventas',
     label: 'Ventas',
-    icon: '',
+    icon: 'ventas',
     color: '#f39c12',
     desc: 'Gestión de ventas y facturación.',
     submods: [
       {
         id: 'importacion_archivos',
         label: 'Importación de Archivos',
-        icon: '',
+        icon: 'importacion_archivos',
         desc: 'Importación masiva de archivos de ventas',
         archivos: [
           { id: 'importar_ventas',                      label: 'Importar Ventas' },
@@ -302,7 +312,7 @@ export const ERP_MODULES = [
       {
         id: 'administracion_ventas',
         label: 'Administración de Ventas',
-        icon: '',
+        icon: 'administracion_ventas',
         desc: 'Gestión y administración de ventas',
         archivos: [
           { id: 'admin_ventas',                          label: 'Administración de Ventas' },
@@ -322,7 +332,7 @@ export const ERP_MODULES = [
       {
         id: 'ventas_contado_kit_prepago',
         label: 'Ventas de Contado Kit Prepago',
-        icon: '',
+        icon: 'ventas_contado_kit_prepago',
         desc: 'Ventas de contado y kit prepago',
         archivos: [
           { id: 'clientes_kit_prepago',                  label: 'Clientes' },
@@ -339,7 +349,7 @@ export const ERP_MODULES = [
       {
         id: 'consultar_cumplimiento_meta',
         label: 'Consultar Cumplimiento Meta',
-        icon: '',
+        icon: 'consultar_cumplimiento_meta',
         desc: 'Consultas de cumplimiento por regional, sede, supervisor y asesor',
         archivos: [
           { id: 'cumplimiento_por_regional',             label: 'Por Regional' },
@@ -354,14 +364,14 @@ export const ERP_MODULES = [
   {
     id: 'crm',
     label: 'CRM',
-    icon: '',
+    icon: 'crm',
     color: '#16a085',
     desc: 'Gestión de relaciones con clientes, seguimiento comercial y estadísticas.',
     submods: [
       {
         id: 'crm_parametros',
         label: 'Parametros',
-        icon: '',
+        icon: 'crm_parametros',
         desc: 'Configuración de parámetros del CRM',
         archivos: [
           { id: 'tipo_llegada',                       label: 'Tipo Llegada' },
@@ -379,7 +389,7 @@ export const ERP_MODULES = [
       {
         id: 'crm_estadisticas',
         label: 'Estadísticas',
-        icon: '',
+        icon: 'crm_estadisticas',
         desc: 'Estadísticas y reportes de gestión CRM',
         archivos: [
           { id: 'nuevos_clientes_referidos',          label: 'Nuevos clientes (Referidos)' },
@@ -396,39 +406,123 @@ export const ERP_MODULES = [
   {
     id: 'parametros',
     label: 'Parametros',
-    icon: '',
+    icon: 'parametros',
     color: '#8e44ad',
-    desc: 'Configuración y parámetros del sistema.',
+    desc: 'Configuración y parámetros generales, administrativos y técnicos del sistema.',
     submods: [
       {
-        id: 'comerciales_tecnicos', label: 'Comerciales y Técnicos', icon: '', desc: 'Parámetros comerciales y técnicos',
+        id: 'par_generales',
+        label: 'Generales',
+        icon: 'config',
+        desc: 'Parámetros básicos del sistema',
         archivos: [
-          { id: 'tipo_productos', label: 'Tipo de Productos' }
+          { id: 'conceptos_entrada_salida', label: 'Conceptos de Entrada y Salida' },
+          { id: 'unidades_medida',          label: 'Unidades de Medida' },
+          { id: 'marcas',                   label: 'Marcas' },
+          { id: 'bancos',                   label: 'Bancos' },
+          { id: 'perimetros',               label: 'Perímetros' },
+        ]
+      },
+      {
+        id: 'par_administrativos',
+        label: 'Administrativos',
+        icon: 'administrativo',
+        desc: 'Parámetros de gestión administrativa y RRHH',
+        archivos: [
+          { id: 'cargos',                   label: 'Cargos' },
+          { id: 'tipos_tecnico',            label: 'Tipos de Técnico' },
+          { id: 'tipo_vendedor',            label: 'Tipo de Vendedor' },
+          { id: 'eps',                      label: 'EPS' },
+          { id: 'arl',                      label: 'ARL' },
+          { id: 'fondo_pensiones',          label: 'Fondo de Pensiones' },
+          { id: 'caja_compensacion',        label: 'Caja de Compensación' },
+          { id: 'temas_capacitacion',       label: 'Temas de Capacitación' },
+          { id: 'fondo_cesantias',          label: 'Fondo Cesantias' },
+          { id: 'tipos_solicitud_dias',     label: 'Tipos Solicitud Dias' },
+          { id: 'centros_costos',           label: 'Centros de costos' },
+          { id: 'origen_seguimiento',       label: 'Origen de Seguimiento' },
+          { id: 'estados_origen_seg',       label: 'Estados Origen Seguimiento' },
+        ]
+      },
+      {
+        id: 'par_comerciales_tecnicos',
+        label: 'Comerciales y Técnicos',
+        icon: 'comerciales_tecnicos',
+        desc: 'Parámetros técnicos, comerciales y de liquidación',
+        archivos: [
+          { id: 'tipo_productos',           label: 'Tipo de Productos' },
+          { id: 'planes_venta',             label: 'Planes de Venta' },
+          { id: 'liq_pagos_comercial',      label: 'Liquidación de Pagos Comercial' },
+          { id: 'liq_pagos_tecnicos',       label: 'Liquidación de Pagos Técnicos' },
+          { id: 'liq_pagos_compania',       label: 'Liquidación de Pagos Compañía' },
+          { id: 'liq_pagos_subagentes',     label: 'Liquidación de Pagos Subagentes' },
+          { id: 'params_dias_garantia',     label: 'Parámetros Días Garantía' },
+          { id: 'param_fecha_cierre_log',   label: 'Parámetro Fecha de Cierre Logístico' },
+          { id: 'precios_mantenimientos',   label: 'Precios Mantenimientos y Servicios' },
+          { id: 'servicios_cobran_wo',      label: 'Servicios que se cobran en Work Order' },
+          { id: 'motivos_anulacion_cont',   label: 'Motivos Anulación de Contratos' },
+          { id: 'tipos_plan',               label: 'Tipos de Plan' },
+          { id: 'subproductos',             label: 'Subproductos' },
+          { id: 'importar_subproductos',    label: 'Importar Subproductos' },
+          { id: 'importar_max_servicios',   label: 'Importar Productos Máximos por Tipo de Servicios' },
+          { id: 'wo_excentas_control',      label: 'Work Orders Excentas de Control de Material' },
+        ]
+      },
+      {
+        id: 'par_auxilio_movilidad',
+        label: 'Parámetros Auxilio de Movilidad',
+        icon: 'vehiculos',
+        desc: 'Configuración de auxilios de movilidad y tarifas',
+        archivos: [
+          { id: 'importar_tarifas_movilidad', label: 'Importar Tarifas Auxilio de Movilidad' },
+          { id: 'tecnicos_excentos_pago',     label: 'Técnicos Excentos de Pagos Auxilio de Movilidad' },
+          { id: 'importar_servicios_auxilio', label: 'Importar Servicios que Aplican al Auxilio de Movilidad' },
         ]
       }
     ],
-    archivos: []
+    archivos: [
+      { id: 'lineas_vehiculos', label: 'Líneas Vehículos' },
+      { id: 'transportadoras',  label: 'Transportadoras' },
+    ]
   },
   {
     id: 'usuarios',
     label: 'Usuarios',
-    icon: '',
+    icon: 'usuarios',
     color: '#2980b9',
-    desc: 'Administración de usuarios y roles.',
+    desc: 'Administración de usuarios, roles y auditoría.',
     submods: [],
     archivos: [
       { id: 'usuarios_sistema', label: 'Usuarios del Sistema' },
       { id: 'grupos_usuarios', label: 'Grupos de Usuarios' },
-      { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' }
+      { id: 'cambiar_contrasena', label: 'Cambiar Contraseña' },
+      { id: 'auditoria_usuarios', label: 'Auditoria de Usuarios' },
     ]
   },
   {
     id: 'liquidacion_comisiones',
     label: 'Liquidación Comisiones',
-    icon: '',
+    icon: 'liquidacion_comisiones',
     color: '#d35400',
-    desc: 'Cálculo y gestión de comisiones.',
-    submods: [],
+    desc: 'Cálculo y gestión de comisiones de subagentes.',
+    submods: [
+      {
+        id: 'liq_subagentes',
+        label: 'Subagentes',
+        icon: 'subagentes',
+        desc: 'Liquidación de comisiones para subagentes',
+        archivos: [
+          { id: 'liq_params_generales',    label: 'Parametros Generales' },
+          { id: 'liq_importar_valores',    label: 'Importar Valores Comisiones' },
+          { id: 'liq_indicador_satisf',    label: 'Indicador Satisfacciones' },
+          { id: 'liq_indicador_optimus',   label: 'Indicador Optimus' },
+          { id: 'liq_importar_relacion',   label: 'Importar Relacion Pagos Directv' },
+          { id: 'liq_params_perimetros',   label: 'Parametros perímetros IBS' },
+          { id: 'liq_generar_liquidacion', label: 'Generar Liquidacion de Comisiones' },
+          { id: 'liq_aprobadas',           label: 'Liquidaciones Aprobadas' },
+        ]
+      }
+    ],
     archivos: []
   }
 ];

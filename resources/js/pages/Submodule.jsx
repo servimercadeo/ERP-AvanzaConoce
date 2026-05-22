@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { ERP_MODULES } from '../data/erpModules';
+import { MODULE_ICONS, IconFolder, IconUnderConstruction } from '../components/Icons';
 
 // ── Importa aquí los CRUD de cada archivo ───────────────────────────────
 import EmpleadosCrud from './EmpleadosCrud';
 import ContratosCrud from './ContratosCrud';
+import SeleccionCrud from './SeleccionCrud';
+import BaseIngresoCrud from './BaseIngresoCrud';
+
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
 // import ClientesSubCrud     from './ClientesSubCrud';
@@ -27,9 +31,15 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── ADMINISTRATIVO ─────────────────────────────────── */
     case 'administrativo':
       switch (submoduleId) {
-        case 'admin_contratos':
+        case 'seleccion':
           switch (archivoId) {
-            case 'ver_crear_contratos': return ContratosCrud;
+            case 'proceso_seleccion': return SeleccionCrud;
+            case 'base_ingreso': return BaseIngresoCrud;
+            default: return null;
+          }
+      case 'admin_contratos':
+        switch (archivoId) {
+          case 'ver_crear_contratos': return ContratosCrud;
             default: return null;
           }
         default: return null;
@@ -183,11 +193,19 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── PARÁMETROS ─────────────────────────────────────── */
     case 'parametros':
       switch (submoduleId) {
-        case 'comerciales_tecnicos':
-          switch (archivoId) {
-            // case 'tipo_productos': return TipoProductosCrud;
-            default: return null;
-          }
+        case 'par_generales':
+        case 'par_administrativos':
+        case 'par_comerciales_tecnicos':
+        case 'par_auxilio_movilidad':
+          return null;
+        default: return null;
+      }
+
+    /* ── LIQUIDACIÓN COMISIONES ──────────────────────────── */
+    case 'liquidacion_comisiones':
+      switch (submoduleId) {
+        case 'liq_subagentes':
+          return null;
         default: return null;
       }
 
@@ -222,22 +240,27 @@ export default function Submodule() {
 
   return (
     <Layout>
-      <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ width: '100%', maxWidth: '100%', margin: '0 auto' }}>
 
         {/* ── Breadcrumb ──────────────────────────────────── */}
         <div className="breadcrumb" id="breadcrumb">
           <Link to="/dashboard">Inicio</Link>
           <span className="sep">›</span>
-          <Link to={`/module/${mod.id}`}>{mod.icon} {mod.label}</Link>
+          <Link to={`/module/${mod.id}`} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 13 })} {mod.label}
+          </Link>
           <span className="sep">›</span>
-          <span>{sub.icon} {sub.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 13 })} {sub.label}
+          </span>
         </div>
 
         {/* ── Encabezado ──────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 0 }}>
           <div>
-            <p className="page-title" style={{ textAlign: 'left', marginBottom: 4 }}>
-              {sub.icon} {sub.label}
+            <p className="page-title" style={{ textAlign: 'left', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: 'var(--primary)' }}>{React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 22 })}</span>
+              {sub.label}
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 0 }}>
               {mod.label} · {sub.desc}
@@ -292,7 +315,7 @@ export default function Submodule() {
           ) : (
             /* ── Sin CRUD aún: placeholder ── */
             <div style={S.placeholder}>
-              <div style={S.placeholderIcon}>🚧</div>
+              <div style={S.placeholderIcon}><IconUnderConstruction size={56} /></div>
               <h3 style={{ fontFamily: "'Poppins', sans-serif", color: 'var(--primary)', marginBottom: 8 }}>
                 {archivoActual?.label}
               </h3>

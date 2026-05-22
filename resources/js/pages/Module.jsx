@@ -1,12 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ERP_MODULES } from "../data/erpModules";
+import {
+    MODULE_ICONS,
+    IconFolder,
+    IconUnderConstruction,
+} from "../components/Icons";
 
 // ── Importa aquí los CRUD de cada módulo ─────────────────────────────────
 import EmpleadosCrud from "./EmpleadosCrud";
 // import VehiculosCrud           from './VehiculosCrud';          // Administrativo
-// import SedesCrud               from './SedesCrud';              // Sedes
+import SedesCrud from "./SedesCrud"; // Sedes
 // import RelacionCrud            from './RelacionCrud';           // Sedes
 // import RegionalesCrud          from './RegionalesCrud';         // Sedes
 // import ConsultarContratosCrud  from './ConsultarContratosCrud'; // Sedes
@@ -35,7 +40,8 @@ function resolveCrud(moduleId, archivoId) {
         /* ── SEDES ──────────────────────────────────────────────── */
         case "sedes":
             switch (archivoId) {
-                // case 'sedes_file':                return SedesCrud;
+                case "sedes_file":
+                    return SedesCrud;
                 // case 'relacion':                  return RelacionCrud;
                 // case 'regionales':                return RegionalesCrud;
                 // case 'consultar_contratos':       return ConsultarContratosCrud;
@@ -122,6 +128,13 @@ export default function Module() {
         tieneArchivos ? (mod?.archivos?.[0]?.id ?? null) : null,
     );
 
+    /* ── Auto-selección: cuando cambia de módulo, abrir el 1er archivo ── */
+    useEffect(() => {
+        const currentMod = ERP_MODULES.find((m) => m.id === moduleId);
+        const primerArchivo = currentMod?.archivos?.[0]?.id ?? null;
+        setTabActiva(primerArchivo);
+    }, [moduleId]);
+
     if (!mod) {
         return (
             <Layout>
@@ -144,15 +157,23 @@ export default function Module() {
 
     return (
         <Layout>
-            <div
-                style={{ width: "100%", maxWidth: "1200px", margin: "0 auto" }}
-            >
+            <div style={{ width: "100%", maxWidth: "100%", margin: "0 auto" }}>
                 {/* ── Breadcrumb ─────────────────────────────────────── */}
                 <div className="breadcrumb" id="breadcrumb">
                     <Link to="/dashboard">Inicio</Link>
                     <span className="sep">›</span>
-                    <span>
-                        {mod.icon} {mod.label}
+                    <span
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                        }}
+                    >
+                        {React.createElement(
+                            MODULE_ICONS[mod.icon] ?? IconFolder,
+                            { size: 14 },
+                        )}
+                        {mod.label}
                     </span>
                     {tabActiva && archivoActual && (
                         <>
@@ -176,9 +197,21 @@ export default function Module() {
                     <div>
                         <p
                             className="page-title"
-                            style={{ textAlign: "left", marginBottom: 4 }}
+                            style={{
+                                textAlign: "left",
+                                marginBottom: 4,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                            }}
                         >
-                            {mod.icon} {mod.label}
+                            <span style={{ color: "var(--primary)" }}>
+                                {React.createElement(
+                                    MODULE_ICONS[mod.icon] ?? IconFolder,
+                                    { size: 22 },
+                                )}
+                            </span>
+                            {mod.label}
                         </p>
                         <p
                             style={{
@@ -207,7 +240,7 @@ export default function Module() {
                             gap: 6,
                         }}
                     >
-                        ← Volver atras
+                        ← Volver
                     </Link>
                 </div>
 
@@ -274,7 +307,9 @@ export default function Module() {
                                 </>
                             ) : (
                                 <div style={S.placeholder}>
-                                    <div style={S.placeholderIcon}>🚧</div>
+                                    <div style={S.placeholderIcon}>
+                                        <IconUnderConstruction size={56} />
+                                    </div>
                                     <h3
                                         style={{
                                             fontFamily: "'Poppins', sans-serif",
@@ -309,9 +344,9 @@ export default function Module() {
                 )}
 
                 {/* ══════════════════════════════════════════════════════
-            SECCIÓN 2 — Submódulos como tarjetas (si los hay)
+            SECCIÓN 2 — Submódulos como tarjetas (si los hay y NO hay archivos directos)
         ══════════════════════════════════════════════════════ */}
-                {mod.submods && mod.submods.length > 0 && (
+                {mod.submods && mod.submods.length > 0 && !tieneArchivos && (
                     <div style={{ marginTop: 36 }}>
                         <p className="section-title">Submódulos</p>
                         <div className="mod-subgrid" id="submod-grid">
@@ -322,7 +357,11 @@ export default function Module() {
                                     to={`/module/${mod.id}/submodule/${sub.id}`}
                                 >
                                     <span className="sc-icon">
-                                        {sub.icon || "📂"}
+                                        {React.createElement(
+                                            MODULE_ICONS[sub.icon] ??
+                                                IconFolder,
+                                            { size: 22 },
+                                        )}
                                     </span>
                                     <span className="sc-label">
                                         {sub.label}

@@ -17,13 +17,21 @@ class SedesSeeder extends Seeder
             return;
         }
 
-        DB::table('sedes')->truncate();
-
         $handle = fopen($csvPath, 'r');
         fgetcsv($handle); // saltar cabecera
 
         $nullOrVal = fn($v) => ($v === '' || strtoupper((string) $v) === 'NULL' || $v === '-') ? null : $v;
         $intOrZero = fn($v) => is_numeric($v) ? (int) $v : 0;
+
+        $updateCols = [
+            'nombre', 'id_ciudad', 'direccion', 'telefono', 'estado',
+            'id_consultor_mac', 'id_almacenista_mac', 'id_secretaria_mac',
+            'id_jefe_mac', 'id_user_mac', 'id_torre_mac',
+            'codigo_distribuidor', 'codigo_instalador',
+            'numero_contrato_inicial', 'numero_contrato_final',
+            'meta_prepago', 'meta_postpago', 'tipo_sede', 'id_sede_padre',
+            'sub_canal', 'updated_at',
+        ];
 
         $batch = [];
         $count = 0;
@@ -59,15 +67,15 @@ class SedesSeeder extends Seeder
 
             $count++;
 
-            // Insertar en lotes de 50 para no saturar memoria
+            // Upsert en lotes de 50: inserta nuevas y actualiza existentes por id
             if (count($batch) >= 50) {
-                DB::table('sedes')->insertOrIgnore($batch);
+                DB::table('sedes')->upsert($batch, ['id'], $updateCols);
                 $batch = [];
             }
         }
 
         if (!empty($batch)) {
-            DB::table('sedes')->insertOrIgnore($batch);
+            DB::table('sedes')->upsert($batch, ['id'], $updateCols);
         }
 
         fclose($handle);

@@ -156,11 +156,17 @@ class EmpleadosSeeder extends Seeder
 
         if (!file_exists($csvPath2)) {
             $this->command->warn("CSV no encontrado: {$csvPath2} (omitido)");
-            return;
+        } else {
+            $count2 = $this->importarCsv($csvPath2, $sedesMap, $empresasMap, $cargosMap, $epsMap, $rhMap, $ecMap, $bancosMap, $arlsMap, $cajasMap);
+            $this->command->info("✓ {$count2} usuarios importados desde Users2.csv");
         }
 
-        $count2 = $this->importarCsv($csvPath2, $sedesMap, $empresasMap, $cargosMap, $epsMap, $rhMap, $ecMap, $bancosMap, $arlsMap, $cajasMap);
-        $this->command->info("✓ {$count2} usuarios importados desde Users2.csv");
+        // Segundo paso: resolver jefe_inmediato a partir de id_supervisor
+        $this->resolverJefesInmediatos($csvPath);
+        if (file_exists($csvPath2)) {
+            $this->resolverJefesInmediatos($csvPath2);
+        }
+        $this->command->info("✓ Jefes inmediatos resueltos");
     }
 
     private function importarCsv(
@@ -224,6 +230,7 @@ class EmpleadosSeeder extends Seeder
                 'observaciones_medicas'          => $nullOrVal($row[57] ?? null),
                 'alergias'                       => $nullOrVal($row[58] ?? null),
                 'ingresos'                       => $floatOrNull($row[59] ?? null),
+                'empleador'                      => $upper($nullOrVal($row[27] ?? null)),
                 'tipo_vinculacion'               => $nullOrVal($row[63] ?? null),
                 'licencia_carro'                 => $nullOrVal($row[65] ?? null),
                 'licencia_carro_vence'           => $dateOrNull($row[66] ?? null),
@@ -270,5 +277,28 @@ class EmpleadosSeeder extends Seeder
 
         fclose($handle);
         return $count;
+    }
+
+    private function resolverJefesInmediatos(string $path): void
+    {
+        $handle = fopen($path, 'r');
+        fgetcsv($handle); // saltar cabecera
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if (!isset($row[0]) || !is_numeric($row[0])) continue;
+            if (!isset($row[20]) || !is_numeric($row[20]) || (int) $row[20] === 0) continue;
+
+            $supervisorNombre = DB::table('users')
+                ->where('avanzaconoce_id', (int) $row[20])
+                ->value('name');
+
+            if ($supervisorNombre) {
+                DB::table('users')
+                    ->where('avanzaconoce_id', (int) $row[0])
+                    ->update(['jefe_inmediato' => mb_strtoupper($supervisorNombre, 'UTF-8')]);
+            }
+        }
+
+        fclose($handle);
     }
 }

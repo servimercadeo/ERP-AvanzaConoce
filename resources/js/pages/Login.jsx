@@ -1,16 +1,47 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import api from "../api/axios";
 
 export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
+
+    const [step, setStep] = useState("email");
     const [email, setEmail] = useState("");
-    const [password, setPass] = useState("");
+    const [userName, setUserName] = useState("");
+    const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const passwordRef = useRef(null);
+
+    useEffect(() => {
+        if (step === "password" && passwordRef.current) {
+            passwordRef.current.focus();
+        }
+    }, [step]);
+
+    const handleEmailSubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
+        try {
+            const res = await api.post("/check-email", { email });
+            if (!res.data.exists) {
+                setError("No encontramos una cuenta con ese correo.");
+                return;
+            }
+            setUserName(res.data.name);
+            setStep("password");
+        } catch {
+            setError("Error al verificar el correo. Intenta de nuevo.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError(null);
         setLoading(true);
@@ -19,117 +50,177 @@ export default function Login() {
             navigate("/dashboard");
         } catch (err) {
             setError(
-                err.response?.data?.errors?.email?.[0] ??
-                    "Error al iniciar sesión.",
+                err.response?.data?.message ??
+                    err.response?.data?.errors?.email?.[0] ??
+                    "Contraseña incorrecta. Intenta de nuevo.",
             );
         } finally {
             setLoading(false);
         }
     };
 
+    const handleBack = () => {
+        setStep("email");
+        setPassword("");
+        setError(null);
+        setUserName("");
+    };
+
     return (
-        <div style={styles.wrapper}>
-            <div style={styles.card}>
-                <h1 style={styles.titulo}>ERP AvanzaConoce</h1>
-                <p style={styles.subtitulo}>
-                    Ingresa tus credenciales para continuar
-                </p>
+        <div className="login-wrapper">
+            <div className="login-card">
+                {/* Marca */}
+                <div className="login-brand">
+                    <svg
+                        width="52"
+                        height="52"
+                        viewBox="0 0 36 36"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <ellipse
+                            cx="18"
+                            cy="22"
+                            rx="10"
+                            ry="10"
+                            fill="#1a9b8c"
+                            opacity="0.18"
+                        />
+                        <path
+                            d="M18 4 C18 4 10 14 10 22 A8 8 0 0 0 26 22 C26 14 18 4 18 4Z"
+                            fill="#1a9b8c"
+                        />
+                        <path
+                            d="M18 12 C18 12 13 19 13 23 A5 5 0 0 0 23 23 C23 19 18 12 18 12Z"
+                            fill="#f5a623"
+                        />
+                        <circle cx="27" cy="10" r="4" fill="#e8c41a" />
+                    </svg>
+                    <div>
+                        <div className="login-brand-name">
+                            ERP <span>AvanzaConoce</span>
+                        </div>
+                        <div className="login-brand-sub">
+                            Sistema de gestión empresarial
+                        </div>
+                    </div>
+                </div>
 
-                <form onSubmit={handleSubmit} style={styles.form}>
-                    <label style={styles.label}>Correo electrónico</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        style={styles.input}
-                        placeholder="usuario@empresaa.com"
-                    />
+                {/* Contenido del paso — key distinta para animar la transición */}
+                {step === "email" ? (
+                    <div key="email" className="login-step-body">
+                        <div className="login-heading">
+                            <h2>Bienvenido</h2>
+                            <p>Ingresa tu correo electrónico para continuar</p>
+                        </div>
 
-                    <label style={styles.label}>Contraseña</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPass(e.target.value)}
-                        required
-                        style={styles.input}
-                        placeholder="••••••••"
-                    />
+                        <form
+                            onSubmit={handleEmailSubmit}
+                            className="login-form"
+                        >
+                            <div className="login-field">
+                                <label htmlFor="login-email">
+                                    Correo electrónico
+                                </label>
+                                <input
+                                    id="login-email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    autoFocus
+                                    placeholder="usuario@empresa.com"
+                                />
+                            </div>
 
-                    {error && <p style={styles.error}>{error}</p>}
+                            {error && (
+                                <div className="login-error">{error}</div>
+                            )}
 
-                    <button type="submit" disabled={loading} style={styles.btn}>
-                        {loading ? "Ingresando..." : "Iniciar sesión"}
-                    </button>
-                </form>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="login-btn"
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="login-spinner" />{" "}
+                                        Verificando...
+                                    </>
+                                ) : (
+                                    <>
+                                        Continuar{" "}
+                                        <span className="login-btn-arrow">
+                                            →
+                                        </span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                ) : (
+                    <div key="password" className="login-step-body">
+                        <button onClick={handleBack} className="login-back">
+                            ← Cambiar cuenta
+                        </button>
 
-                <p style={styles.hint}>
-                    ¿Vienes desde AvanzaConoce? Usa el botón{" "}
-                    <strong>"Ir al ERP"</strong> allá.
-                </p>
+                        <div className="login-user-chip">
+                            <div className="login-user-avatar">
+                                {userName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div className="login-user-name">
+                                    {userName}
+                                </div>
+                                <div className="login-user-email">{email}</div>
+                            </div>
+                        </div>
+
+                        <div className="login-heading">
+                            <h2>Ingresa tu contraseña</h2>
+                            <p>Verifica tu identidad para acceder al ERP</p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="login-form">
+                            <div className="login-field">
+                                <label htmlFor="login-password">
+                                    Contraseña
+                                </label>
+                                <input
+                                    id="login-password"
+                                    ref={passwordRef}
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) =>
+                                        setPassword(e.target.value)
+                                    }
+                                    required
+                                    placeholder="••••••••"
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="login-error">{error}</div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="login-btn"
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="login-spinner" />{" "}
+                                        Iniciando sesión...
+                                    </>
+                                ) : (
+                                    "Iniciar sesión"
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
-
-const styles = {
-    wrapper: {
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f0f4f8",
-    },
-    card: {
-        background: "#fff",
-        borderRadius: "12px",
-        padding: "2.5rem",
-        width: "100%",
-        maxWidth: "420px",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-    },
-    titulo: {
-        margin: "0 0 0.25rem",
-        fontSize: "1.6rem",
-        color: "#1a3c5e",
-        textAlign: "center",
-    },
-    subtitulo: {
-        color: "#6b7280",
-        textAlign: "center",
-        marginBottom: "2rem",
-        fontSize: "0.9rem",
-    },
-    form: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-    label: { fontSize: "0.85rem", fontWeight: 600, color: "#374151" },
-    input: {
-        padding: "0.65rem 0.9rem",
-        borderRadius: "8px",
-        border: "1px solid #d1d5db",
-        fontSize: "0.95rem",
-        marginBottom: "0.75rem",
-        outline: "none",
-    },
-    btn: {
-        marginTop: "0.5rem",
-        padding: "0.75rem",
-        background: "#2563eb",
-        color: "#fff",
-        border: "none",
-        borderRadius: "8px",
-        fontSize: "1rem",
-        fontWeight: 600,
-        cursor: "pointer",
-    },
-    error: {
-        color: "#dc2626",
-        fontSize: "0.85rem",
-        margin: "0.25rem 0",
-    },
-    hint: {
-        marginTop: "1.5rem",
-        fontSize: "0.8rem",
-        color: "#9ca3af",
-        textAlign: "center",
-    },
-};

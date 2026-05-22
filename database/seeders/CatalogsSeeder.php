@@ -16,7 +16,9 @@ class CatalogsSeeder extends Seeder
         $this->importSimple('empleadores',       'empleadores.csv',      150);
         $this->importSimple('bancos',            'bancos.csv',           100);
         $this->importSimple('arls',              'arl.csv',              100);
-        $this->importSimple('cajas_compensacion','caja_compensasion.csv',100);
+        $this->importSimple('cajas_compensacion','caja_compensasion.csv',  100);
+        $this->importSimple('fondos_pensiones',  'fondos_pensiones.csv',   100);
+        $this->importSimple('fondos_cesantias',  'fondos_cesantias.csv',   100);
         $this->importCiudades();
     }
 
