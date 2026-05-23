@@ -7,228 +7,246 @@ use Illuminate\Support\Facades\DB;
 
 class ContratosSeeder extends Seeder
 {
-    private const TIPO_CONTRATO = [
-        1 => 'Por definir',
-        2 => 'Término Fijo',
-        3 => 'Término Fijo Inferior a un año',
-        4 => 'De Obra Labor',
-        5 => 'Aprendiz SENA',
-        6 => 'Término Indefinido',
-        7 => 'Indefinido Medio Tiempo',
-    ];
-
-    private const TIPO_VINCULACION = [
-        1 => 'Directo',
-        2 => 'Indirecto',
-    ];
-
-    private const AREA_EMPRESA = [
-        1 => 'Por definir',
-        2 => 'Comercial',
-        3 => 'Administrativa',
-        4 => 'Técnica',
-    ];
-
-    private const ESTADO = [
-        1 => 'Activo',
-        2 => 'Inactivo',
-    ];
-
     public function run(): void
     {
-        $this->seedManual();
-        $this->importarCsv();
-    }
+        $contratos = [
+            [
+                'cedula'          => '1089381135',
+                'tipo_contrato'   => 'Término Indefinido',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Auxiliar de sistemas',
+                'sede'            => 'Sede Pereira',
+                'area_empresa'    => 'Área Técnica',
+                'jefe_inmediato'  => 'JORGE EMILIO VARON CASTILLO',
+                'fecha_ingreso'   => '2022-03-01',
+                'salario'                  => 2500000,
+                'auxilio_transporte_legal' => 162000,
+                'arl'                      => 'Sura ARL',
+                'fecha_vinculacion_arl'    => '2022-03-01',
+                'lps_afiliado'             => 'Sura EPS',
+                'fecha_vinculacion_lps'    => '2022-03-01',
+                'caja_compensacion'        => 'Comfama',
+                'fecha_vinculacion_caja'   => '2022-03-01',
+                'fondo_pensiones'          => 'Protección',
+                'fondo_cesantias'          => 'Protección',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servicios y Mercadeo S.A.S',
+                'empresa'                  => 'Servicios y Mercadeo S.A.S',
+                'origen_seguimiento'       => 'Referido empleado',
+                'centro_costos'            => 'Administrativo',
+                'anexo_auxilio'            => 'Auxilio de movilización',
+                'valor_anexo'              => 120000,
+                'fecha_entrega_firma'      => '2022-03-01',
+            ],
+            [
+                'cedula'          => '1098765432',
+                'tipo_contrato'   => 'Término Fijo',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Analista administrativo',
+                'sede'            => 'Sede Medellín',
+                'area_empresa'    => 'Área Administrativa',
+                'jefe_inmediato'  => 'JORGE EMILIO VARON CASTILLO',
+                'fecha_ingreso'   => '2023-01-16',
+                'salario'                  => 3200000,
+                'auxilio_transporte_legal' => 162000,
+                'arl'                      => 'Sura ARL',
+                'fecha_vinculacion_arl'    => '2023-01-16',
+                'lps_afiliado'             => 'Sura EPS',
+                'fecha_vinculacion_lps'    => '2023-01-16',
+                'caja_compensacion'        => 'Comfama',
+                'fecha_vinculacion_caja'   => '2023-01-16',
+                'fondo_pensiones'          => 'Protección',
+                'fondo_cesantias'          => 'Colfondos',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servicios y Mercadeo S.A.S',
+                'empresa'                  => 'Servicios y Mercadeo S.A.S',
+                'origen_seguimiento'       => 'Portal de empleo',
+                'centro_costos'            => 'Administrativo',
+                'anexo_auxilio'            => null,
+                'valor_anexo'              => null,
+                'fecha_entrega_firma'      => null,
+            ],
+            [
+                'cedula'          => '43876543',
+                'tipo_contrato'   => 'Término Indefinido',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Analista de talento humano',
+                'sede'            => 'Sede Pereira',
+                'area_empresa'    => 'Área Administrativa',
+                'jefe_inmediato'  => 'JORGE EMILIO VARON CASTILLO',
+                'fecha_ingreso'   => '2021-08-02',
+                'salario'                  => 2800000,
+                'auxilio_transporte_legal' => 162000,
+                'arl'                      => 'Positiva',
+                'fecha_vinculacion_arl'    => '2021-08-02',
+                'lps_afiliado'             => 'Comfamiliar Risaralda',
+                'fecha_vinculacion_lps'    => '2021-08-02',
+                'caja_compensacion'        => 'Comfamiliar Risaralda',
+                'fecha_vinculacion_caja'   => '2021-08-02',
+                'fondo_pensiones'          => 'Porvenir',
+                'fondo_cesantias'          => 'Porvenir',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servicios y Mercadeo S.A.S',
+                'empresa'                  => 'Servicios y Mercadeo S.A.S',
+                'origen_seguimiento'       => 'Referido empleado',
+                'centro_costos'            => 'Talento Humano',
+                'anexo_auxilio'            => 'Auxilio de alimentación',
+                'valor_anexo'              => 80000,
+                'fecha_entrega_firma'      => '2021-08-02',
+            ],
+            [
+                'cedula'          => '71234567',
+                'tipo_contrato'   => 'Término Indefinido',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Coordinador comercial',
+                'sede'            => 'Sede Medellín',
+                'area_empresa'    => 'Área Comercial',
+                'jefe_inmediato'  => 'SIMON GALLEGO MORALES',
+                'fecha_ingreso'   => '2020-05-11',
+                'salario'                  => 4500000,
+                'auxilio_transporte_legal' => null,
+                'arl'                      => 'Sura ARL',
+                'fecha_vinculacion_arl'    => '2020-05-11',
+                'lps_afiliado'             => 'Sura EPS',
+                'fecha_vinculacion_lps'    => '2020-05-11',
+                'caja_compensacion'        => 'Comfama',
+                'fecha_vinculacion_caja'   => '2020-05-11',
+                'fondo_pensiones'          => 'Colfondos',
+                'fondo_cesantias'          => 'Colfondos',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servimercadeo COL',
+                'empresa'                  => 'Servimercadeo COL',
+                'origen_seguimiento'       => 'Portal de empleo',
+                'centro_costos'            => 'Comercial',
+                'anexo_auxilio'            => 'Auxilio de rodamiento',
+                'valor_anexo'              => 350000,
+                'fecha_entrega_firma'      => '2020-05-11',
+            ],
+            [
+                'cedula'          => '52345678',
+                'tipo_contrato'   => 'Término Fijo',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Supervisor de operaciones',
+                'sede'            => 'Sede Cali',
+                'area_empresa'    => 'Área Técnica',
+                'jefe_inmediato'  => 'JORGE EMILIO VARON CASTILLO',
+                'fecha_ingreso'   => '2022-11-07',
+                'salario'                  => 2600000,
+                'auxilio_transporte_legal' => 162000,
+                'arl'                      => 'Positiva',
+                'fecha_vinculacion_arl'    => '2022-11-07',
+                'lps_afiliado'             => 'Nueva E.P.S',
+                'fecha_vinculacion_lps'    => '2022-11-07',
+                'caja_compensacion'        => 'Comfandi',
+                'fecha_vinculacion_caja'   => '2022-11-07',
+                'fondo_pensiones'          => 'Colpensiones',
+                'fondo_cesantias'          => 'Colpensiones',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servimercadeo COL',
+                'empresa'                  => 'Servimercadeo COL',
+                'origen_seguimiento'       => 'Bolsa de trabajo',
+                'centro_costos'            => 'Operativo',
+                'anexo_auxilio'            => null,
+                'valor_anexo'              => null,
+                'fecha_entrega_firma'      => null,
+            ],
+            [
+                'cedula'          => '94567890',
+                'tipo_contrato'   => 'Término Indefinido',
+                'tipo_vinculacion'=> 'Directo',
+                'cargo'           => 'Gerente de procesos administrativos',
+                'sede'            => 'Sede Pereira',
+                'area_empresa'    => 'Área Administrativa',
+                'jefe_inmediato'  => 'DIRECCIÓN GENERAL',
+                'fecha_ingreso'   => '2018-02-01',
+                'salario'                  => 5800000,
+                'auxilio_transporte_legal' => null,
+                'arl'                      => 'Sura ARL',
+                'fecha_vinculacion_arl'    => '2018-02-01',
+                'lps_afiliado'             => 'Sura EPS',
+                'fecha_vinculacion_lps'    => '2018-02-01',
+                'caja_compensacion'        => 'Comfamiliar Risaralda',
+                'fecha_vinculacion_caja'   => '2018-02-01',
+                'fondo_pensiones'          => 'Protección',
+                'fondo_cesantias'          => 'Protección',
+                'estado_contrato'          => 'Activo',
+                'empleador'                => 'Servicios y Mercadeo S.A.S',
+                'empresa'                  => 'Servicios y Mercadeo S.A.S',
+                'origen_seguimiento'       => 'Referido externo',
+                'centro_costos'            => 'Administrativo',
+                'anexo_auxilio'            => 'Auxilio de vehículo',
+                'valor_anexo'              => 500000,
+                'fecha_entrega_firma'      => '2018-02-01',
+            ],
+        ];
 
-    // ── Contratos manuales de prueba ────────────────────────────────────────
-
-    private function seedManual(): void
-    {
-        $cedulasSeeder = ['1089381135'];
-        $empleadoIds   = DB::table('users')->whereIn('cedula', $cedulasSeeder)->pluck('id');
-        $contratoIds   = DB::table('contratos')->whereIn('empleado_id', $empleadoIds)
-                            ->whereNull('id_macaw')->pluck('id');
-
-        DB::table('contrato_centros_costos')->whereIn('contrato_id', $contratoIds)->delete();
-        DB::table('contrato_anexos')->whereIn('contrato_id', $contratoIds)->delete();
-        DB::table('contratos')->whereIn('id', $contratoIds)->delete();
-
-        $empleados = DB::table('users')->whereIn('cedula', $cedulasSeeder)->pluck('id', 'cedula');
-
-        if (!isset($empleados['1089381135'])) return;
-
-        $contratoId = DB::table('contratos')->insertGetId([
-            'empleado_id'              => $empleados['1089381135'],
-            'tipo_contrato'            => 'Término Indefinido',
-            'tipo_vinculacion'         => 'Directo',
-            'cargo'                    => 'Auxiliar de sistemas',
-            'sede'                     => 'Sede Pereira',
-            'area_empresa'             => 'Área Técnica',
-            'jefe_inmediato'           => 'Dirección General',
-            'fecha_ingreso'            => '2022-03-01',
-            'fecha_retiro'             => null,
-            'salario'                  => 2500000,
-            'auxilio_transporte_legal' => 162000,
-            'arl'                      => 'Sura ARL',
-            'fecha_vinculacion_arl'    => '2022-03-01',
-            'lps_afiliado'             => 'Sura',
-            'fecha_vinculacion_lps'    => '2022-03-01',
-            'caja_compensacion'        => 'Comfama',
-            'fecha_vinculacion_caja'   => '2022-03-01',
-            'fondo_pensiones'          => 'Protección',
-            'fondo_cesantias'          => 'Protección',
-            'estado_contrato'          => 'Activo',
-            'empleador'                => 'Servicios y Mercadeo S.A.S',
-            'empresa'                  => 'Servicios y Mercadeo S.A.S',
-            'cliente_proyecto'         => null,
-            'origen_seguimiento'       => 'Referido empleado',
-            'created_at'               => now(),
-            'updated_at'               => now(),
-        ]);
-
-        DB::table('contrato_centros_costos')->insert([
-            'contrato_id'   => $contratoId,
-            'centro_costos' => 'Administrativo',
-            'porcentaje'    => 100,
-            'created_at'    => now(),
-            'updated_at'    => now(),
-        ]);
-
-        DB::table('contrato_anexos')->insert([
-            'contrato_id'        => $contratoId,
-            'anexo_auxilio'      => 'Auxilio de movilización',
-            'valor'              => 120000,
-            'fecha_entrega_firma'=> '2022-03-01',
-            'created_at'         => now(),
-            'updated_at'         => now(),
-        ]);
-    }
-
-    // ── Importación desde contratos.csv ─────────────────────────────────────
-
-    private function importarCsv(): void
-    {
-        $csvPath = database_path('seeders/data/contratos.csv');
-
-        if (!file_exists($csvPath)) {
-            $this->command->warn("CSV no encontrado: {$csvPath} (omitido)");
-            return;
-        }
-
-        $cargosMap      = DB::table('cargos')->pluck('nombre', 'id')->toArray();
-        $sedesMap       = DB::table('sedes')->pluck('nombre', 'id')->toArray();
-        $empleadoresMap = DB::table('empleadores')->pluck('nombre', 'id')->toArray();
-        $arlsMap        = DB::table('arls')->pluck('nombre', 'id')->toArray();
-        $epsMap         = DB::table('eps')->pluck('nombre', 'id')->toArray();
-        $cajasMap       = DB::table('cajas_compensacion')->pluck('nombre', 'id')->toArray();
-        $fondosPensMap  = DB::table('fondos_pensiones')->pluck('nombre', 'id')->toArray();
-        $fondosCesMap   = DB::table('fondos_cesantias')->pluck('nombre', 'id')->toArray();
-
-        $id2name = fn(array $map, $val): ?string =>
-            is_numeric($val) && isset($map[(int) $val]) ? $map[(int) $val] : null;
-
-        $handle = fopen($csvPath, 'r');
-        fgetcsv($handle); // saltar cabecera
-
-        $count = $skipped = 0;
-
-        while (($row = fgetcsv($handle)) !== false) {
-            if (!isset($row[0]) || !is_numeric($row[0])) continue;
-
-            // Buscar empleado: primero por id (users.id), luego por avanzaconoce_id
-            $empleadoId = null;
-
-            if (is_numeric($row[1] ?? '') && (int) $row[1] > 0) {
-                $empleadoId = DB::table('users')->where('id', (int) $row[1])->value('id');
-            }
-
-            if (!$empleadoId && is_numeric($row[2] ?? '') && (int) $row[2] > 0) {
-                $empleadoId = DB::table('users')->where('avanzaconoce_id', (int) $row[2])->value('id');
-            }
+        foreach ($contratos as $data) {
+            $empleadoId = DB::table('users')->where('cedula', $data['cedula'])->value('id');
 
             if (!$empleadoId) {
-                $skipped++;
+                $this->command->warn("Empleado no encontrado: cédula {$data['cedula']}");
                 continue;
             }
 
-            $idMacaw      = (int) $row[0];
-            $centroCostos = trim($row[8] ?? '');
+            $existente = DB::table('contratos')
+                ->where('empleado_id', $empleadoId)
+                ->whereNull('id_macaw')
+                ->first();
 
-            $data = [
+            if ($existente) {
+                $this->command->warn("Contrato ya existe para cédula {$data['cedula']} — omitido");
+                continue;
+            }
+
+            $contratoId = DB::table('contratos')->insertGetId([
                 'empleado_id'              => $empleadoId,
-                'tipo_contrato'            => self::TIPO_CONTRATO[(int) ($row[3] ?? 0)]  ?? null,
-                'empleador'                => $id2name($empleadoresMap, $row[4]  ?? null),
-                'cargo'                    => $id2name($cargosMap,      $row[5]  ?? null),
-                'sede'                     => $id2name($sedesMap,       $row[6]  ?? null),
-                'area_empresa'             => self::AREA_EMPRESA[(int) ($row[7]  ?? 0)]  ?? null,
-                'jefe_inmediato'           => trim($row[9]  ?? '') ?: null,
-                'fecha_ingreso'            => $this->fixDate($row[10] ?? null),
-                'fecha_retiro'             => $this->fixDate($row[11] ?? null),
-                'salario'                  => is_numeric($row[12] ?? '') ? (float) $row[12] : null,
-                'auxilio_transporte_legal' => is_numeric($row[13] ?? '') ? (float) $row[13] : null,
-                'tipo_vinculacion'         => self::TIPO_VINCULACION[(int) ($row[14] ?? 0)] ?? null,
-                'arl'                      => $id2name($arlsMap,       $row[15] ?? null),
-                'fecha_vinculacion_arl'    => $this->fixDate($row[16] ?? null),
-                'lps_afiliado'             => $id2name($epsMap,        $row[17] ?? null),
-                'fecha_vinculacion_lps'    => $this->fixDate($row[18] ?? null),
-                'fondo_pensiones'          => $id2name($fondosPensMap, $row[19] ?? null),
-                'fondo_cesantias'          => $id2name($fondosCesMap,  $row[20] ?? null),
-                'caja_compensacion'        => $id2name($cajasMap,      $row[21] ?? null),
-                'fecha_vinculacion_caja'   => $this->fixDate($row[22] ?? null),
-                'estado_contrato'          => self::ESTADO[(int) ($row[23] ?? 1)] ?? 'Activo',
-                'cliente_proyecto'         => trim($row[24] ?? '') ?: null,
+                'tipo_contrato'            => $data['tipo_contrato'],
+                'tipo_vinculacion'         => $data['tipo_vinculacion'],
+                'cargo'                    => $data['cargo'],
+                'sede'                     => $data['sede'],
+                'area_empresa'             => $data['area_empresa'],
+                'jefe_inmediato'           => $data['jefe_inmediato'],
+                'fecha_ingreso'            => $data['fecha_ingreso'],
+                'fecha_retiro'             => null,
+                'salario'                  => $data['salario'],
+                'auxilio_transporte_legal' => $data['auxilio_transporte_legal'],
+                'arl'                      => $data['arl'],
+                'fecha_vinculacion_arl'    => $data['fecha_vinculacion_arl'],
+                'lps_afiliado'             => $data['lps_afiliado'],
+                'fecha_vinculacion_lps'    => $data['fecha_vinculacion_lps'],
+                'caja_compensacion'        => $data['caja_compensacion'],
+                'fecha_vinculacion_caja'   => $data['fecha_vinculacion_caja'],
+                'fondo_pensiones'          => $data['fondo_pensiones'],
+                'fondo_cesantias'          => $data['fondo_cesantias'],
+                'estado_contrato'          => $data['estado_contrato'],
+                'empleador'                => $data['empleador'],
+                'empresa'                  => $data['empresa'],
+                'cliente_proyecto'         => null,
+                'origen_seguimiento'       => $data['origen_seguimiento'],
+                'created_at'               => now(),
                 'updated_at'               => now(),
-            ];
+            ]);
 
-            try {
-                $existente = DB::table('contratos')->where('id_macaw', $idMacaw)->first();
+            DB::table('contrato_centros_costos')->insert([
+                'contrato_id'   => $contratoId,
+                'centro_costos' => $data['centro_costos'],
+                'porcentaje'    => 100,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
 
-                if ($existente) {
-                    DB::table('contratos')->where('id_macaw', $idMacaw)->update($data);
-                    $contratoId = $existente->id;
-                    DB::table('contrato_centros_costos')->where('contrato_id', $contratoId)->delete();
-                } else {
-                    $contratoId = DB::table('contratos')->insertGetId(
-                        array_merge($data, ['id_macaw' => $idMacaw, 'created_at' => now()])
-                    );
-                }
-
-                if ($centroCostos !== '' && $centroCostos !== '0') {
-                    DB::table('contrato_centros_costos')->insert([
-                        'contrato_id'   => $contratoId,
-                        'centro_costos' => $centroCostos,
-                        'porcentaje'    => 100,
-                        'created_at'    => now(),
-                        'updated_at'    => now(),
-                    ]);
-                }
-
-                $count++;
-            } catch (\Exception $e) {
-                $this->command->warn("Error id_macaw={$idMacaw}: " . $e->getMessage());
+            if ($data['anexo_auxilio']) {
+                DB::table('contrato_anexos')->insert([
+                    'contrato_id'         => $contratoId,
+                    'anexo_auxilio'       => $data['anexo_auxilio'],
+                    'valor'               => $data['valor_anexo'],
+                    'fecha_entrega_firma' => $data['fecha_entrega_firma'],
+                    'created_at'          => now(),
+                    'updated_at'          => now(),
+                ]);
             }
         }
 
-        fclose($handle);
-        $this->command->info("✓ {$count} contratos importados, {$skipped} omitidos (empleado no encontrado)");
-    }
-
-    private function fixDate(?string $v): ?string
-    {
-        if (!$v || strtoupper(trim($v)) === 'NULL' || trim($v) === '') return null;
-
-        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($v), $m)) return trim($v);
-
-        $year = (int) $m[1];
-
-        if ($year < 2) return null;           // 0001-01-01 → dato inválido
-
-        if ($year < 100) {                    // 0019 → 2019
-            $year += 2000;
-        } elseif ($year < 1000) {             // 0215 → 2015, 0202 → 2002, 0223 → 2023
-            $year += 1800;
-        }
-
-        return $year . '-' . $m[2] . '-' . $m[3];
+        $this->command->info('✓ Contratos insertados');
     }
 }
