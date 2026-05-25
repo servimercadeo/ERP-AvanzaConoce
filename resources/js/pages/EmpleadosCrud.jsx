@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -1344,6 +1345,16 @@ export default function EmpleadosCrud() {
                         </svg>
                         Filtros
                     </button>
+                    <PresetFiltersDropdown presets={[
+                        { label: "Empleados activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
+                        { label: "En vacaciones", apply: () => { clearFilters(); setFiltroEstado("Vacaciones"); } },
+                        { label: "Incapacitados", apply: () => { clearFilters(); setFiltroEstado("Incapacitado"); } },
+                        { label: "Contratistas", apply: () => { clearFilters(); setFiltroVinc("Contratista"); } },
+                        { label: "Aprendices SENA", apply: () => { clearFilters(); setFiltroVinc("Aprendiz SENA"); } },
+                        { label: "Técnicos", apply: () => { clearFilters(); setFiltroTipoFunc("TÉCNICO"); } },
+                        { label: "Vendedores", apply: () => { clearFilters(); setFiltroTipoFunc("VENDEDOR"); } },
+                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
+                    ]} />
                 </div>
                 <button className="btn-primary" onClick={openCreate}>
                     + Nuevo empleado
@@ -1679,196 +1690,102 @@ export default function EmpleadosCrud() {
                             >
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Ciudad</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroCiudad}
-                                        onChange={(e) =>
-                                            setFiltroCiudad(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {catalogs.ciudades.map((c) => (
-                                            <option key={c} value={c}>
-                                                {c}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroCiudad}
+                                        defaultValue="Todas"
+                                        options={catalogs.ciudades.map((c) => ({ label: c, value: c }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Sede</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroSede}
-                                        onChange={(e) =>
-                                            setFiltroSede(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {catalogs.sedes.map((s) => (
-                                            <option key={s} value={s}>
-                                                {s}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroSede}
+                                        defaultValue="Todas"
+                                        options={catalogs.sedes.map((s) => ({ label: s, value: s }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Empresa</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroEmpresa}
-                                        onChange={(e) =>
-                                            setFiltroEmpresa(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {empresas.map((e) => (
-                                            <option key={e.id} value={e.id}>
-                                                {e.nombre}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroEmpresa}
+                                        defaultValue="Todas"
+                                        options={empresas.map((e) => ({ label: e.nombre, value: e.id }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>
-                                        Tipo Vinculación
-                                    </label>
-                                    <select
-                                        style={S.input}
+                                    <label style={S.label}>Tipo Vinculación</label>
+                                    <SearchableSelect
                                         value={filtroVinc}
-                                        onChange={(e) =>
-                                            setFiltroVinc(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todos">Elige</option>
-                                        {TIPOS_VINC.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroVinc}
+                                        defaultValue="Todos"
+                                        options={TIPOS_VINC.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>
-                                        Tipo Funcionario
-                                    </label>
-                                    <select
-                                        style={S.input}
+                                    <label style={S.label}>Tipo Funcionario</label>
+                                    <SearchableSelect
                                         value={filtroTipoFunc}
-                                        onChange={(e) =>
-                                            setFiltroTipoFunc(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todos">Elige</option>
-                                        {catalogs.tipos_funcionario.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroTipoFunc}
+                                        defaultValue="Todos"
+                                        options={catalogs.tipos_funcionario.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Cargo</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroCargo}
-                                        onChange={(e) =>
-                                            setFiltroCargo(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todos">Elige</option>
-                                        {catalogs.cargos.map((c) => (
-                                            <option key={c} value={c}>
-                                                {c}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroCargo}
+                                        defaultValue="Todos"
+                                        options={catalogs.cargos.map((c) => ({ label: c, value: c }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>EPS Afiliado</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroEps}
-                                        onChange={(e) =>
-                                            setFiltroEps(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {catalogs.eps.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroEps}
+                                        defaultValue="Todas"
+                                        options={catalogs.eps.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>ARL</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroArl}
-                                        onChange={(e) =>
-                                            setFiltroArl(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {catalogs.arls.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroArl}
+                                        defaultValue="Todas"
+                                        options={catalogs.arls.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>
-                                        Fondo de Pensiones
-                                    </label>
-                                    <select
-                                        style={S.input}
+                                    <label style={S.label}>Fondo de Pensiones</label>
+                                    <SearchableSelect
                                         value={filtroPensiones}
-                                        onChange={(e) =>
-                                            setFiltroPensiones(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todas">Elige</option>
-                                        {PENSIONES.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroPensiones}
+                                        defaultValue="Todas"
+                                        options={PENSIONES.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>RH</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroRH}
-                                        onChange={(e) =>
-                                            setFiltroRH(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todos">Elige</option>
-                                        {catalogs.tipos_rh.map((v) => (
-                                            <option key={v} value={v}>
-                                                {v}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroRH}
+                                        defaultValue="Todos"
+                                        options={catalogs.tipos_rh.map((v) => ({ label: v, value: v }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Estado</label>
-                                    <select
-                                        style={S.input}
+                                    <SearchableSelect
                                         value={filtroEstado}
-                                        onChange={(e) =>
-                                            setFiltroEstado(e.target.value)
-                                        }
-                                    >
-                                        <option value="Todos">Elige</option>
-                                        {ESTADOS_EMP.map((s) => (
-                                            <option key={s} value={s}>
-                                                {s}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroEstado}
+                                        defaultValue="Todos"
+                                        options={ESTADOS_EMP.map((s) => ({ label: s, value: s }))}
+                                    />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>

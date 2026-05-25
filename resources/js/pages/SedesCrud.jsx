@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -613,6 +614,13 @@ export default function SedesCrud() {
                         </svg>
                         Filtros
                     </button>
+                    <PresetFiltersDropdown presets={[
+                        { label: "Sedes activas", apply: () => { clearFilters(); setFiltroEstado("Activa"); } },
+                        { label: "Sedes inactivas", apply: () => { clearFilters(); setFiltroEstado("Inactiva"); } },
+                        { label: "Sedes principales", apply: () => { clearFilters(); setFiltroTipo("Principal"); } },
+                        { label: "Sedes secundarias", apply: () => { clearFilters(); setFiltroTipo("Secundaria"); } },
+                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
+                    ]} />
                 </div>
                 <button
                     className="btn-primary"
@@ -862,103 +870,71 @@ export default function SedesCrud() {
                         <div style={S.modalBody}>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Sede</label>
-                                <select
-                                    style={S.input}
+                                <SearchableSelect
                                     value={filtroSede}
-                                    onChange={(e) =>
-                                        setFiltroSede(e.target.value)
-                                    }
-                                >
-                                    <option value="Todas">Todas</option>
-                                    {options.sedes.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.nombre}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={setFiltroSede}
+                                    defaultValue="Todas"
+                                    options={options.sedes.map((s) => ({ label: s.nombre, value: s.id }))}
+                                />
                             </div>
                             <div style={{ ...S.formGroup, marginTop: 16 }}>
                                 <label style={S.label}>Departamento</label>
-                                <select
-                                    style={S.input}
+                                <SearchableSelect
                                     value={filtroDepto}
-                                    onChange={(e) =>
-                                        setFiltroDepto(e.target.value)
-                                    }
-                                >
-                                    <option value="Todos">Todos</option>
-                                    {departamentos.map((d) => (
-                                        <option key={d.value} value={d.value}>
-                                            {d.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={setFiltroDepto}
+                                    defaultValue="Todos"
+                                    options={departamentos.map((d) => ({ label: d.label, value: d.value }))}
+                                />
                             </div>
                             <div style={{ ...S.formGroup, marginTop: 16 }}>
                                 <label style={S.label}>Ciudad</label>
-                                <select
-                                    style={S.input}
+                                <SearchableSelect
                                     value={filtroCiudad}
-                                    onChange={(e) =>
-                                        setFiltroCiudad(e.target.value)
-                                    }
-                                >
-                                    <option value="Todas">Todas</option>
-                                    {options.ciudades.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.nombre}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={setFiltroCiudad}
+                                    defaultValue="Todas"
+                                    options={options.ciudades.map((c) => ({ label: c.nombre, value: c.id }))}
+                                />
                             </div>
                             <div style={{ ...S.formGroup, marginTop: 16 }}>
                                 <label style={S.label}>Tipo de Sede</label>
-                                <select
-                                    style={S.input}
+                                <SearchableSelect
                                     value={filtroTipo}
-                                    onChange={(e) =>
-                                        setFiltroTipo(e.target.value)
-                                    }
-                                >
-                                    <option value="Todos">Todos</option>
-                                    {options.tipos_sede.map((t) => (
-                                        <option key={t} value={t}>
-                                            {t}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={setFiltroTipo}
+                                    defaultValue="Todos"
+                                    options={options.tipos_sede.map((t) => ({ label: t, value: t }))}
+                                />
                             </div>
                             <div style={{ ...S.formGroup, marginTop: 16 }}>
                                 <label style={S.label}>Estado</label>
-                                <select
-                                    style={S.input}
+                                <SearchableSelect
                                     value={filtroEstado}
-                                    onChange={(e) =>
-                                        setFiltroEstado(e.target.value)
-                                    }
-                                >
-                                    <option value="Todas">Todas</option>
-                                    {options.estados.map((s) => (
-                                        <option key={s} value={s}>
-                                            {s}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={setFiltroEstado}
+                                    defaultValue="Todas"
+                                    options={options.estados.map((s) => ({ label: s, value: s }))}
+                                />
                             </div>
                         </div>
-                        <div style={S.modalFooter}>
+                        <div style={{ ...S.modalFooter, justifyContent: "space-between" }}>
                             <button
                                 style={S.btnSecondary}
                                 onClick={clearFilters}
                             >
-                                Limpiar
+                                Limpiar filtros
                             </button>
-                            <button
-                                style={S.btnPrimaryGreen}
-                                onClick={() => setFilterOpen(false)}
-                            >
-                                Aplicar
-                            </button>
+                            <div style={{ display: "flex", gap: 12 }}>
+                                <button
+                                    style={S.btnSecondary}
+                                    onClick={() => setFilterOpen(false)}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    style={S.btnPrimaryGreen}
+                                    onClick={() => setFilterOpen(false)}
+                                >
+                                    Buscar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1141,10 +1117,11 @@ const S = {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "16px 24px",
-        borderBottom: "1px solid var(--border)",
-        flexShrink: 0,
+        padding: "22px 28px",
         background: "var(--primary)",
+        borderTopLeftRadius: "var(--radius)",
+        borderTopRightRadius: "var(--radius)",
+        flexShrink: 0,
     },
     modalTitleWhite: {
         fontFamily: "'Poppins',sans-serif",
@@ -1206,35 +1183,35 @@ const S = {
     inputErr: { borderColor: "#e74c3c" },
     err: { color: "#e74c3c", fontSize: "0.7rem", marginTop: 2 },
     btnPrimary: {
-        padding: "8px 16px",
+        padding: "10px 20px",
         background: "var(--primary)",
         color: "#fff",
         border: "none",
-        borderRadius: "4px",
-        fontSize: "0.85rem",
-        fontWeight: 600,
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
         cursor: "pointer",
         fontFamily: "Nunito,sans-serif",
     },
     btnPrimaryGreen: {
-        padding: "8px 16px",
-        background: "#5cb85c",
+        padding: "10px 20px",
+        background: "var(--primary)",
         color: "#fff",
         border: "none",
-        borderRadius: "4px",
-        fontSize: "0.85rem",
-        fontWeight: 600,
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
         cursor: "pointer",
         fontFamily: "Nunito,sans-serif",
     },
     btnSecondary: {
-        padding: "8px 16px",
-        background: "#d9534f",
-        color: "#fff",
-        border: "none",
-        borderRadius: "4px",
-        fontSize: "0.85rem",
-        fontWeight: 600,
+        padding: "10px 20px",
+        background: "var(--bg)",
+        color: "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
         cursor: "pointer",
         fontFamily: "Nunito,sans-serif",
     },

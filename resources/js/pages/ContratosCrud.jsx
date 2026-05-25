@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -887,6 +888,13 @@ export default function ContratosCrud() {
     const [search, setSearch] = useState("");
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroSede, setFiltroSede] = useState("Todas");
+    const [filtroTipoContrato, setFiltroTipoContrato] = useState("Todos");
+    const [filtroVinc, setFiltroVinc] = useState("Todos");
+    const [filtroCargo, setFiltroCargo] = useState("Todos");
+    const [filtroArl, setFiltroArl] = useState("Todas");
+    const [filtroCaja, setFiltroCaja] = useState("Todas");
+    const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
+    const [filtroFondoPensiones, setFiltroFondoPensiones] = useState("Todos");
     const [catalogs, setCatalogs] = useState({
         cargos: [],
         sedes: [],
@@ -929,7 +937,7 @@ export default function ContratosCrud() {
 
     useEffect(() => {
         setPagina(1);
-    }, [search, filtroEstado, filtroSede]);
+    }, [search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones]);
 
     const showToast = (msg) => {
         setToast(msg);
@@ -946,13 +954,18 @@ export default function ContratosCrud() {
                     empName.includes(q) ||
                     (c.empleado?.cedula ?? "").includes(q) ||
                     (c.cargo ?? "").toLowerCase().includes(q);
-                const matchE =
-                    filtroEstado === "Todos" ||
-                    c.estado_contrato === filtroEstado;
+                const matchE = filtroEstado === "Todos" || c.estado_contrato === filtroEstado;
                 const matchS = filtroSede === "Todas" || c.sede === filtroSede;
-                return matchQ && matchE && matchS;
+                const matchTC = filtroTipoContrato === "Todos" || c.tipo_contrato === filtroTipoContrato;
+                const matchV = filtroVinc === "Todos" || c.tipo_vinculacion === filtroVinc;
+                const matchC = filtroCargo === "Todos" || c.cargo === filtroCargo;
+                const matchArl = filtroArl === "Todas" || c.arl === filtroArl;
+                const matchCaja = filtroCaja === "Todas" || c.caja_compensacion === filtroCaja;
+                const matchEmp = filtroEmpresa === "Todas" || c.empresa === filtroEmpresa;
+                const matchFP = filtroFondoPensiones === "Todos" || c.fondo_pensiones === filtroFondoPensiones;
+                return matchQ && matchE && matchS && matchTC && matchV && matchC && matchArl && matchCaja && matchEmp && matchFP;
             }),
-        [contratos, search, filtroEstado, filtroSede],
+        [contratos, search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones],
     );
 
     const paginated = useMemo(
@@ -992,6 +1005,19 @@ export default function ContratosCrud() {
         } catch (err) {
             showToast("Error al guardar el contrato.");
         }
+    };
+
+    const clearFilters = () => {
+        setSearch("");
+        setFiltroEstado("Todos");
+        setFiltroSede("Todas");
+        setFiltroTipoContrato("Todos");
+        setFiltroVinc("Todos");
+        setFiltroCargo("Todos");
+        setFiltroArl("Todas");
+        setFiltroCaja("Todas");
+        setFiltroEmpresa("Todas");
+        setFiltroFondoPensiones("Todos");
     };
 
     const handleDelete = async () => {
@@ -1061,6 +1087,15 @@ export default function ContratosCrud() {
                         </svg>
                         Filtros
                     </button>
+                    <PresetFiltersDropdown presets={[
+                        { label: "Contratos activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
+                        { label: "Contratos vencidos", apply: () => { clearFilters(); setFiltroEstado("Vencido"); } },
+                        { label: "Contratos inactivos", apply: () => { clearFilters(); setFiltroEstado("Inactivo"); } },
+                        { label: "Contratos anulados", apply: () => { clearFilters(); setFiltroEstado("Anulado"); } },
+                        { label: "Término fijo", apply: () => { clearFilters(); setFiltroTipoContrato("Término Fijo"); } },
+                        { label: "Prestación de servicios", apply: () => { clearFilters(); setFiltroTipoContrato("Prestación de Servicios"); } },
+                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
+                    ]} />
                 </div>
                 <button
                     className="btn-primary"
@@ -1260,70 +1295,112 @@ export default function ContratosCrud() {
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
                     <div
-                        style={{ ...S.modal, maxWidth: 500 }}
+                        style={{ ...S.modal, maxWidth: 860, maxHeight: "none", overflow: "visible" }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
-                            <span style={S.modalTitleWhite}>Filtros</span>
-                            <button
-                                style={S.closeBtnWhite}
-                                onClick={() => setFilterOpen(false)}
-                            >
+                            <span style={S.modalTitleWhite}>Filtros de Búsqueda</span>
+                            <button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>
                                 <IconClose size={14} />
                             </button>
                         </div>
-                        <div style={S.modalBody}>
-                            <div style={S.formGroup}>
-                                <label style={S.label}>Estado</label>
-                                <select
-                                    style={S.input}
-                                    value={filtroEstado}
-                                    onChange={(e) =>
-                                        setFiltroEstado(e.target.value)
-                                    }
-                                >
-                                    <option value="Todos">Todos</option>
-                                    {ESTADOS_CONTRATO.map((s) => (
-                                        <option key={s} value={s}>
-                                            {s}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div style={{ ...S.formGroup, marginTop: 16 }}>
-                                <label style={S.label}>Sede</label>
-                                <select
-                                    style={S.input}
-                                    value={filtroSede}
-                                    onChange={(e) =>
-                                        setFiltroSede(e.target.value)
-                                    }
-                                >
-                                    <option value="Todas">Todas</option>
-                                    {catalogs.sedes.map((s) => (
-                                        <option key={s} value={s}>
-                                            {s}
-                                        </option>
-                                    ))}
-                                </select>
+                        <div style={{ ...S.modalBody, overflowY: "visible", overflowX: "visible" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 24px" }}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Estado</label>
+                                    <FilterSelect
+                                        value={filtroEstado}
+                                        onChange={setFiltroEstado}
+                                        defaultValue="Todos"
+                                        options={ESTADOS_CONTRATO.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Tipo de Contrato</label>
+                                    <FilterSelect
+                                        value={filtroTipoContrato}
+                                        onChange={setFiltroTipoContrato}
+                                        defaultValue="Todos"
+                                        options={TIPOS_CONTRATO.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Tipo de Vinculación</label>
+                                    <FilterSelect
+                                        value={filtroVinc}
+                                        onChange={setFiltroVinc}
+                                        defaultValue="Todos"
+                                        options={catalogs.tipos_vinculacion.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Sede</label>
+                                    <FilterSelect
+                                        value={filtroSede}
+                                        onChange={setFiltroSede}
+                                        defaultValue="Todas"
+                                        options={catalogs.sedes.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Cargo</label>
+                                    <FilterSelect
+                                        value={filtroCargo}
+                                        onChange={setFiltroCargo}
+                                        defaultValue="Todos"
+                                        options={catalogs.cargos.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>ARL</label>
+                                    <FilterSelect
+                                        value={filtroArl}
+                                        onChange={setFiltroArl}
+                                        defaultValue="Todas"
+                                        options={catalogs.arls.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Caja de Compensación</label>
+                                    <FilterSelect
+                                        value={filtroCaja}
+                                        onChange={setFiltroCaja}
+                                        defaultValue="Todas"
+                                        options={catalogs.cajas.map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Empresa</label>
+                                    <FilterSelect
+                                        value={filtroEmpresa}
+                                        onChange={setFiltroEmpresa}
+                                        defaultValue="Todas"
+                                        options={[...new Set(contratos.map((c) => c.empresa).filter(Boolean))].map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Fondo de Pensiones</label>
+                                    <FilterSelect
+                                        value={filtroFondoPensiones}
+                                        onChange={setFiltroFondoPensiones}
+                                        defaultValue="Todos"
+                                        options={[...new Set(contratos.map((c) => c.fondo_pensiones).filter(Boolean))].map((s) => ({ label: s, value: s }))}
+                                    />
+                                </div>
                             </div>
                         </div>
-                        <div style={S.modalFooter}>
-                            <button
-                                style={S.btnSecondary}
-                                onClick={() => {
-                                    setFiltroEstado("Todos");
-                                    setFiltroSede("Todas");
-                                }}
-                            >
-                                Limpiar
+                        <div style={{ ...S.modalFooter, justifyContent: "space-between" }}>
+                            <button style={S.btnSecondary} onClick={clearFilters}>
+                                Limpiar filtros
                             </button>
-                            <button
-                                style={S.btnPrimary}
-                                onClick={() => setFilterOpen(false)}
-                            >
-                                Aplicar
-                            </button>
+                            <div style={{ display: "flex", gap: 12 }}>
+                                <button style={S.btnSecondary} onClick={() => setFilterOpen(false)}>
+                                    Cancelar
+                                </button>
+                                <button style={S.btnPrimary} onClick={() => setFilterOpen(false)}>
+                                    Buscar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
