@@ -8,7 +8,6 @@ node_modules/
 !.env.example
 
 # Build artifacts
-public/build/
 public/hot
 
 # Git
