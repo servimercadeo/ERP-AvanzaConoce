@@ -1,3 +1,17 @@
+# ── Etapa 1: compilar assets con Node.js ────────────────────────────────────
+FROM node:20-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY resources/ resources/
+COPY vite.config.js ./
+
+RUN npm run build
+
+# ── Etapa 2: imagen PHP + Apache ────────────────────────────────────────────
 FROM php:8.2-apache
 
 # Dependencias del sistema
@@ -11,10 +25,6 @@ RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 # Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Node.js 20 (para Vite build)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
-
 # Apache: apuntar DocumentRoot a /public y activar mod_rewrite
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
@@ -25,19 +35,17 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
 
 WORKDIR /var/www/html
 
-# 1. Instalar dependencias PHP (cache layer separado)
+# Dependencias PHP (cache layer separado)
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
-# 2. Instalar dependencias JS (cache layer separado)
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# 3. Copiar el resto del código y compilar assets
+# Código fuente
 COPY . .
-RUN npm run build
 
-# 4. Post-install scripts de Composer
+# Assets compilados desde la etapa anterior
+COPY --from=assets /app/public/build public/build
+
+# Post-install scripts de Composer
 RUN composer run-script post-autoload-dump 2>/dev/null || true
 
 # Permisos de Laravel
