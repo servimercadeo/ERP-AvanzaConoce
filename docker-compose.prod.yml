@@ -38,6 +38,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
       - "traefik.http.routers.erp.rule=Host(`erp.local`)"
       - "traefik.http.routers.erp.entrypoints=web"
       - "traefik.http.services.erp.loadbalancer.server.port=80"
