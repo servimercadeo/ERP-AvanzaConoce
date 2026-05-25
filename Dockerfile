@@ -1,17 +1,3 @@
-# ── Etapa 1: compilar assets con Node.js ────────────────────────────────────
-FROM node:20-alpine AS assets
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-
-COPY resources/ resources/
-COPY vite.config.js ./
-
-RUN npm run build
-
-# ── Etapa 2: imagen PHP + Apache ────────────────────────────────────────────
 FROM php:8.2-apache
 
 # Dependencias del sistema
@@ -39,11 +25,8 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
-# Código fuente
+# Código fuente (incluye public/build ya compilado)
 COPY . .
-
-# Assets compilados desde la etapa anterior
-COPY --from=assets /app/public/build public/build
 
 # Post-install scripts de Composer
 RUN composer run-script post-autoload-dump 2>/dev/null || true
