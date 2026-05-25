@@ -1,0 +1,37 @@
+# Dependencias (se instalan dentro del contenedor)
+vendor/
+node_modules/
+
+# Entorno local
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+public/build/
+public/hot
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+phpunit.xml
+.phpunit.result.cache
+
+# Herramientas de desarrollo
+.editorconfig
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs y cache locales
+storage/logs/*.log
+bootstrap/cache/*.php
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile

@@ -1,0 +1,73 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: erp-app
+    restart: unless-stopped
+    environment:
+      APP_NAME: "ERP AvanzaConoce"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: "base64:nQFz6jiBELSzs4sJdYbnGz5Aq/MkYJSpcG/bTJPnmLs="
+      APP_URL: "http://erp.local"
+
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: erp_avanzaconoce
+      DB_USERNAME: erp_user
+      DB_PASSWORD: erp_password_segura
+
+      CACHE_DRIVER: file
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      SESSION_LIFETIME: 120
+      QUEUE_CONNECTION: sync
+
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: error
+    volumes:
+      - erp_storage:/var/www/html/storage/app
+      - erp_logs:/var/www/html/storage/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.erp.rule=Host(`erp.local`)"
+      - "traefik.http.routers.erp.entrypoints=web"
+      - "traefik.http.services.erp.loadbalancer.server.port=80"
+
+  db:
+    image: mysql:8.0
+    container_name: erp-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: erp_avanzaconoce
+      MYSQL_USER: erp_user
+      MYSQL_PASSWORD: erp_password_segura
+      MYSQL_ROOT_PASSWORD: root_password_segura
+    volumes:
+      - erp_db_data:/var/lib/mysql
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  erp_db_data:
+  erp_storage:
+  erp_logs:
+
+networks:
+  internal:
+    driver: bridge
+  proxy:
+    external: true
