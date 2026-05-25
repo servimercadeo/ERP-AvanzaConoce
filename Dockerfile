@@ -30,8 +30,8 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
 # 2. Instalar dependencias JS (cache layer separado)
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # 3. Copiar el resto del código y compilar assets
 COPY . .
