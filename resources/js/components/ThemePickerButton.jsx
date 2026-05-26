@@ -209,9 +209,6 @@ export default function ThemePickerButton() {
               <IcoReset />
               {resetting ? 'Restableciendo…' : 'Restablecer valores de fábrica'}
             </button>
-            <p className="tpb-footer-note">
-              {user ? '✨ Sincronizado en la nube' : '💻 Guardado en este navegador'}
-            </p>
           </div>
         </div>
       )}
@@ -223,7 +220,6 @@ export default function ThemePickerButton() {
         onClick={() => setOpen(v => !v)}
       >
         {open ? <IcoClose /> : <IcoPalette />}
-        {!open && <span className="theme-fab-badge">PRO</span>}
       </button>
     </>
   )
