@@ -67,7 +67,7 @@ export default function SeleccionCrud() {
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('Abierta');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); // 'create', 'edit', 'view'
+  const [modalMode, setModalMode] = useState('create');
   const [form, setForm] = useState({});
   const [pagina, setPagina] = useState(1);
   const POR_PAGINA = 10;
@@ -88,7 +88,6 @@ export default function SeleccionCrud() {
           nextReqNumber = Math.max(...reqNumbers) + 1;
         }
       }
-
       setForm({
         fecha_solicitud: '21 mayo 2026',
         numero_identificacion_proceso: `REQ${nextReqNumber}`,
@@ -176,7 +175,7 @@ export default function SeleccionCrud() {
   };
 
   const filteredData = data.filter(row => {
-    const matchesSearch = Object.values(row).some(val => 
+    const matchesSearch = Object.values(row).some(val =>
       String(val).toLowerCase().includes(searchTerm.toLowerCase())
     );
     const matchesEstado = estadoFilter === 'Todas' ? true : row.estado === estadoFilter;
@@ -188,20 +187,26 @@ export default function SeleccionCrud() {
 
   const getEstadoColors = (estado) => {
     const e = estado ? estado.toLowerCase() : '';
-    if (e === 'abierta' || e === 'activa') return { bg: '#d1fae5', text: '#065f46' };
-    if (e === 'cerrada' || e === 'inactiva') return { bg: '#fee2e2', text: '#991b1b' };
-    return { bg: '#f3f4f6', text: '#374151' };
+    if (e === 'abierta' || e === 'activa') return { bg: '#d1fae5', color: '#065f46' };
+    if (e === 'cerrada' || e === 'inactiva') return { bg: '#fee2e2', color: '#991b1b' };
+    if (e === 'en proceso') return { bg: '#fef3c7', color: '#92400e' };
+    return { bg: 'var(--bg)', color: 'var(--text-muted)' };
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
-      
-      {/* ── Top Controls ── */}
+
+      {/* ── Toolbar ── */}
       <div style={S.toolbar}>
-        
-        {/* Left Side (Search & Filters) */}
+
+        {/* Left: Search + Estado */}
         <div style={S.filters}>
-          <div style={{ position: 'relative' }}>
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
             <input
               type="text"
               placeholder="Buscar requisición, cargo o proyecto..."
@@ -211,34 +216,39 @@ export default function SeleccionCrud() {
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '2px 14px' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280' }}>ESTADO:</label>
+          <div style={S.estadoWrap}>
+            <label style={S.estadoLabel}>Estado:</label>
             <select
               value={estadoFilter}
               onChange={(e) => setEstadoFilter(e.target.value)}
-              style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.9rem', color: '#111827', fontWeight: 500, padding: '6px 0', cursor: 'pointer' }}
+              style={S.estadoSelect}
             >
               <option value="Todas">Todas</option>
               <option value="Abierta">Abierta</option>
+              <option value="En proceso">En proceso</option>
               <option value="Cerrada">Cerrada</option>
+              <option value="Cancelada">Cancelada</option>
             </select>
           </div>
         </div>
 
-        {/* Right Side (Buttons) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button style={{ ...S.btnFilter, background: '#f8fafc' }}>
-            <span style={{ fontSize: '1.1rem' }}>↻</span> Actualizar
+        {/* Right: Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button style={S.filterBtn}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+            </svg>
+            Actualizar
           </button>
-          <button style={S.btnNuevo} onClick={() => handleOpenModal('create')}>
+          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>
             + Nueva requisición
           </button>
         </div>
 
       </div>
 
-      {/* ── Table ── */}
-      <div style={S.tableContainer}>
+      {/* ── Tabla ── */}
+      <div style={S.tableWrap}>
         <table style={S.table}>
           <thead>
             <tr>
@@ -262,7 +272,7 @@ export default function SeleccionCrud() {
                   <td style={S.td}>{itemIndex}</td>
                   <td style={S.td}>{row.nro_identificacion_proceso}</td>
                   <td style={S.td}>
-                    <span style={S.badge(estColors.bg, estColors.text)}>
+                    <span style={S.badge(estColors.bg, estColors.color)}>
                       {row.estado}
                     </span>
                   </td>
@@ -272,15 +282,15 @@ export default function SeleccionCrud() {
                   <td style={S.td}>{row.tipo_solicitud}</td>
                   <td style={S.td}>{row.ciudad}</td>
                   <td style={{ ...S.td, textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                      <button style={S.actionBtn('#3b82f6', '#eff6ff')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
-                        <IconEye size={16} />
+                    <div style={S.actions}>
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
+                        <IconEye size={15} />
                       </button>
-                      <button style={S.actionBtn('#10b981', '#ecfdf5')} title="Editar" onClick={() => handleOpenModal('edit', row)}>
-                        <IconEdit size={16} />
+                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}>
+                        <IconEdit size={15} />
                       </button>
-                      <button style={S.actionBtn('#ef4444', '#fef2f2')} title="Eliminar">
-                        <IconTrash size={16} />
+                      <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar">
+                        <IconTrash size={15} />
                       </button>
                     </div>
                   </td>
@@ -289,7 +299,7 @@ export default function SeleccionCrud() {
             })}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                <td colSpan="9" style={S.empty}>
                   No hay requisiciones que coincidan con la búsqueda.
                 </td>
               </tr>
@@ -298,38 +308,42 @@ export default function SeleccionCrud() {
         </table>
       </div>
 
+      {/* ── Paginación ── */}
       {filteredData.length > 0 && (
         <div style={S.paginationWrap}>
           <span style={S.pageInfo}>
             Página {pagina} · Mostrando {Math.min(POR_PAGINA, filteredData.length - (pagina - 1) * POR_PAGINA)} de {filteredData.length} registros
           </span>
           <div style={S.pageControls}>
-            <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1} style={{ ...S.pageBtn(false), opacity: pagina === 1 ? 0.5 : 1 }}>‹</button>
+            <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1} style={S.pageBtn(pagina === 1)}>‹</button>
             {getPaginasBotones(pagina, totalPaginas).map((n, i) =>
               n === "..." ? (
                 <span key={`ellipsis-${i}`} style={S.pageEllipsis}>…</span>
               ) : (
-                <button key={n} onClick={() => setPagina(n)} style={S.pageBtn(n === pagina)}>
+                <button key={n} onClick={() => setPagina(n)} style={n === pagina ? S.pageBtnActive : S.pageBtn(false)}>
                   {n}
                 </button>
               )
             )}
-            <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas} style={{ ...S.pageBtn(false), opacity: pagina === totalPaginas ? 0.5 : 1 }}>›</button>
+            <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas} style={S.pageBtn(pagina === totalPaginas)}>›</button>
           </div>
         </div>
       )}
 
-      {/* ── Modal Crear/Editar/Ver Requisición ── */}
+      {/* ── Modal ── */}
       {isModalOpen && (
         <div style={S.overlay} onClick={handleCloseModal}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
-            <div style={S.modalHeader}>
-              <span style={S.modalTitle}>
+
+            <div style={S.modalHeaderGreen}>
+              <span style={S.modalTitleWhite}>
                 {modalMode === 'create' ? 'Registrar nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}
               </span>
-              <button style={S.closeBtn} onClick={handleCloseModal}><IconClose size={18} /></button>
+              <button style={S.closeBtnWhite} onClick={handleCloseModal}>
+                <IconClose size={14} />
+              </button>
             </div>
-            
+
             <div style={S.modalBody}>
               <div style={S.grid3}>
                 <Field label="Nombre responsable solicitud" k="nombre_responsable" req={modalMode !== 'view'} opts={MOCK_OPTS.responsables} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
@@ -359,14 +373,15 @@ export default function SeleccionCrud() {
 
             <div style={S.modalFooter}>
               {modalMode === 'view' ? (
-                <button style={S.btnCancel} onClick={handleCloseModal}>Cerrar</button>
+                <button style={S.btnSecondary} onClick={handleCloseModal}>Cerrar</button>
               ) : (
                 <>
-                  <button style={S.btnCancel} onClick={handleCloseModal}>Cancelar</button>
-                  <button style={S.btnSave} onClick={handleSave}>Guardar requisición</button>
+                  <button style={S.btnSecondary} onClick={handleCloseModal}>Cancelar</button>
+                  <button style={S.btnPrimaryGreen} onClick={handleSave}>Guardar requisición</button>
                 </>
               )}
             </div>
+
           </div>
         </div>
       )}
@@ -376,33 +391,40 @@ export default function SeleccionCrud() {
 }
 
 function Field({ label, k, type = "text", opts, req, span, form, onChange, disabled }) {
-  const style = {
-    display: 'flex', flexDirection: 'column', gap: '6px',
+  const wrapStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 5,
+    minWidth: 0,
     ...(span ? { gridColumn: `span ${span}` } : {})
   };
   const inputStyle = {
-    padding: '10px 14px', borderRadius: '8px', border: '1px solid #e5e7eb',
-    fontSize: '0.95rem', outline: 'none',
-    background: disabled ? '#f8fafc' : '#fff',
-    color: disabled ? '#6b7280' : '#111827',
-    fontFamily: 'inherit',
-    transition: 'border-color 0.2s',
-    width: '100%'
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '8px 10px',
+    border: '1.5px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: '0.88rem',
+    fontFamily: 'Nunito,sans-serif',
+    color: disabled ? 'var(--text-muted)' : 'var(--text)',
+    background: disabled ? 'var(--bg)' : 'var(--white)',
+    outline: 'none',
+    transition: 'border 0.15s',
   };
 
   return (
-    <div style={style}>
-      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+    <div style={wrapStyle}>
+      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>
         {label}
-        {req && <span style={{ color: '#ef4444', marginLeft: '4px', fontWeight: 'bold' }}>*</span>}
+        {req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
       {opts ? (
         <select style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
           <option value="">-- Selecciona --</option>
-          {opts.map(o => <option key={o} value={o}>{o.charAt ? o.charAt(0).toUpperCase() + o.slice(1) : o}</option>)}
+          {opts.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : type === 'textarea' ? (
-        <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
+        <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       ) : (
         <input type={type} style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       )}
@@ -411,70 +433,308 @@ function Field({ label, k, type = "text", opts, req, span, form, onChange, disab
 }
 
 const S = {
-  // Toolbar
-  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '15px' },
-  filters: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
-  searchInput: {
-    padding: '10px 16px 10px 38px', borderRadius: '20px', border: '1px solid #e5e7eb',
-    fontSize: '0.9rem', outline: 'none', minWidth: '280px', background: '#fff',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'%3E%3C/path%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat', backgroundPosition: '14px center', backgroundSize: '16px'
-  },
-  btnFilter: {
-    padding: '10px 16px', borderRadius: '20px', border: '1px solid #e5e7eb', background: '#fff',
-    display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#374151', fontWeight: 500
-  },
-  btnNuevo: {
-    padding: '10px 20px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '20px',
-    cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px',
-    boxShadow: '0 2px 4px rgba(13, 148, 136, 0.15)'
-  },
-  
-  // Table
-  tableContainer: {
-    width: '100%', overflowX: 'auto', border: '1px solid #f0fdfa', borderRadius: '12px', background: '#fff',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)'
-  },
-  table: { width: '100%', borderCollapse: 'collapse', minWidth: '1000px' },
-  th: {
-    padding: '16px 14px', background: '#f0fdfa', color: '#115e59', fontWeight: 600, fontSize: '0.75rem',
-    textAlign: 'left', borderBottom: '1px solid #ccfbf1', textTransform: 'uppercase', letterSpacing: '0.05em'
-  },
-  tr: { borderBottom: '1px solid #f3f4f6', transition: 'background 0.2s' },
-  td: { padding: '14px', fontSize: '0.85rem', color: '#374151', textAlign: 'left', verticalAlign: 'middle' },
-  
-  // Badges
-  badge: (bg, text) => ({
-    padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600,
-    background: bg, color: text, display: 'inline-block', whiteSpace: 'nowrap'
-  }),
-  
-  // Action Buttons
-  actionBtn: (color, bg) => ({
-    background: bg, border: 'none', color: color, cursor: 'pointer', display: 'inline-flex',
-    alignItems: 'center', justifyContent: 'center', padding: '6px', borderRadius: '6px', transition: 'all 0.2s',
-  }),
-  
-  // Pagination
-  paginationWrap: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', padding: '0 8px', flexWrap: 'wrap', gap: '10px' },
-  pageInfo: { color: '#6b7280', fontSize: '0.85rem' },
-  pageControls: { display: 'flex', alignItems: 'center', gap: '6px' },
-  pageBtn: (active) => ({
-    padding: '6px 12px', background: active ? '#0d9488' : '#fff', color: active ? '#fff' : '#374151',
-    border: `1px solid ${active ? '#0d9488' : '#e5e7eb'}`, borderRadius: '6px', cursor: 'pointer',
-    fontSize: '0.85rem', fontWeight: active ? 600 : 500, transition: 'all 0.2s', minWidth: '32px'
-  }),
-  pageEllipsis: { padding: '6px', color: '#9ca3af' },
+    /* Toolbar */
+    toolbar: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        marginBottom: 20,
+        flexWrap: "wrap",
+    },
+    filters: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+        flex: 1,
+    },
+    searchWrap: { position: "relative", flex: 1, minWidth: 200, maxWidth: 380 },
+    searchIcon: {
+        position: "absolute",
+        left: 11,
+        top: "50%",
+        transform: "translateY(-50%)",
+        display: "flex",
+        alignItems: "center",
+        color: "var(--text-muted)",
+        pointerEvents: "none",
+    },
+    searchInput: {
+        width: "100%",
+        padding: "9px 12px 9px 34px",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.88rem",
+        fontFamily: "Nunito,sans-serif",
+        background: "var(--white)",
+        color: "var(--text)",
+        outline: "none",
+    },
+    estadoWrap: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "0 14px",
+        background: "var(--white)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        height: 38,
+    },
+    estadoLabel: {
+        fontSize: "0.78rem",
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        fontFamily: "Nunito,sans-serif",
+        whiteSpace: "nowrap",
+    },
+    estadoSelect: {
+        border: "none",
+        background: "transparent",
+        outline: "none",
+        fontSize: "0.88rem",
+        fontFamily: "Nunito,sans-serif",
+        color: "var(--text)",
+        fontWeight: 700,
+        cursor: "pointer",
+        padding: "0",
+    },
+    filterBtn: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 16px",
+        background: "var(--white)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        color: "var(--text)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        fontFamily: "Nunito,sans-serif",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+    },
 
-  // Modal
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overscrollBehavior: 'none', backdropFilter: 'blur(2px)' },
-  modal: { background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', maxHeight: '90vh', overflow: 'hidden' },
-  modalHeader: { padding: '20px 24px', background: '#0d9488', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { fontSize: '1.1rem', fontWeight: 600, letterSpacing: '0.02em' },
-  closeBtn: { background: 'none', border: 'none', color: '#ccfbf1', cursor: 'pointer', display: 'flex', padding: 4, transition: 'color 0.2s' },
-  modalBody: { padding: '32px 24px', overflowY: 'auto', flex: 1, maxHeight: 'calc(90vh - 140px)', overscrollBehavior: 'contain', background: '#f8fafc' },
-  modalFooter: { padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: '#fff' },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' },
-  btnCancel: { padding: '10px 18px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#4b5563', fontSize: '0.9rem', transition: 'all 0.2s' },
-  btnSave: { padding: '10px 18px', background: '#0d9488', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#fff', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }
+    /* Botones */
+    btnPrimary: {
+        padding: "10px 24px",
+        background: "var(--primary)",
+        color: "#fff",
+        border: "none",
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: "Nunito,sans-serif",
+        transition: "background 0.18s",
+        whiteSpace: "nowrap",
+    },
+    btnPrimaryGreen: {
+        padding: "10px 20px",
+        background: "var(--primary)",
+        color: "#fff",
+        border: "none",
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: "Nunito,sans-serif",
+    },
+    btnSecondary: {
+        padding: "10px 20px",
+        background: "var(--bg)",
+        color: "var(--text)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: "Nunito,sans-serif",
+    },
+
+    /* Tabla */
+    tableWrap: {
+        background: "var(--white)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow)",
+        overflowX: "auto",
+    },
+    table: { width: "100%", borderCollapse: "collapse", minWidth: 1000 },
+    th: {
+        padding: "14px 14px",
+        background: "var(--bg)",
+        color: "var(--primary)",
+        fontWeight: 700,
+        fontSize: "0.75rem",
+        fontFamily: "Nunito,sans-serif",
+        textAlign: "left",
+        borderBottom: "1.5px solid var(--border)",
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        whiteSpace: "nowrap",
+    },
+    tr: { borderBottom: "1px solid var(--border)", transition: "background 0.15s" },
+    td: {
+        padding: "13px 14px",
+        fontSize: "0.85rem",
+        fontFamily: "Nunito,sans-serif",
+        color: "var(--text)",
+        textAlign: "left",
+        verticalAlign: "middle",
+    },
+    badge: (bg, color) => ({
+        background: bg,
+        color,
+        borderRadius: 20,
+        padding: "3px 10px",
+        fontSize: "0.78rem",
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        fontFamily: "Nunito,sans-serif",
+    }),
+    actions: { display: "flex", gap: 6, justifyContent: "center" },
+    actionBtn: (bg, color) => ({
+        background: bg,
+        border: "none",
+        borderRadius: 6,
+        padding: "5px 8px",
+        cursor: "pointer",
+        fontSize: "0.85rem",
+        color,
+        transition: "opacity 0.15s",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+    }),
+    empty: {
+        padding: "60px 20px",
+        textAlign: "center",
+        color: "var(--text-muted)",
+        fontSize: "0.9rem",
+        fontFamily: "Nunito,sans-serif",
+    },
+
+    /* Paginación */
+    paginationWrap: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 4,
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    pageInfo: {
+        color: "var(--text-muted)",
+        fontSize: "0.85rem",
+        fontFamily: "Nunito,sans-serif",
+    },
+    pageControls: { display: "flex", alignItems: "center", gap: 6 },
+    pageBtn: (disabled) => ({
+        minWidth: 32,
+        height: 32,
+        padding: "0 8px",
+        border: "1.5px solid var(--border)",
+        borderRadius: 6,
+        background: "var(--white)",
+        color: disabled ? "var(--text-muted)" : "var(--text)",
+        fontSize: "0.88rem",
+        fontWeight: 700,
+        fontFamily: "Nunito,sans-serif",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        transition: "all 0.15s",
+    }),
+    pageBtnActive: {
+        minWidth: 32,
+        height: 32,
+        padding: "0 8px",
+        border: "1.5px solid var(--primary)",
+        borderRadius: 6,
+        background: "var(--primary)",
+        color: "#fff",
+        fontSize: "0.88rem",
+        fontWeight: 700,
+        fontFamily: "Nunito,sans-serif",
+        cursor: "default",
+    },
+    pageEllipsis: {
+        minWidth: 28,
+        height: 32,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--text-muted)",
+        fontSize: "0.88rem",
+        userSelect: "none",
+    },
+
+    /* Modal */
+    overlay: {
+        position: "fixed",
+        inset: 0,
+        background: "rgba(26,58,53,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 5000,
+        padding: 20,
+    },
+    modal: {
+        background: "var(--white)",
+        borderRadius: "var(--radius)",
+        boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
+        width: "100%",
+        maxWidth: 900,
+        maxHeight: "92vh",
+        display: "flex",
+        flexDirection: "column",
+    },
+    modalHeaderGreen: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "22px 28px",
+        background: "var(--primary)",
+        borderTopLeftRadius: "var(--radius)",
+        borderTopRightRadius: "var(--radius)",
+        flexShrink: 0,
+    },
+    modalTitleWhite: {
+        fontFamily: "'Poppins',sans-serif",
+        fontWeight: 700,
+        fontSize: "1.2rem",
+        color: "#fff",
+    },
+    closeBtnWhite: {
+        background: "none",
+        border: "1.5px solid rgba(255,255,255,0.6)",
+        borderRadius: "50%",
+        width: 26,
+        height: 26,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        color: "#fff",
+    },
+    modalBody: {
+        padding: "22px 28px 28px",
+        overflowY: "auto",
+        overflowX: "hidden",
+        flex: 1,
+    },
+    modalFooter: {
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 12,
+        padding: "16px 28px",
+        borderTop: "1.5px solid var(--border)",
+        flexShrink: 0,
+    },
+    grid3: {
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 14,
+    },
 };
