@@ -2,14 +2,20 @@ import React from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import { ERP_MODULES } from "../data/erpModules";
-import { MODULE_ICONS, IconFolder, IconLayers, IconParametros, IconVentas } from "../components/Icons";
+import {
+    MODULE_ICONS,
+    IconFolder,
+    IconLayers,
+    IconParametros,
+    IconVentas,
+} from "../components/Icons";
 
 export default function Dashboard() {
     return (
         <Layout>
             <div className="home-hero">
                 <h1>
-                    Bienvenido al <span>ERP</span>
+                    Bienvenidos al <span>ERP</span>
                 </h1>
                 <p>
                     Plataforma integrada de gestión empresarial que centraliza
@@ -21,7 +27,6 @@ export default function Dashboard() {
                     Navega por los módulos desde el menú superior o selecciona
                     uno de los accesos directos a continuación.
                 </p>
-
             </div>
 
             <p
@@ -35,7 +40,7 @@ export default function Dashboard() {
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    marginTop: "40px"
+                    marginTop: "40px",
                 }}
             >
                 Módulos del Sistema
@@ -58,7 +63,10 @@ export default function Dashboard() {
                         to={`/module/${mod.id}`}
                     >
                         <span className="mod-icon-circle">
-                            {React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 30 })}
+                            {React.createElement(
+                                MODULE_ICONS[mod.icon] ?? IconFolder,
+                                { size: 30 },
+                            )}
                         </span>
                         <span className="mod-label">{mod.label}</span>
                     </Link>
@@ -69,7 +77,9 @@ export default function Dashboard() {
                 <h2>¿Para qué sirve este ERP?</h2>
                 <div className="info-cards">
                     <div className="info-card">
-                        <div className="ic-icon"><IconLayers size={28} /></div>
+                        <div className="ic-icon">
+                            <IconLayers size={28} />
+                        </div>
                         <div>
                             <h3>Integración total</h3>
                             <p>
@@ -79,7 +89,9 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"><IconParametros size={28} /></div>
+                        <div className="ic-icon">
+                            <IconParametros size={28} />
+                        </div>
                         <div>
                             <h3>Automatización</h3>
                             <p>
@@ -89,7 +101,9 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"><IconVentas size={28} /></div>
+                        <div className="ic-icon">
+                            <IconVentas size={28} />
+                        </div>
                         <div>
                             <h3>Toma de decisiones</h3>
                             <p>
