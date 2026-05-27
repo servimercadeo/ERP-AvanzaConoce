@@ -96,11 +96,16 @@ export default function BaseIngresoCrud() {
 
   useEffect(() => {
     if (isModalOpen) {
-      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflowY = 'hidden';
+      document.body.style.overflowY = 'hidden';
     } else {
-      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = '';
     }
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => { 
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = ''; 
+    };
   }, [isModalOpen]);
 
   const handleChange = (k) => (e) => {

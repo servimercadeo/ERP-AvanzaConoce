@@ -496,6 +496,21 @@ export default function SedesCrud() {
         filtroCiudad,
     ]);
 
+    useEffect(() => {
+        const anyOpen = modalOpen || viewOpen || !!deleteTarget || filterOpen;
+        if (anyOpen) {
+            document.documentElement.style.overflowY = 'hidden';
+            document.body.style.overflowY = 'hidden';
+        } else {
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
+        }
+        return () => {
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
+        };
+    }, [modalOpen, viewOpen, deleteTarget, filterOpen]);
+
     const paginated = useMemo(
         () => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
         [filtered, pagina],

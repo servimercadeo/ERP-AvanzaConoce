@@ -1053,16 +1053,22 @@ export default function EmpleadosCrud() {
     }, []);
 
     React.useEffect(() => {
-        document.body.style.overflow =
+        const anyOpen =
             modalOpen ||
             filterOpen ||
             deleteTarget ||
             viewOpen ||
-            credencialesOpen
-                ? "hidden"
-                : "";
+            credencialesOpen;
+        if (anyOpen) {
+            document.documentElement.style.overflowY = 'hidden';
+            document.body.style.overflowY = 'hidden';
+        } else {
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
+        }
         return () => {
-            document.body.style.overflow = "";
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
         };
     }, [modalOpen, filterOpen, deleteTarget, viewOpen, credencialesOpen]);
 

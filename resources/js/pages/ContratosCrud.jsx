@@ -939,6 +939,21 @@ export default function ContratosCrud() {
         setPagina(1);
     }, [search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones]);
 
+    useEffect(() => {
+        const anyOpen = modalOpen || viewOpen || !!deleteTarget || filterOpen;
+        if (anyOpen) {
+            document.documentElement.style.overflowY = 'hidden';
+            document.body.style.overflowY = 'hidden';
+        } else {
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
+        }
+        return () => {
+            document.documentElement.style.overflowY = '';
+            document.body.style.overflowY = '';
+        };
+    }, [modalOpen, viewOpen, deleteTarget, filterOpen]);
+
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);

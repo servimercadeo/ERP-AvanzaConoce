@@ -3,7 +3,8 @@ import {
   IconEye,
   IconEdit,
   IconTrash,
-  IconClose
+  IconClose,
+  IconGestionar
 } from '../components/Icons';
 
 /* ─── Mock Data ──────────────────────────────────────────────────────── */
@@ -24,6 +25,47 @@ const INITIAL_DATA = [
   }
 ];
 
+const getTodayStr = () => new Date().toISOString().slice(0, 10);
+
+const CANDIDATES_MOCK = [
+  {
+    id: 1,
+    nombres: 'Simon Gallego',
+    identificacion: '1089383135',
+    correo: 'simon.23051997@gmail.com',
+    celular: '3217085550',
+    ciudad: 'Pereira',
+    tipo_documento: 'Cédula de Ciudadanía',
+    fecha_expedicion: '2015-06-12',
+    edad: '29',
+    fecha_postulacion: getTodayStr(),
+    fuente: 'Fase Inicial',
+    fuente_especifica: 'Pendiente de Aval',
+    estado: 'Contratación',
+    pruebas: true,
+    aval: true,
+    observaciones: 'Excelente perfil técnico. Cumple con todos los requisitos del cargo.'
+  },
+  {
+    id: 2,
+    nombres: 'Juan Camilo',
+    identificacion: '1089381135',
+    correo: 'marin.jc2005@gmail.com',
+    celular: '3217085555',
+    ciudad: 'Pereira',
+    tipo_documento: 'Cédula de Ciudadanía',
+    fecha_expedicion: '2023-01-20',
+    edad: '21',
+    fecha_postulacion: getTodayStr(),
+    fuente: 'Fase Inicial',
+    fuente_especifica: 'Pendiente de Aval',
+    estado: 'Contratación',
+    pruebas: true,
+    aval: true,
+    observaciones: 'Candidato con gran motivación. Aprobó pruebas con puntaje sobresaliente.'
+  },
+];
+
 const MOCK_OPTS = {
   responsables: ['Jorge Emilio Varón', 'Ana Gómez', 'Luis Martínez'],
   procesos: ['Administrativo', 'Operativo', 'Comercial', 'Tecnología'],
@@ -33,7 +75,10 @@ const MOCK_OPTS = {
   proyectos: ['SM: DIRECTV', 'SM: CLARO', 'Proyecto Interno'],
   paises: ['Colombia', 'Perú', 'Ecuador', 'México'],
   estados: ['Abierta', 'En proceso', 'Cerrada', 'Cancelada'],
-  sino: ['Sí', 'No']
+  sino: ['Sí', 'No'],
+  tipos_documento: ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'],
+  fuentes_reclutamiento: ['Fase Inicial', 'Vinculacion temporal', 'Vinculacion directa'],
+  fuentes_especificas: ['Pendiente de Aval', 'Contratar por S&M']
 };
 
 function getPaginasBotones(pagina, total) {
@@ -70,7 +115,123 @@ export default function SeleccionCrud() {
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm] = useState({});
   const [pagina, setPagina] = useState(1);
+  const [manageRow, setManageRow] = useState(null);
+  const [candidates, setCandidates] = useState(CANDIDATES_MOCK);
+  const [candidateSearch, setCandidateSearch] = useState('');
   const POR_PAGINA = 10;
+
+  const toggleCandidateField = (candidateId, field) => {
+    setCandidates(prev => prev.map(c => {
+      if (c.id === candidateId) {
+        const val = !c[field];
+        let nextEstado = c.estado;
+        if (field === 'pruebas' || field === 'aval') {
+          const newPruebas = field === 'pruebas' ? val : c.pruebas;
+          const newAval = field === 'aval' ? val : c.aval;
+          if (newPruebas && newAval) {
+            nextEstado = 'Contratación';
+          } else {
+            nextEstado = 'Entrevista';
+          }
+        }
+        return { ...c, [field]: val, estado: nextEstado };
+      }
+      return c;
+    }));
+  };
+
+  const [activeSection, setActiveSection] = useState('procesos');
+  const [isCandModalOpen, setIsCandModalOpen] = useState(false);
+  const [candModalMode, setCandModalMode] = useState('create');
+  const [candDetailSearch, setCandDetailSearch] = useState('');
+  const [candForm, setCandForm] = useState({
+    nombres: '',
+    correo: '',
+    celular: '',
+    ciudad: '',
+    tipo_documento: 'Cédula de Ciudadanía',
+    identificacion: '',
+    fecha_expedicion: '',
+    edad: '',
+    fecha_postulacion: getTodayStr(),
+    fuente: 'Fase Inicial',
+    fuente_especifica: 'Pendiente de Aval',
+    estado: 'Entrevista',
+    observaciones: ''
+  });
+
+  const handleAddCandidate = () => {
+    setCandModalMode('create');
+    setCandForm({
+      nombres: '',
+      correo: '',
+      celular: '',
+      ciudad: '',
+      tipo_documento: 'Cédula de Ciudadanía',
+      identificacion: '',
+      fecha_expedicion: '',
+      edad: '',
+      fecha_postulacion: getTodayStr(),
+      fuente: 'Fase Inicial',
+      fuente_especifica: 'Pendiente de Aval',
+      estado: 'Entrevista',
+      observaciones: ''
+    });
+    setIsCandModalOpen(true);
+  };
+
+  const handleEditCandidate = (c) => {
+    setCandModalMode('edit');
+    setCandForm({ ...c });
+    setIsCandModalOpen(true);
+  };
+
+  const handleViewCandidate = (c) => {
+    setCandModalMode('view');
+    setCandForm({ ...c });
+    setIsCandModalOpen(true);
+  };
+
+  const handleRemoveCandidate = (candidateId) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este candidato del proceso?")) {
+      setCandidates(prev => prev.filter(c => c.id !== candidateId));
+    }
+  };
+
+  const handleSaveCandidate = () => {
+    if (!candForm.nombres || !candForm.correo || !candForm.celular || !candForm.identificacion || !candForm.fuente || !candForm.fuente_especifica) {
+      alert("Por favor, rellene todos los campos obligatorios (*).");
+      return;
+    }
+
+    if (candModalMode === 'create') {
+      const newId = candidates.length > 0 ? Math.max(...candidates.map(c => c.id)) + 1 : 1;
+      const newCandidate = {
+        ...candForm,
+        id: newId,
+        pruebas: false,
+        aval: false,
+        selected: false
+      };
+      setCandidates([...candidates, newCandidate]);
+    } else if (candModalMode === 'edit') {
+      setCandidates(prev => prev.map(c => (c.id === candForm.id ? { ...c, ...candForm } : c)));
+    }
+    setIsCandModalOpen(false);
+  };
+
+  const filteredCandidates = candidates.filter(c => {
+    const term = candidateSearch.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      c.nombres.toLowerCase().includes(term) ||
+      c.identificacion.includes(term) ||
+      c.correo.toLowerCase().includes(term) ||
+      c.celular.includes(term) ||
+      c.fuente.toLowerCase().includes(term) ||
+      c.estado.toLowerCase().includes(term)
+    );
+  });
 
   useEffect(() => {
     setPagina(1);
@@ -162,13 +323,19 @@ export default function SeleccionCrud() {
   };
 
   useEffect(() => {
-    if (isModalOpen) {
-      document.body.style.overflow = 'hidden';
+    const anyOpen = isModalOpen || isCandModalOpen;
+    if (anyOpen) {
+      document.documentElement.style.overflowY = 'hidden';
+      document.body.style.overflowY = 'hidden';
     } else {
-      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = '';
     }
-    return () => { document.body.style.overflow = 'auto'; };
-  }, [isModalOpen]);
+    return () => { 
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowY = ''; 
+    };
+  }, [isModalOpen, isCandModalOpen]);
 
   const handleChange = (k) => (e) => {
     setForm(prev => ({ ...prev, [k]: e.target.value }));
@@ -193,8 +360,131 @@ export default function SeleccionCrud() {
     return { bg: 'var(--bg)', color: 'var(--text-muted)' };
   };
 
+  const filteredCandDetail = candidates.filter(c => {
+    const term = candDetailSearch.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      c.nombres.toLowerCase().includes(term) ||
+      c.identificacion.includes(term) ||
+      c.correo.toLowerCase().includes(term) ||
+      c.celular.includes(term) ||
+      c.fuente.toLowerCase().includes(term) ||
+      c.estado.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+
+      {/* ── Tabs de sección ── */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', margintop: -20 }}>
+        {[
+          { key: 'procesos', label: 'Proceso de Selección' },
+          { key: 'candidatos', label: 'Vista completa candidatos' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            style={{
+              padding: '10px 22px',
+              fontFamily: 'Nunito,sans-serif',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              borderBottom: activeSection === tab.key ? '3px solid var(--primary)' : '3px solid transparent',
+              background: 'transparent',
+              color: activeSection === tab.key ? 'var(--primary)' : 'var(--text-muted)',
+              marginBottom: -2,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Vista completa candidatos ── */}
+      {activeSection === 'candidatos' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={S.searchWrap}>
+              <span style={S.searchIcon}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar candidato..."
+                value={candDetailSearch}
+                onChange={e => setCandDetailSearch(e.target.value)}
+                style={S.searchInput}
+              />
+            </div>
+            <button style={S.btnPrimary} onClick={handleAddCandidate}>+ Agregar candidato</button>
+          </div>
+
+          <div style={{ overflowX: 'auto', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
+                  <th style={S.candTh('center')}>Selección<br/>entrevista</th>
+                  <th style={S.candTh('left')}>Nombres</th>
+                  <th style={S.candTh('left')}>Identificación</th>
+                  <th style={S.candTh('left')}>Correo electrónico</th>
+                  <th style={S.candTh('left')}>Celular</th>
+                  <th style={S.candTh('left')}>Ciudad</th>
+                  <th style={S.candTh('left')}>Fuente reclutamiento</th>
+                  <th style={S.candTh('left')}>Estado proceso</th>
+                  <th style={S.candTh('center')}>Pruebas<br/>psicotécnicas</th>
+                  <th style={S.candTh('center')}>Aval<br/>contratación</th>
+                  <th style={S.candTh('center')}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCandDetail.map(c => (
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
+                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                      <input type="checkbox" checked={c.selected || false} onChange={() => toggleCandidateField(c.id, 'selected')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                    </td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>{c.nombres}</td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.celular}</td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.ciudad}</td>
+                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.fuente}</td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>
+                        {c.estado}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                      <input type="checkbox" checked={c.pruebas || false} onChange={() => toggleCandidateField(c.id, 'pruebas')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                    </td>
+                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                      <input type="checkbox" checked={c.aval || false} onChange={() => toggleCandidateField(c.id, 'aval')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <div style={S.actions}>
+                        <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar candidato" onClick={() => handleEditCandidate(c)}><IconEdit size={15} /></button>
+                        <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleViewCandidate(c)}><IconEye size={15} /></button>
+                        <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar candidato" onClick={() => handleRemoveCandidate(c.id)}><IconClose size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCandDetail.length === 0 && (
+                  <tr><td colSpan="11" style={S.empty}>No se encontraron candidatos.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Proceso de Selección ── */}
+      {activeSection === 'procesos' && (<>
 
       {/* ── Toolbar ── */}
       <div style={S.toolbar}>
@@ -283,14 +573,14 @@ export default function SeleccionCrud() {
                   <td style={S.td}>{row.ciudad}</td>
                   <td style={{ ...S.td, textAlign: 'center' }}>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
-                        <IconEye size={15} />
+                      <button style={S.actionBtn('#fff3cd', '#856404')} title="Gestionar" onClick={() => handleOpenModal('manage', row)}>
+                        <IconGestionar size={15} />
                       </button>
                       <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}>
                         <IconEdit size={15} />
                       </button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar">
-                        <IconTrash size={15} />
+                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
+                        <IconEye size={15} />
                       </button>
                     </div>
                   </td>
@@ -330,6 +620,8 @@ export default function SeleccionCrud() {
         </div>
       )}
 
+      </>)}
+
       {/* ── Modal ── */}
       {isModalOpen && (
         <div style={S.overlay} onClick={handleCloseModal}>
@@ -337,7 +629,7 @@ export default function SeleccionCrud() {
 
             <div style={S.modalHeaderGreen}>
               <span style={S.modalTitleWhite}>
-                {modalMode === 'create' ? 'Registrar nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}
+                {modalMode === 'create' ? 'Registrar nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : modalMode === 'manage' ? 'Visualización y adición de candidatos' : 'Detalles de la requisición'}
               </span>
               <button style={S.closeBtnWhite} onClick={handleCloseModal}>
                 <IconClose size={14} />
@@ -346,38 +638,212 @@ export default function SeleccionCrud() {
 
             <div style={S.modalBody}>
               <div style={S.grid3}>
-                <Field label="Nombre responsable solicitud" k="nombre_responsable" req={modalMode !== 'view'} opts={MOCK_OPTS.responsables} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Número de identificación" k="numero_identificacion" req={modalMode !== 'view'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit'} />
-                <Field label="Cargo del solicitante" k="cargo_solicitante" req={modalMode !== 'view'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit'} />
+                <Field label="Nombre responsable solicitud" k="nombre_responsable" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.responsables} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Número de identificación" k="numero_identificacion" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit' || modalMode === 'manage'} />
+                <Field label="Cargo del solicitante" k="cargo_solicitante" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit' || modalMode === 'manage'} />
 
-                <Field label="Fecha de solicitud" k="fecha_solicitud" req={modalMode !== 'view'} disabled form={form} onChange={handleChange} />
-                <Field label="Proceso" k="proceso" req={modalMode !== 'view'} opts={MOCK_OPTS.procesos} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Número de identificación del proceso" k="numero_identificacion_proceso" req={modalMode !== 'view'} disabled form={form} onChange={handleChange} />
+                <Field label="Fecha de solicitud" k="fecha_solicitud" req={modalMode !== 'view' && modalMode !== 'manage'} disabled form={form} onChange={handleChange} />
+                <Field label="Proceso" k="proceso" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.procesos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Número de identificación del proceso" k="numero_identificacion_proceso" req={modalMode !== 'view' && modalMode !== 'manage'} disabled form={form} onChange={handleChange} />
 
-                <Field label="Cargo requerido" k="cargo_requerido" req={modalMode !== 'view'} opts={MOCK_OPTS.cargos} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Tipo de solicitud" k="tipo_solicitud" req={modalMode !== 'view'} opts={MOCK_OPTS.tipos} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Número de personas requeridas" k="numero_personas" req={modalMode !== 'view'} opts={MOCK_OPTS.numeros} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Cargo requerido" k="cargo_requerido" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.cargos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Tipo de solicitud" k="tipo_solicitud" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.tipos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Número de personas requeridas" k="numero_personas" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.numeros} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
 
-                <Field label="Proyecto" k="proyecto" req={modalMode !== 'view'} opts={MOCK_OPTS.proyectos} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Fecha estimada de ingreso" k="fecha_ingreso" req={modalMode !== 'view'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="País" k="pais" req={modalMode !== 'view'} opts={MOCK_OPTS.paises} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Proyecto" k="proyecto" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.proyectos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Fecha estimada de ingreso" k="fecha_ingreso" req={modalMode !== 'view' && modalMode !== 'manage'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="País" k="pais" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.paises} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
 
-                <Field label="Fecha estimada de cierre" k="fecha_cierre" req={modalMode !== 'view'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Ciudad de operación" k="ciudad" req={modalMode !== 'view'} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="Observaciones de la solicitud" k="observaciones" type="textarea" form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Fecha estimada de cierre" k="fecha_cierre" req={modalMode !== 'view' && modalMode !== 'manage'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Ciudad de operación" k="ciudad" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="Observaciones de la solicitud" k="observaciones" type="textarea" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
 
-                <Field label="Estado" k="estado" req={modalMode !== 'view'} opts={MOCK_OPTS.estados} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
-                <Field label="¿Es una solicitud confidencial?" k="solicitud_confidencial" req={modalMode !== 'view'} opts={MOCK_OPTS.sino} form={form} onChange={handleChange} disabled={modalMode === 'view'} />
+                <Field label="Estado" k="estado" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.estados} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+                <Field label="¿Es una solicitud confidencial?" k="solicitud_confidencial" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.sino} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
               </div>
+
+              {modalMode === 'manage' && (
+                <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '2px dashed var(--border)' }}>
+                  <div style={{ fontSize: '0.9rem', marginBottom: '20px', fontWeight: 700, color: 'var(--text)' }}>
+                     Candidatos requeridos: {form.numero_personas || 1}. Candidatos agregados: {candidates.length}. Candidatos contratados: {candidates.filter(c => c.estado === 'Contratación').length}
+                     <span style={{ marginLeft: 8, color: 'var(--text-muted)', cursor: 'help' }} title="Información sobre candidatos">ⓘ</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: 16, margintop: '10px' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>Búsqueda:</label>
+                        <input
+                          type="text"
+                          placeholder="Buscar candidato..."
+                          value={candidateSearch}
+                          onChange={(e) => setCandidateSearch(e.target.value)}
+                          style={{ padding: '8px 12px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', width: '250px', outline: 'none', fontFamily: 'Nunito, sans-serif', color: 'var(--text)', background: 'var(--white)' }}
+                        />
+                     </div>
+                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button style={S.btnSecondary} onClick={() => setCandidateSearch('')}>Actualizar</button>
+                        <button
+                          style={{
+                            ...S.btnSecondary,
+                            opacity: candidates.some(c => c.selected) ? 1 : 0.6,
+                            cursor: candidates.some(c => c.selected) ? 'pointer' : 'not-allowed'
+                          }}
+                          onClick={() => {
+                            if (candidates.some(c => c.selected)) {
+                              const seleccionados = candidates.filter(c => c.selected).map(c => c.nombres).join(', ');
+                              alert(`Entrevista agendada para: ${seleccionados}`);
+                            }
+                          }}
+                        >
+                          Agendar entrevista
+                        </button>
+                        <button style={S.btnPrimary} onClick={handleAddCandidate}>Agregar candidatos</button>
+                     </div>
+                  </div>
+
+                  <div style={{ overflowX: 'auto', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
+                          <th style={S.candTh('left')}>Nombres</th>
+                          <th style={S.candTh('left')}>Identificación</th>
+                          <th style={S.candTh('left')}>Correo electrónico</th>
+                          <th style={S.candTh('left')}>Estado</th>
+                          <th style={S.candTh('center')}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCandidates.map(c => (
+                          <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
+                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>{c.nombres}</td>
+                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
+                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
+                            <td style={{ padding: '12px 8px' }}>
+                              <span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>
+                                {c.estado}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 8px' }}>
+                              <div style={S.actions}>
+                                <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar candidato" onClick={() => handleEditCandidate(c)}>
+                                  <IconEdit size={15} />
+                                </button>
+                                <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleViewCandidate(c)}>
+                                  <IconEye size={15} />
+                                </button>
+                                <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar candidato" onClick={() => handleRemoveCandidate(c.id)}>
+                                  <IconClose size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredCandidates.length === 0 && (
+                          <tr>
+                            <td colSpan="5" style={S.empty}>No se encontraron candidatos para los criterios de búsqueda.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={S.modalFooter}>
-              {modalMode === 'view' ? (
+              {modalMode === 'view' || modalMode === 'manage' ? (
                 <button style={S.btnSecondary} onClick={handleCloseModal}>Cerrar</button>
               ) : (
                 <>
                   <button style={S.btnSecondary} onClick={handleCloseModal}>Cancelar</button>
                   <button style={S.btnPrimaryGreen} onClick={handleSave}>Guardar requisición</button>
+                </>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal Candidato ─────────────────────────────────────────────── */}
+      {isCandModalOpen && (
+        <div style={S.overlay} onClick={() => setIsCandModalOpen(false)}>
+          <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={S.modalHeaderGreen}>
+              <span style={S.modalTitleWhite}>
+                {candModalMode === 'create' ? 'Agregar Candidato' : candModalMode === 'edit' ? 'Editar Candidato' : 'Detalles del Candidato'}
+              </span>
+              <button style={S.closeBtnWhite} onClick={() => setIsCandModalOpen(false)}>
+                <IconClose size={12} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={S.modalBody}>
+              {/* Sección: Datos personales */}
+              <h4 style={{ margin: '0 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
+                Datos personales
+              </h4>
+              <div style={S.grid3}>
+                <Field label="Nombres completos" k="nombres" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Tipo de documento" k="tipo_documento" opts={MOCK_OPTS.tipos_documento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Número de identificación" k="identificacion" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Fecha de expedición" k="fecha_expedicion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Edad" k="edad" type="number" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Ciudad" k="ciudad" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Correo electrónico" k="correo" type="email" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Celular" k="celular" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Fecha de postulación" k="fecha_postulacion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view' || candModalMode === 'create'} />
+              </div>
+
+              {/* Sección: Proceso de selección */}
+              <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
+                Proceso de selección
+              </h4>
+              <div style={S.grid3}>
+                <Field label="Fuente de reclutamiento" k="fuente" opts={MOCK_OPTS.fuentes_reclutamiento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Fuente específica" k="fuente_especifica" opts={MOCK_OPTS.fuentes_especificas} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Estado del proceso" k="estado" opts={['Entrevista', 'Contratación', 'Descartado', 'En espera']} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+              </div>
+
+              {/* Sección: Observaciones del candidato */}
+              <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
+                Observaciones del candidato
+              </h4>
+              <textarea
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  border: '1.5px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.88rem',
+                  fontFamily: 'Nunito,sans-serif',
+                  color: candModalMode === 'view' ? 'var(--text-muted)' : 'var(--text)',
+                  background: candModalMode === 'view' ? 'var(--bg)' : 'var(--white)',
+                  outline: 'none',
+                  minHeight: 80,
+                  resize: 'vertical',
+                  transition: 'border 0.15s',
+                }}
+                value={candForm.observaciones || ''}
+                onChange={(e) => setCandForm(p => ({ ...p, observaciones: e.target.value }))}
+                disabled={candModalMode === 'view'}
+                placeholder="Escriba aquí las observaciones sobre el candidato..."
+              />
+
+            </div>
+
+            {/* Footer */}
+            <div style={S.modalFooter}>
+              {candModalMode === 'view' ? (
+                <button style={S.btnSecondary} onClick={() => setIsCandModalOpen(false)}>Cerrar</button>
+              ) : (
+                <>
+                  <button style={S.btnSecondary} onClick={() => setIsCandModalOpen(false)}>Cancelar</button>
+                  <button style={S.btnPrimaryGreen} onClick={handleSaveCandidate}>Guardar candidato</button>
                 </>
               )}
             </div>
@@ -737,4 +1203,15 @@ const S = {
         gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
         gap: 14,
     },
+    candTh: (align) => ({
+        padding: '12px 10px',
+        fontSize: '0.75rem',
+        color: 'var(--primary)',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        whiteSpace: 'nowrap',
+        textAlign: align,
+        fontFamily: 'Nunito,sans-serif',
+    }),
 };
