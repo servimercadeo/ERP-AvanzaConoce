@@ -1,72 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import {
-  IconEye,
-  IconEdit,
-  IconTrash,
-  IconClose,
-  IconGestionar
-} from '../components/Icons';
+import { IconEye, IconEdit, IconClose } from '../components/Icons';
 
-/* ─── Mock Data ──────────────────────────────────────────────────────── */
-const INITIAL_DATA = [
-  {
-    id: 1,
-    nro_identificacion_proceso: 'REQ65',
-    nro_identificacion: '123456789',
-    estado: 'Abierta',
-    cargo: 'Analista de datos',
-    fecha_solicitud: '16 mayo 2026',
-    contratadas_requeridas: '2 / 1',
-    proyecto: 'SM: DIRECTV',
-    tipo_solicitud: 'RP: Reemplazo',
-    responsable: 'JORGE EMILIO VARON - jorgevaron@servimercadeo.com',
-    proceso: 'Administrativo',
-    ciudad: 'Pereira'
-  }
+/* ── Data ───────────────────────────────────────────────────────────── */
+const INITIAL_DATA = [{
+  id: 1, nro_identificacion_proceso: 'REQ65', nro_identificacion: '123456789',
+  estado: 'Abierta', cargo: 'Analista de datos', fecha_solicitud: '16 mayo 2026',
+  contratadas_requeridas: '2 / 1', proyecto: 'SM: DIRECTV', tipo_solicitud: 'RP: Reemplazo',
+  responsable: 'JORGE EMILIO VARON - jorgevaron@servimercadeo.com',
+  proceso: 'Administrativo', ciudad: 'Pereira'
+}];
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+const CANDS_MOCK = [
+  { id: 1, requisicion_id: '1', nombres: 'Simon Gallego', identificacion: '1089383135', correo: 'simon.23051997@gmail.com', celular: '3217085550', ciudad: 'Pereira', tipo_documento: 'Cédula de Ciudadanía', fecha_expedicion: '2015-06-12', edad: '29', fecha_postulacion: today(), fuente: 'Fase Inicial', fuente_especifica: 'Pendiente de Aval', estado: 'Contratación', pruebas: true, aval: true, observaciones: 'Excelente perfil técnico.' },
+  { id: 2, requisicion_id: '1', nombres: 'Juan Camilo', identificacion: '1089381135', correo: 'marin.jc2005@gmail.com', celular: '3217085555', ciudad: 'Pereira', tipo_documento: 'Cédula de Ciudadanía', fecha_expedicion: '2023-01-20', edad: '21', fecha_postulacion: today(), fuente: 'Fase Inicial', fuente_especifica: 'Pendiente de Aval', estado: 'Contratación', pruebas: true, aval: true, observaciones: 'Gran motivación.' },
 ];
 
-const getTodayStr = () => new Date().toISOString().slice(0, 10);
-
-const CANDIDATES_MOCK = [
-  {
-    id: 1,
-    nombres: 'Simon Gallego',
-    identificacion: '1089383135',
-    correo: 'simon.23051997@gmail.com',
-    celular: '3217085550',
-    ciudad: 'Pereira',
-    tipo_documento: 'Cédula de Ciudadanía',
-    fecha_expedicion: '2015-06-12',
-    edad: '29',
-    fecha_postulacion: getTodayStr(),
-    fuente: 'Fase Inicial',
-    fuente_especifica: 'Pendiente de Aval',
-    estado: 'Contratación',
-    pruebas: true,
-    aval: true,
-    observaciones: 'Excelente perfil técnico. Cumple con todos los requisitos del cargo.'
-  },
-  {
-    id: 2,
-    nombres: 'Juan Camilo',
-    identificacion: '1089381135',
-    correo: 'marin.jc2005@gmail.com',
-    celular: '3217085555',
-    ciudad: 'Pereira',
-    tipo_documento: 'Cédula de Ciudadanía',
-    fecha_expedicion: '2023-01-20',
-    edad: '21',
-    fecha_postulacion: getTodayStr(),
-    fuente: 'Fase Inicial',
-    fuente_especifica: 'Pendiente de Aval',
-    estado: 'Contratación',
-    pruebas: true,
-    aval: true,
-    observaciones: 'Candidato con gran motivación. Aprobó pruebas con puntaje sobresaliente.'
-  },
-];
-
-const MOCK_OPTS = {
+const OPT = {
   responsables: ['Jorge Emilio Varón', 'Ana Gómez', 'Luis Martínez'],
   procesos: ['Administrativo', 'Operativo', 'Comercial', 'Tecnología'],
   cargos: ['Analista de datos', 'Desarrollador', 'Gerente', 'Asistente'],
@@ -76,496 +27,160 @@ const MOCK_OPTS = {
   paises: ['Colombia', 'Perú', 'Ecuador', 'México'],
   estados: ['Abierta', 'En proceso', 'Cerrada', 'Cancelada'],
   sino: ['Sí', 'No'],
-  tipos_documento: ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'],
-  fuentes_reclutamiento: ['Fase Inicial', 'Vinculacion temporal', 'Vinculacion directa'],
-  fuentes_especificas: ['Pendiente de Aval', 'Contratar por S&M']
+  tipos_doc: ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'],
+  fuentes: ['Fase Inicial', 'Vinculacion temporal', 'Vinculacion directa'],
+  fuentes_esp: ['Pendiente de Aval', 'Contratar por S&M'],
 };
 
-function getPaginasBotones(pagina, total) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const delta = 2;
-  const left = pagina - delta;
-  const right = pagina + delta;
-  const pages = [1];
-  if (left > 2) pages.push("...");
-  for (let i = Math.max(2, left); i <= Math.min(total - 1, right); i++) pages.push(i);
-  if (right < total - 1) pages.push("...");
-  pages.push(total);
-  return pages;
+const EMPTY_CAND = (reqId = '') => ({ requisicion_id: String(reqId), nombres: '', correo: '', celular: '', ciudad: '', tipo_documento: 'Cédula de Ciudadanía', identificacion: '', fecha_expedicion: '', edad: '', fecha_postulacion: today(), fuente: 'Fase Inicial', fuente_especifica: 'Pendiente de Aval', estado: 'Entrevista', observaciones: '' });
+
+function pages(p, t) {
+  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1);
+  const [l, r] = [p - 2, p + 2], out = [1];
+  if (l > 2) out.push('...');
+  for (let i = Math.max(2, l); i <= Math.min(t - 1, r); i++) out.push(i);
+  if (r < t - 1) out.push('...');
+  out.push(t); return out;
 }
 
+const estadoColor = (e = '') => {
+  const v = e.toLowerCase();
+  if (v === 'abierta' || v === 'activa') return ['#d1fae5', '#065f46'];
+  if (v === 'cerrada' || v === 'inactiva') return ['#fee2e2', '#991b1b'];
+  if (v === 'en proceso') return ['#fef3c7', '#92400e'];
+  return ['var(--bg)', 'var(--text-muted)'];
+};
+
+/* ── Style tokens ───────────────────────────────────────────────────── */
+const NUN = 'Nunito,sans-serif';
+const POP = "'Poppins',sans-serif";
+const BD = '1.5px solid var(--border)';
+const RSM = 'var(--radius-sm)';
+const _btn = { height: 40, borderRadius: RSM, fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', fontFamily: NUN, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 };
+const _inp = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: BD, borderRadius: RSM, fontSize: '0.87rem', fontFamily: NUN, outline: 'none' };
+const _pgb = { minWidth: 32, height: 32, padding: '0 8px', border: BD, borderRadius: 6, fontSize: '0.87rem', fontWeight: 700, fontFamily: NUN, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+
+/* ── Component ──────────────────────────────────────────────────────── */
 export default function SeleccionCrud() {
   const [data, setData] = useState(() => {
-    const saved = localStorage.getItem('seleccionData');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return INITIAL_DATA;
+    try { return JSON.parse(localStorage.getItem('seleccionData')) || INITIAL_DATA; } catch { return INITIAL_DATA; }
   });
+  useEffect(() => { localStorage.setItem('seleccionData', JSON.stringify(data)); }, [data]);
 
-  useEffect(() => {
-    localStorage.setItem('seleccionData', JSON.stringify(data));
-  }, [data]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState('Abierta');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('create');
+  const [search, setSearch] = useState('');
+  const [estadoF, setEstadoF] = useState('Abierta');
+  const [modal, setModal] = useState(false);
+  const [mode, setMode] = useState('create');
   const [form, setForm] = useState({});
-  const [pagina, setPagina] = useState(1);
-  const [manageRow, setManageRow] = useState(null);
-  const [candidates, setCandidates] = useState(CANDIDATES_MOCK);
-  const [candidateSearch, setCandidateSearch] = useState('');
-  const POR_PAGINA = 10;
-
-  const toggleCandidateField = (candidateId, field) => {
-    setCandidates(prev => prev.map(c => {
-      if (c.id === candidateId) {
-        const val = !c[field];
-        let nextEstado = c.estado;
-        if (field === 'pruebas' || field === 'aval') {
-          const newPruebas = field === 'pruebas' ? val : c.pruebas;
-          const newAval = field === 'aval' ? val : c.aval;
-          if (newPruebas && newAval) {
-            nextEstado = 'Contratación';
-          } else {
-            nextEstado = 'Entrevista';
-          }
-        }
-        return { ...c, [field]: val, estado: nextEstado };
-      }
-      return c;
-    }));
-  };
-
-  const [activeSection, setActiveSection] = useState('procesos');
-  const [isCandModalOpen, setIsCandModalOpen] = useState(false);
-  const [candModalMode, setCandModalMode] = useState('create');
-  const [candDetailSearch, setCandDetailSearch] = useState('');
-  const [candForm, setCandForm] = useState({
-    nombres: '',
-    correo: '',
-    celular: '',
-    ciudad: '',
-    tipo_documento: 'Cédula de Ciudadanía',
-    identificacion: '',
-    fecha_expedicion: '',
-    edad: '',
-    fecha_postulacion: getTodayStr(),
-    fuente: 'Fase Inicial',
-    fuente_especifica: 'Pendiente de Aval',
-    estado: 'Entrevista',
-    observaciones: ''
-  });
-
-  const handleAddCandidate = () => {
-    setCandModalMode('create');
-    setCandForm({
-      nombres: '',
-      correo: '',
-      celular: '',
-      ciudad: '',
-      tipo_documento: 'Cédula de Ciudadanía',
-      identificacion: '',
-      fecha_expedicion: '',
-      edad: '',
-      fecha_postulacion: getTodayStr(),
-      fuente: 'Fase Inicial',
-      fuente_especifica: 'Pendiente de Aval',
-      estado: 'Entrevista',
-      observaciones: ''
-    });
-    setIsCandModalOpen(true);
-  };
-
-  const handleEditCandidate = (c) => {
-    setCandModalMode('edit');
-    setCandForm({ ...c });
-    setIsCandModalOpen(true);
-  };
-
-  const handleViewCandidate = (c) => {
-    setCandModalMode('view');
-    setCandForm({ ...c });
-    setIsCandModalOpen(true);
-  };
-
-  const handleRemoveCandidate = (candidateId) => {
-    if (confirm("¿Estás seguro de que deseas eliminar este candidato del proceso?")) {
-      setCandidates(prev => prev.filter(c => c.id !== candidateId));
-    }
-  };
-
-  const handleSaveCandidate = () => {
-    if (!candForm.nombres || !candForm.correo || !candForm.celular || !candForm.identificacion || !candForm.fuente || !candForm.fuente_especifica) {
-      alert("Por favor, rellene todos los campos obligatorios (*).");
-      return;
-    }
-
-    if (candModalMode === 'create') {
-      const newId = candidates.length > 0 ? Math.max(...candidates.map(c => c.id)) + 1 : 1;
-      const newCandidate = {
-        ...candForm,
-        id: newId,
-        pruebas: false,
-        aval: false,
-        selected: false
-      };
-      setCandidates([...candidates, newCandidate]);
-    } else if (candModalMode === 'edit') {
-      setCandidates(prev => prev.map(c => (c.id === candForm.id ? { ...c, ...candForm } : c)));
-    }
-    setIsCandModalOpen(false);
-  };
-
-  const filteredCandidates = candidates.filter(c => {
-    const term = candidateSearch.toLowerCase().trim();
-    if (!term) return true;
-    return (
-      c.nombres.toLowerCase().includes(term) ||
-      c.identificacion.includes(term) ||
-      c.correo.toLowerCase().includes(term) ||
-      c.celular.includes(term) ||
-      c.fuente.toLowerCase().includes(term) ||
-      c.estado.toLowerCase().includes(term)
-    );
-  });
+  const [page, setPage] = useState(1);
+  const [cands, setCands] = useState(CANDS_MOCK);
+  const [candSearch, setCandSearch] = useState('');
+  const [candModal, setCandModal] = useState(false);
+  const [candMode, setCandMode] = useState('create');
+  const [candForm, setCandForm] = useState(EMPTY_CAND());
+  const PER = 10;
 
   useEffect(() => {
-    setPagina(1);
-  }, [searchTerm, estadoFilter]);
+    const open = modal || candModal;
+    document.documentElement.style.overflowY = open ? 'hidden' : '';
+    document.body.style.overflowY = open ? 'hidden' : '';
+    return () => { document.documentElement.style.overflowY = ''; document.body.style.overflowY = ''; };
+  }, [modal, candModal]);
 
-  const handleOpenModal = (mode, row = null) => {
-    setModalMode(mode);
-    if (mode === 'create') {
-      let nextReqNumber = 66;
-      if (data.length > 0) {
-        const reqNumbers = data
-          .map(d => parseInt(String(d.nro_identificacion_proceso).replace(/[^0-9]/g, ''), 10))
-          .filter(n => !isNaN(n));
-        if (reqNumbers.length > 0) {
-          nextReqNumber = Math.max(...reqNumbers) + 1;
-        }
-      }
-      setForm({
-        fecha_solicitud: '21 mayo 2026',
-        numero_identificacion_proceso: `REQ${nextReqNumber}`,
-        estado: 'Abierta',
-        solicitud_confidencial: 'No'
-      });
+  useEffect(() => { setPage(1); }, [search, estadoF]);
+
+  const ch = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const openModal = (m, row = null) => {
+    setMode(m);
+    if (m === 'create') {
+      const nums = data.map(d => parseInt(String(d.nro_identificacion_proceso).replace(/\D/g, ''), 10)).filter(Boolean);
+      setForm({ fecha_solicitud: '21 mayo 2026', numero_identificacion_proceso: `REQ${nums.length ? Math.max(...nums) + 1 : 66}`, estado: 'Abierta', solicitud_confidencial: 'No' });
     } else if (row) {
-      setForm({
-        id: row.id,
-        nombre_responsable: row.responsable.split(' - ')[0],
-        numero_identificacion: row.nro_identificacion || '123456789',
-        cargo_solicitante: row.cargo || 'Coordinador',
-        fecha_solicitud: row.fecha_solicitud,
-        proceso: row.proceso,
-        numero_identificacion_proceso: row.nro_identificacion_proceso,
-        cargo_requerido: row.cargo,
-        tipo_solicitud: row.tipo_solicitud,
-        numero_personas: row.contratadas_requeridas.split(' / ')[1] || '1',
-        proyecto: row.proyecto,
-        fecha_ingreso: '2026-05-25',
-        pais: 'Colombia',
-        fecha_cierre: '2026-06-15',
-        ciudad: row.ciudad,
-        observaciones: '',
-        estado: row.estado,
-        solicitud_confidencial: 'No'
-      });
+      setForm({ id: row.id, nombre_responsable: row.responsable.split(' - ')[0], numero_identificacion: row.nro_identificacion || '123456789', cargo_solicitante: row.cargo || 'Coordinador', fecha_solicitud: row.fecha_solicitud, proceso: row.proceso, numero_identificacion_proceso: row.nro_identificacion_proceso, cargo_requerido: row.cargo, tipo_solicitud: row.tipo_solicitud, numero_personas: row.contratadas_requeridas.split(' / ')[1] || '1', proyecto: row.proyecto, fecha_ingreso: '2026-05-25', pais: 'Colombia', fecha_cierre: '2026-06-15', ciudad: row.ciudad, observaciones: '', estado: row.estado, solicitud_confidencial: 'No' });
     }
-    setIsModalOpen(true);
+    setModal(true);
   };
 
-  const handleCloseModal = () => setIsModalOpen(false);
-
-  const handleSave = () => {
-    if (modalMode === 'create') {
-      const newId = data.length > 0 ? Math.max(...data.map(d => d.id)) + 1 : 1;
-      const newRow = {
-        id: newId,
-        nro_identificacion: form.numero_identificacion || '-',
-        nro_identificacion_proceso: form.numero_identificacion_proceso || `REQ${newId + 100}`,
-        estado: form.estado || 'Abierta',
-        cargo: form.cargo_requerido || form.cargo_solicitante || 'Sin definir',
-        fecha_solicitud: form.fecha_solicitud || '21 mayo 2026',
-        contratadas_requeridas: `0 / ${form.numero_personas || '1'}`,
-        proyecto: form.proyecto || 'Sin definir',
-        tipo_solicitud: form.tipo_solicitud || 'RP: Reemplazo',
-        responsable: form.nombre_responsable ? `${form.nombre_responsable} - solicitante@servimercadeo.com` : 'No asignado',
-        proceso: form.proceso || 'Sin definir',
-        ciudad: form.ciudad || 'Sin definir'
-      };
-      setData([newRow, ...data]);
-    } else if (modalMode === 'edit') {
-      setData(data.map(row => {
-        if (row.id === form.id) {
-          return {
-            ...row,
-            estado: form.estado || row.estado,
-            nro_identificacion: form.numero_identificacion || row.nro_identificacion,
-            nro_identificacion_proceso: form.numero_identificacion_proceso || row.nro_identificacion_proceso,
-            cargo: form.cargo_requerido || row.cargo,
-            proyecto: form.proyecto || row.proyecto,
-            tipo_solicitud: form.tipo_solicitud || row.tipo_solicitud,
-            proceso: form.proceso || row.proceso,
-            ciudad: form.ciudad || row.ciudad,
-            contratadas_requeridas: `0 / ${form.numero_personas || '1'}`,
-          };
-        }
-        return row;
-      }));
+  const saveModal = () => {
+    if (mode === 'create') {
+      const newId = data.length ? Math.max(...data.map(d => d.id)) + 1 : 1;
+      setData([{ id: newId, nro_identificacion: form.numero_identificacion || '-', nro_identificacion_proceso: form.numero_identificacion_proceso || `REQ${newId + 100}`, estado: form.estado || 'Abierta', cargo: form.cargo_requerido || form.cargo_solicitante || 'Sin definir', fecha_solicitud: form.fecha_solicitud || '21 mayo 2026', contratadas_requeridas: `0 / ${form.numero_personas || '1'}`, proyecto: form.proyecto || 'Sin definir', tipo_solicitud: form.tipo_solicitud || 'RP: Reemplazo', responsable: form.nombre_responsable ? `${form.nombre_responsable} - solicitante@servimercadeo.com` : 'No asignado', proceso: form.proceso || 'Sin definir', ciudad: form.ciudad || 'Sin definir' }, ...data]);
+    } else if (mode === 'edit') {
+      setData(data.map(r => r.id !== form.id ? r : { ...r, estado: form.estado || r.estado, nro_identificacion: form.numero_identificacion || r.nro_identificacion, nro_identificacion_proceso: form.numero_identificacion_proceso || r.nro_identificacion_proceso, cargo: form.cargo_requerido || r.cargo, proyecto: form.proyecto || r.proyecto, tipo_solicitud: form.tipo_solicitud || r.tipo_solicitud, proceso: form.proceso || r.proceso, ciudad: form.ciudad || r.ciudad, contratadas_requeridas: `0 / ${form.numero_personas || '1'}` }));
     }
-    setIsModalOpen(false);
+    setModal(false);
   };
 
-  useEffect(() => {
-    const anyOpen = isModalOpen || isCandModalOpen;
-    if (anyOpen) {
-      document.documentElement.style.overflowY = 'hidden';
-      document.body.style.overflowY = 'hidden';
-    } else {
-      document.documentElement.style.overflowY = '';
-      document.body.style.overflowY = '';
-    }
-    return () => { 
-      document.documentElement.style.overflowY = '';
-      document.body.style.overflowY = ''; 
-    };
-  }, [isModalOpen, isCandModalOpen]);
+  const addCand = () => { setCandMode('create'); setCandForm(EMPTY_CAND(form.id || '')); setCandModal(true); };
+  const editCand = c => { setCandMode('edit'); setCandForm({ ...c }); setCandModal(true); };
+  const viewCand = c => { setCandMode('view'); setCandForm({ ...c }); setCandModal(true); };
+  const removeCand = id => { if (confirm('¿Eliminar este candidato?')) setCands(p => p.filter(c => c.id !== id)); };
 
-  const handleChange = (k) => (e) => {
-    setForm(prev => ({ ...prev, [k]: e.target.value }));
+  const saveCand = () => {
+    if (!candForm.nombres || !candForm.correo || !candForm.celular || !candForm.identificacion || !candForm.fuente || !candForm.fuente_especifica) { alert('Complete los campos obligatorios (*).'); return; }
+    if (candMode === 'create') setCands(p => [...p, { ...candForm, id: p.length ? Math.max(...p.map(c => c.id)) + 1 : 1, pruebas: false, aval: false }]);
+    else setCands(p => p.map(c => c.id === candForm.id ? { ...c, ...candForm } : c));
+    setCandModal(false);
   };
 
-  const filteredData = data.filter(row => {
-    const matchesSearch = Object.values(row).some(val =>
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    const matchesEstado = estadoFilter === 'Todas' ? true : row.estado === estadoFilter;
-    return matchesSearch && matchesEstado;
+  const filtered = data.filter(r => {
+    const ok = Object.values(r).some(v => String(v).toLowerCase().includes(search.toLowerCase()));
+    return ok && (estadoF === 'Todas' || r.estado === estadoF);
+  });
+  const totalP = Math.max(1, Math.ceil(filtered.length / PER));
+  const paged = filtered.slice((page - 1) * PER, page * PER);
+  const filtCands = cands.filter(c => {
+    if (mode === 'manage' && form.id && String(c.requisicion_id) !== String(form.id)) return false;
+    const t = candSearch.toLowerCase();
+    return !t || [c.nombres, c.identificacion, c.correo, c.celular, c.fuente, c.estado].some(v => String(v).toLowerCase().includes(t));
   });
 
-  const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
-  const paginatedData = filteredData.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-
-  const getEstadoColors = (estado) => {
-    const e = estado ? estado.toLowerCase() : '';
-    if (e === 'abierta' || e === 'activa') return { bg: '#d1fae5', color: '#065f46' };
-    if (e === 'cerrada' || e === 'inactiva') return { bg: '#fee2e2', color: '#991b1b' };
-    if (e === 'en proceso') return { bg: '#fef3c7', color: '#92400e' };
-    return { bg: 'var(--bg)', color: 'var(--text-muted)' };
-  };
-
-  const filteredCandDetail = candidates.filter(c => {
-    const term = candDetailSearch.toLowerCase().trim();
-    if (!term) return true;
-    return (
-      c.nombres.toLowerCase().includes(term) ||
-      c.identificacion.includes(term) ||
-      c.correo.toLowerCase().includes(term) ||
-      c.celular.includes(term) ||
-      c.fuente.toLowerCase().includes(term) ||
-      c.estado.toLowerCase().includes(term)
-    );
-  });
+  const isRO = m => m === 'view' || m === 'manage';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+    <div style={S.page}>
 
-      {/* ── Tabs de sección ── */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', margintop: -20 }}>
-        {[
-          { key: 'procesos', label: 'Proceso de Selección' },
-          { key: 'candidatos', label: 'Vista completa candidatos' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveSection(tab.key)}
-            style={{
-              padding: '10px 22px',
-              fontFamily: 'Nunito,sans-serif',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: 'none',
-              borderBottom: activeSection === tab.key ? '3px solid var(--primary)' : '3px solid transparent',
-              background: 'transparent',
-              color: activeSection === tab.key ? 'var(--primary)' : 'var(--text-muted)',
-              marginBottom: -2,
-              transition: 'color 0.15s, border-color 0.15s',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Vista completa candidatos ── */}
-      {activeSection === 'candidatos' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div style={S.searchWrap}>
-              <span style={S.searchIcon}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Buscar candidato..."
-                value={candDetailSearch}
-                onChange={e => setCandDetailSearch(e.target.value)}
-                style={S.searchInput}
-              />
-            </div>
-            <button style={S.btnPrimary} onClick={handleAddCandidate}>+ Agregar candidato</button>
-          </div>
-
-          <div style={{ overflowX: 'auto', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-              <thead>
-                <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
-                  <th style={S.candTh('center')}>Selección<br/>entrevista</th>
-                  <th style={S.candTh('left')}>Nombres</th>
-                  <th style={S.candTh('left')}>Identificación</th>
-                  <th style={S.candTh('left')}>Correo electrónico</th>
-                  <th style={S.candTh('left')}>Celular</th>
-                  <th style={S.candTh('left')}>Ciudad</th>
-                  <th style={S.candTh('left')}>Fuente reclutamiento</th>
-                  <th style={S.candTh('left')}>Estado proceso</th>
-                  <th style={S.candTh('center')}>Pruebas<br/>psicotécnicas</th>
-                  <th style={S.candTh('center')}>Aval<br/>contratación</th>
-                  <th style={S.candTh('center')}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCandDetail.map(c => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
-                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                      <input type="checkbox" checked={c.selected || false} onChange={() => toggleCandidateField(c.id, 'selected')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                    </td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>{c.nombres}</td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.celular}</td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.ciudad}</td>
-                    <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.fuente}</td>
-                    <td style={{ padding: '12px 8px' }}>
-                      <span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>
-                        {c.estado}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                      <input type="checkbox" checked={c.pruebas || false} onChange={() => toggleCandidateField(c.id, 'pruebas')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                    </td>
-                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                      <input type="checkbox" checked={c.aval || false} onChange={() => toggleCandidateField(c.id, 'aval')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                    </td>
-                    <td style={{ padding: '12px 8px' }}>
-                      <div style={S.actions}>
-                        <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar candidato" onClick={() => handleEditCandidate(c)}><IconEdit size={15} /></button>
-                        <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleViewCandidate(c)}><IconEye size={15} /></button>
-                        <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar candidato" onClick={() => handleRemoveCandidate(c.id)}><IconClose size={15} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredCandDetail.length === 0 && (
-                  <tr><td colSpan="11" style={S.empty}>No se encontraron candidatos.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Proceso de Selección ── */}
-      {activeSection === 'procesos' && (<>
-
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div style={S.toolbar}>
-
-        {/* Left: Search + Estado */}
         <div style={S.filters}>
           <div style={S.searchWrap}>
             <span style={S.searchIcon}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </span>
-            <input
-              type="text"
-              placeholder="Buscar requisición, cargo o proyecto..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={S.searchInput}
-            />
+            <input type="text" placeholder="Buscar requisición, cargo o proyecto..." value={search} onChange={e => setSearch(e.target.value)} style={S.searchInput} />
           </div>
-
           <div style={S.estadoWrap}>
-            <label style={S.estadoLabel}>Estado:</label>
-            <select
-              value={estadoFilter}
-              onChange={(e) => setEstadoFilter(e.target.value)}
-              style={S.estadoSelect}
-            >
-              <option value="Todas">Todas</option>
-              <option value="Abierta">Abierta</option>
-              <option value="En proceso">En proceso</option>
-              <option value="Cerrada">Cerrada</option>
-              <option value="Cancelada">Cancelada</option>
+            <span style={S.label}>Estado</span>
+            <select value={estadoF} onChange={e => setEstadoF(e.target.value)} style={S.estadoSelect}>
+              {['Todas','Abierta','En proceso','Cerrada','Cancelada'].map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
         </div>
-
-        {/* Right: Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button style={S.filterBtn}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
-            </svg>
+        <div style={S.row}>
+          <button style={S.btnOutline}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
             Actualizar
           </button>
-          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>
-            + Nueva requisición
-          </button>
+          <button style={S.btnPrimary} onClick={() => openModal('create')}>+ Nueva requisición</button>
         </div>
-
       </div>
 
-      {/* ── Tabla ── */}
-      <div style={S.tableWrap}>
+      {/* Tabla */}
+      <div style={S.card}>
         <table style={S.table}>
-          <thead>
-            <tr>
-              <th style={S.th}>Item</th>
-              <th style={S.th}>Nro. ID proceso</th>
-              <th style={S.th}>Estado</th>
-              <th style={S.th}>Cargo requerido</th>
-              <th style={S.th}>Fecha solicitud</th>
-              <th style={S.th}>Proyecto</th>
-              <th style={S.th}>Tipo solicitud</th>
-              <th style={S.th}>Ciudad operación</th>
-              <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            {['Item','Nro. ID proceso','Estado','Cargo requerido','Fecha solicitud','Proyecto','Tipo solicitud','Ciudad'].map(h => <th key={h} style={S.th}>{h}</th>)}
+            <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
+          </tr></thead>
           <tbody>
-            {paginatedData.map((row, index) => {
-              const itemIndex = (pagina - 1) * POR_PAGINA + index + 1;
-              const estColors = getEstadoColors(row.estado);
+            {paged.map((row, i) => {
+              const [bg, color] = estadoColor(row.estado);
               return (
                 <tr key={row.id} style={S.tr}>
-                  <td style={S.td}>{itemIndex}</td>
+                  <td style={S.td}>{(page - 1) * PER + i + 1}</td>
                   <td style={S.td}>{row.nro_identificacion_proceso}</td>
-                  <td style={S.td}>
-                    <span style={S.badge(estColors.bg, estColors.color)}>
-                      {row.estado}
-                    </span>
-                  </td>
+                  <td style={S.td}><span style={S.badge(bg, color)}>{row.estado}</span></td>
                   <td style={S.td}>{row.cargo}</td>
                   <td style={S.td}>{row.fecha_solicitud}</td>
                   <td style={S.td}>{row.proyecto}</td>
@@ -573,645 +188,214 @@ export default function SeleccionCrud() {
                   <td style={S.td}>{row.ciudad}</td>
                   <td style={{ ...S.td, textAlign: 'center' }}>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('#fff3cd', '#856404')} title="Gestionar" onClick={() => handleOpenModal('manage', row)}>
-                        <IconGestionar size={15} />
-                      </button>
-                      <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}>
-                        <IconEdit size={15} />
-                      </button>
-                      <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleOpenModal('view', row)}>
-                        <IconEye size={15} />
-                      </button>
+                      <button style={S.aBtn('#e8f8f5','var(--primary-dark)')} title="Editar" onClick={() => openModal('edit', row)}><IconEdit size={14}/></button>
+                      <button style={S.aBtn('#e8f0ff','#1a4fa8')} title="Ver" onClick={() => openModal('view', row)}><IconEye size={14}/></button>
                     </div>
                   </td>
                 </tr>
               );
             })}
-            {filteredData.length === 0 && (
-              <tr>
-                <td colSpan="9" style={S.empty}>
-                  No hay requisiciones que coincidan con la búsqueda.
-                </td>
-              </tr>
-            )}
+            {!filtered.length && <tr><td colSpan="9" style={S.empty}>No hay requisiciones que coincidan con la búsqueda.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      {/* ── Paginación ── */}
-      {filteredData.length > 0 && (
-        <div style={S.paginationWrap}>
-          <span style={S.pageInfo}>
-            Página {pagina} · Mostrando {Math.min(POR_PAGINA, filteredData.length - (pagina - 1) * POR_PAGINA)} de {filteredData.length} registros
-          </span>
-          <div style={S.pageControls}>
-            <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1} style={S.pageBtn(pagina === 1)}>‹</button>
-            {getPaginasBotones(pagina, totalPaginas).map((n, i) =>
-              n === "..." ? (
-                <span key={`ellipsis-${i}`} style={S.pageEllipsis}>…</span>
-              ) : (
-                <button key={n} onClick={() => setPagina(n)} style={n === pagina ? S.pageBtnActive : S.pageBtn(false)}>
-                  {n}
-                </button>
-              )
+      {/* Paginación */}
+      {filtered.length > 0 && (
+        <div style={S.pgWrap}>
+          <span style={S.pgInfo}>Página {page} · {Math.min(PER, filtered.length - (page - 1) * PER)} de {filtered.length} registros</span>
+          <div style={S.row}>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={S.pgBtn(page === 1)}>‹</button>
+            {pages(page, totalP).map((n, i) => n === '...'
+              ? <span key={`e${i}`} style={S.pgDot}>…</span>
+              : <button key={n} onClick={() => setPage(n)} style={n === page ? S.pgActive : S.pgBtn(false)}>{n}</button>
             )}
-            <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas} style={S.pageBtn(pagina === totalPaginas)}>›</button>
+            <button onClick={() => setPage(p => Math.min(totalP, p + 1))} disabled={page === totalP} style={S.pgBtn(page === totalP)}>›</button>
           </div>
         </div>
       )}
 
-      </>)}
-
-      {/* ── Modal ── */}
-      {isModalOpen && (
-        <div style={S.overlay} onClick={handleCloseModal}>
+      {/* Modal Requisición */}
+      {modal && (
+        <div style={S.overlay} onClick={() => setModal(false)}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
-
-            <div style={S.modalHeaderGreen}>
-              <span style={S.modalTitleWhite}>
-                {modalMode === 'create' ? 'Registrar nueva requisición' : modalMode === 'edit' ? 'Editar requisición' : modalMode === 'manage' ? 'Visualización y adición de candidatos' : 'Detalles de la requisición'}
-              </span>
-              <button style={S.closeBtnWhite} onClick={handleCloseModal}>
-                <IconClose size={14} />
-              </button>
+            <div style={S.mHead}>
+              <span style={S.mTitle}>{mode === 'create' ? 'Registrar nueva requisición' : mode === 'edit' ? 'Editar requisición' : mode === 'manage' ? 'Gestión de candidatos' : 'Detalles de la requisición'}</span>
+              <button style={S.mClose} onClick={() => setModal(false)}><IconClose size={13}/></button>
             </div>
-
-            <div style={S.modalBody}>
-              <div style={S.grid3}>
-                <Field label="Nombre responsable solicitud" k="nombre_responsable" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.responsables} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Número de identificación" k="numero_identificacion" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit' || modalMode === 'manage'} />
-                <Field label="Cargo del solicitante" k="cargo_solicitante" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'edit' || modalMode === 'manage'} />
-
-                <Field label="Fecha de solicitud" k="fecha_solicitud" req={modalMode !== 'view' && modalMode !== 'manage'} disabled form={form} onChange={handleChange} />
-                <Field label="Proceso" k="proceso" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.procesos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Número de identificación del proceso" k="numero_identificacion_proceso" req={modalMode !== 'view' && modalMode !== 'manage'} disabled form={form} onChange={handleChange} />
-
-                <Field label="Cargo requerido" k="cargo_requerido" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.cargos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Tipo de solicitud" k="tipo_solicitud" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.tipos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Número de personas requeridas" k="numero_personas" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.numeros} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-
-                <Field label="Proyecto" k="proyecto" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.proyectos} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Fecha estimada de ingreso" k="fecha_ingreso" req={modalMode !== 'view' && modalMode !== 'manage'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="País" k="pais" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.paises} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-
-                <Field label="Fecha estimada de cierre" k="fecha_cierre" req={modalMode !== 'view' && modalMode !== 'manage'} type="date" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Ciudad de operación" k="ciudad" req={modalMode !== 'view' && modalMode !== 'manage'} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="Observaciones de la solicitud" k="observaciones" type="textarea" form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-
-                <Field label="Estado" k="estado" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.estados} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
-                <Field label="¿Es una solicitud confidencial?" k="solicitud_confidencial" req={modalMode !== 'view' && modalMode !== 'manage'} opts={MOCK_OPTS.sino} form={form} onChange={handleChange} disabled={modalMode === 'view' || modalMode === 'manage'} />
+            <div style={S.mBody}>
+              <div style={S.g3}>
+                <F l="Nombre responsable" k="nombre_responsable" req={!isRO(mode)} opts={OPT.responsables} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="N° identificación" k="numero_identificacion" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode) || mode === 'edit'} />
+                <F l="Cargo del solicitante" k="cargo_solicitante" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode) || mode === 'edit'} />
+                <F l="Fecha de solicitud" k="fecha_solicitud" req={!isRO(mode)} dis form={form} ch={ch} />
+                <F l="Proceso" k="proceso" req={!isRO(mode)} opts={OPT.procesos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />
+                <F l="Cargo requerido" k="cargo_requerido" req={!isRO(mode)} opts={OPT.cargos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Tipo de solicitud" k="tipo_solicitud" req={!isRO(mode)} opts={OPT.tipos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Personas requeridas" k="numero_personas" req={!isRO(mode)} opts={OPT.numeros} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Proyecto" k="proyecto" req={!isRO(mode)} opts={OPT.proyectos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Fecha estimada de ingreso" k="fecha_ingreso" req={!isRO(mode)} type="date" form={form} ch={ch} dis={isRO(mode)} />
+                <F l="País" k="pais" req={!isRO(mode)} opts={OPT.paises} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Fecha estimada de cierre" k="fecha_cierre" req={!isRO(mode)} type="date" form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Ciudad de operación" k="ciudad" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Observaciones" k="observaciones" type="textarea" form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Estado" k="estado" req={!isRO(mode)} opts={OPT.estados} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="¿Solicitud confidencial?" k="solicitud_confidencial" req={!isRO(mode)} opts={OPT.sino} form={form} ch={ch} dis={isRO(mode)} />
               </div>
 
-              {modalMode === 'manage' && (
-                <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '2px dashed var(--border)' }}>
-                  <div style={{ fontSize: '0.9rem', marginBottom: '20px', fontWeight: 700, color: 'var(--text)' }}>
-                     Candidatos requeridos: {form.numero_personas || 1}. Candidatos agregados: {candidates.length}. Candidatos contratados: {candidates.filter(c => c.estado === 'Contratación').length}
-                     <span style={{ marginLeft: 8, color: 'var(--text-muted)', cursor: 'help' }} title="Información sobre candidatos">ⓘ</span>
+              {mode === 'manage' && (
+                <div style={S.candSec}>
+                  <div style={S.row}>
+                    {[['Requeridos', form.numero_personas || 1], ['Agregados', cands.length], ['Contratados', cands.filter(c => c.estado === 'Contratación').length]].map(([l, v]) => (
+                      <span key={l} style={S.chip}>{l}: <strong>{v}</strong></span>
+                    ))}
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: 16, margintop: '10px' }}>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <label style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>Búsqueda:</label>
-                        <input
-                          type="text"
-                          placeholder="Buscar candidato..."
-                          value={candidateSearch}
-                          onChange={(e) => setCandidateSearch(e.target.value)}
-                          style={{ padding: '8px 12px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', width: '250px', outline: 'none', fontFamily: 'Nunito, sans-serif', color: 'var(--text)', background: 'var(--white)' }}
-                        />
-                     </div>
-                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <button style={S.btnSecondary} onClick={() => setCandidateSearch('')}>Actualizar</button>
-                        <button
-                          style={{
-                            ...S.btnSecondary,
-                            opacity: candidates.some(c => c.selected) ? 1 : 0.6,
-                            cursor: candidates.some(c => c.selected) ? 'pointer' : 'not-allowed'
-                          }}
-                          onClick={() => {
-                            if (candidates.some(c => c.selected)) {
-                              const seleccionados = candidates.filter(c => c.selected).map(c => c.nombres).join(', ');
-                              alert(`Entrevista agendada para: ${seleccionados}`);
-                            }
-                          }}
-                        >
-                          Agendar entrevista
-                        </button>
-                        <button style={S.btnPrimary} onClick={handleAddCandidate}>Agregar candidatos</button>
-                     </div>
+                  <div style={S.candCtrl}>
+                    <div style={{ ...S.searchWrap, maxWidth: 260 }}>
+                      <span style={S.searchIcon}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                      <input type="text" placeholder="Buscar candidato..." value={candSearch} onChange={e => setCandSearch(e.target.value)} style={S.searchInput} />
+                    </div>
+                    <div style={S.row}>
+                      <button style={S.btnOutline} onClick={() => setCandSearch('')}>Actualizar</button>
+                      <button style={{ ...S.btnOutline, opacity: cands.some(c => c.selected) ? 1 : 0.4, cursor: cands.some(c => c.selected) ? 'pointer' : 'not-allowed' }} onClick={() => { if (cands.some(c => c.selected)) alert(`Entrevista agendada para: ${cands.filter(c => c.selected).map(c => c.nombres).join(', ')}`); }}>Agendar entrevista</button>
+                      <button style={S.btnPrimary} onClick={addCand}>Agregar candidato</button>
+                    </div>
                   </div>
-
-                  <div style={{ overflowX: 'auto', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
-                      <thead>
-                        <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
-                          <th style={S.candTh('left')}>Nombres</th>
-                          <th style={S.candTh('left')}>Identificación</th>
-                          <th style={S.candTh('left')}>Correo electrónico</th>
-                          <th style={S.candTh('left')}>Estado</th>
-                          <th style={S.candTh('center')}>Acciones</th>
-                        </tr>
-                      </thead>
+                  <div style={S.card}>
+                    <table style={{ ...S.table, minWidth: 480 }}>
+                      <thead><tr>
+                        {['Nombres','Identificación','Correo','Estado'].map(h => <th key={h} style={S.th}>{h}</th>)}
+                        <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
+                      </tr></thead>
                       <tbody>
-                        {filteredCandidates.map(c => (
-                          <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
-                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>{c.nombres}</td>
-                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
-                            <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>
-                                {c.estado}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 8px' }}>
+                        {filtCands.map(c => (
+                          <tr key={c.id} style={S.tr}>
+                            <td style={{ ...S.td, fontWeight: 700 }}>{c.nombres}</td>
+                            <td style={{ ...S.td, fontFamily: 'monospace' }}>{c.identificacion}</td>
+                            <td style={S.td}>{c.correo}</td>
+                            <td style={S.td}><span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>{c.estado}</span></td>
+                            <td style={{ ...S.td, textAlign: 'center' }}>
                               <div style={S.actions}>
-                                <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar candidato" onClick={() => handleEditCandidate(c)}>
-                                  <IconEdit size={15} />
-                                </button>
-                                <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleViewCandidate(c)}>
-                                  <IconEye size={15} />
-                                </button>
-                                <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar candidato" onClick={() => handleRemoveCandidate(c.id)}>
-                                  <IconClose size={15} />
-                                </button>
+                                <button style={S.aBtn('#e8f8f5','var(--primary-dark)')} onClick={() => editCand(c)}><IconEdit size={13}/></button>
+                                <button style={S.aBtn('#e8f0ff','#1a4fa8')} onClick={() => viewCand(c)}><IconEye size={13}/></button>
+                                <button style={S.aBtn('#fce8e8','#a33')} onClick={() => removeCand(c.id)}><IconClose size={13}/></button>
                               </div>
                             </td>
                           </tr>
                         ))}
-                        {filteredCandidates.length === 0 && (
-                          <tr>
-                            <td colSpan="5" style={S.empty}>No se encontraron candidatos para los criterios de búsqueda.</td>
-                          </tr>
-                        )}
+                        {!filtCands.length && <tr><td colSpan="5" style={S.empty}>Sin candidatos.</td></tr>}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
             </div>
-
-            <div style={S.modalFooter}>
-              {modalMode === 'view' || modalMode === 'manage' ? (
-                <button style={S.btnSecondary} onClick={handleCloseModal}>Cerrar</button>
-              ) : (
-                <>
-                  <button style={S.btnSecondary} onClick={handleCloseModal}>Cancelar</button>
-                  <button style={S.btnPrimaryGreen} onClick={handleSave}>Guardar requisición</button>
-                </>
-              )}
+            <div style={S.mFoot}>
+              {isRO(mode) ? <button style={S.btnOutline} onClick={() => setModal(false)}>Cerrar</button> : <><button style={S.btnOutline} onClick={() => setModal(false)}>Cancelar</button><button style={S.btnPrimary} onClick={saveModal}>Guardar requisición</button></>}
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ─── Modal Candidato ─────────────────────────────────────────────── */}
-      {isCandModalOpen && (
-        <div style={S.overlay} onClick={() => setIsCandModalOpen(false)}>
+      {/* Modal Candidato */}
+      {candModal && (
+        <div style={S.overlay} onClick={() => setCandModal(false)}>
           <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div style={S.modalHeaderGreen}>
-              <span style={S.modalTitleWhite}>
-                {candModalMode === 'create' ? 'Agregar Candidato' : candModalMode === 'edit' ? 'Editar Candidato' : 'Detalles del Candidato'}
-              </span>
-              <button style={S.closeBtnWhite} onClick={() => setIsCandModalOpen(false)}>
-                <IconClose size={12} />
-              </button>
+            <div style={S.mHead}>
+              <span style={S.mTitle}>{candMode === 'create' ? 'Agregar Candidato' : candMode === 'edit' ? 'Editar Candidato' : 'Detalles del Candidato'}</span>
+              <button style={S.mClose} onClick={() => setCandModal(false)}><IconClose size={13}/></button>
             </div>
-
-            {/* Body */}
-            <div style={S.modalBody}>
-              {/* Sección: Datos personales */}
-              <h4 style={{ margin: '0 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
-                Datos personales
-              </h4>
-              <div style={S.grid3}>
-                <Field label="Nombres completos" k="nombres" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Tipo de documento" k="tipo_documento" opts={MOCK_OPTS.tipos_documento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Número de identificación" k="identificacion" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Fecha de expedición" k="fecha_expedicion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Edad" k="edad" type="number" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Ciudad" k="ciudad" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Correo electrónico" k="correo" type="email" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Celular" k="celular" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Fecha de postulación" k="fecha_postulacion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view' || candModalMode === 'create'} />
+            <div style={S.mBody}>
+              <h4 style={{ ...S.secTitle, marginTop: 0 }}>Datos personales</h4>
+              <div style={S.g3}>
+                <F l="Nombres completos" k="nombres" req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Tipo de documento" k="tipo_documento" opts={OPT.tipos_doc} req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="N° de identificación" k="identificacion" req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Fecha de expedición" k="fecha_expedicion" type="date" form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Edad" k="edad" type="number" form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Ciudad" k="ciudad" form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Correo electrónico" k="correo" type="email" req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Celular" k="celular" req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Fecha de postulación" k="fecha_postulacion" type="date" form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view' || candMode === 'create'} />
               </div>
-
-              {/* Sección: Proceso de selección */}
-              <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
-                Proceso de selección
-              </h4>
-              <div style={S.grid3}>
-                <Field label="Fuente de reclutamiento" k="fuente" opts={MOCK_OPTS.fuentes_reclutamiento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Fuente específica" k="fuente_especifica" opts={MOCK_OPTS.fuentes_especificas} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Estado del proceso" k="estado" opts={['Entrevista', 'Contratación', 'Descartado', 'En espera']} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+              <h4 style={S.secTitle}>Proceso de selección</h4>
+              <div style={S.g3}>
+                <F l="Requisición asociada" k="requisicion_id" req span={3} opts={data.map(r => ({ value: String(r.id), label: `${r.nro_identificacion_proceso} – ${r.cargo}` }))} form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Fuente de reclutamiento" k="fuente" opts={OPT.fuentes} req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Fuente específica" k="fuente_especifica" opts={OPT.fuentes_esp} req form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
+                <F l="Estado del proceso" k="estado" opts={['Entrevista','Contratación','Descartado','En espera']} form={candForm} ch={k => e => setCandForm(p => ({ ...p, [k]: e.target.value }))} dis={candMode === 'view'} />
               </div>
-
-              {/* Sección: Observaciones del candidato */}
-              <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
-                Observaciones del candidato
-              </h4>
-              <textarea
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px 12px',
-                  border: '1.5px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.88rem',
-                  fontFamily: 'Nunito,sans-serif',
-                  color: candModalMode === 'view' ? 'var(--text-muted)' : 'var(--text)',
-                  background: candModalMode === 'view' ? 'var(--bg)' : 'var(--white)',
-                  outline: 'none',
-                  minHeight: 80,
-                  resize: 'vertical',
-                  transition: 'border 0.15s',
-                }}
-                value={candForm.observaciones || ''}
-                onChange={(e) => setCandForm(p => ({ ...p, observaciones: e.target.value }))}
-                disabled={candModalMode === 'view'}
-                placeholder="Escriba aquí las observaciones sobre el candidato..."
-              />
-
+              <h4 style={S.secTitle}>Observaciones</h4>
+              <textarea style={S.ta(candMode === 'view')} value={candForm.observaciones || ''} onChange={e => setCandForm(p => ({ ...p, observaciones: e.target.value }))} disabled={candMode === 'view'} placeholder="Observaciones sobre el candidato..." />
             </div>
-
-            {/* Footer */}
-            <div style={S.modalFooter}>
-              {candModalMode === 'view' ? (
-                <button style={S.btnSecondary} onClick={() => setIsCandModalOpen(false)}>Cerrar</button>
-              ) : (
-                <>
-                  <button style={S.btnSecondary} onClick={() => setIsCandModalOpen(false)}>Cancelar</button>
-                  <button style={S.btnPrimaryGreen} onClick={handleSaveCandidate}>Guardar candidato</button>
-                </>
-              )}
+            <div style={S.mFoot}>
+              {candMode === 'view' ? <button style={S.btnOutline} onClick={() => setCandModal(false)}>Cerrar</button> : <><button style={S.btnOutline} onClick={() => setCandModal(false)}>Cancelar</button><button style={S.btnPrimary} onClick={saveCand}>Guardar candidato</button></>}
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-function Field({ label, k, type = "text", opts, req, span, form, onChange, disabled }) {
-  const wrapStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 5,
-    minWidth: 0,
-    ...(span ? { gridColumn: `span ${span}` } : {})
-  };
-  const inputStyle = {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '8px 10px',
-    border: '1.5px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: '0.88rem',
-    fontFamily: 'Nunito,sans-serif',
-    color: disabled ? 'var(--text-muted)' : 'var(--text)',
-    background: disabled ? 'var(--bg)' : 'var(--white)',
-    outline: 'none',
-    transition: 'border 0.15s',
-  };
-
+/* ── Field ──────────────────────────────────────────────────────────── */
+function F({ l, k, type = 'text', opts, req, span, form, ch, dis }) {
+  const inp = { ..._inp, color: dis ? 'var(--text-muted)' : 'var(--text)', background: dis ? 'var(--bg)' : 'var(--white)' };
   return (
-    <div style={wrapStyle}>
-      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>
-        {label}
-        {req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, ...(span ? { gridColumn: `span ${span}` } : {}) }}>
+      <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text)', fontFamily: NUN }}>
+        {l}{req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
-      {opts ? (
-        <select style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
-          <option value="">-- Selecciona --</option>
-          {opts.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
-      ) : (
-        <input type={type} style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
-      )}
+      {opts
+        ? <select style={inp} value={form[k] ?? ''} onChange={ch(k)} disabled={dis}><option value="">-- Selecciona --</option>{opts.map(o => typeof o === 'string' ? <option key={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+        : type === 'textarea'
+          ? <textarea style={{ ...inp, minHeight: 40, resize: 'vertical' }} value={form[k] ?? ''} onChange={ch(k)} disabled={dis} />
+          : <input type={type} style={inp} value={form[k] ?? ''} onChange={ch(k)} disabled={dis} />
+      }
     </div>
   );
 }
 
+/* ── Styles ─────────────────────────────────────────────────────────── */
 const S = {
-    /* Toolbar */
-    toolbar: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-        marginBottom: 20,
-        flexWrap: "wrap",
-    },
-    filters: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        flexWrap: "wrap",
-        flex: 1,
-    },
-    searchWrap: { position: "relative", flex: 1, minWidth: 200, maxWidth: 380 },
-    searchIcon: {
-        position: "absolute",
-        left: 11,
-        top: "50%",
-        transform: "translateY(-50%)",
-        display: "flex",
-        alignItems: "center",
-        color: "var(--text-muted)",
-        pointerEvents: "none",
-    },
-    searchInput: {
-        width: "100%",
-        padding: "9px 12px 9px 34px",
-        border: "1.5px solid var(--border)",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.88rem",
-        fontFamily: "Nunito,sans-serif",
-        background: "var(--white)",
-        color: "var(--text)",
-        outline: "none",
-    },
-    estadoWrap: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "0 14px",
-        background: "var(--white)",
-        border: "1.5px solid var(--border)",
-        borderRadius: "var(--radius-sm)",
-        height: 38,
-    },
-    estadoLabel: {
-        fontSize: "0.78rem",
-        fontWeight: 700,
-        color: "var(--text-muted)",
-        fontFamily: "Nunito,sans-serif",
-        whiteSpace: "nowrap",
-    },
-    estadoSelect: {
-        border: "none",
-        background: "transparent",
-        outline: "none",
-        fontSize: "0.88rem",
-        fontFamily: "Nunito,sans-serif",
-        color: "var(--text)",
-        fontWeight: 700,
-        cursor: "pointer",
-        padding: "0",
-    },
-    filterBtn: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "9px 16px",
-        background: "var(--white)",
-        border: "1.5px solid var(--border)",
-        borderRadius: "var(--radius-sm)",
-        color: "var(--text)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
-        fontFamily: "Nunito,sans-serif",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-    },
-
-    /* Botones */
-    btnPrimary: {
-        padding: "10px 24px",
-        background: "var(--primary)",
-        color: "#fff",
-        border: "none",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
-        cursor: "pointer",
-        fontFamily: "Nunito,sans-serif",
-        transition: "background 0.18s",
-        whiteSpace: "nowrap",
-    },
-    btnPrimaryGreen: {
-        padding: "10px 20px",
-        background: "var(--primary)",
-        color: "#fff",
-        border: "none",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
-        cursor: "pointer",
-        fontFamily: "Nunito,sans-serif",
-    },
-    btnSecondary: {
-        padding: "10px 20px",
-        background: "var(--bg)",
-        color: "var(--text)",
-        border: "1.5px solid var(--border)",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
-        cursor: "pointer",
-        fontFamily: "Nunito,sans-serif",
-    },
-
-    /* Tabla */
-    tableWrap: {
-        background: "var(--white)",
-        border: "1.5px solid var(--border)",
-        borderRadius: "var(--radius)",
-        boxShadow: "var(--shadow)",
-        overflowX: "auto",
-    },
-    table: { width: "100%", borderCollapse: "collapse", minWidth: 1000 },
-    th: {
-        padding: "14px 14px",
-        background: "var(--bg)",
-        color: "var(--primary)",
-        fontWeight: 700,
-        fontSize: "0.75rem",
-        fontFamily: "Nunito,sans-serif",
-        textAlign: "left",
-        borderBottom: "1.5px solid var(--border)",
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        whiteSpace: "nowrap",
-    },
-    tr: { borderBottom: "1px solid var(--border)", transition: "background 0.15s" },
-    td: {
-        padding: "13px 14px",
-        fontSize: "0.85rem",
-        fontFamily: "Nunito,sans-serif",
-        color: "var(--text)",
-        textAlign: "left",
-        verticalAlign: "middle",
-    },
-    badge: (bg, color) => ({
-        background: bg,
-        color,
-        borderRadius: 20,
-        padding: "3px 10px",
-        fontSize: "0.78rem",
-        fontWeight: 700,
-        whiteSpace: "nowrap",
-        fontFamily: "Nunito,sans-serif",
-    }),
-    actions: { display: "flex", gap: 6, justifyContent: "center" },
-    actionBtn: (bg, color) => ({
-        background: bg,
-        border: "none",
-        borderRadius: 6,
-        padding: "5px 8px",
-        cursor: "pointer",
-        fontSize: "0.85rem",
-        color,
-        transition: "opacity 0.15s",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-    }),
-    empty: {
-        padding: "60px 20px",
-        textAlign: "center",
-        color: "var(--text-muted)",
-        fontSize: "0.9rem",
-        fontFamily: "Nunito,sans-serif",
-    },
-
-    /* Paginación */
-    paginationWrap: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginTop: 4,
-        flexWrap: "wrap",
-        gap: 10,
-    },
-    pageInfo: {
-        color: "var(--text-muted)",
-        fontSize: "0.85rem",
-        fontFamily: "Nunito,sans-serif",
-    },
-    pageControls: { display: "flex", alignItems: "center", gap: 6 },
-    pageBtn: (disabled) => ({
-        minWidth: 32,
-        height: 32,
-        padding: "0 8px",
-        border: "1.5px solid var(--border)",
-        borderRadius: 6,
-        background: "var(--white)",
-        color: disabled ? "var(--text-muted)" : "var(--text)",
-        fontSize: "0.88rem",
-        fontWeight: 700,
-        fontFamily: "Nunito,sans-serif",
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        transition: "all 0.15s",
-    }),
-    pageBtnActive: {
-        minWidth: 32,
-        height: 32,
-        padding: "0 8px",
-        border: "1.5px solid var(--primary)",
-        borderRadius: 6,
-        background: "var(--primary)",
-        color: "#fff",
-        fontSize: "0.88rem",
-        fontWeight: 700,
-        fontFamily: "Nunito,sans-serif",
-        cursor: "default",
-    },
-    pageEllipsis: {
-        minWidth: 28,
-        height: 32,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--text-muted)",
-        fontSize: "0.88rem",
-        userSelect: "none",
-    },
-
-    /* Modal */
-    overlay: {
-        position: "fixed",
-        inset: 0,
-        background: "rgba(26,58,53,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 5000,
-        padding: 20,
-    },
-    modal: {
-        background: "var(--white)",
-        borderRadius: "var(--radius)",
-        boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
-        width: "100%",
-        maxWidth: 900,
-        maxHeight: "92vh",
-        display: "flex",
-        flexDirection: "column",
-    },
-    modalHeaderGreen: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "22px 28px",
-        background: "var(--primary)",
-        borderTopLeftRadius: "var(--radius)",
-        borderTopRightRadius: "var(--radius)",
-        flexShrink: 0,
-    },
-    modalTitleWhite: {
-        fontFamily: "'Poppins',sans-serif",
-        fontWeight: 700,
-        fontSize: "1.2rem",
-        color: "#fff",
-    },
-    closeBtnWhite: {
-        background: "none",
-        border: "1.5px solid rgba(255,255,255,0.6)",
-        borderRadius: "50%",
-        width: 26,
-        height: 26,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        color: "#fff",
-    },
-    modalBody: {
-        padding: "22px 28px 28px",
-        overflowY: "auto",
-        overflowX: "hidden",
-        flex: 1,
-    },
-    modalFooter: {
-        display: "flex",
-        justifyContent: "flex-end",
-        gap: 12,
-        padding: "16px 28px",
-        borderTop: "1.5px solid var(--border)",
-        flexShrink: 0,
-    },
-    grid3: {
-        display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-        gap: 14,
-    },
-    candTh: (align) => ({
-        padding: '12px 10px',
-        fontSize: '0.75rem',
-        color: 'var(--primary)',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        whiteSpace: 'nowrap',
-        textAlign: align,
-        fontFamily: 'Nunito,sans-serif',
-    }),
+  page:       { display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' },
+  toolbar:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  filters:    { display: 'flex', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' },
+  row:        { display: 'flex', alignItems: 'center', gap: 8 },
+  searchWrap: { position: 'relative', flex: 1, minWidth: 180, maxWidth: 360 },
+  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: 'var(--text-muted)', pointerEvents: 'none' },
+  searchInput:{ ..._inp, height: 40, padding: '0 12px 0 32px' },
+  estadoWrap: { display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', background: 'var(--white)', border: BD, borderRadius: RSM },
+  label:      { fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: NUN, whiteSpace: 'nowrap' },
+  estadoSelect:{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.87rem', fontFamily: NUN, color: 'var(--text)', fontWeight: 700, cursor: 'pointer' },
+  btnPrimary: { ..._btn, padding: '0 18px', background: 'var(--primary)', color: '#fff', border: 'none' },
+  btnOutline: { ..._btn, padding: '0 14px', background: 'var(--white)', color: 'var(--text)', border: BD },
+  card:       { background: 'var(--white)', border: BD, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', overflowX: 'auto' },
+  table:      { width: '100%', borderCollapse: 'collapse', minWidth: 1000 },
+  th:         { padding: '11px 14px', background: 'var(--bg)', color: 'var(--primary)', fontWeight: 700, fontSize: '0.72rem', fontFamily: NUN, textAlign: 'left', borderBottom: BD, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' },
+  tr:         { borderBottom: '1px solid var(--border)' },
+  td:         { padding: '11px 14px', fontSize: '0.85rem', fontFamily: NUN, color: 'var(--text)', verticalAlign: 'middle' },
+  badge:      (bg, c) => ({ background: bg, color: c, borderRadius: 20, padding: '3px 10px', fontSize: '0.74rem', fontWeight: 700, whiteSpace: 'nowrap', fontFamily: NUN }),
+  actions:    { display: 'flex', gap: 5, justifyContent: 'center' },
+  aBtn:       (bg, c) => ({ background: bg, border: 'none', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: c, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }),
+  empty:      { padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', fontFamily: NUN },
+  pgWrap:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+  pgInfo:     { color: 'var(--text-muted)', fontSize: '0.84rem', fontFamily: NUN },
+  pgBtn:      d => ({ ..._pgb, background: 'var(--white)', color: d ? 'var(--text-muted)' : 'var(--text)', cursor: d ? 'default' : 'pointer', opacity: d ? 0.4 : 1 }),
+  pgActive:   { ..._pgb, border: '1.5px solid var(--primary)', background: 'var(--primary)', color: '#fff', cursor: 'default' },
+  pgDot:      { minWidth: 24, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', userSelect: 'none' },
+  overlay:    { position: 'fixed', inset: 0, background: 'rgba(26,58,53,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, padding: 20 },
+  modal:      { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: 900, maxHeight: '92vh', display: 'flex', flexDirection: 'column' },
+  mHead:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'var(--primary)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)', flexShrink: 0 },
+  mTitle:     { fontFamily: POP, fontWeight: 700, fontSize: '1.05rem', color: '#fff' },
+  mClose:     { background: 'none', border: '1.5px solid rgba(255,255,255,0.5)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', flexShrink: 0 },
+  mBody:      { padding: '20px 24px 24px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
+  mFoot:      { display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 24px', borderTop: BD, flexShrink: 0 },
+  g3:         { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 },
+  secTitle:   { margin: '22px 0 10px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--primary)', fontFamily: POP },
+  ta:         d => ({ ..._inp, color: d ? 'var(--text-muted)' : 'var(--text)', background: d ? 'var(--bg)' : 'var(--white)', minHeight: 72, resize: 'vertical' }),
+  candSec:    { marginTop: 22, paddingTop: 18, borderTop: '2px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 14 },
+  chip:       { padding: '4px 12px', background: 'var(--bg)', border: BD, borderRadius: 20, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)', fontFamily: NUN },
+  candCtrl:   { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' },
 };

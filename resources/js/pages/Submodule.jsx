@@ -8,6 +8,7 @@ import { MODULE_ICONS, IconFolder, IconUnderConstruction } from '../components/I
 import EmpleadosCrud from './EmpleadosCrud';
 import ContratosCrud from './ContratosCrud';
 import SeleccionCrud from './SeleccionCrud';
+import CandidatosCrud from './CandidatosCrud';
 import BaseIngresoCrud from './BaseIngresoCrud';
 
 // import SubagentesCrud      from './SubagentesCrud';
@@ -34,6 +35,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
         case 'seleccion':
           switch (archivoId) {
             case 'proceso_seleccion': return SeleccionCrud;
+            case 'candidatos': return CandidatosCrud;
             case 'base_ingreso': return BaseIngresoCrud;
             default: return null;
           }
