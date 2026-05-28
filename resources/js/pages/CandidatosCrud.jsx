@@ -3,7 +3,9 @@ import {
   IconEye,
   IconEdit,
   IconClose,
+  IconGestionar,
 } from '../components/Icons';
+
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -76,6 +78,10 @@ export default function CandidatosCrud() {
     estado: 'Entrevista',
     observaciones: ''
   });
+  const [isProcModalOpen, setIsProcModalOpen] = useState(false);
+  const [procModalCandidate, setProcModalCandidate] = useState(null);
+  const [procActiveTab, setProcActiveTab] = useState('assesment');
+  const [procForm, setProcForm] = useState({});
 
   useEffect(() => {
     if (isCandModalOpen) {
@@ -125,6 +131,66 @@ export default function CandidatosCrud() {
     setIsCandModalOpen(true);
   };
 
+  const handleOpenProcesos = (c) => {
+    setProcModalCandidate(c);
+    setProcActiveTab('assesment');
+    // initialize form with existing candidate.processes or defaults
+    setProcForm({
+      assesment: {
+        ejercicio_comercial: c.processes?.assesment?.ejercicio_comercial || '',
+        nombre_ejercicio: c.processes?.assesment?.nombre_ejercicio || '',
+        claridad_mensaje: c.processes?.assesment?.claridad_mensaje || '',
+        conviccion_energia: c.processes?.assesment?.conviccion_energia || '',
+        adaptabilidad_escucha: c.processes?.assesment?.adaptabilidad_escucha || '',
+        orientacion_accion: c.processes?.assesment?.orientacion_accion || '',
+        manejo_presion: c.processes?.assesment?.manejo_presion || '',
+        prom_calificacion: c.processes?.assesment?.prom_calificacion || ''
+      },
+      entrevista: {
+        trayectoria: c.processes?.entrevista?.trayectoria || '',
+        conexion_cliente: c.processes?.entrevista?.conexion_cliente || '',
+        aprendizaje_madurez: c.processes?.entrevista?.aprendizaje_madurez || '',
+        motivacion: c.processes?.entrevista?.motivacion || '',
+        disposicion_proyecto: c.processes?.entrevista?.disposicion_proyecto || '',
+        prom_calificacion: c.processes?.entrevista?.prom_calificacion || ''
+      },
+      retroalimentacion: c.processes?.retroalimentacion || ''
+    });
+    setIsProcModalOpen(true);
+  };
+
+  // helper: round to 1 decimal by default
+  const round = (v, decimals = 1) => {
+    if (v === '' || v === null || typeof v === 'undefined') return '';
+    const m = Math.pow(10, decimals);
+    return Math.round(Number(v) * m) / m;
+  };
+
+  const computeAverage = (obj, keys) => {
+    if (!obj) return '';
+    const vals = keys.map(k => parseFloat(obj[k])).filter(n => !isNaN(n));
+    if (vals.length === 0) return '';
+    const sum = vals.reduce((a, b) => a + b, 0);
+    return round(sum / vals.length, 1);
+  };
+
+  const handleProcNumberChange = (section, key) => (e) => {
+    const raw = e.target.value;
+    const num = raw === '' ? '' : Number(raw);
+    setProcForm(p => {
+      const next = { ...p, [section]: { ...p[section], [key]: num } };
+      // compute prom for the section
+      const assesmentKeys = ['claridad_mensaje','conviccion_energia','adaptabilidad_escucha','orientacion_accion','manejo_presion'];
+      const entrevistaKeys = ['trayectoria','conexion_cliente','aprendizaje_madurez','motivacion','disposicion_proyecto'];
+      if (section === 'assesment') {
+        next.assesment.prom_calificacion = computeAverage(next.assesment, assesmentKeys);
+      } else if (section === 'entrevista') {
+        next.entrevista.prom_calificacion = computeAverage(next.entrevista, entrevistaKeys);
+      }
+      return next;
+    });
+  };
+
   const handleViewCandidate = (c) => {
     setCandModalMode('view');
     setCandForm({ ...c });
@@ -149,6 +215,18 @@ export default function CandidatosCrud() {
       setCandidates(prev => prev.map(c => (c.id === candForm.id ? { ...c, ...candForm } : c)));
     }
     setIsCandModalOpen(false);
+  };
+
+  const handleSaveProcesos = () => {
+    if (!procModalCandidate) return setIsProcModalOpen(false);
+    setCandidates(prev => prev.map(c => {
+      if (c.id === procModalCandidate.id) {
+        return { ...c, processes: procForm };
+      }
+      return c;
+    }));
+    setIsProcModalOpen(false);
+    setProcModalCandidate(null);
   };
 
   const filteredCandDetail = candidates.filter(c => {
@@ -209,7 +287,10 @@ export default function CandidatosCrud() {
                 <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                   <input type="checkbox" checked={c.selected || false} onChange={() => toggleCandidateField(c.id, 'selected')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                 </td>
-                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>{c.nombres}</td>
+                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>
+                  {c.processes ? <span style={S.processDot} title="Tiene procesos guardados" /> : null}
+                  {c.nombres}
+                </td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.celular}</td>
@@ -229,9 +310,10 @@ export default function CandidatosCrud() {
                 </td>
                 <td style={{ padding: '12px 8px' }}>
                   <div style={S.actions}>
+                    <button style={S.actionBtn('  #FFF8DA', '#000')} title="Procesos" onClick={() => handleOpenProcesos(c)}><IconGestionar size={15} /></button>
                     <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar candidato" onClick={() => handleEditCandidate(c)}><IconEdit size={15} /></button>
                     <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver detalles" onClick={() => handleViewCandidate(c)}><IconEye size={15} /></button>
-                    <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar candidato" onClick={() => handleRemoveCandidate(c.id)}><IconClose size={15} /></button>
+                    
                   </div>
                 </td>
               </tr>
@@ -323,6 +405,241 @@ export default function CandidatosCrud() {
         </div>
       )}
 
+      {/* ─── Modal Procesos ─── */}
+      {isProcModalOpen && (
+        <div style={S.overlay} onClick={() => setIsProcModalOpen(false)}>
+          <div style={{ ...S.modal, maxWidth: 960 }} onClick={e => e.stopPropagation()}>
+
+            <div style={S.modalHeaderGreen}>
+              <span style={S.modalTitleWhite}>
+                Procesos {procModalCandidate ? `- ${procModalCandidate.nombres}` : ''}
+              </span>
+              <button style={S.closeBtnWhite} onClick={() => setIsProcModalOpen(false)}>
+                <IconClose size={12} />
+              </button>
+            </div>
+
+            <div style={S.modalBody}>
+              <div style={S.tabSwitch}>
+                <button type="button" onClick={() => setProcActiveTab('assesment')} style={procActiveTab === 'assesment' ? S.tabBtnActive : S.tabBtn}>ASSESMENT</button>
+                <button type="button" onClick={() => setProcActiveTab('entrevista')} style={procActiveTab === 'entrevista' ? S.tabBtnActive : S.tabBtn}>ENTREVISTA</button>
+                <button type="button" onClick={() => setProcActiveTab('retroalimentacion')} style={procActiveTab === 'retroalimentacion' ? S.tabBtnActive : S.tabBtn}>RETROALIMENTACIÓN</button>
+                <button type="button" onClick={() => setProcActiveTab('referencias')} style={procActiveTab === 'referencias' ? S.tabBtnActive : S.tabBtn}>REF. LABORALES</button>
+                <button type="button" onClick={() => setProcActiveTab('fraudes')} style={procActiveTab === 'fraudes' ? S.tabBtnActive : S.tabBtn}>FRAUDES</button>
+                <button type="button" onClick={() => setProcActiveTab('seguridad')} style={procActiveTab === 'seguridad' ? S.tabBtnActive : S.tabBtn}>SEGURIDAD</button>
+              </div>
+
+              {procActiveTab === 'assesment' && (
+                <div style={{ margin: '16px 0 10px 0' }}>
+                  <div style={S.grid3}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>EJERCICIO COMERCIAL APLICADO</label>
+                      <input value={procForm.assesment?.ejercicio_comercial || ''} onChange={e => setProcForm(p => ({ ...p, assesment: { ...p.assesment, ejercicio_comercial: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>NOMBRE DEL EJERCICIO</label>
+                      <input value={procForm.assesment?.nombre_ejercicio || ''} onChange={e => setProcForm(p => ({ ...p, assesment: { ...p.assesment, nombre_ejercicio: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>CLARIDAD DEL MENSAJE</label>
+                      <select value={procForm.assesment?.claridad_mensaje ?? ''} onChange={handleProcNumberChange('assesment','claridad_mensaje')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>CONVICCIÓN Y ENERGÍA</label>
+                      <select value={procForm.assesment?.conviccion_energia ?? ''} onChange={handleProcNumberChange('assesment','conviccion_energia')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>ADAPTABILIDAD Y ESCUCHA</label>
+                      <select value={procForm.assesment?.adaptabilidad_escucha ?? ''} onChange={handleProcNumberChange('assesment','adaptabilidad_escucha')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>ORIENTACIÓN A LA ACCIÓN</label>
+                      <select value={procForm.assesment?.orientacion_accion ?? ''} onChange={handleProcNumberChange('assesment','orientacion_accion')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>MANEJO DE LA PRESIÓN</label>
+                      <select value={procForm.assesment?.manejo_presion ?? ''} onChange={handleProcNumberChange('assesment','manejo_presion')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>POM CALIFICACION ASSESMENT</label>
+                    <input readOnly value={procForm.assesment?.prom_calificacion ?? ''} style={{ ...S.formInput, width: 200, background: 'var(--bg)' }} />
+                  </div>
+                </div>
+              )}
+
+              {procActiveTab === 'entrevista' && (
+                <div style={{ margin: '16px 0 10px 0' }}>
+                  
+                  <div style={S.grid3}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>TRAYECTORIA</label>
+                      <select value={procForm.entrevista?.trayectoria ?? ''} onChange={handleProcNumberChange('entrevista','trayectoria')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>CONEXIÓN CON EL CLIENTE O EL RESULTADO</label>
+                      <select value={procForm.entrevista?.conexion_cliente ?? ''} onChange={handleProcNumberChange('entrevista','conexion_cliente')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>APRENDIZAJE Y MADUREZ</label>
+                      <select value={procForm.entrevista?.aprendizaje_madurez ?? ''} onChange={handleProcNumberChange('entrevista','aprendizaje_madurez')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>MOTIVACIÓN HACIA EL ROL</label>
+                      <select value={procForm.entrevista?.motivacion ?? ''} onChange={handleProcNumberChange('entrevista','motivacion')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>DISPOSICIÓN Y PROYECTO DE VIDA</label>
+                      <select value={procForm.entrevista?.disposicion_proyecto ?? ''} onChange={handleProcNumberChange('entrevista','disposicion_proyecto')} style={S.formInput}>
+                        <option value="">--</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>PROM. CALIFICACION ENTREVISTA</label>
+                    <input readOnly value={procForm.entrevista?.prom_calificacion ?? ''} style={{ ...S.formInput, width: 200, background: 'var(--bg)' }} />
+                  </div>
+                </div>
+              )}
+
+              {procActiveTab === 'retroalimentacion' && (
+                <div>
+                  <h4 style={{ margin: '16px 0 10px 0', fontSize: '0.9rem', fontWeight: 600 }}>RETROALIMENTACIÓN</h4>
+                  <textarea value={procForm.retroalimentacion || ''} onChange={e => setProcForm(p => ({ ...p, retroalimentacion: e.target.value }))} style={{ ...S.formInput, minHeight: 140, resize: 'vertical' }} />
+                </div>
+              )}
+
+              {procActiveTab === 'referencias' && (
+                <div style={{ margin: '16px 0 10px 0' }}>
+                  
+                  <div style={S.grid3}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>REFERENCIA LABORAL 1</label>
+                      <textarea value={procForm.referencias?.ref_laboral_1 || ''} onChange={e => setProcForm(p => ({ ...p, referencias: { ...p.referencias, ref_laboral_1: e.target.value } }))} style={{ ...S.formInput, minHeight: 80, resize: 'vertical' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>REFERENCIA LABORAL 2</label>
+                      <textarea value={procForm.referencias?.ref_laboral_2 || ''} onChange={e => setProcForm(p => ({ ...p, referencias: { ...p.referencias, ref_laboral_2: e.target.value } }))} style={{ ...S.formInput, minHeight: 80, resize: 'vertical' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {procActiveTab === 'fraudes' && (
+                <div style={{ margin: '16px 0 10px 0' }}>
+                  <div style={S.grid3}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>NÚMERO DE SEGUIMIENTO</label>
+                      <input value={procForm.fraudes?.numero_seguimiento || ''} onChange={e => setProcForm(p => ({ ...p, fraudes: { ...p.fraudes, numero_seguimiento: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>RESPUESTA</label>
+                      <input value={procForm.fraudes?.respuesta || ''} onChange={e => setProcForm(p => ({ ...p, fraudes: { ...p.fraudes, respuesta: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>CIUDAD</label>
+                      <input value={procForm.fraudes?.ciudad || ''} onChange={e => setProcForm(p => ({ ...p, fraudes: { ...p.fraudes, ciudad: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>FECHA CONSULTA</label>
+                      <input type="date" value={procForm.fraudes?.fecha_consulta || ''} onChange={e => setProcForm(p => ({ ...p, fraudes: { ...p.fraudes, fecha_consulta: e.target.value } }))} style={S.formInput} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>FUENTE DE RECLUTAMIENTO</label>
+                      <input value={procForm.fraudes?.fuente_reclutamiento || ''} onChange={e => setProcForm(p => ({ ...p, fraudes: { ...p.fraudes, fuente_reclutamiento: e.target.value } }))} style={S.formInput} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {procActiveTab === 'seguridad' && (
+                <div style={{ margin: '16px 0 10px 0' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', marginBottom: 6, fontWeight: 500 }}>ESTUDIO DE SEGURIDAD</label>
+                    <textarea value={procForm.seguridad?.estudio || ''} onChange={e => setProcForm(p => ({ ...p, seguridad: { ...p.seguridad, estudio: e.target.value } }))} style={{ ...S.formInput, minHeight: 140, resize: 'vertical' }} />
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            <div style={S.modalFooter}>
+              <button style={S.btnSecondary} onClick={() => setIsProcModalOpen(false)}>Cancelar</button>
+              <button style={S.btnPrimaryGreen} onClick={handleSaveProcesos}>Guardar procesos</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -379,4 +696,9 @@ const S = {
   modalBody: { padding: '22px 28px 28px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
   modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 28px', borderTop: '1.5px solid var(--border)', flexShrink: 0 },
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 },
+  tabSwitch: { display: 'inline-flex', background: 'transparent', borderBottom: '1.5px solid var(--border)', gap: 8, paddingBottom: 8, alignItems: 'center' },
+  tabBtn: { padding: '8px 14px', borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' },
+  tabBtnActive: { padding: '8px 14px', borderRadius: 8, background: 'transparent', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 800, borderBottom: '3px solid var(--primary)', fontSize: '0.78rem' },
+  processDot: { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#34d399', marginRight: 8, verticalAlign: 'middle' },
+  formInput: { width: '100%', padding: '8px 10px', borderRadius: 6, border: '1.5px solid var(--border)', boxSizing: 'border-box', fontSize: '0.88rem', height: 40, background: 'var(--white)' },
 };
