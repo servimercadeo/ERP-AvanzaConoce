@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api/axios';
 import {
   IconEye,
   IconEdit,
@@ -9,57 +10,26 @@ import {
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
-const CANDIDATES_MOCK = [
-  {
-    id: 1,
-    requisicion_id: '1',
-    nombres: 'Simon Gallego',
-    identificacion: '1089383135',
-    correo: 'simon.23051997@gmail.com',
-    celular: '3217085550',
-    ciudad: 'Pereira',
-    tipo_documento: 'Cédula de Ciudadanía',
-    fecha_expedicion: '2015-06-12',
-    edad: '29',
-    fecha_postulacion: getTodayStr(),
-    fuente: 'Fase Inicial',
-    fuente_especifica: 'Pendiente de Aval',
-    estado: 'Contratación',
-    pruebas: true,
-    aval: true,
-    observaciones: 'Excelente perfil técnico. Cumple con todos los requisitos del cargo.'
-  },
-  {
-    id: 2,
-    requisicion_id: '1',
-    nombres: 'Juan Camilo',
-    identificacion: '1089381135',
-    correo: 'marin.jc2005@gmail.com',
-    celular: '3217085555',
-    ciudad: 'Pereira',
-    tipo_documento: 'Cédula de Ciudadanía',
-    fecha_expedicion: '2023-01-20',
-    edad: '21',
-    fecha_postulacion: getTodayStr(),
-    fuente: 'Fase Inicial',
-    fuente_especifica: 'Pendiente de Aval',
-    estado: 'Contratación',
-    pruebas: true,
-    aval: true,
-    observaciones: 'Candidato con gran motivación. Aprobó pruebas con puntaje sobresaliente.'
-  },
-];
+const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+const interviewDateFrom = (dateStr) => {
+  if (!dateStr) return { dia_entrevista: '', mes_entrevista: '', anio_entrevista: '' };
+  const d = new Date(dateStr + 'T00:00:00');
+  return { dia_entrevista: d.getDate(), mes_entrevista: MESES[d.getMonth()], anio_entrevista: d.getFullYear() };
+};
 
 const MOCK_OPTS = {
   tipos_documento: ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'],
   fuentes_reclutamiento: ['Fase Inicial', 'Vinculacion temporal', 'Vinculacion directa'],
   fuentes_especificas: ['Pendiente de Aval', 'Contratar por S&M'],
   estados_proceso: ['Entrevista', 'Contratación', 'Descartado', 'En espera'],
+  meses: ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'],
 };
 
 export default function CandidatosCrud() {
-  const [candidates, setCandidates] = useState(CANDIDATES_MOCK);
-  const [requisitions] = useState(() => { try { return JSON.parse(localStorage.getItem('seleccionData')) || []; } catch { return []; } });
+  const [candidates, setCandidates] = useState([]);
+  const [requisitions, setRequisitions] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
   const [candDetailSearch, setCandDetailSearch] = useState('');
   const [isCandModalOpen, setIsCandModalOpen] = useState(false);
   const [candModalMode, setCandModalMode] = useState('create');
@@ -76,12 +46,25 @@ export default function CandidatosCrud() {
     fuente: 'Fase Inicial',
     fuente_especifica: 'Pendiente de Aval',
     estado: 'Entrevista',
+    ...interviewDateFrom(getTodayStr()),
     observaciones: ''
   });
   const [isProcModalOpen, setIsProcModalOpen] = useState(false);
   const [procModalCandidate, setProcModalCandidate] = useState(null);
   const [procActiveTab, setProcActiveTab] = useState('assesment');
   const [procForm, setProcForm] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/candidatos'),
+      api.get('/requisiciones'),
+    ])
+      .then(([c, r]) => { setCandidates(c.data); setRequisitions(r.data); })
+      .catch(console.error)
+      .finally(() => setLoadingData(false));
+  }, []);
+
+  const reload = () => api.get('/candidatos').then(r => setCandidates(r.data)).catch(console.error);
 
   useEffect(() => {
     if (isCandModalOpen) {
@@ -107,7 +90,9 @@ export default function CandidatosCrud() {
           const newAval = field === 'aval' ? val : c.aval;
           nextEstado = (newPruebas && newAval) ? 'Contratación' : 'Entrevista';
         }
-        return { ...c, [field]: val, estado: nextEstado };
+        const updated = { ...c, [field]: val, estado: nextEstado };
+        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado }).catch(console.error);
+        return updated;
       }
       return c;
     }));
@@ -120,14 +105,14 @@ export default function CandidatosCrud() {
       tipo_documento: 'Cédula de Ciudadanía', identificacion: '',
       fecha_expedicion: '', edad: '', fecha_postulacion: getTodayStr(),
       fuente: 'Fase Inicial', fuente_especifica: 'Pendiente de Aval',
-      estado: 'Entrevista', observaciones: '', requisicion_id: ''
+      estado: 'Entrevista', ...interviewDateFrom(getTodayStr()), observaciones: '', requisicion_id: ''
     });
     setIsCandModalOpen(true);
   };
 
   const handleEditCandidate = (c) => {
     setCandModalMode('edit');
-    setCandForm({ ...c });
+    setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
     setIsCandModalOpen(true);
   };
 
@@ -135,26 +120,30 @@ export default function CandidatosCrud() {
     setProcModalCandidate(c);
     setProcActiveTab('assesment');
     // initialize form with existing candidate.processes or defaults
+    const p = c.procesos ?? {};
     setProcForm({
       assesment: {
-        ejercicio_comercial: c.processes?.assesment?.ejercicio_comercial || '',
-        nombre_ejercicio: c.processes?.assesment?.nombre_ejercicio || '',
-        claridad_mensaje: c.processes?.assesment?.claridad_mensaje || '',
-        conviccion_energia: c.processes?.assesment?.conviccion_energia || '',
-        adaptabilidad_escucha: c.processes?.assesment?.adaptabilidad_escucha || '',
-        orientacion_accion: c.processes?.assesment?.orientacion_accion || '',
-        manejo_presion: c.processes?.assesment?.manejo_presion || '',
-        prom_calificacion: c.processes?.assesment?.prom_calificacion || ''
+        ejercicio_comercial: p.assesment?.ejercicio_comercial || '',
+        nombre_ejercicio: p.assesment?.nombre_ejercicio || '',
+        claridad_mensaje: p.assesment?.claridad_mensaje || '',
+        conviccion_energia: p.assesment?.conviccion_energia || '',
+        adaptabilidad_escucha: p.assesment?.adaptabilidad_escucha || '',
+        orientacion_accion: p.assesment?.orientacion_accion || '',
+        manejo_presion: p.assesment?.manejo_presion || '',
+        prom_calificacion: p.assesment?.prom_calificacion || ''
       },
       entrevista: {
-        trayectoria: c.processes?.entrevista?.trayectoria || '',
-        conexion_cliente: c.processes?.entrevista?.conexion_cliente || '',
-        aprendizaje_madurez: c.processes?.entrevista?.aprendizaje_madurez || '',
-        motivacion: c.processes?.entrevista?.motivacion || '',
-        disposicion_proyecto: c.processes?.entrevista?.disposicion_proyecto || '',
-        prom_calificacion: c.processes?.entrevista?.prom_calificacion || ''
+        trayectoria: p.entrevista?.trayectoria || '',
+        conexion_cliente: p.entrevista?.conexion_cliente || '',
+        aprendizaje_madurez: p.entrevista?.aprendizaje_madurez || '',
+        motivacion: p.entrevista?.motivacion || '',
+        disposicion_proyecto: p.entrevista?.disposicion_proyecto || '',
+        prom_calificacion: p.entrevista?.prom_calificacion || ''
       },
-      retroalimentacion: c.processes?.retroalimentacion || ''
+      retroalimentacion: p.retroalimentacion || '',
+      referencias: { ref_laboral_1: p.referencias?.ref_laboral_1 || '', ref_laboral_2: p.referencias?.ref_laboral_2 || '' },
+      fraudes: { numero_seguimiento: p.fraudes?.numero_seguimiento || '', respuesta: p.fraudes?.respuesta || '', ciudad: p.fraudes?.ciudad || '', fecha_consulta: p.fraudes?.fecha_consulta || '', fuente_reclutamiento: p.fraudes?.fuente_reclutamiento || '' },
+      seguridad: { estudio: p.seguridad?.estudio || '' },
     });
     setIsProcModalOpen(true);
   };
@@ -193,40 +182,49 @@ export default function CandidatosCrud() {
 
   const handleViewCandidate = (c) => {
     setCandModalMode('view');
-    setCandForm({ ...c });
+    setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
     setIsCandModalOpen(true);
   };
 
-  const handleRemoveCandidate = (candidateId) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este candidato?')) {
+  const handleRemoveCandidate = async (candidateId) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este candidato?')) return;
+    try {
+      await api.delete(`/candidatos/${candidateId}`);
       setCandidates(prev => prev.filter(c => c.id !== candidateId));
+    } catch (e) {
+      alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
     }
   };
 
-  const handleSaveCandidate = () => {
+  const handleSaveCandidate = async () => {
     if (!candForm.nombres || !candForm.correo || !candForm.celular || !candForm.identificacion || !candForm.fuente || !candForm.fuente_especifica) {
       alert('Por favor, rellene todos los campos obligatorios (*).');
       return;
     }
-    if (candModalMode === 'create') {
-      const newId = candidates.length > 0 ? Math.max(...candidates.map(c => c.id)) + 1 : 1;
-      setCandidates([...candidates, { ...candForm, id: newId, pruebas: false, aval: false, selected: false }]);
-    } else if (candModalMode === 'edit') {
-      setCandidates(prev => prev.map(c => (c.id === candForm.id ? { ...c, ...candForm } : c)));
+    try {
+      if (candModalMode === 'create') {
+        const { data: created } = await api.post('/candidatos', { ...candForm, pruebas: false, aval: false });
+        setCandidates(prev => [created, ...prev]);
+      } else {
+        const { data: updated } = await api.put(`/candidatos/${candForm.id}`, candForm);
+        setCandidates(prev => prev.map(c => c.id === candForm.id ? updated : c));
+      }
+      setIsCandModalOpen(false);
+    } catch (e) {
+      alert('Error al guardar: ' + (e.response?.data?.message || e.message));
     }
-    setIsCandModalOpen(false);
   };
 
-  const handleSaveProcesos = () => {
+  const handleSaveProcesos = async () => {
     if (!procModalCandidate) return setIsProcModalOpen(false);
-    setCandidates(prev => prev.map(c => {
-      if (c.id === procModalCandidate.id) {
-        return { ...c, processes: procForm };
-      }
-      return c;
-    }));
-    setIsProcModalOpen(false);
-    setProcModalCandidate(null);
+    try {
+      const { data: updated } = await api.put(`/candidatos/${procModalCandidate.id}`, { procesos: procForm });
+      setCandidates(prev => prev.map(c => c.id === procModalCandidate.id ? updated : c));
+      setIsProcModalOpen(false);
+      setProcModalCandidate(null);
+    } catch (e) {
+      alert('Error al guardar procesos: ' + (e.response?.data?.message || e.message));
+    }
   };
 
   const filteredCandDetail = candidates.filter(c => {
@@ -260,14 +258,22 @@ export default function CandidatosCrud() {
             style={S.searchInput}
           />
         </div>
-        <button style={S.btnPrimary} onClick={handleAddCandidate}>+ Agregar candidato</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={S.btnSecondary} onClick={reload}>Actualizar</button>
+          <button style={S.btnPrimary} onClick={handleAddCandidate}>+ Agregar candidato</button>
+        </div>
       </div>
 
-      <div style={{ overflowX: 'auto', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
+      {loadingData && (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif', fontSize: '0.9rem' }}>
+          Cargando candidatos…
+        </div>
+      )}
+
+      {!loadingData && <div style={{ overflowX: 'auto', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
           <thead>
             <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
-              <th style={S.candTh('center')}>Selección<br/>entrevista</th>
               <th style={S.candTh('left')}>Nombres</th>
               <th style={S.candTh('left')}>Identificación</th>
               <th style={S.candTh('left')}>Correo electrónico</th>
@@ -284,11 +290,8 @@ export default function CandidatosCrud() {
           <tbody>
             {filteredCandDetail.map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
-                <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                  <input type="checkbox" checked={c.selected || false} onChange={() => toggleCandidateField(c.id, 'selected')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                </td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>
-                  {c.processes ? <span style={S.processDot} title="Tiene procesos guardados" /> : null}
+                  {c.procesos ? <span style={S.processDot} title="Tiene procesos guardados" /> : null}
                   {c.nombres}
                 </td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
@@ -296,7 +299,7 @@ export default function CandidatosCrud() {
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.celular}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.ciudad}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.fuente}</td>
-                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{requisitions.find(r => String(r.id) === String(c.requisicion_id))?.nro_identificacion_proceso || '–'}</td>
+                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.requisicion?.nro_identificacion_proceso || '–'}</td>
                 <td style={{ padding: '12px 8px' }}>
                   <span style={S.badge(c.estado === 'Contratación' ? '#d1fae5' : '#e8f0ff', c.estado === 'Contratación' ? '#065f46' : '#1a4fa8')}>
                     {c.estado}
@@ -323,7 +326,7 @@ export default function CandidatosCrud() {
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {/* ─── Modal Candidato ─── */}
       {isCandModalOpen && (
@@ -363,6 +366,9 @@ export default function CandidatosCrud() {
                 <Field label="Fuente de reclutamiento" k="fuente" opts={MOCK_OPTS.fuentes_reclutamiento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Fuente específica" k="fuente_especifica" opts={MOCK_OPTS.fuentes_especificas} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Estado del proceso" k="estado" opts={MOCK_OPTS.estados_proceso} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Día entrevista" k="dia_entrevista" type="number" form={candForm} onChange={(k) => (e) => {}} disabled={true} />
+                <Field label="Mes entrevista" k="mes_entrevista" form={candForm} onChange={(k) => (e) => {}} disabled={true} />
+                <Field label="Año entrevista" k="anio_entrevista" type="number" form={candForm} onChange={(k) => (e) => {}} disabled={true} />
               </div>
 
               <h4 style={{ margin: '24px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>

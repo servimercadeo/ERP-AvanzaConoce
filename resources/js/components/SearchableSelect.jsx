@@ -30,42 +30,68 @@ const presetBtnStyle = {
     whiteSpace: "nowrap",
 };
 
-export function SearchableSelect({ value, onChange, options, defaultValue, placeholder = "Elige" }) {
-    const [query, setQuery] = useState("");
+export function SearchableSelect({ value, onChange, options, defaultValue, placeholder = "Elige", disabled = false }) {
+    const selectedLabel =
+        value === defaultValue || value === "" || value == null
+            ? ""
+            : options.find((o) => String(o.value) === String(value))?.label ?? String(value);
+
+    const [query, setQuery] = useState(selectedLabel);
     const [open, setOpen] = useState(false);
     const [hovered, setHovered] = useState(-1);
     const ref = useRef(null);
+
+    // Sync query with selected label when closed or when value changes externally
+    useEffect(() => {
+        if (!open) setQuery(selectedLabel);
+    }, [selectedLabel, open]);
 
     useEffect(() => {
         function onOutside(e) {
             if (ref.current && !ref.current.contains(e.target)) {
                 setOpen(false);
-                setQuery("");
+                // revert to selected label if user didn't pick anything new
+                setQuery(selectedLabel);
             }
         }
         document.addEventListener("mousedown", onOutside);
         return () => document.removeEventListener("mousedown", onOutside);
-    }, []);
+    }, [selectedLabel]);
 
-    const filtered = options.filter((o) =>
-        o.label.toLowerCase().includes(query.toLowerCase())
-    );
+    const q = query.toLowerCase();
+    const filtered = q.length === 0
+        ? options                                                        // sin texto: muestra todo
+        : options.filter((o) => o.label.toLowerCase().startsWith(q));   // con texto: filtra por inicio
 
-    const selectedLabel =
-        value === defaultValue
-            ? ""
-            : options.find((o) => String(o.value) === String(value))?.label ?? value;
+    const handleSelect = (optValue, optLabel) => {
+        onChange(optValue);
+        setQuery(optLabel);
+        setOpen(false);
+        setHovered(-1);
+    };
+
+    const handleClear = () => {
+        onChange(defaultValue);
+        setQuery("");
+        setOpen(false);
+    };
 
     return (
         <div ref={ref} style={{ position: "relative" }}>
             <input
-                style={inputStyle}
+                style={{
+                    ...inputStyle,
+                    background: disabled ? "var(--bg)" : "var(--white)",
+                    color: disabled ? "var(--text-muted)" : "var(--text)",
+                    cursor: disabled ? "default" : "text",
+                }}
                 placeholder={placeholder}
-                value={open ? query : selectedLabel}
-                onFocus={() => { setOpen(true); setQuery(""); setHovered(-1); }}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); setHovered(-1); }}
+                value={query}
+                disabled={disabled}
+                onFocus={() => { if (!disabled) { setOpen(true); setHovered(-1); } }}
+                onChange={(e) => { if (!disabled) { setQuery(e.target.value); setOpen(true); setHovered(-1); } }}
             />
-            {open && (
+            {open && !disabled && (
                 <div style={{
                     position: "absolute",
                     top: "calc(100% + 2px)",
@@ -76,20 +102,21 @@ export function SearchableSelect({ value, onChange, options, defaultValue, place
                     borderRadius: "var(--radius-sm)",
                     boxShadow: "0 4px 14px rgba(0,0,0,0.13)",
                     zIndex: 1000,
-                    maxHeight: 200,
+                    maxHeight: 220,
                     overflowY: "auto",
                 }}>
+                    {/* Opción limpiar */}
                     <div
-                        style={{ padding: "7px 10px", cursor: "pointer", fontSize: "0.88rem", color: "var(--text-muted)", background: hovered === -2 ? "var(--bg,#f5f5f5)" : "transparent" }}
+                        style={{ padding: "7px 10px", cursor: "pointer", fontSize: "0.85rem", color: "var(--text-muted)", background: hovered === -2 ? "var(--bg,#f5f5f5)" : "transparent", borderBottom: "1px solid var(--border)" }}
                         onMouseEnter={() => setHovered(-2)}
                         onMouseLeave={() => setHovered(-1)}
-                        onClick={() => { onChange(defaultValue); setOpen(false); setQuery(""); }}
+                        onClick={handleClear}
                     >
                         {placeholder}
                     </div>
                     {filtered.length === 0 ? (
-                        <div style={{ padding: "7px 10px", fontSize: "0.88rem", color: "var(--text-muted)" }}>
-                            Sin resultados
+                        <div style={{ padding: "7px 10px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                            Sin resultados para "{query}"
                         </div>
                     ) : (
                         filtered.map((o, i) => (
@@ -101,10 +128,11 @@ export function SearchableSelect({ value, onChange, options, defaultValue, place
                                     fontSize: "0.88rem",
                                     background: hovered === i ? "var(--bg,#f5f5f5)" : "transparent",
                                     fontWeight: String(value) === String(o.value) ? 700 : 400,
+                                    color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
                                 }}
                                 onMouseEnter={() => setHovered(i)}
                                 onMouseLeave={() => setHovered(-1)}
-                                onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                                onClick={() => handleSelect(o.value, o.label)}
                             >
                                 {o.label}
                             </div>

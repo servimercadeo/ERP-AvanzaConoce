@@ -22,5 +22,15 @@ class DatabaseSeeder extends Seeder
 
         // 5. Contratos vinculados a esos empleados
         $this->call(ContratosSeeder::class);
+
+        // 6. Proyectos ya están en su propia migración con seed inline
+        // 7. Requisiciones de selección
+        $this->call(RequisicionesSeeder::class);
+
+        // 8. Candidatos vinculados a requisiciones
+        $this->call(CandidatosSeeder::class);
+
+        // 9. Base de ingresos por cargo y proyecto
+        $this->call(BaseIngresosSeeder::class);
     }
 }
