@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AppSettingController;
+use App\Http\Controllers\Api\BaseIngresoController;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\EmpleadoController;
@@ -152,6 +153,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
+    // CRUD completo de base de ingresos
+    Route::apiResource('base-ingresos', BaseIngresoController::class)
+        ->parameters(['base-ingresos' => 'baseIngreso']);
+
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
         ->parameters(['requisiciones' => 'requisicion']);
@@ -166,9 +171,12 @@ Route::middleware('auth:sanctum')->group(function () {
                                ->get(['id', 'nombre'])
                                ->map(fn($p) => ['value' => $p->id, 'label' => $p->nombre])
                                ->values(),
-            'responsables' => DB::table('users')->whereNotNull('name')->where('name', '!=', '')
-                               ->orderBy('name')->pluck('name'),
+            'responsables' => DB::table('users')
+                               ->whereNotNull('name')->where('name', '!=', '')
+                               ->orderBy('name')
+                               ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+            'empleadores'  => DB::table('empleadores')->orderBy('nombre')->pluck('nombre'),
         ]);
     });
 });

@@ -50,7 +50,8 @@ const _pgb = { minWidth: 32, height: 32, padding: '0 8px', border: BD, borderRad
 /* ── Component ──────────────────────────────────────────────────────── */
 export default function SeleccionCrud() {
   const [data, setData] = useState([]);
-  const [catalogs, setCatalogs] = useState({ cargos: [], proyectos: [], responsables: [], ciudades: [] });
+  const [catalogs, setCatalogs] = useState({ cargos: [], proyectos: [], responsables: [], ciudades: [], empleadores: [] });
+  const [empresas, setEmpresas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -69,8 +70,9 @@ export default function SeleccionCrud() {
     Promise.all([
       api.get('/requisiciones'),
       api.get('/seleccion/catalogos'),
+      api.get('/empresas'),
     ])
-      .then(([r, c]) => { setData(r.data); setCatalogs(c.data); })
+      .then(([r, c, e]) => { setData(r.data); setCatalogs(c.data); setEmpresas(e.data); })
       .catch(console.error)
       .finally(() => setLoadingData(false));
   }, []);
@@ -92,8 +94,21 @@ export default function SeleccionCrud() {
   };
 
   /* ── Derived data ──────────────────────────────────────────────── */
-  const ciudadesOpts  = (catalogs.ciudades || []).map(c => ({ value: c, label: c }));
-  const proyectosOpts = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
+  const ciudadesOpts     = (catalogs.ciudades || []).map(c => ({ value: c, label: c }));
+  const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
+  const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
+  const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
+  const empleadoresOpts  = (catalogs.empleadores || []).map(e => ({ value: e, label: e }));
+
+  const handleSolicitanteChange = (name) => {
+    const user = (catalogs.responsables || []).find(u => u.name === name);
+    setForm(p => ({
+      ...p,
+      nombre_responsable:    name,
+      numero_identificacion: user?.cedula ?? p.numero_identificacion ?? '',
+      cargo_solicitante:     user?.cargo  ?? p.cargo_solicitante ?? '',
+    }));
+  };
 
   /* ── Modal requisicion ─────────────────────────────────────────── */
   const openModal = (m, row = null) => {
@@ -112,6 +127,8 @@ export default function SeleccionCrud() {
         cargo_requerido:             row.cargo || '',
         tipo_solicitud:              row.tipo_solicitud || '',
         proyecto_id:                 row.proyecto_id != null ? String(row.proyecto_id) : '',
+        empresa_id:                  row.empresa_id  != null ? String(row.empresa_id)  : '',
+        empleador:                   row.empleador || '',
         fecha_ingreso:               row.fecha_ingreso || '',
         pais:                        row.pais || 'Colombia',
         fecha_cierre:                row.fecha_cierre || '',
@@ -136,6 +153,8 @@ export default function SeleccionCrud() {
         fecha_cierre:           form.fecha_cierre || null,
         requeridas:             parseInt(form.numero_personas) || 1,
         proyecto_id:            form.proyecto_id || null,
+        empresa_id:             form.empresa_id  || null,
+        empleador:              form.empleador   || null,
         tipo_solicitud:         form.tipo_solicitud,
         responsable:            form.nombre_responsable,
         proceso:                form.proceso,
@@ -287,9 +306,19 @@ export default function SeleccionCrud() {
             </div>
             <div style={S.mBody}>
               <div style={S.g3}>
-                <F l="Nombre responsable"         k="nombre_responsable"          req={!isRO(mode)} opts={catalogs.responsables} form={form} ch={ch} dis={isRO(mode)} />
-                <F l="N° identificación"           k="numero_identificacion"        req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode) || mode === 'edit'} />
-                <F l="Cargo del solicitante"       k="cargo_solicitante"            req={!isRO(mode)} opts={catalogs.cargos} form={form} ch={ch} dis={isRO(mode) || mode === 'edit'} />
+                {/* Responsable — selección con auto-relleno */}
+                <SField l="Nombre responsable" req={!isRO(mode)}>
+                  <SearchableSelect
+                    key={`resp-${form.nombre_responsable ?? ''}`}
+                    value={form.nombre_responsable ?? ''}
+                    onChange={handleSolicitanteChange}
+                    options={responsablesOpts}
+                    placeholder="-- Selecciona responsable --"
+                    disabled={isRO(mode)}
+                  />
+                </SField>
+                <F l="N° identificación"     k="numero_identificacion" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Cargo del solicitante" k="cargo_solicitante"     req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Fecha de solicitud"          k="fecha_solicitud"              req={!isRO(mode)} dis form={form} ch={ch} />
                 <F l="Proceso"                     k="proceso"                      req={!isRO(mode)} opts={OPT.procesos} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />
@@ -308,8 +337,34 @@ export default function SeleccionCrud() {
                   />
                 </SField>
 
+                {/* Empresa – SearchableSelect */}
+                <SField l="Empresa" req={!isRO(mode)}>
+                  <SearchableSelect
+                    key={`emp-${form.empresa_id ?? ''}`}
+                    value={form.empresa_id ?? ''}
+                    onChange={chVal('empresa_id')}
+                    options={empresasOpts}
+                    defaultValue=""
+                    placeholder="-- Selecciona empresa --"
+                    disabled={isRO(mode)}
+                  />
+                </SField>
+
+                {/* Empleador – SearchableSelect */}
+                <SField l="Empleador">
+                  <SearchableSelect
+                    key={`empl-${form.empleador ?? ''}`}
+                    value={form.empleador ?? ''}
+                    onChange={chVal('empleador')}
+                    options={empleadoresOpts}
+                    defaultValue=""
+                    placeholder="-- Selecciona empleador --"
+                    disabled={isRO(mode)}
+                  />
+                </SField>
+
                 <F l="Fecha estimada de ingreso" k="fecha_ingreso" req={!isRO(mode)} type="date" form={form} ch={ch} dis={isRO(mode)} />
-                <F l="País"                      k="pais"          req={!isRO(mode)} opts={OPT.paises} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="País"                      k="pais"          form={form} ch={ch} dis={true} />
                 <F l="Fecha estimada de cierre"  k="fecha_cierre"  req={!isRO(mode)} type="date" form={form} ch={ch} dis={isRO(mode)} />
 
                 {/* Ciudad – SearchableSelect */}

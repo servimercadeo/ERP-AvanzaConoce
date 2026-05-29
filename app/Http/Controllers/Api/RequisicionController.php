@@ -10,7 +10,7 @@ class RequisicionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Requisicion::with('proyecto');
+        $query = Requisicion::with(['proyecto', 'empresa']);
 
         if ($request->search) {
             $s = $request->search;
@@ -41,11 +41,13 @@ class RequisicionController extends Controller
             'fecha_cierre'            => 'nullable|date',
             'requeridas'              => 'nullable|integer|min:1',
             'proyecto_id'             => 'nullable|exists:proyectos,id',
+            'empresa_id'              => 'nullable|exists:empresas,id',
             'tipo_solicitud'          => 'nullable|string|max:60',
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
             'ciudad'                  => 'nullable|string|max:120',
             'pais'                    => 'nullable|string|max:80',
+            'empleador'               => 'nullable|string|max:150',
             'solicitud_confidencial'  => 'nullable|boolean',
             'observaciones'           => 'nullable|string',
         ]);
@@ -58,7 +60,7 @@ class RequisicionController extends Controller
         $data['nro_identificacion_proceso'] = 'REQ' . ($max + 1);
 
         $req = Requisicion::create($data);
-        return response()->json($req->load('proyecto'), 201);
+        return response()->json($req->load(['proyecto', 'empresa']), 201);
     }
 
     public function show(Requisicion $requisicion)
@@ -79,6 +81,8 @@ class RequisicionController extends Controller
             'requeridas'              => 'nullable|integer|min:1',
             'contratadas'             => 'nullable|integer|min:0',
             'proyecto_id'             => 'nullable|exists:proyectos,id',
+            'empresa_id'              => 'nullable|exists:empresas,id',
+            'empleador'               => 'nullable|string|max:150',
             'tipo_solicitud'          => 'nullable|string|max:60',
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
@@ -89,7 +93,7 @@ class RequisicionController extends Controller
         ]);
 
         $requisicion->update($data);
-        return response()->json($requisicion->load('proyecto'));
+        return response()->json($requisicion->load(['proyecto', 'empresa']));
     }
 
     public function destroy(Requisicion $requisicion)

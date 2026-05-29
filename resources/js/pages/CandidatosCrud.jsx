@@ -51,6 +51,12 @@ export default function CandidatosCrud() {
   });
   const [isProcModalOpen, setIsProcModalOpen] = useState(false);
   const [procModalCandidate, setProcModalCandidate] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   const [procActiveTab, setProcActiveTab] = useState('assesment');
   const [procForm, setProcForm] = useState({});
 
@@ -85,13 +91,17 @@ export default function CandidatosCrud() {
       if (c.id === candidateId) {
         const val = !c[field];
         let nextEstado = c.estado;
+        const extra = {};
         if (field === 'pruebas' || field === 'aval') {
           const newPruebas = field === 'pruebas' ? val : c.pruebas;
           const newAval = field === 'aval' ? val : c.aval;
           nextEstado = (newPruebas && newAval) ? 'Contratación' : 'Entrevista';
+          if (field === 'aval') {
+            extra.fecha_aval = val ? new Date().toISOString().slice(0, 10) : null;
+          }
         }
-        const updated = { ...c, [field]: val, estado: nextEstado };
-        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado }).catch(console.error);
+        const updated = { ...c, [field]: val, estado: nextEstado, ...extra };
+        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado, ...extra }).catch(console.error);
         return updated;
       }
       return c;
@@ -120,30 +130,38 @@ export default function CandidatosCrud() {
     setProcModalCandidate(c);
     setProcActiveTab('assesment');
     // initialize form with existing candidate.processes or defaults
-    const p = c.procesos ?? {};
     setProcForm({
       assesment: {
-        ejercicio_comercial: p.assesment?.ejercicio_comercial || '',
-        nombre_ejercicio: p.assesment?.nombre_ejercicio || '',
-        claridad_mensaje: p.assesment?.claridad_mensaje || '',
-        conviccion_energia: p.assesment?.conviccion_energia || '',
-        adaptabilidad_escucha: p.assesment?.adaptabilidad_escucha || '',
-        orientacion_accion: p.assesment?.orientacion_accion || '',
-        manejo_presion: p.assesment?.manejo_presion || '',
-        prom_calificacion: p.assesment?.prom_calificacion || ''
+        ejercicio_comercial:   c.asmt_ejercicio            ?? '',
+        nombre_ejercicio:      c.asmt_nombre_ejercicio     ?? '',
+        claridad_mensaje:      c.asmt_claridad_mensaje     ?? '',
+        conviccion_energia:    c.asmt_conviccion_energia   ?? '',
+        adaptabilidad_escucha: c.asmt_adaptabilidad_escucha ?? '',
+        orientacion_accion:    c.asmt_orientacion_accion   ?? '',
+        manejo_presion:        c.asmt_manejo_presion       ?? '',
+        prom_calificacion:     c.asmt_prom                 ?? '',
       },
       entrevista: {
-        trayectoria: p.entrevista?.trayectoria || '',
-        conexion_cliente: p.entrevista?.conexion_cliente || '',
-        aprendizaje_madurez: p.entrevista?.aprendizaje_madurez || '',
-        motivacion: p.entrevista?.motivacion || '',
-        disposicion_proyecto: p.entrevista?.disposicion_proyecto || '',
-        prom_calificacion: p.entrevista?.prom_calificacion || ''
+        trayectoria:          c.entv_trayectoria          ?? '',
+        conexion_cliente:     c.entv_conexion_cliente     ?? '',
+        aprendizaje_madurez:  c.entv_aprendizaje_madurez  ?? '',
+        motivacion:           c.entv_motivacion           ?? '',
+        disposicion_proyecto: c.entv_disposicion_proyecto ?? '',
+        prom_calificacion:    c.entv_prom                 ?? '',
       },
-      retroalimentacion: p.retroalimentacion || '',
-      referencias: { ref_laboral_1: p.referencias?.ref_laboral_1 || '', ref_laboral_2: p.referencias?.ref_laboral_2 || '' },
-      fraudes: { numero_seguimiento: p.fraudes?.numero_seguimiento || '', respuesta: p.fraudes?.respuesta || '', ciudad: p.fraudes?.ciudad || '', fecha_consulta: p.fraudes?.fecha_consulta || '', fuente_reclutamiento: p.fraudes?.fuente_reclutamiento || '' },
-      seguridad: { estudio: p.seguridad?.estudio || '' },
+      retroalimentacion: c.retroalimentacion ?? '',
+      referencias: {
+        ref_laboral_1: c.ref_laboral_1 ?? '',
+        ref_laboral_2: c.ref_laboral_2 ?? '',
+      },
+      fraudes: {
+        numero_seguimiento: c.fraude_nro_seguimiento ?? '',
+        respuesta:          c.fraude_respuesta        ?? '',
+        ciudad:             c.fraude_ciudad           ?? '',
+        fecha_consulta:     c.fraude_fecha_consulta   ?? '',
+        fuente_reclutamiento: c.fraude_fuente         ?? '',
+      },
+      seguridad: { estudio: c.seguridad_estudio ?? '' },
     });
     setIsProcModalOpen(true);
   };
@@ -210,6 +228,7 @@ export default function CandidatosCrud() {
         setCandidates(prev => prev.map(c => c.id === candForm.id ? updated : c));
       }
       setIsCandModalOpen(false);
+      showToast(candModalMode === 'create' ? 'Candidato agregado exitosamente' : 'Candidato actualizado exitosamente');
     } catch (e) {
       alert('Error al guardar: ' + (e.response?.data?.message || e.message));
     }
@@ -217,11 +236,38 @@ export default function CandidatosCrud() {
 
   const handleSaveProcesos = async () => {
     if (!procModalCandidate) return setIsProcModalOpen(false);
+    const f = procForm;
+    const payload = {
+      asmt_ejercicio:            f.assesment?.ejercicio_comercial   || null,
+      asmt_nombre_ejercicio:     f.assesment?.nombre_ejercicio      || null,
+      asmt_claridad_mensaje:     f.assesment?.claridad_mensaje      === '' ? null : f.assesment?.claridad_mensaje,
+      asmt_conviccion_energia:   f.assesment?.conviccion_energia    === '' ? null : f.assesment?.conviccion_energia,
+      asmt_adaptabilidad_escucha:f.assesment?.adaptabilidad_escucha === '' ? null : f.assesment?.adaptabilidad_escucha,
+      asmt_orientacion_accion:   f.assesment?.orientacion_accion    === '' ? null : f.assesment?.orientacion_accion,
+      asmt_manejo_presion:       f.assesment?.manejo_presion        === '' ? null : f.assesment?.manejo_presion,
+      asmt_prom:                 f.assesment?.prom_calificacion     === '' ? null : f.assesment?.prom_calificacion,
+      entv_trayectoria:          f.entrevista?.trayectoria          === '' ? null : f.entrevista?.trayectoria,
+      entv_conexion_cliente:     f.entrevista?.conexion_cliente     === '' ? null : f.entrevista?.conexion_cliente,
+      entv_aprendizaje_madurez:  f.entrevista?.aprendizaje_madurez  === '' ? null : f.entrevista?.aprendizaje_madurez,
+      entv_motivacion:           f.entrevista?.motivacion           === '' ? null : f.entrevista?.motivacion,
+      entv_disposicion_proyecto: f.entrevista?.disposicion_proyecto === '' ? null : f.entrevista?.disposicion_proyecto,
+      entv_prom:                 f.entrevista?.prom_calificacion    === '' ? null : f.entrevista?.prom_calificacion,
+      retroalimentacion:         f.retroalimentacion                || null,
+      ref_laboral_1:             f.referencias?.ref_laboral_1       || null,
+      ref_laboral_2:             f.referencias?.ref_laboral_2       || null,
+      fraude_nro_seguimiento:    f.fraudes?.numero_seguimiento      || null,
+      fraude_respuesta:          f.fraudes?.respuesta               || null,
+      fraude_ciudad:             f.fraudes?.ciudad                  || null,
+      fraude_fecha_consulta:     f.fraudes?.fecha_consulta          || null,
+      fraude_fuente:             f.fraudes?.fuente_reclutamiento    || null,
+      seguridad_estudio:         f.seguridad?.estudio               || null,
+    };
     try {
-      const { data: updated } = await api.put(`/candidatos/${procModalCandidate.id}`, { procesos: procForm });
+      const { data: updated } = await api.put(`/candidatos/${procModalCandidate.id}`, payload);
       setCandidates(prev => prev.map(c => c.id === procModalCandidate.id ? updated : c));
       setIsProcModalOpen(false);
       setProcModalCandidate(null);
+      showToast('Procesos guardados exitosamente');
     } catch (e) {
       alert('Error al guardar procesos: ' + (e.response?.data?.message || e.message));
     }
@@ -291,7 +337,6 @@ export default function CandidatosCrud() {
             {filteredCandDetail.map(c => (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>
-                  {c.procesos ? <span style={S.processDot} title="Tiene procesos guardados" /> : null}
                   {c.nombres}
                 </td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
@@ -643,6 +688,23 @@ export default function CandidatosCrud() {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
+          background: toast.type === 'success' ? 'var(--primary)' : '#e74c3c',
+          color: '#fff', padding: '14px 28px', borderRadius: 10,
+          fontFamily: 'Nunito,sans-serif', fontWeight: 700, fontSize: '0.95rem',
+          boxShadow: '0 8px 28px rgba(0,0,0,0.2)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeInUp 0.25s ease',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          {toast.msg}
         </div>
       )}
 

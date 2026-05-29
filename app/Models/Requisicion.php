@@ -11,8 +11,8 @@ class Requisicion extends Model
     protected $fillable = [
         'nro_identificacion_proceso', 'nro_identificacion', 'estado',
         'cargo', 'cargo_solicitante', 'fecha_solicitud', 'fecha_ingreso',
-        'fecha_cierre', 'requeridas', 'contratadas', 'proyecto_id',
-        'tipo_solicitud', 'responsable', 'proceso', 'ciudad', 'pais',
+        'fecha_cierre', 'requeridas', 'contratadas', 'proyecto_id', 'empresa_id',
+        'empleador', 'tipo_solicitud', 'responsable', 'proceso', 'ciudad', 'pais',
         'solicitud_confidencial', 'observaciones',
     ];
 
@@ -26,6 +26,11 @@ class Requisicion extends Model
     public function proyecto()
     {
         return $this->belongsTo(Proyecto::class);
+    }
+
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class);
     }
 
     public function candidatos()

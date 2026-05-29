@@ -12,7 +12,7 @@ class Candidato extends Model
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
         'fecha_expedicion', 'edad', 'ciudad', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
-        'pruebas', 'aval', 'negocio', 'observaciones',
+        'pruebas', 'aval', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
         'asmt_ejercicio', 'asmt_nombre_ejercicio',
         'asmt_claridad_mensaje', 'asmt_conviccion_energia', 'asmt_adaptabilidad_escucha',
@@ -31,6 +31,7 @@ class Candidato extends Model
     protected $casts = [
         'fecha_expedicion'    => 'date:Y-m-d',
         'fecha_postulacion'   => 'date:Y-m-d',
+        'fecha_aval'          => 'date:Y-m-d',
         'fraude_fecha_consulta' => 'date:Y-m-d',
         'pruebas'             => 'boolean',
         'aval'                => 'boolean',
