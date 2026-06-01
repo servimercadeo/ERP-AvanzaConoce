@@ -18,13 +18,13 @@ export function AuthProvider({ children }) {
         });
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (email, password, recaptchaToken) => {
         // Paso 1: obtener cookie CSRF de Sanctum
         await api.get("/sanctum/csrf-cookie", { baseURL: "/" });
         // Paso 2: autenticar
         const res = await api.post(
             "/login",
-            { email, password },
+            { email, password, recaptcha_token: recaptchaToken },
             { baseURL: "/" },
         );
         setUser(res.data.user);

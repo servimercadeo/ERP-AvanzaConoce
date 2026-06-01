@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SearchableSelect } from "../components/SearchableSelect";
+import ReCAPTCHA from "react-google-recaptcha";
 
 const EMPTY = {
     documento: "",
@@ -569,6 +570,8 @@ export default function RegistroCandidatosForm() {
     const [step, setStep] = useState(1);
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [recaptchaToken, setRecaptchaToken] = useState(null);
+    const recaptchaRef = useRef(null);
     const [ciudades, setCiudades] = useState([]);
     const [proyectos, setProyectos] = useState([]);
     const [catalogosLoading, setCatalogosLoading] = useState(true);
@@ -674,6 +677,11 @@ export default function RegistroCandidatosForm() {
         const errs2 = validateStep(2);
         const errs = { ...errs1, ...errs2 };
         
+        if (import.meta.env.VITE_APP_ENV === 'production' && !recaptchaToken) {
+            alert("Por favor completa la verificación reCAPTCHA antes de enviar.");
+            return;
+        }
+
         if (Object.keys(errs).length > 0) {
             setErrors(errs);
             // Salta al paso donde esté el primer error
@@ -707,7 +715,7 @@ export default function RegistroCandidatosForm() {
                     "X-CSRF-TOKEN": csrfToken ?? "",
                     Accept: "application/json",
                 },
-                body: JSON.stringify({ ...form, token: tokenParam }),
+                body: JSON.stringify({ ...form, token: tokenParam, recaptcha_token: recaptchaToken }),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -716,6 +724,8 @@ export default function RegistroCandidatosForm() {
             setSubmitted(true);
         } catch (err) {
             alert("Error al enviar el formulario: " + err.message);
+            setRecaptchaToken(null);
+            recaptchaRef.current?.reset();
         } finally {
             setLoading(false);
         }
@@ -774,9 +784,9 @@ export default function RegistroCandidatosForm() {
         );
     }
 
-    // ── PANTALLA: REQUISICIÓN COMPLETADA / CERRADA ──
+    // ── PANTALLA: REQUISICIÓN COMPLETADA ──
 
-    if (registroEstado === 'Cerrada') {
+    if (registroEstado === 'Completada') {
         return (
             <div style={{ minHeight: "100vh", background: "radial-gradient(circle at 10% 20%, rgba(26, 155, 140, 0.05) 0%, rgba(240, 250, 248, 0.4) 90%), #e8f8f5", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Nunito, sans-serif" }}>
                 <FormStyles />
@@ -1487,6 +1497,17 @@ export default function RegistroCandidatosForm() {
                                 
                                 {/* Navegación */}
                                 <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                                    {import.meta.env.VITE_APP_ENV === 'production' && (
+                                        <div style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: 8 }}>
+                                            <ReCAPTCHA
+                                                ref={recaptchaRef}
+                                                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                onChange={setRecaptchaToken}
+                                                onExpired={() => setRecaptchaToken(null)}
+                                            />
+                                        </div>
+                                    )}
+
                                     <button
                                         type="button"
                                         className="btn-modern-secondary"
@@ -1501,7 +1522,7 @@ export default function RegistroCandidatosForm() {
                                     <button
                                         type="submit"
                                         className="btn-modern-primary"
-                                        disabled={loading}
+                                        disabled={loading || (import.meta.env.VITE_APP_ENV === 'production' && !recaptchaToken)}
                                     >
                                         {loading ? (
                                             <>

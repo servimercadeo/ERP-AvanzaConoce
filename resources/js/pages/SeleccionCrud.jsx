@@ -13,7 +13,7 @@ const OPT = {
   procesos:    ['Administrativo', 'Operativo', 'Comercial', 'Tecnología'],
   tipos:       ['RP: Reemplazo', 'CN: Cargo Nuevo'],
   paises:      ['Colombia', 'Perú', 'Ecuador', 'México'],
-  estados:     ['Abierta', 'En proceso', 'Cerrada', 'Cancelada'],
+  estados:     ['Abierta', 'En proceso', 'Completada', 'Cancelada'],
   sino:        ['Sí', 'No'],
   tipos_doc:   ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'],
   fuentes:     ['Fase Inicial', 'Vinculacion temporal', 'Vinculacion directa'],
@@ -32,8 +32,9 @@ function pages(p, t) {
 
 const estadoColor = (e = '') => {
   const v = e.toLowerCase();
-  if (v === 'abierta' || v === 'activa') return ['#d1fae5', '#065f46'];
-  if (v === 'cerrada' || v === 'inactiva') return ['#fee2e2', '#991b1b'];
+  if (v === 'abierta' || v === 'activa') return ['#dbeafe', '#1e40af'];
+  if (v === 'completada') return ['#d1fae5', '#065f46'];
+  if (v === 'cancelada') return ['#fee2e2', '#991b1b'];
   if (v === 'en proceso') return ['#fef3c7', '#92400e'];
   return ['var(--bg)', 'var(--text-muted)'];
 };
@@ -214,7 +215,7 @@ export default function SeleccionCrud() {
           <div style={S.estadoWrap}>
             <span style={S.label}>Estado</span>
             <select value={estadoF} onChange={e => setEstadoF(e.target.value)} style={S.estadoSelect}>
-              {['Todas', 'Abierta', 'En proceso', 'Cerrada', 'Cancelada'].map(o => <option key={o}>{o}</option>)}
+              {['Todas', 'Abierta', 'En proceso', 'Completada', 'Cancelada'].map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
         </div>
