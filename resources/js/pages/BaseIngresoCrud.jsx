@@ -193,7 +193,6 @@ export default function BaseIngresoCrud() {
           </span>
           <input
             type="text"
-            placeholder="Buscar documento, nombre, cargo..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             style={S.searchInput}
@@ -298,7 +297,6 @@ export default function BaseIngresoCrud() {
                     key="candidato-select"
                     value={String(form.candidato_id ?? '')}
                     defaultValue=""
-                    placeholder="Buscar candidato por nombre o documento..."
                     options={candidatoOptions}
                     onChange={handleCandidatoSelect}
                   />

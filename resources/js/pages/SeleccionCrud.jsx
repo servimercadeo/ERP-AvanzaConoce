@@ -209,7 +209,7 @@ export default function SeleccionCrud() {
             <span style={S.searchIcon}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </span>
-            <input type="text" placeholder="Buscar requisición, cargo o proyecto..." value={search} onChange={e => setSearch(e.target.value)} style={S.searchInput} />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} style={S.searchInput} />
           </div>
           <div style={S.estadoWrap}>
             <span style={S.label}>Estado</span>
@@ -314,7 +314,6 @@ export default function SeleccionCrud() {
                     value={form.nombre_responsable ?? ''}
                     onChange={handleSolicitanteChange}
                     options={responsablesOpts}
-                    placeholder="-- Selecciona responsable --"
                     disabled={isRO(mode)}
                   />
                 </SField>
@@ -333,7 +332,6 @@ export default function SeleccionCrud() {
                     onChange={chVal('proyecto_id')}
                     options={proyectosOpts}
                     defaultValue=""
-                    placeholder="-- Selecciona proyecto --"
                     disabled={isRO(mode)}
                   />
                 </SField>
@@ -346,7 +344,6 @@ export default function SeleccionCrud() {
                     onChange={chVal('empresa_id')}
                     options={empresasOpts}
                     defaultValue=""
-                    placeholder="-- Selecciona empresa --"
                     disabled={isRO(mode)}
                   />
                 </SField>
@@ -359,7 +356,6 @@ export default function SeleccionCrud() {
                     onChange={chVal('empleador_id')}
                     options={empleadoresOpts}
                     defaultValue=""
-                    placeholder="-- Selecciona empleador --"
                     disabled={isRO(mode)}
                   />
                 </SField>
@@ -376,7 +372,6 @@ export default function SeleccionCrud() {
                     onChange={chVal('ciudad_id')}
                     options={ciudadesOpts}
                     defaultValue=""
-                    placeholder="-- Selecciona ciudad --"
                     disabled={isRO(mode)}
                   />
                 </SField>
@@ -415,7 +410,7 @@ function F({ l, k, type = 'text', opts, req, span, form, ch, dis }) {
         {l}{req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
       {opts
-        ? <select style={inp} value={form[k] ?? ''} onChange={ch(k)} disabled={dis}><option value="">-- Selecciona --</option>{opts.map(o => typeof o === 'string' ? <option key={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+        ? <SearchableSelect value={form[k] ?? ''} onChange={(val) => ch(k)({ target: { value: val } })} options={opts.map(o => typeof o === 'string' ? { value: o, label: o } : o)} defaultValue="" disabled={dis} />
         : type === 'textarea'
           ? <textarea style={{ ...inp, minHeight: 40, resize: 'vertical' }} value={form[k] ?? ''} onChange={ch(k)} disabled={dis} />
           : <input type={type} style={inp} value={form[k] ?? ''} onChange={ch(k)} disabled={dis} />

@@ -232,7 +232,6 @@ function SearchableSelect({
                     value={open ? query : selected ? selected.label : ""}
                     onChange={handleChange}
                     onFocus={handleFocus}
-                    placeholder="Escribe para buscar…"
                     disabled={disabled}
                 />
                 {open && (
@@ -1079,7 +1078,6 @@ export default function ContratosCrud() {
                         </span>
                         <input
                             style={S.searchInput}
-                            placeholder="Buscar por empleado, cédula o cargo…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />

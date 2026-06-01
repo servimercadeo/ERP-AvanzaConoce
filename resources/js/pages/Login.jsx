@@ -129,7 +129,6 @@ export default function Login() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoFocus
-                                    placeholder="usuario@empresa.com"
                                 />
                             </div>
 
@@ -195,7 +194,6 @@ export default function Login() {
                                         setPassword(e.target.value)
                                     }
                                     required
-                                    placeholder="••••••••"
                                 />
                             </div>
 

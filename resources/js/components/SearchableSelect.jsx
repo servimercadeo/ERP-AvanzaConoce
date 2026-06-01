@@ -3,15 +3,27 @@ import React, { useState, useEffect, useRef } from "react";
 const inputStyle = {
     width: "100%",
     boxSizing: "border-box",
-    padding: "8px 10px",
+    padding: "12px 44px 12px 10px",
     border: "1.5px solid var(--border)",
     borderRadius: "var(--radius-sm)",
-    fontSize: "0.88rem",
+    fontSize: "0.95rem",
     fontFamily: "Nunito,sans-serif",
     color: "var(--text)",
     background: "var(--white)",
     outline: "none",
-    transition: "border 0.15s",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease",
+    minHeight: 48,
+    lineHeight: 1.2,
+};
+
+const chevronStyle = {
+    position: "absolute",
+    right: 14,
+    top: "50%",
+    transform: "translateY(-50%)",
+    pointerEvents: "none",
+    color: "var(--text-muted)",
+    transition: "transform 0.2s ease, color 0.2s ease",
 };
 
 const presetBtnStyle = {
@@ -30,7 +42,7 @@ const presetBtnStyle = {
     whiteSpace: "nowrap",
 };
 
-export function SearchableSelect({ value, onChange, options, defaultValue, placeholder = "Elige", disabled = false }) {
+export function SearchableSelect({ value, onChange, options, defaultValue, disabled = false }) {
     const selectedLabel =
         value === defaultValue || value === "" || value == null
             ? ""
@@ -77,45 +89,71 @@ export function SearchableSelect({ value, onChange, options, defaultValue, place
     };
 
     return (
-        <div ref={ref} style={{ position: "relative" }}>
+        <div
+            ref={ref}
+            style={{
+                position: "relative",
+                borderRadius: "var(--radius-sm)",
+                display: "block",
+            }}
+        >
             <input
                 style={{
                     ...inputStyle,
                     background: disabled ? "var(--bg)" : "var(--white)",
                     color: disabled ? "var(--text-muted)" : "var(--text)",
                     cursor: disabled ? "default" : "text",
+                    boxShadow: open ? "0 0 0 4px rgba(26,155,140,0.14)" : "none",
+                    borderColor: open ? "var(--primary)" : "var(--border)",
                 }}
-                placeholder={placeholder}
+                
                 value={query}
                 disabled={disabled}
                 onFocus={() => { if (!disabled) { setOpen(true); setHovered(-1); } }}
+                onBlur={() => { if (!disabled) { setHovered(-1); } }}
                 onChange={(e) => { if (!disabled) { setQuery(e.target.value); setOpen(true); setHovered(-1); } }}
             />
+            <span style={{ ...chevronStyle, transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)` }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </span>
             {open && !disabled && (
                 <div style={{
                     position: "absolute",
-                    top: "calc(100% + 2px)",
+                    top: "calc(100% + 8px)",
                     left: 0,
                     right: 0,
                     background: "var(--white)",
-                    border: "1.5px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    boxShadow: "0 4px 14px rgba(0,0,0,0.13)",
+                    border: "1.5px solid rgba(26,155,140,0.14)",
+                    borderRadius: "14px",
+                    boxShadow: "0 18px 36px rgba(26, 155, 140, 0.16)",
                     zIndex: 1000,
-                    maxHeight: 220,
+                    maxHeight: 180,
                     overflowY: "auto",
+                    padding: "8px",
+                    backdropFilter: "blur(6px)",
                 }}>
-                    {/* Opción limpiar */}
+                    {/* Opción limpiar (sin texto placeholder) */}
                     <div
-                        style={{ padding: "7px 10px", cursor: "pointer", fontSize: "0.85rem", color: "var(--text-muted)", background: hovered === -2 ? "var(--bg,#f5f5f5)" : "transparent", borderBottom: "1px solid var(--border)" }}
+                        style={{
+                            padding: "9px 12px",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            color: "var(--text-muted)",
+                            background: hovered === -2 ? "rgba(26,155,140,0.08)" : "transparent",
+                            borderRadius: "10px",
+                            borderBottom: "1px solid rgba(197,232,227,0.9)",
+                            marginBottom: 6,
+                        }}
                         onMouseEnter={() => setHovered(-2)}
                         onMouseLeave={() => setHovered(-1)}
                         onClick={handleClear}
                     >
-                        {placeholder}
+                        Limpiar selección
                     </div>
                     {filtered.length === 0 ? (
-                        <div style={{ padding: "7px 10px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                        <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
                             Sin resultados para "{query}"
                         </div>
                     ) : (
@@ -123,12 +161,15 @@ export function SearchableSelect({ value, onChange, options, defaultValue, place
                             <div
                                 key={o.value}
                                 style={{
-                                    padding: "7px 10px",
+                                    padding: "10px 12px",
                                     cursor: "pointer",
-                                    fontSize: "0.88rem",
-                                    background: hovered === i ? "var(--bg,#f5f5f5)" : "transparent",
+                                    fontSize: "0.9rem",
+                                    background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
+                                    borderRadius: "10px",
+                                    marginBottom: 4,
                                     fontWeight: String(value) === String(o.value) ? 700 : 400,
                                     color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
+                                    transition: "background 0.15s ease, transform 0.15s ease",
                                 }}
                                 onMouseEnter={() => setHovered(i)}
                                 onMouseLeave={() => setHovered(-1)}
