@@ -606,7 +606,6 @@ export default function SedesCrud() {
                         </span>
                         <input
                             style={S.searchInput}
-                            placeholder="Buscar sede o código…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />

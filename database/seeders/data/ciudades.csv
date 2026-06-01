@@ -1151,7 +1151,7 @@ id,nombre,id_departamento,valor_flete,codigo_dane,codigo_dep,codigo_ciu,perimetr
 10034,PAISPAMBA,8,0,0,0,0,URBANO
 10035,"EL CARMEN",12,0,0,0,0,RURAL
 10036,Chinauta,11,0,0,0,0,RURAL
-10037,Tuchin,10,0,23819,23,819,URBANO
+10037,Tuchín,10,0,23815,23,815,URBANO
 10038,Campeche,2,0,0,0,0,RURAL
 10039,Quito,39,NULL,NULL,NULL,NULL,URBANO
 10040,Guayaquil,39,NULL,NULL,NULL,NULL,URBANO
@@ -1162,3 +1162,6 @@ id,nombre,id_departamento,valor_flete,codigo_dane,codigo_dep,codigo_ciu,perimetr
 10045,Ambato,39,NULL,NULL,NULL,NULL,URBANO
 10046,Machala,39,NULL,NULL,NULL,NULL,URBANO
 10047,Esmeraldas,39,NULL,NULL,NULL,NULL,URBANO
+10048,Guachené,8,10000,19300,19,300,URBANO
+10049,Los Córdobas,10,10000,23421,23,421,EXTRARURAL
+10050,San José de Uré,10,10000,23682,23,682,EXTRARURAL

@@ -6,6 +6,7 @@ import Login     from '../pages/Login'
 import Dashboard from '../pages/Dashboard'
 import Module    from '../pages/Module'
 import Submodule from '../pages/Submodule'
+import RegistroCandidatosForm from '../forms/RegistroCandidatosForm'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/registro-candidatos" element={<RegistroCandidatosForm />} />
             <Route
               path="/dashboard"
               element={<PrivateRoute><Dashboard /></PrivateRoute>}

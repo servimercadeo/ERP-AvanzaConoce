@@ -1328,7 +1328,6 @@ export default function EmpleadosCrud() {
                         </span>
                         <input
                             style={S.searchInput}
-                            placeholder="Buscar por nombre, cédula o cargo…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />

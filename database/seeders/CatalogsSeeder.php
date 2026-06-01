@@ -4,11 +4,14 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CatalogsSeeder extends Seeder
 {
     public function run(): void
     {
+        Schema::disableForeignKeyConstraints();
+
         $this->importSimple('cargos',            'Cargos.csv',           150);
         $this->importSimple('eps',               'EPS.csv',              100);
         $this->importSimple('tipos_rh',          'rh.csv',               10);
@@ -20,6 +23,8 @@ class CatalogsSeeder extends Seeder
         $this->importSimple('fondos_pensiones',  'fondos_pensiones.csv',   100);
         $this->importSimple('fondos_cesantias',  'fondos_cesantias.csv',   100);
         $this->importCiudades();
+
+        Schema::enableForeignKeyConstraints();
     }
 
     private function importSimple(string $table, string $file, int $max): void

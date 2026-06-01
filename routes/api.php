@@ -1,12 +1,17 @@
 <?php
 
 use App\Http\Controllers\Api\AppSettingController;
+use App\Http\Controllers\Api\BaseIngresoController;
+use App\Http\Controllers\Api\CandidatoController;
+use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
+use App\Http\Controllers\Api\RequisicionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\SsoController;
+use App\Services\RecaptchaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +19,89 @@ use Illuminate\Support\Facades\Route;
 // ── Público ──────────────────────────────────────────────────────────────────
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'app' => config('app.name')]);
+});
+
+// Catálogos para el formulario público de registro de candidatos
+Route::get('/registro/catalogos', function (Request $request) {
+    $negocio = null;
+    $estado  = null;
+
+    if ($request->get('token')) {
+        $req = DB::table('requisiciones')
+            ->leftJoin('proyectos', 'requisiciones.proyecto_id', '=', 'proyectos.id')
+            ->where('requisiciones.registro_token', $request->get('token'))
+            ->select('proyectos.nombre as proyecto_nombre', 'requisiciones.estado')
+            ->first();
+        if ($req) {
+            $negocio = $req->proyecto_nombre;
+            $estado  = $req->estado;
+        }
+    }
+
+    return response()->json([
+        'ciudades'  => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
+        'proyectos' => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
+        'negocio'   => $negocio,
+        'estado'    => $estado,
+    ]);
+});
+
+// Registro público de candidatos desde el formulario externo
+Route::post('/candidatos/registro', function (Request $request) {
+    $data = $request->validate([
+        'documento'        => 'required|string|max:30',
+        'nombres'          => 'required|string|max:120',
+        'apellidos'        => 'required|string|max:120',
+        'edad'             => 'required|integer|min:14|max:80',
+        'fecha_expedicion' => 'required|date',
+        'ciudad_id'        => 'required|exists:ciudades,id',
+        'celular'          => 'required|string|max:15',
+        'correo'           => 'required|email|max:160',
+        'negocio'          => 'nullable|string|max:120',
+        'token'            => 'nullable|string|max:40',
+        'recaptcha_token'  => app()->environment('production') ? 'required|string' : 'nullable|string',
+    ]);
+
+    if (app()->environment('production') && !RecaptchaService::verify($data['recaptcha_token'] ?? '')) {
+        return response()->json(['message' => 'Verificación reCAPTCHA fallida. Inténtalo de nuevo.'], 422);
+    }
+
+    $requisicionId = null;
+    if (!empty($data['token'])) {
+        $req = DB::table('requisiciones')
+            ->where('registro_token', $data['token'])
+            ->select('id', 'estado')
+            ->first();
+        if ($req) {
+            if (in_array($req->estado, ['Completada', 'Cancelada'])) {
+                return response()->json(['message' => 'Esta requisición ya no está disponible.'], 409);
+            }
+            $requisicionId = $req->id;
+        }
+    }
+
+    $candidato = DB::table('candidatos')->insertGetId([
+        'requisicion_id'   => $requisicionId,
+        'nombres'          => strtoupper(trim($data['nombres'] . ' ' . $data['apellidos'])),
+        'tipo_documento'   => 'Cédula de Ciudadanía',
+        'identificacion'   => $data['documento'],
+        'fecha_expedicion' => $data['fecha_expedicion'],
+        'edad'             => $data['edad'],
+        'ciudad_id'        => $data['ciudad_id'],
+        'celular'          => $data['celular'],
+        'correo'           => $data['correo'],
+        'negocio'          => $data['negocio'] ?? null,
+        'fuente'           => 'Fase Inicial',
+        'fuente_especifica'=> 'Pendiente de Aval',
+        'estado'           => 'Entrevista',
+        'fecha_postulacion'=> now()->toDateString(),
+        'pruebas'          => false,
+        'aval'             => false,
+        'created_at'       => now(),
+        'updated_at'       => now(),
+    ]);
+
+    return response()->json(['id' => $candidato], 201);
 });
 
 // Configuración global (tema de color) — lectura pública
@@ -86,4 +174,35 @@ Route::middleware('auth:sanctum')->group(function () {
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
+
+    // CRUD completo de base de ingresos
+    Route::apiResource('base-ingresos', BaseIngresoController::class)
+        ->parameters(['base-ingresos' => 'baseIngreso']);
+
+    // CRUD completo de requisiciones y candidatos
+    Route::apiResource('requisiciones', RequisicionController::class)
+        ->parameters(['requisiciones' => 'requisicion']);
+    Route::apiResource('candidatos', CandidatoController::class)
+        ->parameters(['candidatos' => 'candidato']);
+    Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index']);
+    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store']);
+    Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download']);
+    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy']);
+
+    // Catálogos para el módulo de selección (cargos, proyectos, responsables, ciudades)
+    Route::get('/seleccion/catalogos', function () {
+        return response()->json([
+            'cargos'       => DB::table('cargos')->select('id', 'nombre')->orderBy('nombre')->get(),
+            'proyectos'    => DB::table('proyectos')->where('activo', true)->orderBy('nombre')
+                               ->get(['id', 'nombre'])
+                               ->map(fn($p) => ['value' => $p->id, 'label' => $p->nombre])
+                               ->values(),
+            'responsables' => DB::table('users')
+                               ->whereNotNull('name')->where('name', '!=', '')
+                               ->orderBy('name')
+                               ->get(['name', 'cedula', 'cargo']),
+            'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
+            'empleadores'  => DB::table('empleadores')->select('id', 'nombre')->orderBy('nombre')->get(),
+        ]);
+    });
 });

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Login() {
     const { login } = useAuth();
@@ -13,8 +14,10 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [recaptchaToken, setRecaptchaToken] = useState(null);
 
     const passwordRef = useRef(null);
+    const recaptchaRef = useRef(null);
 
     useEffect(() => {
         if (step === "password" && passwordRef.current) {
@@ -46,7 +49,7 @@ export default function Login() {
         setError(null);
         setLoading(true);
         try {
-            await login(email, password);
+            await login(email, password, recaptchaToken);
             navigate("/dashboard");
         } catch (err) {
             setError(
@@ -54,6 +57,8 @@ export default function Login() {
                     err.response?.data?.errors?.email?.[0] ??
                     "Contraseña incorrecta. Intenta de nuevo.",
             );
+            setRecaptchaToken(null);
+            recaptchaRef.current?.reset();
         } finally {
             setLoading(false);
         }
@@ -64,6 +69,8 @@ export default function Login() {
         setPassword("");
         setError(null);
         setUserName("");
+        setRecaptchaToken(null);
+        recaptchaRef.current?.reset();
     };
 
     return (
@@ -129,7 +136,6 @@ export default function Login() {
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoFocus
-                                    placeholder="usuario@empresa.com"
                                 />
                             </div>
 
@@ -195,9 +201,19 @@ export default function Login() {
                                         setPassword(e.target.value)
                                     }
                                     required
-                                    placeholder="••••••••"
                                 />
                             </div>
+
+                            {import.meta.env.VITE_APP_ENV === 'production' && (
+                                <div style={{ margin: "4px 0 8px" }}>
+                                    <ReCAPTCHA
+                                        ref={recaptchaRef}
+                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                        onChange={setRecaptchaToken}
+                                        onExpired={() => setRecaptchaToken(null)}
+                                    />
+                                </div>
+                            )}
 
                             {error && (
                                 <div className="login-error">{error}</div>
@@ -205,7 +221,7 @@ export default function Login() {
 
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || (import.meta.env.VITE_APP_ENV === 'production' && !recaptchaToken)}
                                 className="login-btn"
                             >
                                 {loading ? (
