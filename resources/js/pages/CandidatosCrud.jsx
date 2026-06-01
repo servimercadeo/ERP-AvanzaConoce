@@ -971,13 +971,10 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
         {label}{req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
       {opts ? (
-        <SearchableSelect
-          value={form[k] ?? ''}
-          onChange={(val) => onChange(k)({ target: { value: val } })}
-          options={opts.map(o => typeof o === 'string' ? { value: o, label: o } : o)}
-          defaultValue=""
-          disabled={disabled}
-        />
+        <select style={inputStyle} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
+          <option value="">-- Selecciona --</option>
+          {opts.map(o => typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
       ) : type === 'textarea' ? (
         <textarea style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       ) : (
