@@ -27,6 +27,7 @@ services:
 
       LOG_CHANNEL: stderr
       LOG_LEVEL: error
+      RECAPTCHA_SECRET_KEY: "6Lc5wActAAAAAFw9UAuCpFjDRz_nlZrNTsAdux5Y"
     volumes:
       - erp_storage:/var/www/html/storage/app
       - erp_logs:/var/www/html/storage/logs

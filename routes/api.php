@@ -11,7 +11,6 @@ use App\Http\Controllers\Api\RequisicionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserPreferenceController;
 use App\Http\Controllers\SsoController;
-use App\Services\RecaptchaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -59,12 +58,7 @@ Route::post('/candidatos/registro', function (Request $request) {
         'correo'           => 'required|email|max:160',
         'negocio'          => 'nullable|string|max:120',
         'token'            => 'nullable|string|max:40',
-        'recaptcha_token'  => app()->environment('production') ? 'required|string' : 'nullable|string',
     ]);
-
-    if (app()->environment('production') && !RecaptchaService::verify($data['recaptcha_token'] ?? '')) {
-        return response()->json(['message' => 'Verificación reCAPTCHA fallida. Inténtalo de nuevo.'], 422);
-    }
 
     $requisicionId = null;
     if (!empty($data['token'])) {
