@@ -218,7 +218,7 @@ export default function ThemePickerButton() {
                                         className={`tpb-toggle-btn${!prefs.dark ? " tpb-toggle-btn--active" : ""}`}
                                         onClick={() => set("dark", false)}
                                     >
-                                        <IcoSun /> Clarito
+                                        <IcoSun /> Claro
                                     </button>
                                     <button
                                         className={`tpb-toggle-btn${prefs.dark ? " tpb-toggle-btn--active" : ""}`}
