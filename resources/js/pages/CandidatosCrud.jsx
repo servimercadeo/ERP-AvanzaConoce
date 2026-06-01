@@ -222,6 +222,20 @@ export default function CandidatosCrud() {
     );
   };
 
+  const handleDownloadDoc = async (candidatoId, docId, nombreOriginal) => {
+    try {
+      const res = await api.get(`/candidatos/${candidatoId}/documentos/${docId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombreOriginal;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Error al descargar el documento.');
+    }
+  };
+
   const handleAddCustomDoc = async () => {
     if (!newDocFile) { alert('Selecciona un archivo.'); return; }
     const nombre = newDocFile.name.replace(/\.[^/.]+$/, '');
@@ -591,14 +605,12 @@ export default function CandidatosCrud() {
                             {existing ? (
                               <>
                                 <span style={SD.docFile}>{existing.nombre_original}</span>
-                                <a
-                                  href={`/api/candidatos/${candForm.id}/documentos/${existing.id}/download`}
+                                <button
                                   style={SD.btnDownload}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  onClick={() => handleDownloadDoc(candForm.id, existing.id, existing.nombre_original)}
                                 >
                                   Descargar
-                                </a>
+                                </button>
                                 <label style={{ ...SD.btnReplace, opacity: uploading ? 0.6 : 1, cursor: uploading ? 'default' : 'pointer' }}>
                                   {uploading ? 'Subiendo…' : 'Reemplazar'}
                                   <input type="file" style={{ display: 'none' }} disabled={uploading}
@@ -624,14 +636,12 @@ export default function CandidatosCrud() {
                         <div key={d.id} style={SD.docRow}>
                           <span style={SD.docLabel}>{d.nombre}</span>
                           <span style={SD.docFile}>{d.nombre_original}</span>
-                          <a
-                            href={`/api/candidatos/${candForm.id}/documentos/${d.id}/download`}
+                          <button
                             style={SD.btnDownload}
-                            target="_blank"
-                            rel="noreferrer"
+                            onClick={() => handleDownloadDoc(candForm.id, d.id, d.nombre_original)}
                           >
                             Descargar
-                          </a>
+                          </button>
                           <button style={SD.btnDel} onClick={() => handleDeleteDoc(d)}>✕</button>
                         </div>
                       ))}
