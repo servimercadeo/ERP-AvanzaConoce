@@ -8,11 +8,21 @@ class Requisicion extends Model
 {
     protected $table = 'requisiciones';
 
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->registro_token)) {
+                $model->registro_token = \Illuminate\Support\Str::uuid()->toString();
+            }
+        });
+    }
+
     protected $fillable = [
-        'nro_identificacion_proceso', 'nro_identificacion', 'estado',
-        'cargo', 'cargo_solicitante', 'fecha_solicitud', 'fecha_ingreso',
+        'nro_identificacion_proceso', 'registro_token', 'nro_identificacion', 'estado',
+        'cargo_id', 'cargo_solicitante', 'fecha_solicitud', 'fecha_ingreso',
         'fecha_cierre', 'requeridas', 'contratadas', 'proyecto_id', 'empresa_id',
-        'empleador', 'tipo_solicitud', 'responsable', 'proceso', 'ciudad', 'pais',
+        'empleador_id', 'tipo_solicitud', 'responsable', 'proceso', 'ciudad_id', 'pais',
         'solicitud_confidencial', 'observaciones',
     ];
 
@@ -31,6 +41,21 @@ class Requisicion extends Model
     public function empresa()
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function cargo()
+    {
+        return $this->belongsTo(Cargo::class);
+    }
+
+    public function empleador()
+    {
+        return $this->belongsTo(Empleador::class);
+    }
+
+    public function ciudad()
+    {
+        return $this->belongsTo(Ciudad::class);
     }
 
     public function candidatos()

@@ -10,15 +10,15 @@ class RequisicionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Requisicion::with(['proyecto', 'empresa']);
+        $query = Requisicion::with(['proyecto', 'empresa', 'cargo', 'ciudad', 'empleador']);
 
         if ($request->search) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
                 $q->where('nro_identificacion_proceso', 'like', "%$s%")
-                  ->orWhere('cargo', 'like', "%$s%")
-                  ->orWhere('ciudad', 'like', "%$s%")
-                  ->orWhere('responsable', 'like', "%$s%");
+                  ->orWhere('responsable', 'like', "%$s%")
+                  ->orWhereHas('cargo', fn($c) => $c->where('nombre', 'like', "%$s%"))
+                  ->orWhereHas('ciudad', fn($c) => $c->where('nombre', 'like', "%$s%"));
             });
         }
 
@@ -34,7 +34,7 @@ class RequisicionController extends Controller
         $data = $request->validate([
             'nro_identificacion'      => 'nullable|string|max:30',
             'estado'                  => 'nullable|string|max:30',
-            'cargo'                   => 'nullable|string|max:150',
+            'cargo_id'                => 'nullable|exists:cargos,id',
             'cargo_solicitante'       => 'nullable|string|max:150',
             'fecha_solicitud'         => 'required|date',
             'fecha_ingreso'           => 'nullable|date',
@@ -42,17 +42,16 @@ class RequisicionController extends Controller
             'requeridas'              => 'nullable|integer|min:1',
             'proyecto_id'             => 'nullable|exists:proyectos,id',
             'empresa_id'              => 'nullable|exists:empresas,id',
+            'empleador_id'            => 'nullable|exists:empleadores,id',
             'tipo_solicitud'          => 'nullable|string|max:60',
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
-            'ciudad'                  => 'nullable|string|max:120',
+            'ciudad_id'               => 'nullable|exists:ciudades,id',
             'pais'                    => 'nullable|string|max:80',
-            'empleador'               => 'nullable|string|max:150',
             'solicitud_confidencial'  => 'nullable|boolean',
             'observaciones'           => 'nullable|string',
         ]);
 
-        // Auto-generar nro_identificacion_proceso
         $max = Requisicion::pluck('nro_identificacion_proceso')
             ->map(fn($n) => (int) preg_replace('/\D/', '', $n))
             ->filter()
@@ -60,12 +59,12 @@ class RequisicionController extends Controller
         $data['nro_identificacion_proceso'] = 'REQ' . ($max + 1);
 
         $req = Requisicion::create($data);
-        return response()->json($req->load(['proyecto', 'empresa']), 201);
+        return response()->json($req->load(['proyecto', 'empresa', 'cargo', 'ciudad', 'empleador']), 201);
     }
 
     public function show(Requisicion $requisicion)
     {
-        return response()->json($requisicion->load(['proyecto', 'candidatos']));
+        return response()->json($requisicion->load(['proyecto', 'cargo', 'ciudad', 'empleador', 'candidatos']));
     }
 
     public function update(Request $request, Requisicion $requisicion)
@@ -73,7 +72,7 @@ class RequisicionController extends Controller
         $data = $request->validate([
             'nro_identificacion'      => 'nullable|string|max:30',
             'estado'                  => 'nullable|string|max:30',
-            'cargo'                   => 'nullable|string|max:150',
+            'cargo_id'                => 'nullable|exists:cargos,id',
             'cargo_solicitante'       => 'nullable|string|max:150',
             'fecha_solicitud'         => 'sometimes|date',
             'fecha_ingreso'           => 'nullable|date',
@@ -82,18 +81,18 @@ class RequisicionController extends Controller
             'contratadas'             => 'nullable|integer|min:0',
             'proyecto_id'             => 'nullable|exists:proyectos,id',
             'empresa_id'              => 'nullable|exists:empresas,id',
-            'empleador'               => 'nullable|string|max:150',
+            'empleador_id'            => 'nullable|exists:empleadores,id',
             'tipo_solicitud'          => 'nullable|string|max:60',
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
-            'ciudad'                  => 'nullable|string|max:120',
+            'ciudad_id'               => 'nullable|exists:ciudades,id',
             'pais'                    => 'nullable|string|max:80',
             'solicitud_confidencial'  => 'nullable|boolean',
             'observaciones'           => 'nullable|string',
         ]);
 
         $requisicion->update($data);
-        return response()->json($requisicion->load(['proyecto', 'empresa']));
+        return response()->json($requisicion->load(['proyecto', 'empresa', 'cargo', 'ciudad', 'empleador']));
     }
 
     public function destroy(Requisicion $requisicion)

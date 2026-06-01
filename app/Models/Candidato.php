@@ -10,7 +10,7 @@ class Candidato extends Model
 
     protected $fillable = [
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
-        'fecha_expedicion', 'edad', 'ciudad', 'correo', 'celular',
+        'fecha_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
         'pruebas', 'aval', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
@@ -42,5 +42,15 @@ class Candidato extends Model
     public function requisicion()
     {
         return $this->belongsTo(Requisicion::class);
+    }
+
+    public function ciudad()
+    {
+        return $this->belongsTo(Ciudad::class);
+    }
+
+    public function documentos()
+    {
+        return $this->hasMany(CandidatoDocumento::class);
     }
 }

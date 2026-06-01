@@ -10,6 +10,8 @@ import {
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
+const FIXED_DOCS = ['Hoja de vida', 'Pruebas psicotécnicas'];
+
 const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
 const interviewDateFrom = (dateStr) => {
@@ -29,6 +31,7 @@ const MOCK_OPTS = {
 export default function CandidatosCrud() {
   const [candidates, setCandidates] = useState([]);
   const [requisitions, setRequisitions] = useState([]);
+  const [ciudadesOpts, setCiudadesOpts] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [candDetailSearch, setCandDetailSearch] = useState('');
   const [isCandModalOpen, setIsCandModalOpen] = useState(false);
@@ -37,7 +40,7 @@ export default function CandidatosCrud() {
     nombres: '',
     correo: '',
     celular: '',
-    ciudad: '',
+    ciudad_id: '',
     tipo_documento: 'Cédula de Ciudadanía',
     identificacion: '',
     fecha_expedicion: '',
@@ -49,14 +52,28 @@ export default function CandidatosCrud() {
     ...interviewDateFrom(getTodayStr()),
     observaciones: ''
   });
+  const [docs, setDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [newDocFile, setNewDocFile] = useState(null);
+
   const [isProcModalOpen, setIsProcModalOpen] = useState(false);
   const [procModalCandidate, setProcModalCandidate] = useState(null);
   const [toast, setToast] = useState(null);
+  const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
+  const handleConfirmOk = () => {
+    const fn = confirmDlg.onConfirm;
+    setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
+    fn?.();
+  };
+  const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
   const [procActiveTab, setProcActiveTab] = useState('assesment');
   const [procForm, setProcForm] = useState({});
 
@@ -64,8 +81,13 @@ export default function CandidatosCrud() {
     Promise.all([
       api.get('/candidatos'),
       api.get('/requisiciones'),
+      api.get('/seleccion/catalogos'),
     ])
-      .then(([c, r]) => { setCandidates(c.data); setRequisitions(r.data); })
+      .then(([c, r, cat]) => {
+        setCandidates(c.data);
+        setRequisitions(r.data);
+        setCiudadesOpts((cat.data.ciudades || []).map(ci => ({ value: String(ci.id), label: ci.nombre })));
+      })
       .catch(console.error)
       .finally(() => setLoadingData(false));
   }, []);
@@ -86,32 +108,43 @@ export default function CandidatosCrud() {
     };
   }, [isCandModalOpen]);
 
-  const toggleCandidateField = (candidateId, field) => {
+  const doToggleField = (candidateId, field) => {
     setCandidates(prev => prev.map(c => {
-      if (c.id === candidateId) {
-        const val = !c[field];
-        let nextEstado = c.estado;
-        const extra = {};
-        if (field === 'pruebas' || field === 'aval') {
-          const newPruebas = field === 'pruebas' ? val : c.pruebas;
-          const newAval = field === 'aval' ? val : c.aval;
-          nextEstado = (newPruebas && newAval) ? 'Contratación' : 'Entrevista';
-          if (field === 'aval') {
-            extra.fecha_aval = val ? new Date().toISOString().slice(0, 10) : null;
-          }
-        }
-        const updated = { ...c, [field]: val, estado: nextEstado, ...extra };
-        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado, ...extra }).catch(console.error);
-        return updated;
+      if (c.id !== candidateId) return c;
+      const val = !c[field];
+      let nextEstado = c.estado;
+      const extra = {};
+      if (field === 'pruebas' || field === 'aval') {
+        const newPruebas = field === 'pruebas' ? val : c.pruebas;
+        const newAval    = field === 'aval'    ? val : c.aval;
+        nextEstado = (newPruebas && newAval) ? 'Contratación' : 'Entrevista';
+        if (field === 'aval') extra.fecha_aval = val ? new Date().toISOString().slice(0, 10) : null;
       }
-      return c;
+      api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado, ...extra }).catch(console.error);
+      return { ...c, [field]: val, estado: nextEstado, ...extra };
     }));
+  };
+
+  const toggleCandidateField = (candidateId, field) => {
+    const candidate = candidates.find(x => x.id === candidateId);
+    if (!candidate) return;
+    const currentVal = !!candidate[field];
+    if (currentVal) {
+      const label = field === 'pruebas' ? 'Pruebas psicotécnicas' : 'Aval de contratación';
+      showConfirm(
+        `¿Desactivar "${label}"?`,
+        'Esta acción puede afectar el proceso del candidato.',
+        () => doToggleField(candidateId, field)
+      );
+      return;
+    }
+    doToggleField(candidateId, field);
   };
 
   const handleAddCandidate = () => {
     setCandModalMode('create');
     setCandForm({
-      nombres: '', correo: '', celular: '', ciudad: '',
+      nombres: '', correo: '', celular: '', ciudad_id: '',
       tipo_documento: 'Cédula de Ciudadanía', identificacion: '',
       fecha_expedicion: '', edad: '', fecha_postulacion: getTodayStr(),
       fuente: 'Fase Inicial', fuente_especifica: 'Pendiente de Aval',
@@ -123,7 +156,77 @@ export default function CandidatosCrud() {
   const handleEditCandidate = (c) => {
     setCandModalMode('edit');
     setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
+    setNewDocFile(null);
+    setDocsLoading(true);
+    setDocs([]);
     setIsCandModalOpen(true);
+    api.get(`/candidatos/${c.id}/documentos`)
+      .then(r => setDocs(r.data))
+      .catch(console.error)
+      .finally(() => setDocsLoading(false));
+  };
+
+  const REQUIRED_DOCS = ['Hoja de vida', 'Pruebas psicotécnicas'];
+
+  const handleUploadDoc = async (nombre, file) => {
+    setUploadingDoc(nombre);
+    const fd = new FormData();
+    fd.append('nombre', nombre);
+    fd.append('archivo', file);
+    try {
+      const { data } = await api.post(`/candidatos/${candForm.id}/documentos`, fd, {
+        headers: { 'Content-Type': undefined },
+      });
+      setDocs(prev => {
+        const filtered = prev.filter(d => d.nombre !== nombre);
+        return [...filtered, data].sort((a, b) => a.nombre.localeCompare(b.nombre));
+      });
+      if (REQUIRED_DOCS.includes(nombre)) {
+        reload();
+      }
+    } catch (e) {
+      alert('Error al subir: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const doDeleteDoc = async (doc) => {
+    try {
+      await api.delete(`/candidatos/${candForm.id}/documentos/${doc.id}`);
+      setDocs(prev => prev.filter(d => d.id !== doc.id));
+      if (REQUIRED_DOCS.includes(doc.nombre)) {
+        setCandidates(prev => prev.map(c => {
+          if (c.id !== candForm.id) return c;
+          const updatedDocs = (c.documentos || []).filter(d => d.nombre !== doc.nombre);
+          const stillOk = updatedDocs.filter(d => REQUIRED_DOCS.includes(d.nombre)).length >= 2;
+          if (!stillOk && (c.pruebas || c.aval)) {
+            api.put(`/candidatos/${candForm.id}`, {
+              pruebas: false, aval: false, fecha_aval: null, estado: 'Entrevista',
+            }).catch(console.error);
+            return { ...c, documentos: updatedDocs, pruebas: false, aval: false, fecha_aval: null, estado: 'Entrevista' };
+          }
+          return { ...c, documentos: updatedDocs };
+        }));
+      }
+    } catch (e) {
+      alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+    }
+  };
+
+  const handleDeleteDoc = (doc) => {
+    showConfirm(
+      '¿Eliminar documento?',
+      `"${doc.nombre}" será eliminado permanentemente.`,
+      () => doDeleteDoc(doc)
+    );
+  };
+
+  const handleAddCustomDoc = async () => {
+    if (!newDocFile) { alert('Selecciona un archivo.'); return; }
+    const nombre = newDocFile.name.replace(/\.[^/.]+$/, '');
+    await handleUploadDoc(nombre, newDocFile);
+    setNewDocFile(null);
   };
 
   const handleOpenProcesos = (c) => {
@@ -204,14 +307,21 @@ export default function CandidatosCrud() {
     setIsCandModalOpen(true);
   };
 
-  const handleRemoveCandidate = async (candidateId) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este candidato?')) return;
+  const doRemoveCandidate = async (candidateId) => {
     try {
       await api.delete(`/candidatos/${candidateId}`);
       setCandidates(prev => prev.filter(c => c.id !== candidateId));
     } catch (e) {
       alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
     }
+  };
+
+  const handleRemoveCandidate = (candidateId) => {
+    showConfirm(
+      '¿Eliminar candidato?',
+      'Esta acción eliminará al candidato y todos sus datos. No se puede deshacer.',
+      () => doRemoveCandidate(candidateId)
+    );
   };
 
   const handleSaveCandidate = async () => {
@@ -304,10 +414,7 @@ export default function CandidatosCrud() {
             style={S.searchInput}
           />
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button style={S.btnSecondary} onClick={reload}>Actualizar</button>
-          <button style={S.btnPrimary} onClick={handleAddCandidate}>+ Agregar candidato</button>
-        </div>
+        <button style={S.btnSecondary} onClick={reload}>Actualizar</button>
       </div>
 
       {loadingData && (
@@ -334,7 +441,16 @@ export default function CandidatosCrud() {
             </tr>
           </thead>
           <tbody>
-            {filteredCandDetail.map(c => (
+            {filteredCandDetail.map(c => {
+              const docsCount = (c.documentos || []).filter(d => ['Hoja de vida', 'Pruebas psicotécnicas'].includes(d.nombre)).length;
+              const docsOk    = docsCount >= 2;
+              const asmtOk    = c.asmt_prom != null;
+              const entvOk    = c.entv_prom != null;
+              const pruebasDisabled = (!docsOk || !asmtOk) && !c.pruebas;
+              const avalDisabled    = (!docsOk || !entvOk) && !c.aval;
+              const pruebasTip = !docsOk ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero' : !asmtOk ? 'Completa el Assessment en Procesos para habilitar' : '';
+              const avalTip    = !docsOk ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero' : !entvOk ? 'Completa la Entrevista en Procesos para habilitar' : '';
+              return (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: 'var(--white)' }}>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontWeight: 700 }}>
                   {c.nombres}
@@ -342,7 +458,7 @@ export default function CandidatosCrud() {
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)', fontFamily: 'monospace' }}>{c.identificacion}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.correo}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.celular}</td>
-                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.ciudad}</td>
+                <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.ciudad?.nombre || '-'}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.fuente}</td>
                 <td style={{ padding: '12px 8px', fontSize: '0.85rem', color: 'var(--text)' }}>{c.requisicion?.nro_identificacion_proceso || '–'}</td>
                 <td style={{ padding: '12px 8px' }}>
@@ -351,10 +467,24 @@ export default function CandidatosCrud() {
                   </span>
                 </td>
                 <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                  <input type="checkbox" checked={c.pruebas || false} onChange={() => toggleCandidateField(c.id, 'pruebas')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    checked={c.pruebas || false}
+                    onChange={() => toggleCandidateField(c.id, 'pruebas')}
+                    disabled={pruebasDisabled}
+                    title={pruebasTip}
+                    style={{ width: 16, height: 16, cursor: pruebasDisabled ? 'not-allowed' : 'pointer', opacity: pruebasDisabled ? 0.35 : 1 }}
+                  />
                 </td>
                 <td style={{ padding: '12px 8px', textAlign: 'center' }}>
-                  <input type="checkbox" checked={c.aval || false} onChange={() => toggleCandidateField(c.id, 'aval')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                  <input
+                    type="checkbox"
+                    checked={c.aval || false}
+                    onChange={() => toggleCandidateField(c.id, 'aval')}
+                    disabled={avalDisabled}
+                    title={avalTip}
+                    style={{ width: 16, height: 16, cursor: avalDisabled ? 'not-allowed' : 'pointer', opacity: avalDisabled ? 0.35 : 1 }}
+                  />
                 </td>
                 <td style={{ padding: '12px 8px' }}>
                   <div style={S.actions}>
@@ -365,10 +495,11 @@ export default function CandidatosCrud() {
                   </div>
                 </td>
               </tr>
-            ))}
+            ); })}
             {filteredCandDetail.length === 0 && (
               <tr><td colSpan="12" style={S.empty}>No se encontraron candidatos.</td></tr>
             )}
+
           </tbody>
         </table>
       </div>}
@@ -397,7 +528,7 @@ export default function CandidatosCrud() {
                 <Field label="Número de identificación" k="identificacion" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Fecha de expedición" k="fecha_expedicion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Edad" k="edad" type="number" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
-                <Field label="Ciudad" k="ciudad" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Ciudad" k="ciudad_id" opts={ciudadesOpts} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Celular" k="celular" req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Fecha de postulación" k="fecha_postulacion" type="date" form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view' || candModalMode === 'create'} />
@@ -407,7 +538,7 @@ export default function CandidatosCrud() {
                 Proceso de selección
               </h4>
               <div style={S.grid3}>
-                <Field label="Requisición asociada" k="requisicion_id" req span={3} opts={requisitions.map(r => ({ value: String(r.id), label: `${r.nro_identificacion_proceso} – ${r.cargo}` }))} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
+                <Field label="Requisición asociada" k="requisicion_id" req span={3} opts={requisitions.map(r => ({ value: String(r.id), label: `${r.nro_identificacion_proceso} – ${r.cargo?.nombre || '(sin cargo)'}` }))} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Fuente de reclutamiento" k="fuente" opts={MOCK_OPTS.fuentes_reclutamiento} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Fuente específica" k="fuente_especifica" opts={MOCK_OPTS.fuentes_especificas} req form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
                 <Field label="Estado del proceso" k="estado" opts={MOCK_OPTS.estados_proceso} form={candForm} onChange={(k) => (e) => setCandForm(p => ({ ...p, [k]: e.target.value }))} disabled={candModalMode === 'view'} />
@@ -439,6 +570,95 @@ export default function CandidatosCrud() {
                 disabled={candModalMode === 'view'}
                 placeholder="Escriba aquí las observaciones sobre el candidato..."
               />
+
+              {/* ── Documentos (solo en edición) ── */}
+              {candModalMode === 'edit' && (
+                <>
+                  <h4 style={{ margin: '28px 0 14px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif" }}>
+                    Documentos
+                  </h4>
+
+                  {docsLoading ? (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif' }}>Cargando documentos…</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                      {/* Fijos */}
+                      {FIXED_DOCS.map(nombre => {
+                        const existing = docs.find(d => d.nombre === nombre);
+                        const uploading = uploadingDoc === nombre;
+                        return (
+                          <div key={nombre} style={SD.docRow}>
+                            <span style={SD.docLabel}>{nombre}</span>
+                            {existing ? (
+                              <>
+                                <span style={SD.docFile}>{existing.nombre_original}</span>
+                                <a
+                                  href={`/api/candidatos/${candForm.id}/documentos/${existing.id}/download`}
+                                  style={SD.btnDownload}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Descargar
+                                </a>
+                                <label style={{ ...SD.btnReplace, opacity: uploading ? 0.6 : 1, cursor: uploading ? 'default' : 'pointer' }}>
+                                  {uploading ? 'Subiendo…' : 'Reemplazar'}
+                                  <input type="file" style={{ display: 'none' }} disabled={uploading}
+                                    onChange={e => { if (e.target.files[0]) handleUploadDoc(nombre, e.target.files[0]); e.target.value = ''; }}
+                                  />
+                                </label>
+                                <button style={SD.btnDel} onClick={() => handleDeleteDoc(existing)}>✕</button>
+                              </>
+                            ) : (
+                              <label style={{ ...SD.btnReplace, opacity: uploading ? 0.6 : 1, cursor: uploading ? 'default' : 'pointer' }}>
+                                {uploading ? 'Subiendo…' : 'Subir archivo'}
+                                <input type="file" style={{ display: 'none' }} disabled={uploading}
+                                  onChange={e => { if (e.target.files[0]) handleUploadDoc(nombre, e.target.files[0]); e.target.value = ''; }}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Documentos adicionales ya subidos */}
+                      {docs.filter(d => !FIXED_DOCS.includes(d.nombre)).map(d => (
+                        <div key={d.id} style={SD.docRow}>
+                          <span style={SD.docLabel}>{d.nombre}</span>
+                          <span style={SD.docFile}>{d.nombre_original}</span>
+                          <a
+                            href={`/api/candidatos/${candForm.id}/documentos/${d.id}/download`}
+                            style={SD.btnDownload}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Descargar
+                          </a>
+                          <button style={SD.btnDel} onClick={() => handleDeleteDoc(d)}>✕</button>
+                        </div>
+                      ))}
+
+                      {/* Agregar nuevo documento */}
+                      <div style={{ ...SD.docRow, marginTop: 6, background: 'var(--bg)', borderRadius: 8, padding: '10px 12px', gap: 10 }}>
+                        <label style={{ ...SD.btnFileSelect, flex: '1 1 auto' }}>
+                          {newDocFile ? newDocFile.name : 'Seleccionar archivo'}
+                          <input type="file" style={{ display: 'none' }}
+                            onChange={e => setNewDocFile(e.target.files[0] || null)}
+                          />
+                        </label>
+                        <button
+                          style={{ ...SD.btnAdd, opacity: uploadingDoc ? 0.6 : 1 }}
+                          disabled={!!uploadingDoc}
+                          onClick={handleAddCustomDoc}
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div style={S.modalFooter}>
@@ -691,6 +911,28 @@ export default function CandidatosCrud() {
         </div>
       )}
 
+      {confirmDlg.open && (
+        <div style={{ ...S.overlay, zIndex: 6000 }} onClick={handleConfirmCancel}>
+          <div
+            style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={S.modalHeaderGreen}>
+              <span style={{ ...S.modalTitleWhite, fontSize: '1rem' }}>{confirmDlg.title}</span>
+            </div>
+            <div style={{ padding: '22px 28px' }}>
+              <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>
+                {confirmDlg.msg}
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+              <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
+              <button style={S.btnPrimaryGreen} onClick={handleConfirmOk}>Aceptar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div style={{
           position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
@@ -743,6 +985,18 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
     </div>
   );
 }
+
+const SD = {
+  docRow:        { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' },
+  docLabel:      { minWidth: 200, fontSize: '0.87rem', fontWeight: 700, color: 'var(--text)', fontFamily: 'Nunito,sans-serif', flexShrink: 0 },
+  docFile:       { flex: 1, fontSize: '0.83rem', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  btnDownload:   { padding: '6px 14px', background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', borderRadius: 6, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', textDecoration: 'none', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' },
+  btnReplace:    { padding: '6px 14px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' },
+  btnFileSelect: { padding: '6px 14px', background: 'var(--white)', color: 'var(--text)', border: '1.5px solid var(--border)', borderRadius: 6, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' },
+  btnDel:        { padding: '5px 8px', background: '#fce8e8', color: '#a33', border: 'none', borderRadius: 6, fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1 },
+  btnAdd:        { padding: '7px 16px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito,sans-serif', whiteSpace: 'nowrap' },
+  nameInput:     { padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 6, fontSize: '0.87rem', fontFamily: 'Nunito,sans-serif', outline: 'none', background: 'var(--white)', color: 'var(--text)' },
+};
 
 const S = {
   searchWrap: { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },

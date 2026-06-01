@@ -7,7 +7,7 @@ const EMPTY = {
     apellidos: "",
     edad: "",
     fecha_expedicion: "",
-    ciudad: "",
+    ciudad_id: "",
     celular: "",
     correo: "",
     negocio: "",
@@ -106,13 +106,14 @@ export default function RegistroCandidatosForm() {
     const [ciudades, setCiudades] = useState([]);
     const [proyectos, setProyectos] = useState([]);
     const [catalogosLoading, setCatalogosLoading] = useState(true);
+    const [registroEstado, setRegistroEstado] = useState(null);
     const focus = useInputFocus();
-    const reqParam =
-        new URLSearchParams(window.location.search).get("req") ?? "";
+    const tokenParam =
+        new URLSearchParams(window.location.search).get("token") ?? "";
 
     useEffect(() => {
-        const url = reqParam
-            ? `/api/registro/catalogos?req=${encodeURIComponent(reqParam)}`
+        const url = tokenParam
+            ? `/api/registro/catalogos?token=${encodeURIComponent(tokenParam)}`
             : "/api/registro/catalogos";
         fetch(url)
             .then((r) => r.json())
@@ -122,6 +123,7 @@ export default function RegistroCandidatosForm() {
                 if (data.negocio) {
                     setForm((p) => ({ ...p, negocio: data.negocio }));
                 }
+                setRegistroEstado(data.estado ?? null);
             })
             .catch(() => {})
             .finally(() => setCatalogosLoading(false));
@@ -151,7 +153,7 @@ export default function RegistroCandidatosForm() {
             e.edad = "Ingresa una edad válida (entre 14 y 80 años)";
         }
         if (!form.fecha_expedicion) e.fecha_expedicion = "Campo obligatorio";
-        if (!form.ciudad) e.ciudad = "Selecciona una ciudad";
+        if (!form.ciudad_id) e.ciudad_id = "Selecciona una ciudad";
         if (!form.celular.trim()) {
             e.celular = "Campo obligatorio";
         } else if (!/^\d{10}$/.test(form.celular.trim())) {
@@ -162,7 +164,6 @@ export default function RegistroCandidatosForm() {
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) {
             e.correo = "Ingresa un correo electrónico válido";
         }
-        if (!form.negocio) e.negocio = "Selecciona un negocio";
         return e;
     };
 
@@ -191,7 +192,7 @@ export default function RegistroCandidatosForm() {
                     "X-CSRF-TOKEN": csrfToken ?? "",
                     Accept: "application/json",
                 },
-                body: JSON.stringify({ ...form, req: reqParam }),
+                body: JSON.stringify({ ...form, token: tokenParam }),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -204,6 +205,50 @@ export default function RegistroCandidatosForm() {
             setLoading(false);
         }
     };
+
+    if (catalogosLoading && tokenParam) {
+        return (
+            <div style={{ minHeight: "100vh", background: "var(--bg, #e8f8f5)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Nunito, sans-serif", color: "var(--text-muted, #5a7a75)" }}>
+                Cargando…
+            </div>
+        );
+    }
+
+    if (registroEstado === 'Cerrada') {
+        return (
+            <div style={{ minHeight: "100vh", background: "var(--bg, #e8f8f5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Nunito, sans-serif" }}>
+                <div style={{ background: "var(--white, #fff)", borderRadius: "var(--radius, 16px)", boxShadow: "var(--shadow, 0 4px 20px rgba(26,155,140,0.12))", padding: "60px 48px", maxWidth: 520, width: "100%", textAlign: "center" }}>
+                    <div style={{ width: 76, height: 76, borderRadius: "50%", background: "var(--primary-light, #d0f0ec)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", fontSize: "2rem", color: "var(--primary, #1a9b8c)", fontWeight: 700 }}>
+                        ✓
+                    </div>
+                    <h2 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: "1.4rem", color: "var(--primary, #1a9b8c)", margin: "0 0 12px" }}>
+                        Requisición completada
+                    </h2>
+                    <p style={{ color: "var(--text-muted, #5a7a75)", fontSize: "0.93rem", lineHeight: 1.7, margin: 0 }}>
+                        El proceso de selección para esta vacante ha finalizado exitosamente. Ya no es posible recibir nuevas postulaciones.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (registroEstado === 'Cancelada') {
+        return (
+            <div style={{ minHeight: "100vh", background: "var(--bg, #e8f8f5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "Nunito, sans-serif" }}>
+                <div style={{ background: "var(--white, #fff)", borderRadius: "var(--radius, 16px)", boxShadow: "var(--shadow, 0 4px 20px rgba(26,155,140,0.12))", padding: "60px 48px", maxWidth: 520, width: "100%", textAlign: "center" }}>
+                    <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fde8e8", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", fontSize: "2rem", color: "#c0392b", fontWeight: 700 }}>
+                        ✕
+                    </div>
+                    <h2 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: "1.4rem", color: "#c0392b", margin: "0 0 12px" }}>
+                        Requisición cancelada
+                    </h2>
+                    <p style={{ color: "var(--text-muted, #5a7a75)", fontSize: "0.93rem", lineHeight: 1.7, margin: 0 }}>
+                        Este proceso de selección ha sido cancelado y no se están aceptando nuevas postulaciones.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     if (submitted) {
         return (
@@ -545,19 +590,19 @@ export default function RegistroCandidatosForm() {
                         <Field
                             label="6. Ciudad de residencia"
                             required
-                            error={errors.ciudad}
+                            error={errors.ciudad_id}
                         >
                             <div
                                 style={{
                                     maxWidth: 340,
-                                    outline: errors.ciudad
+                                    outline: errors.ciudad_id
                                         ? "1.5px solid #c0392b"
                                         : "none",
                                     borderRadius: "var(--radius-sm, 10px)",
                                 }}
                             >
                                 <SearchableSelect
-                                    value={form.ciudad}
+                                    value={form.ciudad_id}
                                     defaultValue=""
                                     placeholder={
                                         catalogosLoading
@@ -565,10 +610,10 @@ export default function RegistroCandidatosForm() {
                                             : "Buscar ciudad..."
                                     }
                                     options={ciudades.map((c) => ({
-                                        value: c,
-                                        label: c,
+                                        value: String(c.id),
+                                        label: c.nombre,
                                     }))}
-                                    onChange={(v) => set("ciudad", v)}
+                                    onChange={(v) => set("ciudad_id", v)}
                                 />
                             </div>
                         </Field>
@@ -616,33 +661,21 @@ export default function RegistroCandidatosForm() {
                         <Field
                             label="9. Negocio al que se postula"
                             required
-                            error={errors.negocio}
                         >
-                            <div
+                            <input
+                                type="text"
+                                value={form.negocio}
+                                readOnly
+                                disabled
                                 style={{
+                                    ...inputBase,
                                     maxWidth: 340,
-                                    outline: errors.negocio
-                                        ? "1.5px solid #c0392b"
-                                        : "none",
-                                    borderRadius: "var(--radius-sm, 10px)",
+                                    background: "var(--bg2, #f0faf8)",
+                                    color: "var(--text-muted, #5a7a75)",
+                                    cursor: "not-allowed",
+                                    userSelect: "none",
                                 }}
-                            >
-                                <SearchableSelect
-                                    key={form.negocio}
-                                    value={form.negocio}
-                                    defaultValue=""
-                                    placeholder={
-                                        catalogosLoading
-                                            ? "Cargando proyectos..."
-                                            : "Buscar proyecto..."
-                                    }
-                                    options={proyectos.map((n) => ({
-                                        value: n,
-                                        label: n,
-                                    }))}
-                                    onChange={(v) => set("negocio", v)}
-                                />
-                            </div>
+                            />
                         </Field>
 
                         {/* Botón enviar */}

@@ -10,7 +10,14 @@ class CandidatoController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Candidato::with(['requisicion.proyecto', 'requisicion.empresa']);
+        $query = Candidato::with([
+            'requisicion.proyecto',
+            'requisicion.empresa',
+            'requisicion.cargo',
+            'ciudad',
+            'documentos' => fn($q) => $q->whereIn('nombre', ['Hoja de vida', 'Pruebas psicotécnicas'])
+                                        ->select(['id', 'candidato_id', 'nombre']),
+        ]);
 
         if ($request->requisicion_id) {
             $query->where('requisicion_id', $request->requisicion_id);
@@ -37,7 +44,7 @@ class CandidatoController extends Controller
             'identificacion'    => 'required|string|max:30',
             'fecha_expedicion'  => 'nullable|date',
             'edad'              => 'nullable|integer|min:14|max:100',
-            'ciudad'            => 'nullable|string|max:120',
+            'ciudad_id'         => 'nullable|exists:ciudades,id',
             'correo'            => 'required|email|max:180',
             'celular'           => 'nullable|string|max:20',
             'fecha_postulacion' => 'nullable|date',
@@ -59,12 +66,12 @@ class CandidatoController extends Controller
         }
 
         $candidato = Candidato::create($data);
-        return response()->json($candidato->load('requisicion'), 201);
+        return response()->json($candidato->load(['requisicion.cargo', 'ciudad']), 201);
     }
 
     public function show(Candidato $candidato)
     {
-        return response()->json($candidato->load('requisicion'));
+        return response()->json($candidato->load(['requisicion.cargo', 'ciudad']));
     }
 
     public function update(Request $request, Candidato $candidato)
@@ -76,7 +83,7 @@ class CandidatoController extends Controller
             'identificacion'           => 'sometimes|required|string|max:30',
             'fecha_expedicion'         => 'nullable|date',
             'edad'                     => 'nullable|integer|min:14|max:100',
-            'ciudad'                   => 'nullable|string|max:120',
+            'ciudad_id'                => 'nullable|exists:ciudades,id',
             'correo'                   => 'sometimes|required|email|max:180',
             'celular'                  => 'nullable|string|max:20',
             'fecha_postulacion'        => 'nullable|date',
@@ -121,7 +128,7 @@ class CandidatoController extends Controller
         }
 
         $candidato->update($data);
-        return response()->json($candidato->load('requisicion'));
+        return response()->json($candidato->load(['requisicion.cargo', 'ciudad']));
     }
 
     public function destroy(Candidato $candidato)

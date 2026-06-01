@@ -94,11 +94,12 @@ export default function SeleccionCrud() {
   };
 
   /* ── Derived data ──────────────────────────────────────────────── */
-  const ciudadesOpts     = (catalogs.ciudades || []).map(c => ({ value: c, label: c }));
+  const ciudadesOpts     = (catalogs.ciudades || []).map(c => ({ value: String(c.id), label: c.nombre }));
   const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
   const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
-  const empleadoresOpts  = (catalogs.empleadores || []).map(e => ({ value: e, label: e }));
+  const empleadoresOpts  = (catalogs.empleadores || []).map(e => ({ value: String(e.id), label: e.nombre }));
+  const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
 
   const handleSolicitanteChange = (name) => {
     const user = (catalogs.responsables || []).find(u => u.name === name);
@@ -124,15 +125,15 @@ export default function SeleccionCrud() {
         fecha_solicitud:             row.fecha_solicitud || today(),
         proceso:                     row.proceso || '',
         numero_identificacion_proceso: row.nro_identificacion_proceso,
-        cargo_requerido:             row.cargo || '',
+        cargo_id:                    row.cargo_id != null ? String(row.cargo_id) : '',
         tipo_solicitud:              row.tipo_solicitud || '',
         proyecto_id:                 row.proyecto_id != null ? String(row.proyecto_id) : '',
         empresa_id:                  row.empresa_id  != null ? String(row.empresa_id)  : '',
-        empleador:                   row.empleador || '',
+        empleador_id:                row.empleador_id != null ? String(row.empleador_id) : '',
         fecha_ingreso:               row.fecha_ingreso || '',
         pais:                        row.pais || 'Colombia',
         fecha_cierre:                row.fecha_cierre || '',
-        ciudad:                      row.ciudad || '',
+        ciudad_id:                   row.ciudad_id != null ? String(row.ciudad_id) : '',
         observaciones:               row.observaciones || '',
         estado:                      row.estado || 'Abierta',
         solicitud_confidencial:      row.solicitud_confidencial ? 'Sí' : 'No',
@@ -146,23 +147,23 @@ export default function SeleccionCrud() {
       setSaving(true);
       const payload = {
         nro_identificacion:     form.numero_identificacion,
-        cargo:                  form.cargo_requerido,
+        cargo_id:               form.cargo_id       || null,
         cargo_solicitante:      form.cargo_solicitante,
         fecha_solicitud:        form.fecha_solicitud,
-        fecha_ingreso:          form.fecha_ingreso || null,
-        fecha_cierre:           form.fecha_cierre || null,
+        fecha_ingreso:          form.fecha_ingreso  || null,
+        fecha_cierre:           form.fecha_cierre   || null,
         requeridas:             parseInt(form.numero_personas) || 1,
-        proyecto_id:            form.proyecto_id || null,
-        empresa_id:             form.empresa_id  || null,
-        empleador:              form.empleador   || null,
+        proyecto_id:            form.proyecto_id    || null,
+        empresa_id:             form.empresa_id     || null,
+        empleador_id:           form.empleador_id   || null,
         tipo_solicitud:         form.tipo_solicitud,
         responsable:            form.nombre_responsable,
         proceso:                form.proceso,
-        ciudad:                 form.ciudad,
+        ciudad_id:              form.ciudad_id      || null,
         pais:                   form.pais || 'Colombia',
         estado:                 form.estado || 'Abierta',
         solicitud_confidencial: form.solicitud_confidencial === 'Sí',
-        observaciones:          form.observaciones || null,
+        observaciones:          form.observaciones  || null,
       };
       if (mode === 'create') {
         const { data: nr } = await api.post('/requisiciones', payload);
@@ -188,7 +189,7 @@ export default function SeleccionCrud() {
   const paged    = filtered.slice((page - 1) * PER, page * PER);
 
   const copyFormLink = (row) => {
-    const url = `${window.location.origin}/registro-candidatos?req=${row.nro_identificacion_proceso}`;
+    const url = `${window.location.origin}/registro-candidatos?token=${row.registro_token}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(row.id);
       setTimeout(() => setCopiedId(null), 2500);
@@ -249,11 +250,11 @@ export default function SeleccionCrud() {
                     <td style={S.td}>{(page - 1) * PER + i + 1}</td>
                     <td style={S.td}>{row.nro_identificacion_proceso}</td>
                     <td style={S.td}><span style={S.badge(bg, color)}>{row.estado}</span></td>
-                    <td style={S.td}>{row.cargo}</td>
+                    <td style={S.td}>{row.cargo?.nombre || '-'}</td>
                     <td style={S.td}>{fmtDate(row.fecha_solicitud)}</td>
                     <td style={S.td}>{row.proyecto?.nombre || '-'}</td>
                     <td style={S.td}>{row.tipo_solicitud}</td>
-                    <td style={S.td}>{row.ciudad}</td>
+                    <td style={S.td}>{row.ciudad?.nombre || '-'}</td>
                     <td style={{ ...S.td, textAlign: 'center' }}>
                       <div style={S.actions}>
                         <button style={S.aBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => openModal('edit', row)}><IconEdit size={14}/></button>
@@ -322,7 +323,7 @@ export default function SeleccionCrud() {
                 <F l="Fecha de solicitud"          k="fecha_solicitud"              req={!isRO(mode)} dis form={form} ch={ch} />
                 <F l="Proceso"                     k="proceso"                      req={!isRO(mode)} opts={OPT.procesos} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />
-                <F l="Cargo requerido"             k="cargo_requerido"              req={!isRO(mode)} opts={catalogs.cargos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Cargo requerido"             k="cargo_id"                     req={!isRO(mode)} opts={cargosOpts} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Tipo de solicitud"           k="tipo_solicitud"               req={!isRO(mode)} opts={OPT.tipos} form={form} ch={ch} dis={isRO(mode)} />
                 {/* Proyecto – SearchableSelect */}
                 <SField l="Proyecto" req={!isRO(mode)}>
@@ -353,9 +354,9 @@ export default function SeleccionCrud() {
                 {/* Empleador – SearchableSelect */}
                 <SField l="Empleador">
                   <SearchableSelect
-                    key={`empl-${form.empleador ?? ''}`}
-                    value={form.empleador ?? ''}
-                    onChange={chVal('empleador')}
+                    key={`empl-${form.empleador_id ?? ''}`}
+                    value={form.empleador_id ?? ''}
+                    onChange={chVal('empleador_id')}
                     options={empleadoresOpts}
                     defaultValue=""
                     placeholder="-- Selecciona empleador --"
@@ -370,9 +371,9 @@ export default function SeleccionCrud() {
                 {/* Ciudad – SearchableSelect */}
                 <SField l="Ciudad de operación" req={!isRO(mode)}>
                   <SearchableSelect
-                    key={`ciudad-${form.ciudad ?? ''}`}
-                    value={form.ciudad ?? ''}
-                    onChange={chVal('ciudad')}
+                    key={`ciudad-${form.ciudad_id ?? ''}`}
+                    value={form.ciudad_id ?? ''}
+                    onChange={chVal('ciudad_id')}
                     options={ciudadesOpts}
                     defaultValue=""
                     placeholder="-- Selecciona ciudad --"

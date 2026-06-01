@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\simon\\\\OneDrive\\\\Desktop\\\\ERP-AvanzaConoce\\\\resources\\\\js\" -Recurse -Filter \"*seleccion*\" -ErrorAction SilentlyContinue)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\simon\\\\OneDrive\\\\Desktop\\\\ERP-AvanzaConoce\\\\resources\\\\js\" -Recurse -Filter \"*seleccion*\" -ErrorAction SilentlyContinue)",
+      "Bash(php artisan *)",
+      "Bash(npm run *)",
+      "Bash(find app/Http/Resources -name \"Requisicion*\")",
+      "Bash(find app *)"
     ]
   }
 }
