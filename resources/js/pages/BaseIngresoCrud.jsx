@@ -114,7 +114,7 @@ export default function BaseIngresoCrud() {
       telefono:                 c.celular                               || p.telefono,
       proyecto:                 c.negocio         || req.proyecto?.nombre || p.proyecto,
       empresa:                  req.empresa?.nombre                    || p.empresa,
-      empleador:                req.empleador                          || p.empleador,
+      empleador:                req.empleador?.nombre                  || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
       tipo_ingreso:             (req.tipo_solicitud?.includes('Reemplazo') ? 'Reemplazo' : req.tipo_solicitud?.includes('Nuevo') ? 'Nuevo' : null) || p.tipo_ingreso,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,
