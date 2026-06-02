@@ -57,7 +57,7 @@ export default function SeleccionCrud() {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [estadoF, setEstadoF] = useState('Abierta');
+  const [estadoF, setEstadoF] = useState('Todas');
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState('create');
   const [form, setForm] = useState({});
