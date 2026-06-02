@@ -259,3 +259,103 @@ export function PresetFiltersDropdown({ presets }) {
         </div>
     );
 }
+
+export function FilterDropdown({ label, value, onChange, options }) {
+    const [open, setOpen] = useState(false);
+    const [hovered, setHovered] = useState(-1);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        function onOutside(e) {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        }
+        document.addEventListener("mousedown", onOutside);
+        return () => document.removeEventListener("mousedown", onOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => (typeof o === 'string' ? o : o.value) === value);
+    const displayLabel = typeof selectedLabel === 'object' ? selectedLabel.label : (selectedLabel || value);
+
+    const handleSelect = (val) => {
+        onChange(val);
+        setOpen(false);
+    };
+
+    return (
+        <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+            <div
+                onClick={() => setOpen(!open)}
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    height: 40,
+                    padding: "0 12px",
+                    background: "var(--white)",
+                    border: open ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    boxShadow: open ? "0 0 0 4px rgba(26,155,140,0.14)" : "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    userSelect: "none",
+                }}
+            >
+                {label && (
+                    <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", whiteSpace: "nowrap" }}>
+                        {label}
+                    </span>
+                )}
+                <span style={{ fontSize: "0.87rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                    {displayLabel}
+                </span>
+                <span style={{ display: "flex", color: "var(--text-muted)", transform: `rotate(${open ? 180 : 0}deg)`, transition: "transform 0.2s ease" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                </span>
+            </div>
+            {open && (
+                <div style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: 0,
+                    background: "var(--white)",
+                    border: "1.5px solid rgba(26,155,140,0.14)",
+                    borderRadius: "12px",
+                    boxShadow: "0 10px 30px rgba(26,155,140,0.15)",
+                    zIndex: 1000,
+                    minWidth: 150,
+                    padding: "6px",
+                }}>
+                    {options.map((o, i) => {
+                        const val = typeof o === 'string' ? o : o.value;
+                        const lbl = typeof o === 'string' ? o : o.label;
+                        const active = val === value;
+                        return (
+                            <div
+                                key={val}
+                                onMouseEnter={() => setHovered(i)}
+                                onMouseLeave={() => setHovered(-1)}
+                                onClick={() => handleSelect(val)}
+                                style={{
+                                    padding: "8px 12px",
+                                    cursor: "pointer",
+                                    fontSize: "0.87rem",
+                                    fontFamily: "Nunito,sans-serif",
+                                    borderRadius: "8px",
+                                    fontWeight: active ? 700 : 400,
+                                    color: active ? "var(--primary)" : "var(--text)",
+                                    background: hovered === i ? "rgba(26,155,140,0.08)" : (active ? "rgba(26,155,140,0.04)" : "transparent"),
+                                    transition: "all 0.15s ease",
+                                }}
+                            >
+                                {lbl}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+

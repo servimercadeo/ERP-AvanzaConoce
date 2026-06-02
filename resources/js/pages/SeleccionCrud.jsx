@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { SearchableSelect } from '../components/SearchableSelect';
+import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconClose } from '../components/Icons';
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
@@ -212,12 +212,12 @@ export default function SeleccionCrud() {
             </span>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} style={S.searchInput} />
           </div>
-          <div style={S.estadoWrap}>
-            <span style={S.label}>Estado</span>
-            <select value={estadoF} onChange={e => setEstadoF(e.target.value)} style={S.estadoSelect}>
-              {['Todas', 'Abierta', 'En proceso', 'Completada', 'Cancelada'].map(o => <option key={o}>{o}</option>)}
-            </select>
-          </div>
+          <FilterDropdown
+            label="Estado"
+            value={estadoF}
+            onChange={setEstadoF}
+            options={['Todas', 'Abierta', 'En proceso', 'Completada', 'Cancelada']}
+          />
         </div>
         <div style={S.row}>
           <button style={S.btnOutline} onClick={reload}>
@@ -440,9 +440,7 @@ const S = {
   searchWrap:  { position: 'relative', flex: 1, minWidth: 180, maxWidth: 360 },
   searchIcon:  { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput: { ..._inp, height: 40, padding: '0 12px 0 32px' },
-  estadoWrap:  { display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', background: 'var(--white)', border: BD, borderRadius: RSM },
   label:       { fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: NUN, whiteSpace: 'nowrap' },
-  estadoSelect:{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.87rem', fontFamily: NUN, color: 'var(--text)', fontWeight: 700, cursor: 'pointer' },
   btnPrimary:  { ..._btn, padding: '0 18px', background: 'var(--primary)', color: '#fff', border: 'none' },
   btnOutline:  { ..._btn, padding: '0 14px', background: 'var(--white)', color: 'var(--text)', border: BD },
   card:        { background: 'var(--white)', border: BD, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', overflowX: 'auto' },

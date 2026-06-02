@@ -1703,3 +1703,45 @@ html.dark .tpb-switch-row:hover {
         padding: 28px 22px;
     }
 }
+
+/* ── PREMIUM GLOBAL SELECT STYLING ── */
+select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231a3a35' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    background-size: 13px !important;
+    padding-right: 36px !important;
+    background-color: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+select:hover:not(:disabled) {
+    border-color: var(--primary) !important;
+}
+
+select:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(26, 155, 140, 0.15) !important;
+}
+
+select:disabled {
+    background-color: var(--bg) !important;
+    color: var(--text-muted) !important;
+    cursor: not-allowed !important;
+    opacity: 0.7 !important;
+}
+
+select option {
+    background-color: var(--white) !important;
+    color: var(--text) !important;
+    padding: 8px 12px !important;
+}
+
