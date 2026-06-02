@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { ERP_MODULES } from '../data/erpModules';
@@ -219,12 +219,26 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
 /* ═══════════════════════════════════════════════════════════ */
 
 export default function Submodule() {
-  const { moduleId, submoduleId } = useParams();
+  const { moduleId, submoduleId, archivoId } = useParams();
   const mod = ERP_MODULES.find(m => m.id === moduleId);
   const sub = mod ? mod.submods.find(s => s.id === submoduleId) : null;
 
   /* Pestaña activa: por defecto la primera */
-  const [tabActiva, setTabActiva] = useState(sub?.archivos?.[0]?.id ?? null);
+  const [tabActiva, setTabActiva] = useState(() => {
+    const archivos = sub?.archivos ?? [];
+    return archivos.some(archivo => archivo.id === archivoId)
+      ? archivoId
+      : archivos[0]?.id ?? null;
+  });
+
+  useEffect(() => {
+    const archivos = sub?.archivos ?? [];
+    const archivoValido = archivoId && archivos.some(archivo => archivo.id === archivoId)
+      ? archivoId
+      : archivos[0]?.id ?? null;
+
+    setTabActiva(archivoValido);
+  }, [archivoId, sub]);
 
   if (!mod || !sub) {
     return (
