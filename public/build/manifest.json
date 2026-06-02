@@ -1,21 +1,36 @@
 {
   "resources/css/app.css": {
+<<<<<<< HEAD
     "file": "assets/app-C6Rlv4bJ.css",
     "src": "resources/css/app.css",
     "isEntry": true,
+=======
+    "file": "assets/app-CM2cQg8L.css",
+>>>>>>> c414d70d814b6d7c3adee85a4eb09bd3f92b6da4
     "name": "app",
     "names": [
       "app.css"
-    ]
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
   },
   "resources/js/app.jsx": {
+<<<<<<< HEAD
     "file": "assets/app-CjbVzcCY.js",
+=======
+    "file": "assets/app-CH24A7JX.js",
+>>>>>>> c414d70d814b6d7c3adee85a4eb09bd3f92b6da4
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "css": [
+<<<<<<< HEAD
       "assets/app-DkeM4MqR.css",
       "assets/app-C6Rlv4bJ.css"
+=======
+      "assets/app-DiUbT--S.css",
+      "assets/app-CM2cQg8L.css"
+>>>>>>> c414d70d814b6d7c3adee85a4eb09bd3f92b6da4
     ]
   }
 }
