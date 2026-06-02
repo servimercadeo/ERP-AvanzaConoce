@@ -14,7 +14,7 @@ const EMPTY_FORM = {
   proyecto: '',
   telefono: '',
   correo: '',
-  tipo_ingreso: '',
+  tipo_vinculacion: '',
   lugar_trabajo: '',
   lider_inmediato: '',
   empleador: '',
@@ -31,7 +31,7 @@ const EMPTY_FORM = {
 };
 
 const ESTADOS = ['en proceso', 'activa', 'finalizada', 'cancelada'];
-const TIPOS_INGRESO = ['Nuevo', 'Reemplazo'];
+const TIPOS_VINCULACION = ['Directa', 'Indirecta'];
 
 function getPaginasBotones(pagina, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -56,6 +56,7 @@ const getEstadoColors = (estado) => {
 export default function BaseIngresoCrud() {
   const [data, setData]           = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [sedes, setSedes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,8 +75,13 @@ export default function BaseIngresoCrud() {
     Promise.all([
       api.get('/base-ingresos'),
       api.get('/candidatos'),
+      api.get('/sedes'),
     ])
-      .then(([ing, cand]) => { setData(ing.data); setCandidates(cand.data); })
+      .then(([ing, cand, sed]) => {
+        setData(ing.data);
+        setCandidates(cand.data);
+        setSedes((sed.data?.data ?? sed.data ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -116,7 +122,7 @@ export default function BaseIngresoCrud() {
       empresa:                  req.empresa?.nombre                    || p.empresa,
       empleador:                req.empleador?.nombre                  || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
-      tipo_ingreso:             (req.tipo_solicitud?.includes('Reemplazo') ? 'Reemplazo' : req.tipo_solicitud?.includes('Nuevo') ? 'Nuevo' : null) || p.tipo_ingreso,
+      tipo_vinculacion:         c.tipo_vinculacion                    || p.tipo_vinculacion,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,
     }));
   };
@@ -126,7 +132,7 @@ export default function BaseIngresoCrud() {
     if (row) {
       setForm({ ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' });
     } else {
-      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10) });
+      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'en proceso' });
     }
     setIsModalOpen(true);
   };
@@ -317,8 +323,18 @@ export default function BaseIngresoCrud() {
                 <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Teléfono" k="telefono" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Tipo de ingreso" k="tipo_ingreso" opts={TIPOS_INGRESO} form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Lugar de trabajo" k="lugar_trabajo" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={TIPOS_VINCULACION} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>Sede</label>
+                  <SearchableSelect
+                    key={`sede-${form.lugar_trabajo ?? ''}`}
+                    value={form.lugar_trabajo ?? ''}
+                    defaultValue=""
+                    options={sedes}
+                    onChange={val => setForm(p => ({ ...p, lugar_trabajo: val }))}
+                    disabled={modalMode === 'view'}
+                  />
+                </div>
                 <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Empleador" k="empleador" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />

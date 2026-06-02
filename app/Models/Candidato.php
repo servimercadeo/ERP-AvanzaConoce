@@ -12,7 +12,7 @@ class Candidato extends Model
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
         'fecha_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
-        'pruebas', 'aval', 'fecha_aval', 'negocio', 'observaciones',
+        'pruebas', 'aval', 'tipo_vinculacion', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
         'asmt_ejercicio', 'asmt_nombre_ejercicio',
         'asmt_claridad_mensaje', 'asmt_conviccion_energia', 'asmt_adaptabilidad_escucha',
