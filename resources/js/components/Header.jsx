@@ -59,7 +59,7 @@ export default function Header() {
                       {sub.archivos?.length > 0 && (
                         <div className="sub-dropdown">
                           {sub.archivos.map(archivo => (
-                            <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}`}>
+                            <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}/file/${archivo.id}`}>
                               <span className="sub-icon"><IconFile size={14} /></span>
                               <span>{archivo.label}</span>
                             </Link>

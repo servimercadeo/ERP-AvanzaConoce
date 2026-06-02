@@ -27,6 +27,10 @@ export default function App() {
               element={<PrivateRoute><Module /></PrivateRoute>}
             />
             <Route
+              path="/module/:moduleId/submodule/:submoduleId/file/:archivoId"
+              element={<PrivateRoute><Submodule /></PrivateRoute>}
+            />
+            <Route
               path="/module/:moduleId/submodule/:submoduleId"
               element={<PrivateRoute><Submodule /></PrivateRoute>}
             />
