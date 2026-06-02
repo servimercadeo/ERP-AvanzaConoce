@@ -14,6 +14,7 @@ class CandidatoController extends Controller
             'requisicion.proyecto',
             'requisicion.empresa',
             'requisicion.cargo',
+            'requisicion.empleador',
             'ciudad',
             'documentos' => fn($q) => $q->whereIn('nombre', ['Hoja de vida', 'Pruebas psicotécnicas'])
                                         ->select(['id', 'candidato_id', 'nombre']),
