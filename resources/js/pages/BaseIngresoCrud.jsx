@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
@@ -66,6 +68,7 @@ export default function BaseIngresoCrud() {
   const [sedes, setSedes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [estadoFilter, setEstadoFilter] = useState('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
@@ -79,20 +82,18 @@ export default function BaseIngresoCrud() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const qc = useQueryClient();
+  const { data: _qBaseIngresos } = useQuery({ queryKey: ['base-ingresos'], queryFn: () => api.get('/base-ingresos').then(r => r.data) });
+  const { data: _qCandidates }   = useQuery({ queryKey: ['candidatos'],    queryFn: () => api.get('/candidatos').then(r => r.data) });
+  const { data: _qSedes }        = useQuery({ queryKey: ['sedes'],         queryFn: () => api.get('/sedes').then(r => r.data) });
+
   useEffect(() => {
-    Promise.all([
-      api.get('/base-ingresos'),
-      api.get('/candidatos'),
-      api.get('/sedes'),
-    ])
-      .then(([ing, cand, sed]) => {
-        setData(ing.data);
-        setCandidates(cand.data);
-        setSedes((sed.data?.data ?? sed.data ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    if (_qBaseIngresos) { setData(_qBaseIngresos); setLoading(false); }
+  }, [_qBaseIngresos]);
+  useEffect(() => { if (_qCandidates) setCandidates(_qCandidates); }, [_qCandidates]);
+  useEffect(() => {
+    if (_qSedes) setSedes((_qSedes?.data ?? _qSedes ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+  }, [_qSedes]);
 
   useEffect(() => { setPagina(1); }, [searchTerm, estadoFilter]);
 
@@ -198,11 +199,12 @@ export default function BaseIngresoCrud() {
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const filteredData = data.filter(row =>
-    [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
-      .some(v => String(v ?? '').toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase())
-  );
+  const filteredData = useMemo(() =>
+    data.filter(row =>
+      [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
+        .some(v => String(v ?? '').toLowerCase().includes(debouncedSearch.toLowerCase())) &&
+      (estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase())
+    ), [data, debouncedSearch, estadoFilter]);
 
   const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
   const paginatedData = filteredData.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);

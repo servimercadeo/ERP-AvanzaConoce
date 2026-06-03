@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
@@ -977,8 +979,9 @@ function getPaginasBotones(pagina, total) {
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
     const [empleados, setEmpleados] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // loading derived from React Query
     const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroCargo, setFiltroCargo] = useState("Todos");
@@ -1016,41 +1019,18 @@ export default function EmpleadosCrud() {
     const [pagina, setPagina] = useState(1);
     const [sedesActivas, setSedesActivas] = useState([]);
 
-    useEffect(() => {
-        fetch("/api/empresas")
-            .then((r) => (r.ok ? r.json() : []))
-            .then(setEmpresas)
-            .catch(() => {});
-    }, []);
+    const { data: _qEmpresas,  isLoading: _le } = useQuery({ queryKey: ['empresas'],  queryFn: () => api.get('/empresas').then(r => r.data) });
+    const { data: _qCatalogos, isLoading: _lc } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
+    const { data: _qSedes,     isLoading: _ls } = useQuery({ queryKey: ['sedes'],     queryFn: () => api.get('/sedes').then(r => r.data) });
+    const { data: _qEmpleados, isLoading: _lem }= useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
+    const loading = _lem;
 
+    useEffect(() => { if (_qEmpresas)  setEmpresas(_qEmpresas); },  [_qEmpresas]);
+    useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
     useEffect(() => {
-        fetch("/api/catalogos")
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-                if (data) setCatalogs(data);
-            })
-            .catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        fetch("/api/sedes")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => {
-                const activas = Array.isArray(data)
-                    ? data.filter((s) => s.estado === "Activa")
-                    : [];
-                setSedesActivas(activas);
-            })
-            .catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        setLoading(true);
-        api.get("/empleados")
-            .then((r) => setEmpleados(r.data))
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    }, []);
+        if (_qSedes) setSedesActivas((Array.isArray(_qSedes) ? _qSedes : []).filter(s => s.estado === 'Activa'));
+    }, [_qSedes]);
+    useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
 
     React.useEffect(() => {
         const anyOpen =
@@ -1076,7 +1056,7 @@ export default function EmpleadosCrud() {
     const filtered = useMemo(
         () =>
             empleados.filter((e) => {
-                const palabras = search
+                const palabras = debouncedSearch
                     .toLowerCase()
                     .trim()
                     .split(/\s+/)
@@ -1136,7 +1116,7 @@ export default function EmpleadosCrud() {
             }),
         [
             empleados,
-            search,
+            debouncedSearch,
             filtroEstado,
             filtroSede,
             filtroCargo,

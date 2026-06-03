@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
@@ -405,6 +407,7 @@ export default function SedesCrud() {
 
     // Filters
     const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 300);
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroDepto, setFiltroDepto] = useState("Todos");
     const [filtroTipo, setFiltroTipo] = useState("Todos");
@@ -420,13 +423,22 @@ export default function SedesCrud() {
     const [toast, setToast] = useState(null);
     const [pagina, setPagina] = useState(1);
 
+    const { data: _qSedes, refetch: refetchSedes } = useQuery({
+        queryKey: ['sedes-full'],
+        queryFn: async () => {
+            const [r1, r2] = await Promise.all([api.get('/sedes'), api.get('/sedes/options')]);
+            return { sedes: r1.data, options: r2.data };
+        },
+    });
+
+    useEffect(() => {
+        if (_qSedes) { setSedes(_qSedes.sedes); setOptions(_qSedes.options); setLoading(false); }
+    }, [_qSedes]);
+
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [resSedes, resOpts] = await Promise.all([
-                api.get("/sedes"),
-                api.get("/sedes/options"),
-            ]);
+            const [resSedes, resOpts] = await Promise.all([api.get("/sedes"), api.get("/sedes/options")]);
             setSedes(resSedes.data);
             setOptions(resOpts.data);
         } catch (err) {
@@ -437,10 +449,6 @@ export default function SedesCrud() {
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
@@ -449,7 +457,7 @@ export default function SedesCrud() {
     const filtered = useMemo(
         () =>
             sedes.filter((s) => {
-                const q = search.toLowerCase();
+                const q = debouncedSearch.toLowerCase();
                 const matchQ =
                     (s.nombre || "").toLowerCase().includes(q) ||
                     (s.codigo_distribuidor || "").toLowerCase().includes(q);
@@ -476,7 +484,7 @@ export default function SedesCrud() {
             }),
         [
             sedes,
-            search,
+            debouncedSearch,
             filtroSede,
             filtroDepto,
             filtroTipo,

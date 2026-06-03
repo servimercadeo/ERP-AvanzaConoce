@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import {
     IconEye,
@@ -71,8 +73,9 @@ export default function CandidatosCrud() {
     const [candidates, setCandidates] = useState([]);
     const [requisitions, setRequisitions] = useState([]);
     const [ciudadesOpts, setCiudadesOpts] = useState([]);
-    const [loadingData, setLoadingData] = useState(true);
+    // loadingData is derived from React Query (see queries below)
     const [candDetailSearch, setCandDetailSearch] = useState("");
+    const debouncedSearch = useDebounce(candDetailSearch, 300);
     const [isCandModalOpen, setIsCandModalOpen] = useState(false);
     const [candModalMode, setCandModalMode] = useState("create");
     const [candForm, setCandForm] = useState({
@@ -124,25 +127,16 @@ export default function CandidatosCrud() {
     const [procActiveTab, setProcActiveTab] = useState("assesment");
     const [procForm, setProcForm] = useState({});
 
+    const { data: _qCandidates,   isLoading: _lc } = useQuery({ queryKey: ['candidatos'],         queryFn: () => api.get('/candidatos').then(r => r.data) });
+    const { data: _qRequisitions, isLoading: _lr } = useQuery({ queryKey: ['requisiciones'],       queryFn: () => api.get('/requisiciones').then(r => r.data) });
+    const { data: _qCatalogos,    isLoading: _lk } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data) });
+    const loadingData = _lc || _lr || _lk;
+
+    useEffect(() => { if (_qCandidates)   setCandidates(_qCandidates); },   [_qCandidates]);
+    useEffect(() => { if (_qRequisitions) setRequisitions(_qRequisitions); }, [_qRequisitions]);
     useEffect(() => {
-        Promise.all([
-            api.get("/candidatos"),
-            api.get("/requisiciones"),
-            api.get("/seleccion/catalogos"),
-        ])
-            .then(([c, r, cat]) => {
-                setCandidates(c.data);
-                setRequisitions(r.data);
-                setCiudadesOpts(
-                    (cat.data.ciudades || []).map((ci) => ({
-                        value: String(ci.id),
-                        label: ci.nombre,
-                    })),
-                );
-            })
-            .catch(console.error)
-            .finally(() => setLoadingData(false));
-    }, []);
+        if (_qCatalogos) setCiudadesOpts((_qCatalogos.ciudades || []).map(ci => ({ value: String(ci.id), label: ci.nombre })));
+    }, [_qCatalogos]);
 
     const reload = () =>
         api
@@ -165,32 +159,37 @@ export default function CandidatosCrud() {
     }, [isCandModalOpen]);
 
     const doToggleField = (candidateId, field, extraData = {}) => {
+        const candidate = candidates.find((x) => x.id === candidateId);
+        if (!candidate) return;
+
+        const val = !candidate[field];
+        let nextEstado = candidate.estado;
+        const extra = { ...extraData };
+        if (field === "pruebas" || field === "aval") {
+            const newPruebas = field === "pruebas" ? val : candidate.pruebas;
+            const newAval    = field === "aval"    ? val : candidate.aval;
+            nextEstado = newPruebas && newAval ? "Contratación" : "Entrevista";
+            if (field === "aval") {
+                extra.fecha_aval = val ? new Date().toISOString().slice(0, 10) : null;
+                if (!val) extra.tipo_vinculacion = null;
+            }
+        }
+
         setCandidates((prev) =>
-            prev.map((c) => {
-                if (c.id !== candidateId) return c;
-                const val = !c[field];
-                let nextEstado = c.estado;
-                const extra = { ...extraData };
-                if (field === "pruebas" || field === "aval") {
-                    const newPruebas = field === "pruebas" ? val : c.pruebas;
-                    const newAval = field === "aval" ? val : c.aval;
-                    nextEstado =
-                        newPruebas && newAval ? "Contratación" : "Entrevista";
-                    if (field === "aval") {
-                        extra.fecha_aval = val
-                            ? new Date().toISOString().slice(0, 10)
-                            : null;
-                        if (!val) extra.tipo_vinculacion = null;
-                    }
-                }
-                api.put(`/candidatos/${candidateId}`, {
-                    [field]: val,
-                    estado: nextEstado,
-                    ...extra,
-                }).catch(console.error);
-                return { ...c, [field]: val, estado: nextEstado, ...extra };
-            }),
+            prev.map((c) =>
+                c.id === candidateId
+                    ? { ...c, [field]: val, estado: nextEstado, ...extra }
+                    : c
+            )
         );
+
+        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado, ...extra })
+            .catch((err) => {
+                setCandidates((prev) =>
+                    prev.map((c) => (c.id === candidateId ? candidate : c))
+                );
+                alert(err.response?.data?.message || "Error al guardar el cambio.");
+            });
     };
 
     const toggleCandidateField = (candidateId, field) => {
@@ -501,9 +500,11 @@ export default function CandidatosCrud() {
                 });
                 setCandidates((prev) => [created, ...prev]);
             } else {
+                // eslint-disable-next-line no-unused-vars
+                const { pruebas: _p, aval: _a, ...editPayload } = candForm;
                 const { data: updated } = await api.put(
                     `/candidatos/${candForm.id}`,
-                    candForm,
+                    editPayload,
                 );
                 setCandidates((prev) =>
                     prev.map((c) => (c.id === candForm.id ? updated : c)),
@@ -605,17 +606,17 @@ export default function CandidatosCrud() {
         }
     };
 
-    const filteredCandDetail = candidates.filter((c) => {
-        const term = candDetailSearch.toLowerCase().trim();
-        if (!term) return true;
-        return (
+    const filteredCandDetail = useMemo(() => {
+        const term = debouncedSearch.toLowerCase().trim();
+        if (!term) return candidates;
+        return candidates.filter((c) =>
             c.nombres.toLowerCase().includes(term) ||
             c.identificacion.includes(term) ||
             c.correo.toLowerCase().includes(term) ||
-            c.celular.includes(term) ||
+            (c.celular || '').includes(term) ||
             c.estado.toLowerCase().includes(term)
         );
-    });
+    }, [candidates, debouncedSearch]);
 
     return (
         <div

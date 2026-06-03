@@ -1,21 +1,149 @@
 {
+  "_Layout-BIH2KEE0.css": {
+    "file": "assets/Layout-BIH2KEE0.css",
+    "src": "_Layout-BIH2KEE0.css"
+  },
+  "_Layout-XCkd3iRA.js": {
+    "file": "assets/Layout-XCkd3iRA.js",
+    "name": "Layout",
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "resources/js/app.jsx",
+      "_vendor-router-CbT8WECF.js"
+    ],
+    "css": [
+      "assets/Layout-BIH2KEE0.css"
+    ]
+  },
+  "_SearchableSelect-Qoo_jHUD.js": {
+    "file": "assets/SearchableSelect-Qoo_jHUD.js",
+    "name": "SearchableSelect",
+    "imports": [
+      "_vendor-query-fzP4zlX8.js"
+    ]
+  },
+  "_useDebounce-CUKvOqZq.js": {
+    "file": "assets/useDebounce-CUKvOqZq.js",
+    "name": "useDebounce",
+    "imports": [
+      "_vendor-query-fzP4zlX8.js"
+    ]
+  },
+  "_vendor-query-fzP4zlX8.js": {
+    "file": "assets/vendor-query-fzP4zlX8.js",
+    "name": "vendor-query"
+  },
+  "_vendor-react-l0sNRNKZ.js": {
+    "file": "assets/vendor-react-l0sNRNKZ.js",
+    "name": "vendor-react"
+  },
+  "_vendor-router-CbT8WECF.js": {
+    "file": "assets/vendor-router-CbT8WECF.js",
+    "name": "vendor-router",
+    "imports": [
+      "_vendor-query-fzP4zlX8.js"
+    ]
+  },
   "resources/css/app.css": {
-    "file": "assets/app-QL2iJoiF.css",
+    "file": "assets/app-D1xSTSQg.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
     "name": "app",
     "names": [
       "app.css"
-    ],
-    "src": "resources/css/app.css",
-    "isEntry": true
+    ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-CS-1W7JW.js",
+    "file": "assets/app-DUlFSivP.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "_vendor-router-CbT8WECF.js"
+    ],
+    "dynamicImports": [
+      "resources/js/pages/Login.jsx",
+      "resources/js/pages/Dashboard.jsx",
+      "resources/js/pages/Module.jsx",
+      "resources/js/pages/Submodule.jsx",
+      "resources/js/forms/RegistroCandidatosForm.jsx"
+    ],
     "css": [
-      "assets/app-DiUbT--S.css",
-      "assets/app-QL2iJoiF.css"
+      "assets/app-D1xSTSQg.css"
+    ]
+  },
+  "resources/js/forms/RegistroCandidatosForm.jsx": {
+    "file": "assets/RegistroCandidatosForm-B9pHXzGB.js",
+    "name": "RegistroCandidatosForm",
+    "src": "resources/js/forms/RegistroCandidatosForm.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "_SearchableSelect-Qoo_jHUD.js"
+    ]
+  },
+  "resources/js/pages/Dashboard.jsx": {
+    "file": "assets/Dashboard-DIMUGeC0.js",
+    "name": "Dashboard",
+    "src": "resources/js/pages/Dashboard.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "_Layout-XCkd3iRA.js",
+      "_vendor-router-CbT8WECF.js",
+      "resources/js/app.jsx"
+    ],
+    "css": [
+      "assets/app-D1xSTSQg.css"
+    ]
+  },
+  "resources/js/pages/Login.jsx": {
+    "file": "assets/Login-CGF18PQ3.js",
+    "name": "Login",
+    "src": "resources/js/pages/Login.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "resources/js/app.jsx",
+      "_vendor-router-CbT8WECF.js"
+    ],
+    "css": [
+      "assets/app-D1xSTSQg.css"
+    ]
+  },
+  "resources/js/pages/Module.jsx": {
+    "file": "assets/Module-D7t4gJnf.js",
+    "name": "Module",
+    "src": "resources/js/pages/Module.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "_Layout-XCkd3iRA.js",
+      "_useDebounce-CUKvOqZq.js",
+      "_SearchableSelect-Qoo_jHUD.js",
+      "resources/js/app.jsx",
+      "_vendor-router-CbT8WECF.js"
+    ],
+    "css": [
+      "assets/app-D1xSTSQg.css"
+    ]
+  },
+  "resources/js/pages/Submodule.jsx": {
+    "file": "assets/Submodule-2KTeSB4p.js",
+    "name": "Submodule",
+    "src": "resources/js/pages/Submodule.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-fzP4zlX8.js",
+      "_Layout-XCkd3iRA.js",
+      "resources/js/app.jsx",
+      "_useDebounce-CUKvOqZq.js",
+      "_SearchableSelect-Qoo_jHUD.js",
+      "_vendor-router-CbT8WECF.js"
+    ],
+    "css": [
+      "assets/app-D1xSTSQg.css"
     ]
   }
 }

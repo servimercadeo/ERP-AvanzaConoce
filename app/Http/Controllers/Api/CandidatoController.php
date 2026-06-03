@@ -132,6 +132,58 @@ class CandidatoController extends Controller
             $data['nombres'] = strtoupper($data['nombres']);
         }
 
+        // Enforce prerequisites when activating pruebas or aval
+        $activandoPruebas = array_key_exists('pruebas', $data) && $data['pruebas'] && !$candidato->pruebas;
+        $activandoAval    = array_key_exists('aval', $data)    && $data['aval']    && !$candidato->aval;
+
+        if ($activandoPruebas || $activandoAval) {
+            $candidato->loadMissing('requisicion.proyecto');
+            $isTigo = str_contains(
+                strtolower($candidato->requisicion?->proyecto?->nombre ?? ''),
+                'tigo'
+            );
+            $docCount = $candidato->documentos()
+                ->whereIn('nombre', ['Hoja de vida', 'Pruebas psicotécnicas'])
+                ->count();
+
+            if ($activandoPruebas) {
+                if ($docCount < 2) {
+                    return response()->json(
+                        ['message' => 'Sube "Hoja de vida" y "Pruebas psicotécnicas" antes de activar este check.'],
+                        422
+                    );
+                }
+                if ($isTigo && $candidato->asmt_prom === null && ($data['asmt_prom'] ?? null) === null) {
+                    return response()->json(
+                        ['message' => 'Completa el Assessment en Procesos antes de activar Pruebas psicotécnicas.'],
+                        422
+                    );
+                }
+            }
+
+            if ($activandoAval) {
+                $pruebasActivas = $data['pruebas'] ?? $candidato->pruebas;
+                if (!$pruebasActivas) {
+                    return response()->json(
+                        ['message' => 'Activa primero Pruebas psicotécnicas.'],
+                        422
+                    );
+                }
+                if ($docCount < 2) {
+                    return response()->json(
+                        ['message' => 'Sube "Hoja de vida" y "Pruebas psicotécnicas" antes de activar el Aval.'],
+                        422
+                    );
+                }
+                if ($isTigo && $candidato->entv_prom === null && ($data['entv_prom'] ?? null) === null) {
+                    return response()->json(
+                        ['message' => 'Completa la Entrevista en Procesos antes de activar el Aval de contratación.'],
+                        422
+                    );
+                }
+            }
+        }
+
         $avalAntes = $candidato->aval;
         $candidato->update($data);
 
@@ -139,7 +191,11 @@ class CandidatoController extends Controller
             $candidato->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'ciudad']);
             $baseIngreso = BaseIngreso::where('candidato_id', $candidato->id)->latest()->first();
             $recipient   = config('mail.aval_recipient', env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'));
-            Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
+            try {
+                Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
+            } catch (\Exception $e) {
+                \Log::warning('Correo de aval no enviado: ' . $e->getMessage());
+            }
         } elseif ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
             BaseIngreso::where('candidato_id', $candidato->id)->delete();
         }
