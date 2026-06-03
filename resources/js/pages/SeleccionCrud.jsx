@@ -192,6 +192,10 @@ export default function SeleccionCrud() {
   const paged    = filtered.slice((page - 1) * PER, page * PER);
 
   const copyFormLink = (row) => {
+    if (!row.registro_token) {
+      alert('Esta requisición no tiene token. Ábrela y guárdala para generarlo automáticamente.');
+      return;
+    }
     const url = `${window.location.origin}/registro-candidatos?token=${row.registro_token}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(row.id);
