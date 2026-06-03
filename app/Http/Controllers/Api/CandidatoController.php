@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AvalContratacionMail;
+use App\Models\BaseIngreso;
 use App\Models\Candidato;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 class CandidatoController extends Controller
 {
@@ -93,6 +96,7 @@ class CandidatoController extends Controller
             'estado'                   => 'nullable|string|max:60',
             'pruebas'                  => 'nullable|boolean',
             'aval'                     => 'nullable|boolean',
+            'tipo_vinculacion'         => 'nullable|string|in:Directa,Indirecta',
             'fecha_aval'               => 'nullable|date',
             'negocio'                  => 'nullable|string|max:150',
             'observaciones'            => 'nullable|string',
@@ -128,8 +132,17 @@ class CandidatoController extends Controller
             $data['nombres'] = strtoupper($data['nombres']);
         }
 
+        $avalAntes = $candidato->aval;
         $candidato->update($data);
-        return response()->json($candidato->load(['requisicion.cargo', 'ciudad']));
+
+        if (!$avalAntes && !empty($data['aval']) && $data['aval']) {
+            $candidato->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'ciudad']);
+            $baseIngreso = BaseIngreso::where('candidato_id', $candidato->id)->latest()->first();
+            $recipient   = config('mail.aval_recipient', env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'));
+            Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
+        }
+
+        return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));
     }
 
     public function destroy(Candidato $candidato)

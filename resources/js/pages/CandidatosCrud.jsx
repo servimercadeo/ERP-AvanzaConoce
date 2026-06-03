@@ -98,6 +98,7 @@ export default function CandidatosCrud() {
 
     const [isProcModalOpen, setIsProcModalOpen] = useState(false);
     const [procModalCandidate, setProcModalCandidate] = useState(null);
+    const [vinculacionModal, setVinculacionModal] = useState({ open: false, candidateId: null, tipo: 'Directa' });
     const [toast, setToast] = useState(null);
     const [confirmDlg, setConfirmDlg] = useState({
         open: false,
@@ -163,22 +164,24 @@ export default function CandidatosCrud() {
         };
     }, [isCandModalOpen]);
 
-    const doToggleField = (candidateId, field) => {
+    const doToggleField = (candidateId, field, extraData = {}) => {
         setCandidates((prev) =>
             prev.map((c) => {
                 if (c.id !== candidateId) return c;
                 const val = !c[field];
                 let nextEstado = c.estado;
-                const extra = {};
+                const extra = { ...extraData };
                 if (field === "pruebas" || field === "aval") {
                     const newPruebas = field === "pruebas" ? val : c.pruebas;
                     const newAval = field === "aval" ? val : c.aval;
                     nextEstado =
                         newPruebas && newAval ? "Contratación" : "Entrevista";
-                    if (field === "aval")
+                    if (field === "aval") {
                         extra.fecha_aval = val
                             ? new Date().toISOString().slice(0, 10)
                             : null;
+                        if (!val) extra.tipo_vinculacion = null;
+                    }
                 }
                 api.put(`/candidatos/${candidateId}`, {
                     [field]: val,
@@ -206,7 +209,16 @@ export default function CandidatosCrud() {
             );
             return;
         }
+        if (field === "aval") {
+            setVinculacionModal({ open: true, candidateId, tipo: 'Directa' });
+            return;
+        }
         doToggleField(candidateId, field);
+    };
+
+    const handleConfirmVinculacion = () => {
+        doToggleField(vinculacionModal.candidateId, 'aval', { tipo_vinculacion: vinculacionModal.tipo });
+        setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' });
     };
 
     const handleAddCandidate = () => {
@@ -475,9 +487,7 @@ export default function CandidatosCrud() {
             !candForm.nombres ||
             !candForm.correo ||
             !candForm.celular ||
-            !candForm.identificacion ||
-            !candForm.fuente ||
-            !candForm.fuente_especifica
+            !candForm.identificacion
         ) {
             alert("Por favor, rellene todos los campos obligatorios (*).");
             return;
@@ -603,7 +613,6 @@ export default function CandidatosCrud() {
             c.identificacion.includes(term) ||
             c.correo.toLowerCase().includes(term) ||
             c.celular.includes(term) ||
-            c.fuente.toLowerCase().includes(term) ||
             c.estado.toLowerCase().includes(term)
         );
     });
@@ -698,10 +707,7 @@ export default function CandidatosCrud() {
                                     Correo electrónico
                                 </th>
                                 <th style={S.candTh("left")}>Celular</th>
-                                <th style={S.candTh("left")}>Ciudad</th>
-                                <th style={S.candTh("left")}>
-                                    Fuente reclutamiento
-                                </th>
+                                <th style={S.candTh("left")}>Proyecto</th>
                                 <th style={S.candTh("left")}>Requisición</th>
                                 <th style={S.candTh("left")}>Estado proceso</th>
                                 <th style={S.candTh("center")}>
@@ -733,17 +739,19 @@ export default function CandidatosCrud() {
                                 const pruebasDisabled =
                                     (!docsOk || (isTigo && !asmtOk)) && !c.pruebas;
                                 const avalDisabled =
-                                    (!docsOk || (isTigo && !entvOk)) && !c.aval;
+                                    (!c.pruebas || !docsOk || (isTigo && !entvOk)) && !c.aval;
                                 const pruebasTip = !docsOk
                                     ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero'
                                     : isTigo && !asmtOk
                                       ? "Completa el Assessment en Procesos para habilitar"
                                       : "";
-                                const avalTip = !docsOk
-                                    ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero'
-                                    : isTigo && !entvOk
-                                      ? "Completa la Entrevista en Procesos para habilitar"
-                                      : "";
+                                const avalTip = !c.pruebas
+                                    ? "Activa primero Pruebas psicotécnicas"
+                                    : !docsOk
+                                      ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero'
+                                      : isTigo && !entvOk
+                                        ? "Completa la Entrevista en Procesos para habilitar"
+                                        : "";
                                 return (
                                     <tr
                                         key={c.id}
@@ -798,16 +806,7 @@ export default function CandidatosCrud() {
                                                 color: "var(--text)",
                                             }}
                                         >
-                                            {c.ciudad?.nombre || "-"}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: "12px 8px",
-                                                fontSize: "0.85rem",
-                                                color: "var(--text)",
-                                            }}
-                                        >
-                                            {c.fuente}
+                                            {c.requisicion?.proyecto?.nombre || "-"}
                                         </td>
                                         <td
                                             style={{
@@ -894,6 +893,7 @@ export default function CandidatosCrud() {
                                         </td>
                                         <td style={{ padding: "12px 8px" }}>
                                             <div style={S.actions}>
+                                                {isTigo && (
                                                 <button
                                                     style={S.actionBtn(
                                                         "  #FFF8DA",
@@ -906,6 +906,7 @@ export default function CandidatosCrud() {
                                                 >
                                                     <IconGestionar size={15} />
                                                 </button>
+                                                )}
                                                 <button
                                                     style={S.actionBtn(
                                                         "#e8f8f5",
@@ -1141,20 +1142,6 @@ export default function CandidatosCrud() {
                                     disabled={candModalMode === "view"}
                                 />
                                 <Field
-                                    label="Fuente de reclutamiento"
-                                    k="fuente"
-                                    opts={MOCK_OPTS.fuentes_reclutamiento}
-                                    req
-                                    form={candForm}
-                                    onChange={(k) => (e) =>
-                                        setCandForm((p) => ({
-                                            ...p,
-                                            [k]: e.target.value,
-                                        }))
-                                    }
-                                    disabled={candModalMode === "view"}
-                                />
-                                <Field
                                     label="Fuente específica"
                                     k="fuente_especifica"
                                     opts={MOCK_OPTS.fuentes_especificas}
@@ -1206,47 +1193,6 @@ export default function CandidatosCrud() {
                                 />
                             </div>
 
-                            <h4
-                                style={{
-                                    margin: "24px 0 14px 0",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 700,
-                                    color: "var(--primary)",
-                                    fontFamily: "'Poppins',sans-serif",
-                                }}
-                            >
-                                Observaciones del candidato
-                            </h4>
-                            <textarea
-                                style={{
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                    padding: "10px 12px",
-                                    border: "1.5px solid var(--border)",
-                                    borderRadius: "var(--radius-sm)",
-                                    fontSize: "0.88rem",
-                                    fontFamily: "Nunito,sans-serif",
-                                    color:
-                                        candModalMode === "view"
-                                            ? "var(--text-muted)"
-                                            : "var(--text)",
-                                    background:
-                                        candModalMode === "view"
-                                            ? "var(--bg)"
-                                            : "var(--white)",
-                                    outline: "none",
-                                    minHeight: 80,
-                                    resize: "vertical",
-                                }}
-                                value={candForm.observaciones || ""}
-                                onChange={(e) =>
-                                    setCandForm((p) => ({
-                                        ...p,
-                                        observaciones: e.target.value,
-                                    }))
-                                }
-                                disabled={candModalMode === "view"}
-                            />
 
                             {/* ── Documentos (solo en edición) ── */}
                             {candModalMode === "edit" && (
@@ -2364,7 +2310,7 @@ export default function CandidatosCrud() {
                                         >
                                             ESTUDIO DE SEGURIDAD
                                         </label>
-                                        <textarea
+                                        <select
                                             value={
                                                 procForm.seguridad?.estudio ||
                                                 ""
@@ -2378,12 +2324,12 @@ export default function CandidatosCrud() {
                                                     },
                                                 }))
                                             }
-                                            style={{
-                                                ...S.formInput,
-                                                minHeight: 140,
-                                                resize: "vertical",
-                                            }}
-                                        />
+                                            style={S.formInput}
+                                        >
+                                            <option value="">-- Seleccionar --</option>
+                                            <option value="Aprobado">Aprobado</option>
+                                            <option value="No Aprobado">No Aprobado</option>
+                                        </select>
                                     </div>
                                 </div>
                             )}
@@ -2401,6 +2347,79 @@ export default function CandidatosCrud() {
                                 onClick={handleSaveProcesos}
                             >
                                 Guardar procesos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {vinculacionModal.open && (
+                <div
+                    style={{ ...S.overlay, zIndex: 6100 }}
+                    onClick={() => setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' })}
+                >
+                    <div
+                        style={{
+                            background: "var(--white)",
+                            borderRadius: "var(--radius)",
+                            boxShadow: "0 16px 60px rgba(26,155,140,0.28)",
+                            width: "100%",
+                            maxWidth: 420,
+                            overflow: "hidden",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeaderGreen}>
+                            <span style={{ ...S.modalTitleWhite, fontSize: "1rem" }}>
+                                Tipo de vinculación
+                            </span>
+                        </div>
+                        <div style={{ padding: "24px 28px" }}>
+                            <p style={{ margin: "0 0 18px", fontSize: "0.93rem", color: "var(--text)", fontFamily: "Nunito,sans-serif", lineHeight: 1.6 }}>
+                                ¿Cómo será la vinculación del empleado?
+                            </p>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                {["Directa", "Indirecta"].map((op) => (
+                                    <label
+                                        key={op}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 12,
+                                            padding: "12px 16px",
+                                            border: `2px solid ${vinculacionModal.tipo === op ? "var(--primary)" : "var(--border)"}`,
+                                            borderRadius: "var(--radius-sm)",
+                                            cursor: "pointer",
+                                            background: vinculacionModal.tipo === op ? "var(--primary-light, #e8f7f5)" : "var(--white)",
+                                            fontFamily: "Nunito,sans-serif",
+                                            fontWeight: 700,
+                                            fontSize: "0.92rem",
+                                            color: "var(--text)",
+                                            userSelect: "none",
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="tipo_vinculacion"
+                                            value={op}
+                                            checked={vinculacionModal.tipo === op}
+                                            onChange={() => setVinculacionModal((p) => ({ ...p, tipo: op }))}
+                                            style={{ accentColor: "var(--primary)", width: 16, height: 16 }}
+                                        />
+                                        Vinculación {op}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "14px 28px", borderTop: "1.5px solid var(--border)" }}>
+                            <button
+                                style={S.btnSecondary}
+                                onClick={() => setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' })}
+                            >
+                                Cancelar
+                            </button>
+                            <button style={S.btnPrimaryGreen} onClick={handleConfirmVinculacion}>
+                                Confirmar aval
                             </button>
                         </div>
                     </div>
