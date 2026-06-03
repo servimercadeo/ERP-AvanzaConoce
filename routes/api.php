@@ -169,6 +169,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
+    // Sincronizar candidatos avalados y con pruebas a base de ingresos
+    Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);

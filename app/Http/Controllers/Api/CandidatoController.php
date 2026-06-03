@@ -140,6 +140,8 @@ class CandidatoController extends Controller
             $baseIngreso = BaseIngreso::where('candidato_id', $candidato->id)->latest()->first();
             $recipient   = config('mail.aval_recipient', env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'));
             Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
+        } elseif ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
+            BaseIngreso::where('candidato_id', $candidato->id)->delete();
         }
 
         return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));

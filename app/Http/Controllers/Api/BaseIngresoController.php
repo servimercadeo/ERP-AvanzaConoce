@@ -100,4 +100,40 @@ class BaseIngresoController extends Controller
         $baseIngreso->delete();
         return response()->json(null, 204);
     }
+
+    public function sync(Request $request)
+    {
+        $existingIds = BaseIngreso::whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
+
+        $candidatos = \App\Models\Candidato::with(['requisicion.cargo', 'requisicion.proyecto', 'requisicion.empresa', 'requisicion.empleador', 'ciudad'])
+            ->where('pruebas', true)
+            ->where('aval', true)
+            ->whereNotIn('id', $existingIds)
+            ->get();
+
+        $count = 0;
+        foreach ($candidatos as $c) {
+            $req = $c->requisicion;
+            BaseIngreso::create([
+                'candidato_id'               => $c->id,
+                'fecha_aval'                 => $c->fecha_aval,
+                'documento_identificacion'   => $c->identificacion,
+                'nombre_completo'            => $c->nombres,
+                'cargo'                      => $req ? ($req->cargo ? $req->cargo->nombre : null) : null,
+                'ciudad'                     => $c->ciudad ? $c->ciudad->nombre : ($req && $req->ciudad ? $req->ciudad->nombre : null),
+                'empresa'                    => $req ? ($req->empresa ? $req->empresa->nombre : null) : null,
+                'proyecto'                   => $c->negocio ?: ($req && $req->proyecto ? $req->proyecto->nombre : null),
+                'telefono'                   => $c->celular,
+                'correo'                     => $c->correo,
+                'tipo_vinculacion'           => $c->tipo_vinculacion,
+                'lider_inmediato'            => $req ? $req->responsable : null,
+                'empleador'                  => $req ? ($req->empleador ? $req->empleador->nombre : null) : null,
+                'fecha_programacion_ingreso' => now()->toDateString(),
+                'estado'                     => 'activa',
+            ]);
+            $count++;
+        }
+
+        return response()->json(['message' => "Sincronización completa: $count registros agregados."]);
+    }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { SearchableSelect } from '../components/SearchableSelect';
+import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
 
 const EMPTY_FORM = {
@@ -30,8 +30,15 @@ const EMPTY_FORM = {
   estado: '',
 };
 
-const ESTADOS = ['en proceso', 'activa', 'finalizada', 'cancelada'];
+const ESTADOS = ['activa', 'en proceso', 'finalizada', 'cancelada'];
 const TIPOS_VINCULACION = ['Directa', 'Indirecta'];
+const ESTADO_FILTERS = [
+  { value: 'Todos', label: 'Todos los estados' },
+  { value: 'en proceso', label: 'En proceso' },
+  { value: 'activa', label: 'Activa' },
+  { value: 'finalizada', label: 'Finalizada' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
 
 function getPaginasBotones(pagina, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -59,6 +66,7 @@ export default function BaseIngresoCrud() {
   const [sedes, setSedes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm]           = useState(EMPTY_FORM);
@@ -86,7 +94,7 @@ export default function BaseIngresoCrud() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { setPagina(1); }, [searchTerm]);
+  useEffect(() => { setPagina(1); }, [searchTerm, estadoFilter]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -132,7 +140,7 @@ export default function BaseIngresoCrud() {
     if (row) {
       setForm({ ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' });
     } else {
-      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'en proceso' });
+      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'activa' });
     }
     setIsModalOpen(true);
   };
@@ -169,11 +177,31 @@ export default function BaseIngresoCrud() {
     }
   };
 
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post('/base-ingresos/sync');
+      showToast(res.data.message);
+      // Reload data
+      const [ing, cand] = await Promise.all([
+        api.get('/base-ingresos'),
+        api.get('/candidatos')
+      ]);
+      setData(ing.data);
+      setCandidates(cand.data);
+    } catch (e) {
+      alert('Error al sincronizar: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
   const filteredData = data.filter(row =>
     [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
-      .some(v => String(v ?? '').toLowerCase().includes(searchTerm.toLowerCase()))
+      .some(v => String(v ?? '').toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase())
   );
 
   const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
@@ -191,20 +219,31 @@ export default function BaseIngresoCrud() {
 
       {/* Toolbar */}
       <div style={S.toolbar}>
-        <div style={S.searchWrap}>
-          <span style={S.searchIcon}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={S.searchInput}
+        <div style={S.filters}>
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={S.searchInput}
+            />
+          </div>
+          <FilterDropdown
+            label="Estado"
+            value={estadoFilter}
+            onChange={setEstadoFilter}
+            options={ESTADO_FILTERS}
           />
         </div>
-        <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button style={S.btnSecondary} onClick={handleSync}>Actualizar</button>
+          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -421,6 +460,7 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
 
 const S = {
   toolbar:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  filters:      { display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap' },
   searchWrap:   { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
   searchIcon:   { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput:  { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },
