@@ -2310,7 +2310,7 @@ export default function CandidatosCrud() {
                                         >
                                             ESTUDIO DE SEGURIDAD
                                         </label>
-                                        <textarea
+                                        <select
                                             value={
                                                 procForm.seguridad?.estudio ||
                                                 ""
@@ -2324,12 +2324,12 @@ export default function CandidatosCrud() {
                                                     },
                                                 }))
                                             }
-                                            style={{
-                                                ...S.formInput,
-                                                minHeight: 140,
-                                                resize: "vertical",
-                                            }}
-                                        />
+                                            style={S.formInput}
+                                        >
+                                            <option value="">-- Seleccionar --</option>
+                                            <option value="Aprobado">Aprobado</option>
+                                            <option value="No Aprobado">No Aprobado</option>
+                                        </select>
                                     </div>
                                 </div>
                             )}

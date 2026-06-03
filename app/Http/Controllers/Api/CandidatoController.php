@@ -142,7 +142,7 @@ class CandidatoController extends Controller
             Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
         }
 
-        return response()->json($candidato->load(['requisicion.cargo', 'ciudad']));
+        return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));
     }
 
     public function destroy(Candidato $candidato)
