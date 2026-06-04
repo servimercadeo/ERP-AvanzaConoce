@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const ESTADO_CIVIL_OPTS = ["SOLTERO", "CASADO", "DIVORCIADO", "VIUDO"];
 const HIJOS_OPTS = ["0", "1", "2", "3", "4", "5", "6"];
@@ -409,6 +409,32 @@ export default function RegistroNuevosIngresosForm() {
     const [loading, setLoading] = useState(false);
     const [consentChecked, setConsentChecked] = useState(false);
     const [consentDeclined, setConsentDeclined] = useState(false);
+    const [prefillLoading, setPrefillLoading] = useState(false);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (!token) return;
+        setPrefillLoading(true);
+        fetch(`/api/registro-nuevos-ingresos/prefill?token=${encodeURIComponent(token)}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                setForm(prev => ({
+                    ...prev,
+                    documento: data.documento || prev.documento,
+                    nombres:   data.nombres   || prev.nombres,
+                    apellidos: data.apellidos || prev.apellidos,
+                    correo:    data.correo    || prev.correo,
+                    celular:   data.celular   || prev.celular,
+                    ciudad:    data.ciudad    || prev.ciudad,
+                }));
+            })
+            .catch(() => {})
+            .finally(() => setPrefillLoading(false));
+    }, []);
 
     const set = (k, v) => {
         setForm(p => ({ ...p, [k]: v }));
@@ -528,6 +554,17 @@ export default function RegistroNuevosIngresosForm() {
 
     // ── Stepper progress ──
     const stepProgress = step > 1 ? `${((step - 1) / (STEPS.length - 1)) * 100}%` : "0%";
+
+    if (prefillLoading) {
+        return (
+            <div className="rni-page">
+                <FormStyles />
+                <div style={{ color: 'var(--teal)', fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.1rem', textAlign: 'center' }}>
+                    Cargando tus datos…
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="rni-page">

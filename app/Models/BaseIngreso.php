@@ -14,7 +14,8 @@ class BaseIngreso extends Model
         'tipo_vinculacion', 'lugar_trabajo', 'lider_inmediato', 'empleador',
         'fecha_programacion_ingreso', 'fecha_correccion', 'tasa_riesgo_arl',
         'salario_basico', 'auxilio_transporte', 'otrosi_variable',
-        'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion', 'estado',
+        'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion',
+        'estado', 'alerta_enviada',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class BaseIngreso extends Model
         'auxilio_rodamiento'         => 'decimal:2',
         'auxilio_comunicacion'       => 'decimal:2',
         'auxilio_alimentacion'       => 'decimal:2',
+        'alerta_enviada'             => 'boolean',
     ];
 
     public function candidato()
