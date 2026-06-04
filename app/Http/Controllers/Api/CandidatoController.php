@@ -211,7 +211,7 @@ class CandidatoController extends Controller
         if (!$avalAntes && !empty($data['aval']) && $data['aval']) {
             $candidato->refresh()->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'requisicion.empleador', 'ciudad']);
             $baseIngreso = BaseIngreso::where('candidato_id', $candidato->id)->latest()->first();
-            $recipient   = config('mail.aval_recipient', env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'));
+            $recipient   = config('mail.aval_recipient');
             try {
                 Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
             } catch (\Exception $e) {
