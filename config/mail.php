@@ -115,4 +115,6 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    'aval_recipient' => env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'),
+
 ];
