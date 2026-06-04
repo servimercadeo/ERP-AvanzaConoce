@@ -145,8 +145,22 @@ export default function AvalesContratacionCrud() {
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const handleAlertToggle = (rowId) => {
-    setData(prev => prev.map(r => r.id === rowId ? { ...r, alerta_enviada: !r.alerta_enviada } : r));
+  const [alertLoading, setAlertLoading] = useState(null);
+
+  const handleAlertToggle = async (row) => {
+    if (row.alerta_enviada || alertLoading === row.id) return;
+    if (!window.confirm(`¿Enviar alerta de registro al correo ${row.correo || '(sin correo)'}?`)) return;
+    setAlertLoading(row.id);
+    try {
+      await api.post(`/base-ingresos/${row.id}/alerta`);
+      setData(prev => prev.map(r => r.id === row.id ? { ...r, alerta_enviada: true } : r));
+      qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+      showToast('Alerta enviada al candidato');
+    } catch (e) {
+      alert('Error al enviar alerta: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setAlertLoading(null);
+    }
   };
 
   const filteredData = useMemo(() =>
@@ -243,8 +257,15 @@ export default function AvalesContratacionCrud() {
                       <input
                         type="checkbox"
                         checked={row.alerta_enviada ?? false}
-                        onChange={() => handleAlertToggle(row.id)}
-                        style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                        onChange={() => handleAlertToggle(row)}
+                        disabled={row.alerta_enviada || alertLoading === row.id}
+                        title={row.alerta_enviada ? 'Alerta ya enviada' : 'Enviar alerta al candidato'}
+                        style={{
+                          width: 18, height: 18,
+                          cursor: row.alerta_enviada ? 'not-allowed' : 'pointer',
+                          accentColor: 'var(--primary)',
+                          opacity: alertLoading === row.id ? 0.5 : 1,
+                        }}
                       />
                     </td>
                     <td style={{ ...S.td, textAlign: 'center' }}>

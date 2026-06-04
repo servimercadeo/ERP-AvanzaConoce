@@ -2,6 +2,10 @@
 
 use App\Http\Controllers\Api\AppSettingController;
 use App\Http\Controllers\Api\BaseIngresoController;
+use App\Mail\AlertaIngresoMail;
+use App\Models\BaseIngreso;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
@@ -173,6 +177,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
+    // Enviar alerta de ingreso al candidato por correo
+    Route::post('base-ingresos/{baseIngreso}/alerta', function (BaseIngreso $baseIngreso) {
+        if (!$baseIngreso->correo) {
+            return response()->json(['message' => 'El registro no tiene correo electrónico.'], 422);
+        }
+        try {
+            Mail::to($baseIngreso->correo)->send(new AlertaIngresoMail($baseIngreso));
+            $baseIngreso->update(['alerta_enviada' => true]);
+            return response()->json(['message' => 'Alerta enviada correctamente.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error al enviar: ' . $e->getMessage()], 500);
+        }
+    });
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);
@@ -292,6 +309,30 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
     file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     return response()->json(['message' => 'Documento subido correctamente.'], 201);
+});
+
+// Prefill público del formulario de registro usando token (cédula cifrada)
+Route::get('/registro-nuevos-ingresos/prefill', function (Request $request) {
+    try {
+        $cedula  = Crypt::decryptString(urldecode($request->query('token', '')));
+        $ingreso = BaseIngreso::where('documento_identificacion', $cedula)->latest()->first();
+        if (!$ingreso) return response()->json(null, 404);
+
+        $partes    = preg_split('/\s+/', trim($ingreso->nombre_completo ?? ''), 2);
+        $nombres   = $partes[0] ?? '';
+        $apellidos = $partes[1] ?? '';
+
+        return response()->json([
+            'documento' => $ingreso->documento_identificacion,
+            'nombres'   => $nombres,
+            'apellidos' => $apellidos,
+            'correo'    => $ingreso->correo ?? '',
+            'celular'   => $ingreso->telefono ?? '',
+            'ciudad'    => strtoupper($ingreso->ciudad ?? ''),
+        ]);
+    } catch (\Exception) {
+        return response()->json(null, 400);
+    }
 });
 
 // Registro público de nuevos ingresos (Guardado en JSON para llenado manual por el usuario)
