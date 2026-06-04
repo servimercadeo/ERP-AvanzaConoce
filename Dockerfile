@@ -1,8 +1,10 @@
 FROM php:8.2-apache
 
-# Dependencias del sistema
+# Dependencias del sistema + Node.js 20
 RUN apt-get update && apt-get install -y \
     git curl libpng-dev libonig-dev libxml2-dev zip unzip \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Extensiones PHP requeridas por Laravel
@@ -25,8 +27,15 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
 
-# Código fuente (incluye public/build ya compilado)
+# Dependencias Node (cache layer separado)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Código fuente
 COPY . .
+
+# Compilar assets con Vite (genera public/build/manifest.json y los chunks)
+RUN npm run build
 
 # Post-install scripts de Composer
 RUN composer run-script post-autoload-dump 2>/dev/null || true
