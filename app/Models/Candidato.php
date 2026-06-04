@@ -12,7 +12,7 @@ class Candidato extends Model
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
         'fecha_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
-        'pruebas', 'aval', 'fecha_aval', 'negocio', 'observaciones',
+        'pruebas', 'aval', 'tipo_vinculacion', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
         'asmt_ejercicio', 'asmt_nombre_ejercicio',
         'asmt_claridad_mensaje', 'asmt_conviccion_energia', 'asmt_adaptabilidad_escucha',
@@ -26,13 +26,20 @@ class Candidato extends Model
         'fraude_nro_seguimiento', 'fraude_respuesta', 'fraude_ciudad',
         'fraude_fecha_consulta', 'fraude_fuente',
         'seguridad_estudio',
+        // Remuneración
+        'tasa_riesgo_arl', 'salario_basico', 'auxilio_transporte',
+        'otrosi_variable', 'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion',
+        // Datos de contratación
+        'lugar_trabajo', 'fecha_programacion_ingreso', 'fecha_correccion',
     ];
 
     protected $casts = [
         'fecha_expedicion'    => 'date:Y-m-d',
         'fecha_postulacion'   => 'date:Y-m-d',
         'fecha_aval'          => 'date:Y-m-d',
-        'fraude_fecha_consulta' => 'date:Y-m-d',
+        'fraude_fecha_consulta'        => 'date:Y-m-d',
+        'fecha_programacion_ingreso'   => 'date:Y-m-d',
+        'fecha_correccion'             => 'date:Y-m-d',
         'pruebas'             => 'boolean',
         'aval'                => 'boolean',
         'asmt_prom'           => 'float',

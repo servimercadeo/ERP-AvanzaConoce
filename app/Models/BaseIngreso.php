@@ -11,7 +11,7 @@ class BaseIngreso extends Model
     protected $fillable = [
         'candidato_id', 'fecha_aval', 'documento_identificacion', 'nombre_completo',
         'cargo', 'ciudad', 'empresa', 'proyecto', 'telefono', 'correo',
-        'tipo_ingreso', 'lugar_trabajo', 'lider_inmediato', 'empleador',
+        'tipo_vinculacion', 'lugar_trabajo', 'lider_inmediato', 'empleador',
         'fecha_programacion_ingreso', 'fecha_correccion', 'tasa_riesgo_arl',
         'salario_basico', 'auxilio_transporte', 'otrosi_variable',
         'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion', 'estado',

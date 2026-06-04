@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
@@ -885,6 +887,7 @@ export default function ContratosCrud() {
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroTipoContrato, setFiltroTipoContrato] = useState("Todos");
@@ -912,6 +915,16 @@ export default function ContratosCrud() {
     const [filterOpen, setFilterOpen] = useState(false);
     const [pagina, setPagina] = useState(1);
 
+    const { data: _qContratos } = useQuery({ queryKey: ['contratos'], queryFn: () => api.get('/contratos').then(r => r.data) });
+    const { data: _qEmpleados } = useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
+    const { data: _qCatalogos } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
+
+    useEffect(() => {
+        if (_qContratos) { setContratos(_qContratos); setLoading(false); }
+    }, [_qContratos]);
+    useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
+    useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -929,10 +942,6 @@ export default function ContratosCrud() {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     useEffect(() => {
         setPagina(1);
@@ -961,7 +970,7 @@ export default function ContratosCrud() {
     const filtered = useMemo(
         () =>
             contratos.filter((c) => {
-                const q = search.toLowerCase();
+                const q = debouncedSearch.toLowerCase();
                 const empName =
                     `${c.empleado?.apellidos ?? ""} ${c.empleado?.nombres ?? ""}`.toLowerCase();
                 const matchQ =
@@ -979,7 +988,7 @@ export default function ContratosCrud() {
                 const matchFP = filtroFondoPensiones === "Todos" || c.fondo_pensiones === filtroFondoPensiones;
                 return matchQ && matchE && matchS && matchTC && matchV && matchC && matchArl && matchCaja && matchEmp && matchFP;
             }),
-        [contratos, search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones],
+        [contratos, debouncedSearch, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones],
     );
 
     const paginated = useMemo(

@@ -21,6 +21,10 @@ class RequisicionesSeeder extends Seeder
         $cargo = fn(string $n) => $cargos[strtolower($n)] ?? null;
         $city  = fn(string $n) => $ciudades[strtolower($n)] ?? null;
 
+        $empresaServi  = DB::table('empresas')->where('nombre', 'Servimercadeo COL')->value('id');
+        $empresaAlty   = DB::table('empresas')->where('nombre', 'Altycom')->value('id');
+        $empleadorBase = DB::table('empleadores')->first()->id ?? null;
+
         DB::table('requisiciones')->insert([
             [
                 'nro_identificacion_proceso' => 'REQ65',
@@ -34,6 +38,8 @@ class RequisicionesSeeder extends Seeder
                 'requeridas'                 => 2,
                 'contratadas'                => 1,
                 'proyecto_id'                => $proyectos['DIRECTV CO'] ?? null,
+                'empresa_id'                 => $empresaServi,
+                'empleador_id'               => $empleadorBase,
                 'tipo_solicitud'             => 'RP: Reemplazo',
                 'responsable'                => 'JORGE EMILIO VARON - jorgevaron@servimercadeo.com',
                 'proceso'                    => 'Administrativo',
@@ -56,6 +62,8 @@ class RequisicionesSeeder extends Seeder
                 'requeridas'                 => 3,
                 'contratadas'                => 0,
                 'proyecto_id'                => $proyectos['TIGO HOME'] ?? null,
+                'empresa_id'                 => $empresaAlty,
+                'empleador_id'               => $empleadorBase,
                 'tipo_solicitud'             => 'CN: Cargo Nuevo',
                 'responsable'                => 'ANA GOMEZ - ana.gomez@servimercadeo.com',
                 'proceso'                    => 'Comercial',
@@ -78,6 +86,8 @@ class RequisicionesSeeder extends Seeder
                 'requeridas'                 => 1,
                 'contratadas'                => 0,
                 'proyecto_id'                => $proyectos['HUGHES COL'] ?? null,
+                'empresa_id'                 => $empresaServi,
+                'empleador_id'               => $empleadorBase,
                 'tipo_solicitud'             => 'RP: Reemplazo',
                 'responsable'                => 'LUIS MARTINEZ - luis.martinez@servimercadeo.com',
                 'proceso'                    => 'Operativo',

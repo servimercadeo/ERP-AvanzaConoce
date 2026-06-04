@@ -35,7 +35,7 @@ return new class extends Migration
             $table->decimal('auxilio_rodamiento', 12, 2)->nullable()->default(0);
             $table->decimal('auxilio_comunicacion', 12, 2)->nullable()->default(0);
             $table->decimal('auxilio_alimentacion', 12, 2)->nullable()->default(0);
-            $table->string('estado', 40)->default('en proceso');
+            $table->string('estado', 40)->default('activa');
             $table->timestamps();
         });
     }

@@ -9,6 +9,7 @@ node_modules/
 
 # Build artifacts
 public/hot
+public/build/
 
 # Git
 .git/

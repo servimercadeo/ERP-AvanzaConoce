@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
-import { SearchableSelect } from '../components/SearchableSelect';
+import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
 
 const EMPTY_FORM = {
@@ -14,7 +16,7 @@ const EMPTY_FORM = {
   proyecto: '',
   telefono: '',
   correo: '',
-  tipo_ingreso: '',
+  tipo_vinculacion: '',
   lugar_trabajo: '',
   lider_inmediato: '',
   empleador: '',
@@ -30,8 +32,15 @@ const EMPTY_FORM = {
   estado: '',
 };
 
-const ESTADOS = ['en proceso', 'activa', 'finalizada', 'cancelada'];
-const TIPOS_INGRESO = ['Nuevo', 'Reemplazo'];
+const ESTADOS = ['activa', 'en proceso', 'finalizada', 'cancelada'];
+const TIPOS_VINCULACION = ['Directa', 'Indirecta'];
+const ESTADO_FILTERS = [
+  { value: 'Todos', label: 'Todos los estados' },
+  { value: 'en proceso', label: 'En proceso' },
+  { value: 'activa', label: 'Activa' },
+  { value: 'finalizada', label: 'Finalizada' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
 
 function getPaginasBotones(pagina, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -56,8 +65,11 @@ const getEstadoColors = (estado) => {
 export default function BaseIngresoCrud() {
   const [data, setData]           = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [sedes, setSedes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const [estadoFilter, setEstadoFilter] = useState('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm]           = useState(EMPTY_FORM);
@@ -70,17 +82,20 @@ export default function BaseIngresoCrud() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/base-ingresos'),
-      api.get('/candidatos'),
-    ])
-      .then(([ing, cand]) => { setData(ing.data); setCandidates(cand.data); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const qc = useQueryClient();
+  const { data: _qBaseIngresos } = useQuery({ queryKey: ['base-ingresos'], queryFn: () => api.get('/base-ingresos').then(r => r.data) });
+  const { data: _qCandidates }   = useQuery({ queryKey: ['candidatos'],    queryFn: () => api.get('/candidatos').then(r => r.data) });
+  const { data: _qSedes }        = useQuery({ queryKey: ['sedes'],         queryFn: () => api.get('/sedes').then(r => r.data) });
 
-  useEffect(() => { setPagina(1); }, [searchTerm]);
+  useEffect(() => {
+    if (_qBaseIngresos) { setData(_qBaseIngresos); setLoading(false); }
+  }, [_qBaseIngresos]);
+  useEffect(() => { if (_qCandidates) setCandidates(_qCandidates); }, [_qCandidates]);
+  useEffect(() => {
+    if (_qSedes) setSedes((_qSedes?.data ?? _qSedes ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+  }, [_qSedes]);
+
+  useEffect(() => { setPagina(1); }, [searchTerm, estadoFilter]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -116,17 +131,32 @@ export default function BaseIngresoCrud() {
       empresa:                  req.empresa?.nombre                    || p.empresa,
       empleador:                req.empleador?.nombre                  || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
-      tipo_ingreso:             (req.tipo_solicitud?.includes('Reemplazo') ? 'Reemplazo' : req.tipo_solicitud?.includes('Nuevo') ? 'Nuevo' : null) || p.tipo_ingreso,
+      tipo_vinculacion:         c.tipo_vinculacion                    || p.tipo_vinculacion,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,
+      lugar_trabajo:            c.lugar_trabajo                      || p.lugar_trabajo,
+      fecha_programacion_ingreso: c.fecha_programacion_ingreso       || p.fecha_programacion_ingreso,
+      fecha_correccion:         c.fecha_correccion                   || p.fecha_correccion,
+      tasa_riesgo_arl:          c.tasa_riesgo_arl                    || p.tasa_riesgo_arl,
+      salario_basico:           c.salario_basico                     || p.salario_basico,
+      auxilio_transporte:       c.auxilio_transporte                 || p.auxilio_transporte,
+      otrosi_variable:          c.otrosi_variable                    || p.otrosi_variable,
+      auxilio_rodamiento:       c.auxilio_rodamiento                 || p.auxilio_rodamiento,
+      auxilio_comunicacion:     c.auxilio_comunicacion               || p.auxilio_comunicacion,
+      auxilio_alimentacion:     c.auxilio_alimentacion               || p.auxilio_alimentacion,
     }));
   };
 
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
     if (row) {
-      setForm({ ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' });
+      const base = { ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' };
+      if (!base.lugar_trabajo && row.candidato_id) {
+        const c = candidates.find(x => String(x.id) === String(row.candidato_id));
+        if (c?.lugar_trabajo) base.lugar_trabajo = c.lugar_trabajo;
+      }
+      setForm(base);
     } else {
-      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10) });
+      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'activa' });
     }
     setIsModalOpen(true);
   };
@@ -163,12 +193,33 @@ export default function BaseIngresoCrud() {
     }
   };
 
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post('/base-ingresos/sync');
+      showToast(res.data.message);
+      // Reload data
+      const [ing, cand] = await Promise.all([
+        api.get('/base-ingresos'),
+        api.get('/candidatos')
+      ]);
+      setData(ing.data);
+      setCandidates(cand.data);
+    } catch (e) {
+      alert('Error al sincronizar: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const filteredData = data.filter(row =>
-    [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
-      .some(v => String(v ?? '').toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredData = useMemo(() =>
+    data.filter(row =>
+      [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
+        .some(v => String(v ?? '').toLowerCase().includes(debouncedSearch.toLowerCase())) &&
+      (estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase())
+    ), [data, debouncedSearch, estadoFilter]);
 
   const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
   const paginatedData = filteredData.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -185,20 +236,31 @@ export default function BaseIngresoCrud() {
 
       {/* Toolbar */}
       <div style={S.toolbar}>
-        <div style={S.searchWrap}>
-          <span style={S.searchIcon}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={S.searchInput}
+        <div style={S.filters}>
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={S.searchInput}
+            />
+          </div>
+          <FilterDropdown
+            label="Estado"
+            value={estadoFilter}
+            onChange={setEstadoFilter}
+            options={ESTADO_FILTERS}
           />
         </div>
-        <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button style={S.btnSecondary} onClick={handleSync}>Actualizar</button>
+          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        </div>
       </div>
 
       {/* Tabla */}
@@ -317,8 +379,18 @@ export default function BaseIngresoCrud() {
                 <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Teléfono" k="telefono" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Tipo de ingreso" k="tipo_ingreso" opts={TIPOS_INGRESO} form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Lugar de trabajo" k="lugar_trabajo" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={TIPOS_VINCULACION} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>Sede</label>
+                  <SearchableSelect
+                    key={`sede-${form.lugar_trabajo ?? ''}`}
+                    value={form.lugar_trabajo ?? ''}
+                    defaultValue=""
+                    options={sedes}
+                    onChange={val => setForm(p => ({ ...p, lugar_trabajo: val }))}
+                    disabled={modalMode === 'view'}
+                  />
+                </div>
                 <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Empleador" k="empleador" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
@@ -405,6 +477,7 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
 
 const S = {
   toolbar:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  filters:      { display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap' },
   searchWrap:   { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
   searchIcon:   { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput:  { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },

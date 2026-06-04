@@ -11,7 +11,7 @@ class Requisicion extends Model
     protected static function boot()
     {
         parent::boot();
-        static::creating(function ($model) {
+        static::saving(function ($model) {
             if (empty($model->registro_token)) {
                 $model->registro_token = \Illuminate\Support\Str::uuid()->toString();
             }
