@@ -145,9 +145,13 @@ export default function AvalesContratacionCrud() {
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const handleAlertToggle = (rowId) => {
+    setData(prev => prev.map(r => r.id === rowId ? { ...r, alerta_enviada: !r.alerta_enviada } : r));
+  };
+
   const filteredData = useMemo(() =>
     data.filter(row => {
-      const matchSearch = [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.proyecto, row.ciudad]
+      const matchSearch = [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.proyecto]
         .some(v => String(v ?? '').toLowerCase().includes(debouncedSearch.toLowerCase()));
       const matchTipo   = tipoFilter === 'Todos'   || String(row.tipo_vinculacion ?? '').toLowerCase() === tipoFilter.toLowerCase();
       const matchEstado = estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase();
@@ -200,11 +204,11 @@ export default function AvalesContratacionCrud() {
                 <th style={S.th}>Nombre completo</th>
                 <th style={S.th}>Cargo</th>
                 <th style={S.th}>Empresa / Proyecto</th>
-                <th style={S.th}>Ciudad</th>
                 <th style={S.th}>Tipo vinculación</th>
                 <th style={S.th}>F. tentativa ingreso</th>
                 <th style={S.th}>F. corrección</th>
                 <th style={S.th}>Estado</th>
+                <th style={{ ...S.th, textAlign: 'center' }}>Envío de alerta</th>
                 <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
@@ -222,7 +226,6 @@ export default function AvalesContratacionCrud() {
                       <span style={{ display: 'block' }}>{fmt(row.empresa)}</span>
                       {row.proyecto && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{row.proyecto}</span>}
                     </td>
-                    <td style={S.td}>{fmt(row.ciudad)}</td>
                     <td style={S.td}>
                       {row.tipo_vinculacion
                         ? <span style={S.badge(tc.bg, tc.color)}>{row.tipo_vinculacion}</span>
@@ -235,6 +238,14 @@ export default function AvalesContratacionCrud() {
                       <span style={S.badge(ec.bg, ec.color)}>
                         {row.estado ? row.estado.charAt(0).toUpperCase() + row.estado.slice(1) : '—'}
                       </span>
+                    </td>
+                    <td style={{ ...S.td, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={row.alerta_enviada ?? false}
+                        onChange={() => handleAlertToggle(row.id)}
+                        style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                      />
                     </td>
                     <td style={{ ...S.td, textAlign: 'center' }}>
                       <div style={S.actions}>
@@ -292,7 +303,6 @@ export default function AvalesContratacionCrud() {
                 <ReadField label="Cargo"        value={form.cargo} />
                 <ReadField label="Empresa"      value={form.empresa} />
                 <ReadField label="Proyecto"     value={form.proyecto} />
-                <ReadField label="Ciudad"       value={form.ciudad} />
                 <ReadField label="Teléfono"     value={form.telefono} />
                 <ReadField label="Correo"       value={form.correo} span={2} />
               </div>
