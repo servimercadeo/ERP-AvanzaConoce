@@ -14,6 +14,8 @@ use App\Http\Controllers\SsoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 // ── Público ──────────────────────────────────────────────────────────────────
 Route::get('/health', function () {
@@ -201,4 +203,142 @@ Route::middleware('auth:sanctum')->group(function () {
             'empleadores'  => DB::table('empleadores')->select('id', 'nombre')->orderBy('nombre')->get(),
         ]);
     });
+
+    // Respuestas del formulario de nuevos ingresos (Guardado sin migración en JSON)
+    Route::get('/respuestas-ingresos', function () {
+        $path = storage_path('app/respuestas_ingresos.json');
+        if (!file_exists($path)) {
+            return response()->json([]);
+        }
+        $data = json_decode(file_get_contents($path), true) ?: [];
+        return response()->json($data);
+    });
+
+    // Documentos de contratación por candidato (admin)
+    Route::get('/documentos-contratacion/{documento}', function ($documento) {
+        $metaPath = storage_path('app/documentos_contratacion.json');
+        if (!file_exists($metaPath)) return response()->json(null);
+        $meta = json_decode(file_get_contents($metaPath), true) ?: [];
+        return response()->json($meta[$documento] ?? null);
+    });
+
+    Route::get('/documentos-contratacion/{documento}/{tipo}/download', function ($documento, $tipo) {
+        $metaPath = storage_path('app/documentos_contratacion.json');
+        abort_unless(file_exists($metaPath), 404);
+        $meta    = json_decode(file_get_contents($metaPath), true) ?: [];
+        $archivo = $meta[$documento]['archivos'][$tipo] ?? null;
+        abort_unless($archivo, 404);
+        abort_unless(Storage::disk('local')->exists($archivo['ruta']), 404);
+        return response()->download(
+            Storage::disk('local')->path($archivo['ruta']),
+            $archivo['nombre_original']
+        );
+    });
+
+    Route::delete('/documentos-contratacion/{documento}/{tipo}', function ($documento, $tipo) {
+        $metaPath = storage_path('app/documentos_contratacion.json');
+        if (!file_exists($metaPath)) return response()->json(['message' => 'No encontrado.'], 404);
+        $meta = json_decode(file_get_contents($metaPath), true) ?: [];
+        if (!isset($meta[$documento]['archivos'][$tipo])) {
+            return response()->json(['message' => 'Documento no encontrado.'], 404);
+        }
+        Storage::disk('local')->delete($meta[$documento]['archivos'][$tipo]['ruta']);
+        unset($meta[$documento]['archivos'][$tipo]);
+        file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        return response()->json(null, 204);
+    });
+
+    Route::delete('/respuestas-ingresos/{id}', function ($id) {
+        $path = storage_path('app/respuestas_ingresos.json');
+        if (!file_exists($path)) {
+            return response()->json(['message' => 'No se encontraron respuestas.'], 404);
+        }
+        $data = json_decode(file_get_contents($path), true) ?: [];
+        $filtered = array_values(array_filter($data, fn($item) => $item['id'] !== $id));
+        file_put_contents($path, json_encode($filtered, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        return response()->json(null, 204);
+    });
 });
+
+// Carga pública de documentos de contratación (candidato sube sus propios archivos)
+Route::post('/documentos-contratacion/upload', function (Request $request) {
+    $request->validate([
+        'documento' => 'required|string|max:40',
+        'tipo'      => 'required|string|max:120',
+        'archivo'   => 'required|file|max:10240',
+    ]);
+
+    $documento = $request->input('documento');
+    $tipo      = $request->input('tipo');
+    $file      = $request->file('archivo');
+    $ext       = $file->getClientOriginalExtension() ?: 'pdf';
+    $dirSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $documento);
+    $tipSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $tipo);
+    $path      = $file->storeAs("documentos_contratacion/{$dirSafe}", "{$tipSafe}.{$ext}", 'local');
+
+    $metaPath = storage_path('app/documentos_contratacion.json');
+    $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+
+    if (!isset($meta[$documento])) {
+        $meta[$documento] = ['documento' => $documento, 'archivos' => [], 'created_at' => now()->toDateTimeString()];
+    }
+    $meta[$documento]['archivos'][$tipo] = [
+        'ruta'            => $path,
+        'nombre_original' => $file->getClientOriginalName(),
+        'uploaded_at'     => now()->toDateTimeString(),
+    ];
+    $meta[$documento]['updated_at'] = now()->toDateTimeString();
+
+    file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    return response()->json(['message' => 'Documento subido correctamente.'], 201);
+});
+
+// Registro público de nuevos ingresos (Guardado en JSON para llenado manual por el usuario)
+Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
+    $data = $request->validate([
+        'documento' => 'required|string|max:40',
+        'nombres' => 'required|string|max:200',
+        'apellidos' => 'required|string|max:200',
+        'fecha_nacimiento' => 'required|date',
+        'lugar_nacimiento' => 'required|string|max:200',
+        'estado_civil' => 'required|string|max:50',
+        'numero_hijos' => 'required|string|max:10',
+        'rh' => 'required|string|max:10',
+        'nivel_escolaridad' => 'required|string|max:100',
+        'profesion' => 'required|string|max:150',
+        'ciudad' => 'required|string|max:150',
+        'barrio' => 'required|string|max:150',
+        'direccion' => 'required|string|max:250',
+        'estrato' => 'required|string|max:10',
+        'correo' => 'required|email|max:180',
+        'celular' => 'required|string|max:30',
+        'emergencia_nombre' => 'required|string|max:200',
+        'emergencia_telefono' => 'required|string|max:30',
+        'emergencia_parentesco' => 'required|string|max:100',
+        'eps' => 'required|string|max:150',
+        'afp' => 'required|string|max:150',
+        'talla_camisa' => 'required|string|max:20',
+        'talla_pantalon' => 'required|string|max:20',
+        'talla_zapatos' => 'required|string|max:20',
+    ]);
+
+    $path = storage_path('app/respuestas_ingresos.json');
+    $responses = [];
+    if (file_exists($path)) {
+        $responses = json_decode(file_get_contents($path), true) ?: [];
+    }
+
+    $data['id'] = time() . '_' . rand(1000, 9999);
+    $data['created_at'] = now()->toDateTimeString();
+    
+    $responses[] = $data;
+
+    if (!file_exists(dirname($path))) {
+        mkdir(dirname($path), 0755, true);
+    }
+    file_put_contents($path, json_encode($responses, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    return response()->json(['message' => 'Información registrada con éxito.'], 201);
+});
+

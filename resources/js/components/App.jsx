@@ -9,6 +9,8 @@ const Dashboard              = lazy(() => import('../pages/Dashboard'))
 const Module                 = lazy(() => import('../pages/Module'))
 const Submodule              = lazy(() => import('../pages/Submodule'))
 const RegistroCandidatosForm = lazy(() => import('../forms/RegistroCandidatosForm'))
+const RegistroNuevosIngresosForm = lazy(() => import('../forms/RegistroNuevosIngresosForm'))
+const CargaDocumentosForm        = lazy(() => import('../forms/CargaDocumentosForm'))
 
 function PageLoader() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/registro-candidatos" element={<RegistroCandidatosForm />} />
+              <Route path="/registro-nuevos-ingresos" element={<RegistroNuevosIngresosForm />} />
+              <Route path="/carga-documentos" element={<CargaDocumentosForm />} />
               <Route
                 path="/dashboard"
                 element={<PrivateRoute><Dashboard /></PrivateRoute>}
