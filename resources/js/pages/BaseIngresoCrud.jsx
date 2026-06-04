@@ -133,13 +133,28 @@ export default function BaseIngresoCrud() {
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
       tipo_vinculacion:         c.tipo_vinculacion                    || p.tipo_vinculacion,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,
+      lugar_trabajo:            c.lugar_trabajo                      || p.lugar_trabajo,
+      fecha_programacion_ingreso: c.fecha_programacion_ingreso       || p.fecha_programacion_ingreso,
+      fecha_correccion:         c.fecha_correccion                   || p.fecha_correccion,
+      tasa_riesgo_arl:          c.tasa_riesgo_arl                    || p.tasa_riesgo_arl,
+      salario_basico:           c.salario_basico                     || p.salario_basico,
+      auxilio_transporte:       c.auxilio_transporte                 || p.auxilio_transporte,
+      otrosi_variable:          c.otrosi_variable                    || p.otrosi_variable,
+      auxilio_rodamiento:       c.auxilio_rodamiento                 || p.auxilio_rodamiento,
+      auxilio_comunicacion:     c.auxilio_comunicacion               || p.auxilio_comunicacion,
+      auxilio_alimentacion:     c.auxilio_alimentacion               || p.auxilio_alimentacion,
     }));
   };
 
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
     if (row) {
-      setForm({ ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' });
+      const base = { ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' };
+      if (!base.lugar_trabajo && row.candidato_id) {
+        const c = candidates.find(x => String(x.id) === String(row.candidato_id));
+        if (c?.lugar_trabajo) base.lugar_trabajo = c.lugar_trabajo;
+      }
+      setForm(base);
     } else {
       setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'activa' });
     }

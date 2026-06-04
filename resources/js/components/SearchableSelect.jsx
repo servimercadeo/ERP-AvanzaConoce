@@ -42,7 +42,7 @@ const presetBtnStyle = {
     whiteSpace: "nowrap",
 };
 
-export function SearchableSelect({ value, onChange, options, defaultValue, disabled = false }) {
+export function SearchableSelect({ value, onChange, options, defaultValue, disabled = false, freeText = false }) {
     const selectedLabel =
         value === defaultValue || value === "" || value == null
             ? ""
@@ -62,18 +62,29 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
         function onOutside(e) {
             if (ref.current && !ref.current.contains(e.target)) {
                 setOpen(false);
-                // revert to selected label if user didn't pick anything new
-                setQuery(selectedLabel);
+                if (freeText) {
+                    // commit typed text as the value
+                    const trimmed = (query ?? "").trim();
+                    if (trimmed !== selectedLabel) {
+                        onChange(trimmed || (defaultValue ?? ""));
+                    }
+                } else {
+                    // revert to selected label if user didn't pick anything new
+                    setQuery(selectedLabel);
+                }
             }
         }
         document.addEventListener("mousedown", onOutside);
         return () => document.removeEventListener("mousedown", onOutside);
-    }, [selectedLabel]);
+    }, [selectedLabel, freeText, query, onChange, defaultValue]);
 
     const q = query.toLowerCase();
     const filtered = q.length === 0
-        ? options                                                        // sin texto: muestra todo
-        : options.filter((o) => o.label.toLowerCase().startsWith(q));   // con texto: filtra por inicio
+        ? options
+        : options.filter((o) => o.label.toLowerCase().includes(q));
+
+    const exactMatch = freeText && q.length > 0
+        && options.some((o) => o.label.toLowerCase() === q);
 
     const handleSelect = (optValue, optLabel) => {
         onChange(optValue);
@@ -153,31 +164,54 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
                         Limpiar selección
                     </div>
                     {filtered.length === 0 ? (
-                        <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
-                            Sin resultados para "{query}"
-                        </div>
-                    ) : (
-                        filtered.map((o, i) => (
+                        freeText && query.trim() ? (
                             <div
-                                key={o.value}
-                                style={{
-                                    padding: "10px 12px",
-                                    cursor: "pointer",
-                                    fontSize: "0.9rem",
-                                    background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
-                                    borderRadius: "10px",
-                                    marginBottom: 4,
-                                    fontWeight: String(value) === String(o.value) ? 700 : 400,
-                                    color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
-                                    transition: "background 0.15s ease, transform 0.15s ease",
-                                }}
-                                onMouseEnter={() => setHovered(i)}
+                                style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
+                                onMouseEnter={() => setHovered(-3)}
                                 onMouseLeave={() => setHovered(-1)}
-                                onClick={() => handleSelect(o.value, o.label)}
+                                onClick={() => { onChange(query.trim()); setOpen(false); }}
                             >
-                                {o.label}
+                                Usar "{query}"
                             </div>
-                        ))
+                        ) : (
+                            <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                Sin resultados
+                            </div>
+                        )
+                    ) : (
+                        <>
+                            {filtered.map((o, i) => (
+                                <div
+                                    key={o.value}
+                                    style={{
+                                        padding: "10px 12px",
+                                        cursor: "pointer",
+                                        fontSize: "0.9rem",
+                                        background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
+                                        borderRadius: "10px",
+                                        marginBottom: 4,
+                                        fontWeight: String(value) === String(o.value) ? 700 : 400,
+                                        color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
+                                        transition: "background 0.15s ease, transform 0.15s ease",
+                                    }}
+                                    onMouseEnter={() => setHovered(i)}
+                                    onMouseLeave={() => setHovered(-1)}
+                                    onClick={() => handleSelect(o.value, o.label)}
+                                >
+                                    {o.label}
+                                </div>
+                            ))}
+                            {freeText && query.trim() && !exactMatch && (
+                                <div
+                                    style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", borderTop: "1px solid rgba(197,232,227,0.9)", marginTop: 4, background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
+                                    onMouseEnter={() => setHovered(-3)}
+                                    onMouseLeave={() => setHovered(-1)}
+                                    onClick={() => { onChange(query.trim()); setOpen(false); }}
+                                >
+                                    Usar "{query}"
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             )}

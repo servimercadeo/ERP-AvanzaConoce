@@ -7,6 +7,7 @@ use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class CandidatoController extends Controller
@@ -126,6 +127,18 @@ class CandidatoController extends Controller
             'fraude_fecha_consulta'    => 'nullable|date',
             'fraude_fuente'            => 'nullable|string|max:120',
             'seguridad_estudio'        => 'nullable|string',
+            // Datos de contratación
+            'lugar_trabajo'                => 'nullable|string|max:200',
+            'fecha_programacion_ingreso'   => 'nullable|date',
+            'fecha_correccion'             => 'nullable|date',
+            // Remuneración
+            'tasa_riesgo_arl'          => 'nullable|string|max:20',
+            'salario_basico'           => 'nullable|numeric',
+            'auxilio_transporte'       => 'nullable|numeric',
+            'otrosi_variable'          => 'nullable|numeric',
+            'auxilio_rodamiento'       => 'nullable|numeric',
+            'auxilio_comunicacion'     => 'nullable|numeric',
+            'auxilio_alimentacion'     => 'nullable|numeric',
         ]);
 
         if (isset($data['nombres'])) {
@@ -181,6 +194,14 @@ class CandidatoController extends Controller
                         422
                     );
                 }
+                $tasaArl    = $data['tasa_riesgo_arl'] ?? $candidato->tasa_riesgo_arl;
+                $salario    = $data['salario_basico']   ?? $candidato->salario_basico;
+                if (empty($tasaArl) || is_null($salario) || $salario <= 0) {
+                    return response()->json(
+                        ['message' => 'Completa los campos de remuneración del candidato (Tasa de riesgo ARL y Salario básico) antes de activar el Aval.'],
+                        422
+                    );
+                }
             }
         }
 
@@ -188,13 +209,13 @@ class CandidatoController extends Controller
         $candidato->update($data);
 
         if (!$avalAntes && !empty($data['aval']) && $data['aval']) {
-            $candidato->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'ciudad']);
+            $candidato->refresh()->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'requisicion.empleador', 'ciudad']);
             $baseIngreso = BaseIngreso::where('candidato_id', $candidato->id)->latest()->first();
             $recipient   = config('mail.aval_recipient', env('MAIL_AVAL_TO', 'marin.jc2005@gmail.com'));
             try {
                 Mail::to($recipient)->send(new AvalContratacionMail($candidato, $baseIngreso));
             } catch (\Exception $e) {
-                \Log::warning('Correo de aval no enviado: ' . $e->getMessage());
+                Log::warning('Correo de aval no enviado: ' . $e->getMessage());
             }
         } elseif ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
             BaseIngreso::where('candidato_id', $candidato->id)->delete();

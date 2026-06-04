@@ -76,29 +76,37 @@
       {{-- Tipo de ingreso / vinculación --}}
       <td>{{ $baseIngreso?->tipo_vinculacion ?? $candidato->tipo_vinculacion ?? '-' }}</td>
       {{-- Lugar de trabajo / Sede --}}
-      <td>{{ $baseIngreso?->lugar_trabajo ?? '-' }}</td>
+      <td>{{ $baseIngreso?->lugar_trabajo ?? $candidato->lugar_trabajo ?? '-' }}</td>
       {{-- Líder inmediato --}}
-      <td>{{ $baseIngreso?->lider_inmediato ?? '-' }}</td>
+      <td>{{ $baseIngreso?->lider_inmediato ?? $candidato->requisicion?->responsable ?? '-' }}</td>
       {{-- Empleador --}}
-      <td>{{ $baseIngreso?->empleador ?? '-' }}</td>
+      <td>{{ $baseIngreso?->empleador ?? $candidato->requisicion?->empleador?->nombre ?? '-' }}</td>
       {{-- Fecha programación ingreso --}}
-      <td>{{ $baseIngreso?->fecha_programacion_ingreso ? \Carbon\Carbon::parse($baseIngreso->fecha_programacion_ingreso)->format('d/m/Y') : '-' }}</td>
+      @php $fpi = $baseIngreso?->fecha_programacion_ingreso ?? $candidato->fecha_programacion_ingreso; @endphp
+      <td>{{ $fpi ? \Carbon\Carbon::parse($fpi)->format('d/m/Y') : '-' }}</td>
       {{-- Fecha corrección --}}
-      <td>{{ $baseIngreso?->fecha_correccion ? \Carbon\Carbon::parse($baseIngreso->fecha_correccion)->format('d/m/Y') : '-' }}</td>
+      @php $fc = $baseIngreso?->fecha_correccion ?? $candidato->fecha_correccion; @endphp
+      <td>{{ $fc ? \Carbon\Carbon::parse($fc)->format('d/m/Y') : '-' }}</td>
       {{-- Tasa riesgo ARL --}}
-      <td>{{ $baseIngreso?->tasa_riesgo_arl ?? '-' }}</td>
+      <td>{{ $baseIngreso?->tasa_riesgo_arl ?? $candidato->tasa_riesgo_arl ?? '-' }}</td>
       {{-- Salario básico --}}
-      <td>{{ $baseIngreso?->salario_basico ? '$ ' . number_format($baseIngreso->salario_basico, 0, ',', '.') : '-' }}</td>
+      @php $salario = $baseIngreso?->salario_basico ?? $candidato->salario_basico; @endphp
+      <td>{{ $salario ? '$ ' . number_format($salario, 0, ',', '.') : '-' }}</td>
       {{-- Auxilio transporte --}}
-      <td>{{ $baseIngreso?->auxilio_transporte ? '$ ' . number_format($baseIngreso->auxilio_transporte, 0, ',', '.') : '-' }}</td>
+      @php $auxTransporte = $baseIngreso?->auxilio_transporte ?? $candidato->auxilio_transporte; @endphp
+      <td>{{ $auxTransporte ? '$ ' . number_format($auxTransporte, 0, ',', '.') : '-' }}</td>
       {{-- Otrosi variable --}}
-      <td>{{ $baseIngreso?->otrosi_variable ? '$ ' . number_format($baseIngreso->otrosi_variable, 0, ',', '.') : '$ -' }}</td>
+      @php $otrosiVar = $baseIngreso?->otrosi_variable ?? $candidato->otrosi_variable; @endphp
+      <td>{{ $otrosiVar ? '$ ' . number_format($otrosiVar, 0, ',', '.') : '$ -' }}</td>
       {{-- Auxilio rodamiento --}}
-      <td>{{ $baseIngreso?->auxilio_rodamiento ? '$ ' . number_format($baseIngreso->auxilio_rodamiento, 0, ',', '.') : 'No aplica' }}</td>
+      @php $auxRodamiento = $baseIngreso?->auxilio_rodamiento ?? $candidato->auxilio_rodamiento; @endphp
+      <td>{{ $auxRodamiento ? '$ ' . number_format($auxRodamiento, 0, ',', '.') : 'No aplica' }}</td>
       {{-- Auxilio comunicación --}}
-      <td>{{ $baseIngreso?->auxilio_comunicacion ? '$ ' . number_format($baseIngreso->auxilio_comunicacion, 0, ',', '.') : '-' }}</td>
+      @php $auxComunicacion = $baseIngreso?->auxilio_comunicacion ?? $candidato->auxilio_comunicacion; @endphp
+      <td>{{ $auxComunicacion ? '$ ' . number_format($auxComunicacion, 0, ',', '.') : '-' }}</td>
       {{-- Auxilio alimentación --}}
-      <td>{{ $baseIngreso?->auxilio_alimentacion ? '$ ' . number_format($baseIngreso->auxilio_alimentacion, 0, ',', '.') : '-' }}</td>
+      @php $auxAlimentacion = $baseIngreso?->auxilio_alimentacion ?? $candidato->auxilio_alimentacion; @endphp
+      <td>{{ $auxAlimentacion ? '$ ' . number_format($auxAlimentacion, 0, ',', '.') : '-' }}</td>
     </tr>
   </tbody>
 </table>

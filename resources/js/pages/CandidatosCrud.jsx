@@ -8,6 +8,7 @@ import {
     IconClose,
     IconGestionar,
 } from "../components/Icons";
+import { SearchableSelect } from "../components/SearchableSelect";
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -73,6 +74,7 @@ export default function CandidatosCrud() {
     const [candidates, setCandidates] = useState([]);
     const [requisitions, setRequisitions] = useState([]);
     const [ciudadesOpts, setCiudadesOpts] = useState([]);
+    const [sedesOpts, setSedesOpts] = useState([]);
     // loadingData is derived from React Query (see queries below)
     const [candDetailSearch, setCandDetailSearch] = useState("");
     const debouncedSearch = useDebounce(candDetailSearch, 300);
@@ -93,6 +95,16 @@ export default function CandidatosCrud() {
         estado: "Entrevista",
         ...interviewDateFrom(getTodayStr()),
         observaciones: "",
+        tasa_riesgo_arl: "",
+        salario_basico: "",
+        auxilio_transporte: "",
+        otrosi_variable: "",
+        auxilio_rodamiento: "",
+        auxilio_comunicacion: "",
+        auxilio_alimentacion: "",
+        lugar_trabajo: "",
+        fecha_programacion_ingreso: "",
+        fecha_correccion: "",
     });
     const [docs, setDocs] = useState([]);
     const [docsLoading, setDocsLoading] = useState(false);
@@ -109,6 +121,8 @@ export default function CandidatosCrud() {
         msg: "",
         onConfirm: null,
     });
+    const [alertDlg, setAlertDlg] = useState({ open: false, title: "", msg: "" });
+    const showAlert = (title, msg) => setAlertDlg({ open: true, title, msg });
 
     const showToast = (msg, type = "success") => {
         setToast({ msg, type });
@@ -130,6 +144,7 @@ export default function CandidatosCrud() {
     const { data: _qCandidates,   isLoading: _lc } = useQuery({ queryKey: ['candidatos'],         queryFn: () => api.get('/candidatos').then(r => r.data) });
     const { data: _qRequisitions, isLoading: _lr } = useQuery({ queryKey: ['requisiciones'],       queryFn: () => api.get('/requisiciones').then(r => r.data) });
     const { data: _qCatalogos,    isLoading: _lk } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data) });
+    const { data: _qSedes }                        = useQuery({ queryKey: ['sedes'],               queryFn: () => api.get('/sedes').then(r => r.data) });
     const loadingData = _lc || _lr || _lk;
 
     useEffect(() => { if (_qCandidates)   setCandidates(_qCandidates); },   [_qCandidates]);
@@ -137,6 +152,9 @@ export default function CandidatosCrud() {
     useEffect(() => {
         if (_qCatalogos) setCiudadesOpts((_qCatalogos.ciudades || []).map(ci => ({ value: String(ci.id), label: ci.nombre })));
     }, [_qCatalogos]);
+    useEffect(() => {
+        if (_qSedes) setSedesOpts((_qSedes?.data ?? _qSedes ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+    }, [_qSedes]);
 
     const reload = () =>
         api
@@ -188,7 +206,7 @@ export default function CandidatosCrud() {
                 setCandidates((prev) =>
                     prev.map((c) => (c.id === candidateId ? candidate : c))
                 );
-                alert(err.response?.data?.message || "Error al guardar el cambio.");
+                showAlert("Error", err.response?.data?.message || "Error al guardar el cambio.");
             });
     };
 
@@ -209,6 +227,13 @@ export default function CandidatosCrud() {
             return;
         }
         if (field === "aval") {
+            if (!candidate.tasa_riesgo_arl || !candidate.salario_basico) {
+                showAlert(
+                    'Remuneración incompleta',
+                    'Completa los campos de remuneración del candidato (Tasa de riesgo ARL y Salario básico) antes de activar el Aval de contratación.'
+                );
+                return;
+            }
             setVinculacionModal({ open: true, candidateId, tipo: 'Directa' });
             return;
         }
@@ -280,9 +305,7 @@ export default function CandidatosCrud() {
                 reload();
             }
         } catch (e) {
-            alert(
-                "Error al subir: " + (e.response?.data?.message || e.message),
-            );
+            showAlert("Error al subir", e.response?.data?.message || e.message);
         } finally {
             setUploadingDoc(null);
         }
@@ -324,10 +347,7 @@ export default function CandidatosCrud() {
                 );
             }
         } catch (e) {
-            alert(
-                "Error al eliminar: " +
-                    (e.response?.data?.message || e.message),
-            );
+            showAlert("Error al eliminar", e.response?.data?.message || e.message);
         }
     };
 
@@ -352,13 +372,13 @@ export default function CandidatosCrud() {
             a.click();
             URL.revokeObjectURL(url);
         } catch {
-            alert("Error al descargar el documento.");
+            showAlert("Error", "Error al descargar el documento.");
         }
     };
 
     const handleAddCustomDoc = async () => {
         if (!newDocFile) {
-            alert("Selecciona un archivo.");
+            showAlert("Archivo requerido", "Selecciona un archivo antes de agregar.");
             return;
         }
         const nombre = newDocFile.name.replace(/\.[^/.]+$/, "");
@@ -466,10 +486,7 @@ export default function CandidatosCrud() {
             await api.delete(`/candidatos/${candidateId}`);
             setCandidates((prev) => prev.filter((c) => c.id !== candidateId));
         } catch (e) {
-            alert(
-                "Error al eliminar: " +
-                    (e.response?.data?.message || e.message),
-            );
+            showAlert("Error al eliminar", e.response?.data?.message || e.message);
         }
     };
 
@@ -488,7 +505,7 @@ export default function CandidatosCrud() {
             !candForm.celular ||
             !candForm.identificacion
         ) {
-            alert("Por favor, rellene todos los campos obligatorios (*).");
+            showAlert("Campos obligatorios", "Por favor, rellene todos los campos obligatorios (*) antes de guardar.");
             return;
         }
         try {
@@ -517,9 +534,7 @@ export default function CandidatosCrud() {
                     : "Candidato actualizado exitosamente",
             );
         } catch (e) {
-            alert(
-                "Error al guardar: " + (e.response?.data?.message || e.message),
-            );
+            showAlert("Error al guardar", e.response?.data?.message || e.message);
         }
     };
 
@@ -599,10 +614,7 @@ export default function CandidatosCrud() {
             setProcModalCandidate(null);
             showToast("Procesos guardados exitosamente");
         } catch (e) {
-            alert(
-                "Error al guardar procesos: " +
-                    (e.response?.data?.message || e.message),
-            );
+            showAlert("Error al guardar procesos", e.response?.data?.message || e.message);
         }
     };
 
@@ -1194,6 +1206,129 @@ export default function CandidatosCrud() {
                                 />
                             </div>
 
+
+                            {/* ── Datos de contratación (edición y vista) ── */}
+                            {candModalMode !== "create" && (
+                                <>
+                                    <h4
+                                        style={{
+                                            margin: "24px 0 14px 0",
+                                            fontSize: "0.95rem",
+                                            fontWeight: 700,
+                                            color: "var(--primary)",
+                                            fontFamily: "'Poppins',sans-serif",
+                                        }}
+                                    >
+                                        Datos de contratación
+                                    </h4>
+                                    <div style={S.grid3}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+                                            <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                                                Lugar de trabajo (sede)
+                                            </label>
+                                            <SearchableSelect
+                                                key={`lugart-${candForm.lugar_trabajo ?? ""}`}
+                                                value={candForm.lugar_trabajo ?? ""}
+                                                defaultValue=""
+                                                options={sedesOpts}
+                                                freeText={true}
+                                                onChange={(val) => setCandForm((p) => ({ ...p, lugar_trabajo: val }))}
+                                                disabled={candModalMode === "view"}
+                                            />
+                                        </div>
+                                        <Field
+                                            label="Fecha programación ingreso"
+                                            k="fecha_programacion_ingreso"
+                                            type="date"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Fecha de corrección"
+                                            k="fecha_correccion"
+                                            type="date"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Remuneración (edición y vista) ── */}
+                            {candModalMode !== "create" && (
+                                <>
+                                    <h4
+                                        style={{
+                                            margin: "24px 0 14px 0",
+                                            fontSize: "0.95rem",
+                                            fontWeight: 700,
+                                            color: "var(--primary)",
+                                            fontFamily: "'Poppins',sans-serif",
+                                        }}
+                                    >
+                                        Remuneración
+                                    </h4>
+                                    <div style={S.grid3}>
+                                        <Field
+                                            label="Tasa de riesgo ARL"
+                                            k="tasa_riesgo_arl"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Salario básico"
+                                            k="salario_basico"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Auxilio de transporte"
+                                            k="auxilio_transporte"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Otrosí variable"
+                                            k="otrosi_variable"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Aux. rodamiento / seguridad vial"
+                                            k="auxilio_rodamiento"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Aux. de comunicación"
+                                            k="auxilio_comunicacion"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                        <Field
+                                            label="Aux. de alimentación"
+                                            k="auxilio_alimentacion"
+                                            type="number"
+                                            form={candForm}
+                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            disabled={candModalMode === "view"}
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             {/* ── Documentos (solo en edición) ── */}
                             {candModalMode === "edit" && (
@@ -2421,6 +2556,59 @@ export default function CandidatosCrud() {
                             </button>
                             <button style={S.btnPrimaryGreen} onClick={handleConfirmVinculacion}>
                                 Confirmar aval
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {alertDlg.open && (
+                <div
+                    style={{ ...S.overlay, zIndex: 6100 }}
+                    onClick={() => setAlertDlg({ open: false, title: "", msg: "" })}
+                >
+                    <div
+                        style={{
+                            background: "var(--white)",
+                            borderRadius: "var(--radius)",
+                            boxShadow: "0 16px 60px rgba(26,155,140,0.28)",
+                            width: "100%",
+                            maxWidth: 400,
+                            overflow: "hidden",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeaderGreen}>
+                            <span style={{ ...S.modalTitleWhite, fontSize: "1rem" }}>
+                                {alertDlg.title}
+                            </span>
+                        </div>
+                        <div style={{ padding: "22px 28px" }}>
+                            <p
+                                style={{
+                                    margin: 0,
+                                    fontSize: "0.93rem",
+                                    color: "var(--text)",
+                                    fontFamily: "Nunito,sans-serif",
+                                    lineHeight: 1.6,
+                                }}
+                            >
+                                {alertDlg.msg}
+                            </p>
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                padding: "14px 28px",
+                                borderTop: "1.5px solid var(--border)",
+                            }}
+                        >
+                            <button
+                                style={S.btnPrimaryGreen}
+                                onClick={() => setAlertDlg({ open: false, title: "", msg: "" })}
+                            >
+                                Aceptar
                             </button>
                         </div>
                     </div>
