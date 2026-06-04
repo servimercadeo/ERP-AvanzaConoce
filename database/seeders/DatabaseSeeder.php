@@ -27,7 +27,5 @@ class DatabaseSeeder extends Seeder
         // 7. Requisiciones de selección
         $this->call(RequisicionesSeeder::class);
 
-        // 8. Candidatos vinculados a requisiciones
-        $this->call(CandidatosSeeder::class);
     }
 }
