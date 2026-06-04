@@ -111,6 +111,27 @@ class BaseIngresoController extends Controller
             ->whereNotIn('id', $existingIds)
             ->get();
 
+        // Backfill salary fields for existing records that have null values
+        $existing = BaseIngreso::whereNotNull('candidato_id')
+            ->whereNull('salario_basico')
+            ->with('candidato')
+            ->get();
+
+        foreach ($existing as $ingreso) {
+            $c = $ingreso->candidato;
+            if ($c) {
+                $ingreso->update([
+                    'tasa_riesgo_arl'    => $c->tasa_riesgo_arl,
+                    'salario_basico'     => $c->salario_basico,
+                    'auxilio_transporte' => $c->auxilio_transporte,
+                    'otrosi_variable'    => $c->otrosi_variable,
+                    'auxilio_rodamiento' => $c->auxilio_rodamiento,
+                    'auxilio_comunicacion' => $c->auxilio_comunicacion,
+                    'auxilio_alimentacion' => $c->auxilio_alimentacion,
+                ]);
+            }
+        }
+
         $count = 0;
         foreach ($candidatos as $c) {
             $req = $c->requisicion;
@@ -130,6 +151,13 @@ class BaseIngresoController extends Controller
                 'empleador'                  => $req ? ($req->empleador ? $req->empleador->nombre : null) : null,
                 'fecha_programacion_ingreso' => now()->toDateString(),
                 'estado'                     => 'activa',
+                'tasa_riesgo_arl'            => $c->tasa_riesgo_arl,
+                'salario_basico'             => $c->salario_basico,
+                'auxilio_transporte'         => $c->auxilio_transporte,
+                'otrosi_variable'            => $c->otrosi_variable,
+                'auxilio_rodamiento'         => $c->auxilio_rodamiento,
+                'auxilio_comunicacion'       => $c->auxilio_comunicacion,
+                'auxilio_alimentacion'       => $c->auxilio_alimentacion,
             ]);
             $count++;
         }

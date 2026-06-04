@@ -66,6 +66,7 @@ export const ERP_MODULES = [
         desc: 'Gestión de contratos',
         archivos: [
           { id: 'avales_contratacion', label: 'Avales de Contratación' },
+          { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
           { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           { id: 'empleadores', label: 'Empleadores' },
