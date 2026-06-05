@@ -157,7 +157,12 @@ export default function AvalesContratacionCrud() {
       qc.invalidateQueries({ queryKey: ['base-ingresos'] });
       showToast('Alerta enviada al candidato');
     } catch (e) {
-      alert('Error al enviar alerta: ' + (e.response?.data?.message || e.message));
+      const status = e.response?.status;
+      const msg = status === 404
+        ? 'El registro ya no existe. La lista se ha actualizado.'
+        : 'Error al enviar alerta: ' + (e.response?.data?.message || e.message);
+      alert(msg);
+      qc.invalidateQueries({ queryKey: ['base-ingresos'] });
     } finally {
       setAlertLoading(null);
     }
@@ -319,13 +324,14 @@ export default function AvalesContratacionCrud() {
 
               <label style={S.sectionLabel}>Datos del candidato</label>
               <div style={{ ...S.grid3, marginBottom: 20 }}>
-                <ReadField label="Documento"    value={form.documento_identificacion} />
-                <ReadField label="Nombre"       value={form.nombre_completo} span={2} />
-                <ReadField label="Cargo"        value={form.cargo} />
-                <ReadField label="Empresa"      value={form.empresa} />
-                <ReadField label="Proyecto"     value={form.proyecto} />
-                <ReadField label="Teléfono"     value={form.telefono} />
-                <ReadField label="Correo"       value={form.correo} span={2} />
+                <ReadField label="Documento"         value={form.documento_identificacion} />
+                <ReadField label="Fecha exp. doc."   value={form.candidato?.fecha_expedicion ?? '—'} />
+                <ReadField label="Nombre"            value={form.nombre_completo} span={3} />
+                <ReadField label="Cargo"             value={form.cargo} />
+                <ReadField label="Empresa"           value={form.empresa} />
+                <ReadField label="Proyecto"          value={form.proyecto} />
+                <ReadField label="Teléfono"          value={form.telefono} />
+                <ReadField label="Correo"            value={form.correo} span={2} />
               </div>
 
               <label style={S.sectionLabel}>Vinculación y fechas de ingreso</label>

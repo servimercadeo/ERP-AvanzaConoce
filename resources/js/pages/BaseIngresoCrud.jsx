@@ -121,6 +121,7 @@ export default function BaseIngresoCrud() {
     setForm(p => ({
       ...p,
       candidato_id:             c.id,
+      _fecha_exp_doc:           c.fecha_expedicion                     || '',
       documento_identificacion: c.identificacion                        || p.documento_identificacion,
       nombre_completo:          c.nombres                               || p.nombre_completo,
       cargo:                    req.cargo?.nombre                       || p.cargo,
@@ -149,7 +150,7 @@ export default function BaseIngresoCrud() {
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
     if (row) {
-      const base = { ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' };
+      const base = { ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '', _fecha_exp_doc: row.candidato?.fecha_expedicion ?? '' };
       if (!base.lugar_trabajo && row.candidato_id) {
         const c = candidates.find(x => String(x.id) === String(row.candidato_id));
         if (c?.lugar_trabajo) base.lugar_trabajo = c.lugar_trabajo;
@@ -187,6 +188,7 @@ export default function BaseIngresoCrud() {
     try {
       await api.delete(`/base-ingresos/${id}`);
       setData(prev => prev.filter(r => r.id !== id));
+      qc.invalidateQueries({ queryKey: ['base-ingresos'] });
       showToast('Registro eliminado');
     } catch (e) {
       alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
@@ -368,7 +370,8 @@ export default function BaseIngresoCrud() {
               <label style={S.sectionLabel}>Datos de identificación</label>
               <div style={{ ...S.grid3, marginBottom: 18 }}>
                 <Field label="Documento de identificación" k="documento_identificacion" req form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Nombre completo" k="nombre_completo" req span={2} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <ReadField label="Fecha exp. documento" value={form._fecha_exp_doc || '—'} />
+                <Field label="Nombre completo" k="nombre_completo" req span={3} form={form} onChange={set} disabled={modalMode === 'view'} />
               </div>
 
               <label style={S.sectionLabel}>Datos laborales</label>
@@ -444,6 +447,18 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+function ReadField({ label, value, span }) {
+  const wrap = { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, ...(span ? { gridColumn: `span ${span}` } : {}) };
+  return (
+    <div style={wrap}>
+      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>{label}</label>
+      <div style={{ padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text-muted)', background: 'var(--bg)', minHeight: 36 }}>
+        {value ?? '—'}
+      </div>
     </div>
   );
 }
