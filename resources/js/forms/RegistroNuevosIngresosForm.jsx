@@ -34,7 +34,7 @@ const TALLA_PANTALON_OPTS = ["4","6","8","10","12","14","16","18","28","30","32"
 const TALLA_ZAPATOS_OPTS = ["35","36","37","38","39","40","41","42","43","44"];
 
 const EMPTY_FORM = {
-    documento: "", nombres: "", apellidos: "", fecha_expedicion_doc: "",
+    documento: "", nombres: "", apellidos: "",
     fecha_nacimiento: "", lugar_nacimiento: "", estado_civil: "", numero_hijos: "",
     rh: "", nivel_escolaridad: "", profesion: "", ciudad: "", barrio: "",
     direccion: "", estrato: "", correo: "", celular: "", emergencia_nombre: "",
@@ -81,6 +81,27 @@ const IcoMapPin = () => (
 const IcoCheck = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12"/>
+    </svg>
+);
+const IcoWarning = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+);
+const IcoX = () => (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+);
+const IcoBigCheck = () => (
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+    </svg>
+);
+const IcoStar = () => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
 );
 
@@ -374,8 +395,8 @@ function Field({ label, hint, required, error, icon, children }) {
                 {required && <span style={{ color: "#e74c3c", marginLeft: 4 }}>*</span>}
             </label>
             {hint && (
-                <div style={{ fontSize: "0.76rem", color: "var(--teal)", marginBottom: 7, fontWeight: 600 }}>
-                    ✦ {hint}
+                <div style={{ fontSize: "0.76rem", color: "var(--teal)", marginBottom: 7, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <IcoStar /> {hint}
                 </div>
             )}
             {icon ? (
@@ -386,7 +407,7 @@ function Field({ label, hint, required, error, icon, children }) {
             ) : children}
             {error && (
                 <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.78rem", color: "#e74c3c", marginTop: 5, fontWeight: 600 }}>
-                    <span>⚠</span><span>{error}</span>
+                    <IcoWarning /><span>{error}</span>
                 </div>
             )}
         </div>
@@ -448,7 +469,6 @@ export default function RegistroNuevosIngresosForm() {
             else if (!/^\d+$/.test(form.documento.trim())) e.documento = "Sin espacios, puntos ni comas";
             if (!form.nombres.trim()) e.nombres = "Campo obligatorio";
             if (!form.apellidos.trim()) e.apellidos = "Campo obligatorio";
-            if (!form.fecha_expedicion_doc) e.fecha_expedicion_doc = "Campo obligatorio";
             if (!form.fecha_nacimiento) e.fecha_nacimiento = "Campo obligatorio";
             if (!form.lugar_nacimiento.trim()) e.lugar_nacimiento = "Campo obligatorio";
             if (!form.estado_civil) e.estado_civil = "Campo obligatorio";
@@ -521,7 +541,7 @@ export default function RegistroNuevosIngresosForm() {
             <div className="rni-page">
                 <FormStyles />
                 <div className="rni-card animate-fade-in" style={{ maxWidth: 500, padding: "56px 36px", textAlign: "center", borderColor: "#fde8e8" }}>
-                    <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#fde8e8", color: "#c0392b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem", margin: "0 auto 24px" }}>✕</div>
+                    <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#fde8e8", color: "#c0392b", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}><IcoX /></div>
                     <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: "1.3rem", color: "#c0392b", margin: "0 0 14px" }}>Autorización Requerida</h2>
                     <p style={{ color: "var(--text-muted)", fontSize: "0.91rem", lineHeight: 1.7, margin: "0 0 24px" }}>
                         Para continuar con el proceso de registro es indispensable aceptar las políticas de tratamiento de datos personales de acuerdo con la Ley 1581 de 2012.
@@ -540,7 +560,7 @@ export default function RegistroNuevosIngresosForm() {
             <div className="rni-page">
                 <FormStyles />
                 <div className="rni-card animate-fade-in" style={{ maxWidth: 520, padding: "60px 44px", textAlign: "center" }}>
-                    <div style={{ width: 84, height: 84, borderRadius: "50%", background: "var(--teal-light)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.4rem", margin: "0 auto 28px" }}>✓</div>
+                    <div style={{ width: 84, height: 84, borderRadius: "50%", background: "var(--teal-light)", color: "var(--teal)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}><IcoBigCheck /></div>
                     <h2 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: "1.5rem", color: "var(--teal)", margin: "0 0 14px" }}>¡Registro Completado!</h2>
                     <p style={{ color: "var(--text-muted)", fontSize: "0.93rem", lineHeight: 1.8, margin: "0 0 28px" }}>
                         Tus datos han sido registrados exitosamente. Nos pondremos en contacto contigo pronto para continuar con el proceso de contratación.
@@ -663,9 +683,6 @@ export default function RegistroNuevosIngresosForm() {
                                 </Field>
                                 <Field label="Número de Documento" required error={errors.documento} hint="Documento sin espacios, puntos (.) ni comas (,)" icon={<IcoDoc />}>
                                     <input type="text" className={`rni-input ${errors.documento ? "rni-input-error" : ""}`} value={form.documento} onChange={e => set("documento", e.target.value)} />
-                                </Field>
-                                <Field label="Fecha de Expedición del Documento" required error={errors.fecha_expedicion_doc} hint="Selecciona la fecha de expedición" icon={<IcoCalendar />}>
-                                    <input type="date" className={`rni-input ${errors.fecha_expedicion_doc ? "rni-input-error" : ""}`} value={form.fecha_expedicion_doc} onChange={e => set("fecha_expedicion_doc", e.target.value)} />
                                 </Field>
                                 <Field label="Fecha de Nacimiento" required error={errors.fecha_nacimiento} hint="De acuerdo con tu documento de identidad" icon={<IcoCalendar />}>
                                     <input type="date" className={`rni-input ${errors.fecha_nacimiento ? "rni-input-error" : ""}`} value={form.fecha_nacimiento} onChange={e => set("fecha_nacimiento", e.target.value)} />

@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Mail;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+class DocumentosCompletadosMail extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public function __construct(public string $nombres) {}
+
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            from: new Address(config('mail.from.address'), config('mail.from.name')),
+            subject: 'Confirmación de documentos recibidos - Proceso de contratación',
+        );
+    }
+
+    public function content(): Content
+    {
+        return new Content(view: 'emails.documentos_completados');
+    }
+}

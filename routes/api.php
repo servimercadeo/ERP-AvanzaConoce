@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AppSettingController;
 use App\Http\Controllers\Api\BaseIngresoController;
 use App\Mail\AlertaIngresoMail;
+use App\Mail\CargaDocumentosMail;
+use App\Mail\DocumentosCompletadosMail;
 use App\Models\BaseIngreso;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
@@ -197,6 +199,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
         ->parameters(['requisiciones' => 'requisicion']);
+    Route::get('candidatos/by-doc/{doc}', function ($doc) {
+        $c = \App\Models\Candidato::where('identificacion', $doc)->first(['fecha_expedicion']);
+        return response()->json($c ? ['fecha_expedicion' => $c->fecha_expedicion] : null);
+    });
     Route::apiResource('candidatos', CandidatoController::class)
         ->parameters(['candidatos' => 'candidato']);
     Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index']);
@@ -239,17 +245,20 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($meta[$documento] ?? null);
     });
 
-    Route::get('/documentos-contratacion/{documento}/{tipo}/download', function ($documento, $tipo) {
+    Route::get('/documentos-contratacion/{documento}/{tipo}/download', function ($documento, $tipo, Request $request) {
         $metaPath = storage_path('app/documentos_contratacion.json');
         abort_unless(file_exists($metaPath), 404);
         $meta    = json_decode(file_get_contents($metaPath), true) ?: [];
         $archivo = $meta[$documento]['archivos'][$tipo] ?? null;
         abort_unless($archivo, 404);
         abort_unless(Storage::disk('local')->exists($archivo['ruta']), 404);
-        return response()->download(
-            Storage::disk('local')->path($archivo['ruta']),
-            $archivo['nombre_original']
-        );
+        $filePath = Storage::disk('local')->path($archivo['ruta']);
+        if ($request->boolean('inline')) {
+            return response()->file($filePath, [
+                'Content-Disposition' => 'inline; filename="' . $archivo['nombre_original'] . '"',
+            ]);
+        }
+        return response()->download($filePath, $archivo['nombre_original']);
     });
 
     Route::delete('/documentos-contratacion/{documento}/{tipo}', function ($documento, $tipo) {
@@ -275,6 +284,21 @@ Route::middleware('auth:sanctum')->group(function () {
         file_put_contents($path, json_encode($filtered, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         return response()->json(null, 204);
     });
+});
+
+// Resuelve el token cifrado del link de carga de documentos
+Route::get('/carga-documentos/resolve-token', function (Request $request) {
+    try {
+        $documento = Crypt::decryptString(urldecode($request->query('token', '')));
+        $ingreso   = BaseIngreso::where('documento_identificacion', $documento)->latest()->first();
+        return response()->json([
+            'documento' => $documento,
+            'nombre'    => $ingreso?->nombre_completo ?? '',
+            'correo'    => $ingreso?->correo ?? '',
+        ]);
+    } catch (\Exception) {
+        return response()->json(['error' => 'Token inválido.'], 400);
+    }
 });
 
 // Carga pública de documentos de contratación (candidato sube sus propios archivos)
@@ -307,6 +331,25 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
     $meta[$documento]['updated_at'] = now()->toDateTimeString();
 
     file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    // Enviar correo de completado cuando todos los documentos obligatorios estén subidos (solo una vez)
+    $requiredDocs = ['documento_identidad','diploma_bachiller','certificados_estudio','certificados_laborales','certificacion_eps','certificacion_pension','hoja_vida'];
+    $uploaded     = array_keys($meta[$documento]['archivos'] ?? []);
+    $allDone      = count(array_diff($requiredDocs, $uploaded)) === 0;
+
+    if ($allDone && empty($meta[$documento]['email_completado_enviado'])) {
+        $ingreso = BaseIngreso::where('documento_identificacion', $documento)->latest()->first();
+        if ($ingreso && $ingreso->correo) {
+            try {
+                $primerNombre = explode(' ', trim($ingreso->nombre_completo))[0] ?? $ingreso->nombre_completo;
+                Mail::to($ingreso->correo)->send(new DocumentosCompletadosMail($primerNombre));
+                $meta[$documento]['email_completado_enviado'] = true;
+                file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            } catch (\Exception $e) {
+                \Log::error('Error enviando correo de documentos completados: ' . $e->getMessage());
+            }
+        }
+    }
 
     return response()->json(['message' => 'Documento subido correctamente.'], 201);
 });
@@ -372,13 +415,21 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
 
     $data['id'] = time() . '_' . rand(1000, 9999);
     $data['created_at'] = now()->toDateTimeString();
-    
+
     $responses[] = $data;
 
     if (!file_exists(dirname($path))) {
         mkdir(dirname($path), 0755, true);
     }
     file_put_contents($path, json_encode($responses, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    try {
+        Mail::to($data['correo'])->send(
+            new CargaDocumentosMail($data['nombres'] . ' ' . $data['apellidos'], $data['documento'])
+        );
+    } catch (\Exception $e) {
+        \Log::error('Error enviando correo de carga de documentos: ' . $e->getMessage());
+    }
 
     return response()->json(['message' => 'Información registrada con éxito.'], 201);
 });

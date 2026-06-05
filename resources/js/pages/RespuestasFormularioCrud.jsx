@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
-import { IconEye, IconTrash, IconClose, IconFolder } from '../components/Icons';
+import { IconEye, IconTrash, IconClose, IconFolder, IconCheckCircle, IconXCircle, IconMinusCircle, IconDownload, IconInfo } from '../components/Icons';
 
 const DOCS_LIST = [
   { id: 'documento_identidad',      label: 'Documento de Identidad',        required: true },
@@ -403,6 +403,7 @@ export default function RespuestasFormularioCrud() {
   const [pagina, setPagina] = useState(1);
   const [toast, setToast] = useState(null);
   const [docsModal, setDocsModal] = useState({ open: false, row: null, data: null, loading: false });
+  const [expFecha, setExpFecha] = useState(null);
   const POR_PAGINA = 10;
 
   const showToast = (msg, type = 'success') => {
@@ -424,6 +425,18 @@ export default function RespuestasFormularioCrud() {
   };
 
   useEffect(() => { fetchResponses(); }, []);
+
+  // Auto-refresh del modal de documentos mientras está abierto
+  useEffect(() => {
+    if (!docsModal.open || !docsModal.row) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/documentos-contratacion/${docsModal.row.documento}`);
+        setDocsModal(prev => prev.open ? { ...prev, data: res.data } : prev);
+      } catch {}
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [docsModal.open, docsModal.row?.documento]);
 
   const handleDelete = async (id) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.')) return;
@@ -464,6 +477,29 @@ export default function RespuestasFormularioCrud() {
     }
   };
 
+  const handleRefreshDocs = async () => {
+    if (!docsModal.row) return;
+    try {
+      const res = await api.get(`/documentos-contratacion/${docsModal.row.documento}`);
+      setDocsModal(prev => ({ ...prev, data: res.data }));
+    } catch { showToast('Error al actualizar', 'error'); }
+  };
+
+  const handlePreviewDoc = async (documento, tipo) => {
+    try {
+      const res = await api.get(
+        `/documentos-contratacion/${documento}/${encodeURIComponent(tipo)}/download?inline=1`,
+        { responseType: 'blob' }
+      );
+      const mime = res.headers['content-type'] || 'application/octet-stream';
+      const url  = URL.createObjectURL(new Blob([res.data], { type: mime }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      showToast('Error al previsualizar el documento', 'error');
+    }
+  };
+
   const handleDeleteDoc = async (documento, tipo) => {
     if (!confirm('¿Eliminar este documento? Esta acción no se puede deshacer.')) return;
     try {
@@ -483,9 +519,14 @@ export default function RespuestasFormularioCrud() {
     }
   };
 
-  const handleOpenView = (row) => {
+  const handleOpenView = async (row) => {
     setSelectedResponse(row);
+    setExpFecha(null);
     setIsModalOpen(true);
+    try {
+      const res = await api.get(`/candidatos/by-doc/${row.documento}`);
+      if (res.data) setExpFecha(res.data.fecha_expedicion ?? null);
+    } catch { /* no bloquea el modal si no se encuentra */ }
   };
 
   const filteredData = useMemo(() => {
@@ -659,13 +700,14 @@ export default function RespuestasFormularioCrud() {
               </button>
             </div>
             <div className="rf-modal-body">
-              <div style={{ marginBottom: 20, padding: '12px 16px', borderLeft: '4px solid var(--primary)', background: 'var(--bg2, #f0faf8)', borderRadius: '0 8px 8px 0', fontSize: '0.85rem', color: 'var(--text-muted, #5a7a75)', fontFamily: 'Nunito,sans-serif' }}>
-                ℹ Copia esta información y completa los campos correspondientes del Empleado o Contrato en el ERP según sea necesario.
+              <div style={{ marginBottom: 20, padding: '12px 16px', borderLeft: '4px solid var(--primary)', background: 'var(--bg2, #f0faf8)', borderRadius: '0 8px 8px 0', fontSize: '0.85rem', color: 'var(--text-muted, #5a7a75)', fontFamily: 'Nunito,sans-serif', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconInfo size={14} style={{ flexShrink: 0 }} /> Copia esta información y completa los campos correspondientes del Empleado o Contrato en el ERP según sea necesario.
               </div>
 
               <div className="rf-section-header">1. Información Personal</div>
               <div className="rf-detail-grid">
                 <DetailItem label="Número de documento" value={selectedResponse.documento} />
+                <DetailItem label="Fecha de expedición doc." value={expFecha ?? '—'} />
                 <DetailItem label="Nombres completos" value={selectedResponse.nombres} />
                 <DetailItem label="Apellidos completos" value={selectedResponse.apellidos} />
                 <DetailItem label="Fecha de nacimiento" value={selectedResponse.fecha_nacimiento} />
@@ -722,7 +764,9 @@ export default function RespuestasFormularioCrud() {
           loading={docsModal.loading}
           onClose={() => setDocsModal({ open: false, row: null, data: null, loading: false })}
           onDownload={handleDownloadDoc}
+          onPreview={handlePreviewDoc}
           onDelete={handleDeleteDoc}
+          onRefresh={handleRefreshDocs}
         />
       )}
 
@@ -748,17 +792,8 @@ function DetailItem({ label, value }) {
   );
 }
 
-function DocsModal({ row, data, loading, onClose, onDownload, onDelete }) {
-  const [copied, setCopied] = React.useState(false);
-  const uploadUrl = `${window.location.origin}/carga-documentos?doc=${row.documento}`;
+function DocsModal({ row, data, loading, onClose, onDownload, onPreview, onDelete, onRefresh }) {
   const archivos  = data?.archivos ?? {};
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(uploadUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
 
   return (
     <div className="rf-overlay" onClick={onClose}>
@@ -767,17 +802,30 @@ function DocsModal({ row, data, loading, onClose, onDownload, onDelete }) {
           <span className="rf-modal-title">
             Documentos de Contratación — {row.nombres} {row.apellidos}
           </span>
-          <button className="rf-close-btn" onClick={onClose}>
-            <IconClose size={14} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={onRefresh}
+              title="Actualizar"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, color: '#fff', cursor: 'pointer', padding: '4px 10px', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Actualizar
+            </button>
+            <button className="rf-close-btn" onClick={onClose}>
+              <IconClose size={14} />
+            </button>
+          </div>
         </div>
         <div className="rf-modal-body">
           {loading ? (
             <div className="rf-loading">Cargando documentos...</div>
           ) : (
             <>
-              <div className="rf-section-header" style={{ marginTop: 0 }}>
-                Estado de documentos · {row.documento}
+              <div className="rf-section-header" style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Estado de documentos · {row.documento}</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  {Object.keys(archivos).length} / {DOCS_LIST.length} subidos
+                </span>
               </div>
               <div className="rf-docs-list">
                 {DOCS_LIST.map(doc => {
@@ -787,7 +835,13 @@ function DocsModal({ row, data, loading, onClose, onDownload, onDelete }) {
                       key={doc.id}
                       className={`rf-doc-row ${arch ? 'rf-doc-uploaded' : 'rf-doc-missing'}`}
                     >
-                      <span className="rf-doc-status-icon">{arch ? '✅' : (doc.required ? '❌' : '➖')}</span>
+                      <span className="rf-doc-status-icon">
+                        {arch
+                          ? <IconCheckCircle size={16} style={{ color: '#10b981' }} />
+                          : doc.required
+                            ? <IconXCircle size={16} style={{ color: '#ef4444' }} />
+                            : <IconMinusCircle size={16} style={{ color: '#9ca3af' }} />}
+                      </span>
                       <div className="rf-doc-info">
                         <div className="rf-doc-name">{doc.label}</div>
                         {arch ? (
@@ -802,15 +856,21 @@ function DocsModal({ row, data, loading, onClose, onDownload, onDelete }) {
                         <div className="rf-doc-actions">
                           <button
                             className="rf-doc-btn rf-doc-btn-dl"
+                            onClick={() => onPreview(row.documento, doc.id)}
+                          >
+                            <IconEye size={13} /> Ver
+                          </button>
+                          <button
+                            className="rf-doc-btn rf-doc-btn-dl"
                             onClick={() => onDownload(row.documento, doc.id, arch.nombre_original)}
                           >
-                            ⬇ Descargar
+                            <IconDownload size={13} /> Descargar
                           </button>
                           <button
                             className="rf-doc-btn rf-doc-btn-del"
                             onClick={() => onDelete(row.documento, doc.id)}
                           >
-                            🗑
+                            <IconTrash size={14} />
                           </button>
                         </div>
                       )}
@@ -819,15 +879,6 @@ function DocsModal({ row, data, loading, onClose, onDownload, onDelete }) {
                 })}
               </div>
 
-              <div className="rf-link-box">
-                <div className="rf-link-label">Enlace para el candidato</div>
-                <div className="rf-link-row">
-                  <div className="rf-link-url">{uploadUrl}</div>
-                  <button className="rf-copy-btn" onClick={handleCopy}>
-                    {copied ? '¡Copiado!' : 'Copiar'}
-                  </button>
-                </div>
-              </div>
             </>
           )}
         </div>
