@@ -1,34 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { SearchableSelect } from "../components/SearchableSelect";
 
-const ESTADO_CIVIL_OPTS = ["SOLTERO", "CASADO", "DIVORCIADO", "VIUDO"];
 const HIJOS_OPTS = ["0", "1", "2", "3", "4", "5", "6"];
-const TIPO_SANGRE_OPTS = ["A+", "O+", "B+", "AB+", "A-", "O-", "B-", "AB-"];
 const ESCOLARIDAD_OPTS = ["PREESCOLAR", "PRIMARIA", "SECUNDARIA", "TECNICO", "TECNOLOGO", "PROFESIONAL", "POSGRADO"];
-const CIUDAD_OPTS = [
-    "ARMENIA","APARTADÓ","BARRANCABERMEJA","BARRANQUILLA","BOGOTÁ","BOSA","BUCARAMANGA",
-    "CALDAS","CALI","CARTAGENA","CARTAGO","CUCÚTA","CUENCA","DOSQUEBRADAS","ENGATIVÁ",
-    "FACATATIVA","FLORIDABLANCA","FUSAGASUGA","GIRARDOT","GUAYAQUIL","ITAGUI","JAMUNDI",
-    "LA VIRGINIA","MANIZALES","MARINILLA","MEDELLIN","MONTERIA","PALMIRA","PASTO",
-    "PENSILVANIA","PEREIRA","POPAYAN","QUITO","RIONEGRO","SINCELEJO","SOACHA","TUMACO","VALLEDUPAR"
-];
 const ESTRATO_OPTS = ["1", "2", "3", "4", "5", "6"];
 const PARENTESCO_OPTS = ["PADRE O MADRE","HERMANO O HERMANA","ESPOSO O ESPOSA","TIO O TIA","SOBRINO O SOBRINA","HIJO O HIJA"];
-const EPS_OPTS = [
-    "ALIANSALUD EPS (ANTES COLMÉDICA)","CAFESALUD","COMFENALCO VALLE","COMPENSAR","COOMEVA",
-    "CRUZ BLANCA","EMPRESAS PÚBLICAS DE MEDELLÍN DEPARTAMENTO MÉDICO","EPS SURA","FAMISANAR",
-    "FONDO DE FERROCARRILES NACIONALES DE COLOMBIA (EPS)","FOSYGA","FOSYGA RÉGIMEN DE EXCEPCIÓN",
-    "FOSYGA RESIDENTE EXTERIOR O RÉGIMEN SUBSIDIADO","NUEVA E.P.S.",
-    "S.O.S. SERVICIO OCCIDENTAL DE SALUD S.A.","SALUD TOTAL","SALUDVIDA","SANITAS",
-    "UNIVERSIDAD DE ANTIOQUIA","UNIVERSIDAD DE CÓRDOBA","UNIVERSIDAD DEL ATLÁNTICO",
-    "UNIVERSIDAD DEL CAUCA","UNIVERSIDAD DEL VALLE","UNIVERSIDAD INDUSTRIAL DE SANTANDER",
-    "UNIVERSIDAD NACIONAL DE COLOMBIA","UNIVERSIDAD PEDAGÓGICA - UPTC","A.I.C.","AMBUQ",
-    "ANAS WAYUU","ASMET SALUD","CAFESALUD - MOVILIDAD","CAJACOPI ATLÁNTICO","CAPITAL SALUD",
-    "CAPRESOCA","COMFABOY","COMFACHOCO","COMFACOR","COMFACUNDI","COMFAMILIAR HUILA",
-    "COMFAMILIAR DE NARIÑO","COMFAMILIAR GUAJIRA","COMFASUCRE","COMPARTA","CONVIDA","COOSALUD",
-    "DUSAKAWI","ECOOPSOS","EMDISALUD","EMSSANAR","MALLAMAS","MANEXKA","MUTUAL SER",
-    "PIJAOSALUD","SAVIA SALUD","NINGUNA"
-];
-const AFP_OPTS = ["CAXDAC","COLFONDOS","COLPENSIONES","FONPRECON","OLD MUTUAL","OLD MUTUAL ALTERNATIVO","PENSIONES DE ANTIOQUIA","PORVENIR","PROTECCIÓN","NINGUNO"];
 const TALLA_CAMISA_OPTS = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 const TALLA_PANTALON_OPTS = ["4","6","8","10","12","14","16","18","28","30","32","34","36","38","40"];
 const TALLA_ZAPATOS_OPTS = ["35","36","37","38","39","40","41","42","43","44"];
@@ -369,6 +345,56 @@ const FormStyles = () => (
             border-color: var(--teal);
             color: var(--white);
         }
+        /* SearchableSelect sin ícono (selects genéricos) */
+        .rni-select-wrap input {
+            width: 100% !important;
+            padding: 11px 44px 11px 14px !important;
+            border: 1.5px solid var(--border) !important;
+            border-radius: var(--radius-sm) !important;
+            font-size: 0.93rem !important;
+            font-family: 'Nunito', sans-serif !important;
+            color: var(--text) !important;
+            background: var(--white) !important;
+            outline: none !important;
+            transition: all 0.22s cubic-bezier(0.16,1,0.3,1) !important;
+            box-sizing: border-box !important;
+            min-height: 0 !important;
+            line-height: 1.2 !important;
+        }
+        .rni-select-wrap input:focus {
+            border-color: var(--teal) !important;
+            box-shadow: 0 0 0 4px rgba(26,155,140,0.16) !important;
+        }
+        .rni-select-wrap-error input {
+            border-color: #e74c3c !important;
+            box-shadow: 0 0 0 4px rgba(231,76,60,0.12) !important;
+        }
+
+        /* SearchableSelect overrides para lugar_nacimiento */
+        .rni-city-select input {
+            width: 100% !important;
+            padding: 11px 44px 11px 38px !important;
+            border: 1.5px solid var(--border) !important;
+            border-radius: var(--radius-sm) !important;
+            font-size: 0.93rem !important;
+            font-family: 'Nunito', sans-serif !important;
+            color: var(--text) !important;
+            background: var(--white) !important;
+            outline: none !important;
+            transition: all 0.22s cubic-bezier(0.16,1,0.3,1) !important;
+            box-sizing: border-box !important;
+            min-height: 0 !important;
+            line-height: 1.2 !important;
+        }
+        .rni-city-select input:focus {
+            border-color: var(--teal) !important;
+            box-shadow: 0 0 0 4px rgba(26,155,140,0.16) !important;
+        }
+        .rni-city-select-error input {
+            border-color: #e74c3c !important;
+            box-shadow: 0 0 0 4px rgba(231,76,60,0.12) !important;
+        }
+
         @media (max-width: 600px) {
             .rni-grid { grid-template-columns: 1fr !important; }
             .rni-stepper { padding: 16px 20px !important; }
@@ -431,6 +457,29 @@ export default function RegistroNuevosIngresosForm() {
     const [consentChecked, setConsentChecked] = useState(false);
     const [consentDeclined, setConsentDeclined] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+    const [ciudades, setCiudades] = useState([]);
+    const [epsOpts, setEpsOpts] = useState([]);
+    const [fondosOpts, setFondosOpts] = useState([]);
+    const [estadosCivilOpts, setEstadosCivilOpts] = useState([]);
+    const [tiposRhOpts, setTiposRhOpts] = useState([]);
+
+    const ciudadesOpts = useMemo(
+        () => ciudades.map(c => ({ value: c.nombre, label: c.nombre })),
+        [ciudades]
+    );
+
+    useEffect(() => {
+        fetch("/api/registro/catalogos")
+            .then(r => r.json())
+            .then(data => {
+                setCiudades(data.ciudades ?? []);
+                setEpsOpts(data.eps ?? []);
+                setFondosOpts(data.fondos_pensiones ?? []);
+                setEstadosCivilOpts(data.estados_civil ?? []);
+                setTiposRhOpts(data.tipos_rh ?? []);
+            })
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -597,7 +646,7 @@ export default function RegistroNuevosIngresosForm() {
                         <div className="rni-logo-badge">S&amp;M</div>
                         <div>
                             <h1 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: "1.35rem", margin: "0 0 6px", letterSpacing: "0.03em" }}>
-                                REGISTRO DE CANDIDATOS
+                                REGISTRO DE NUEVOS INGRESOS
                             </h1>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <div className="rni-status-dot" />
@@ -688,31 +737,36 @@ export default function RegistroNuevosIngresosForm() {
                                     <input type="date" className={`rni-input ${errors.fecha_nacimiento ? "rni-input-error" : ""}`} value={form.fecha_nacimiento} onChange={e => set("fecha_nacimiento", e.target.value)} />
                                 </Field>
                                 <Field label="Lugar de Nacimiento" required error={errors.lugar_nacimiento} hint="Municipio y departamento donde naciste" icon={<IcoMapPin />}>
-                                    <input type="text" className={`rni-input ${errors.lugar_nacimiento ? "rni-input-error" : ""}`} value={form.lugar_nacimiento} onChange={e => set("lugar_nacimiento", e.target.value)} />
+                                    <div className={`rni-city-select ${errors.lugar_nacimiento ? "rni-city-select-error" : ""}`}>
+                                        <SearchableSelect
+                                            value={form.lugar_nacimiento}
+                                            defaultValue=""
+                                            options={ciudadesOpts}
+                                            onChange={v => set("lugar_nacimiento", v)}
+                                            freeText={true}
+                                            minSearch={2}
+                                        />
+                                    </div>
                                 </Field>
                                 <Field label="Estado Civil" required error={errors.estado_civil}>
-                                    <select className={`rni-input rni-input-noicon ${errors.estado_civil ? "rni-input-error" : ""}`} value={form.estado_civil} onChange={e => set("estado_civil", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {ESTADO_CIVIL_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.estado_civil ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.estado_civil} defaultValue="" options={estadosCivilOpts.map(o => ({ value: o, label: o }))} onChange={v => set("estado_civil", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Número de Hijos" required error={errors.numero_hijos}>
-                                    <select className={`rni-input rni-input-noicon ${errors.numero_hijos ? "rni-input-error" : ""}`} value={form.numero_hijos} onChange={e => set("numero_hijos", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {HIJOS_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.numero_hijos ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.numero_hijos} defaultValue="" options={HIJOS_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("numero_hijos", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Tipo de Sangre" required error={errors.rh}>
-                                    <select className={`rni-input rni-input-noicon ${errors.rh ? "rni-input-error" : ""}`} value={form.rh} onChange={e => set("rh", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {TIPO_SANGRE_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.rh ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.rh} defaultValue="" options={tiposRhOpts.map(o => ({ value: o, label: o }))} onChange={v => set("rh", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Nivel de Escolaridad" required error={errors.nivel_escolaridad}>
-                                    <select className={`rni-input rni-input-noicon ${errors.nivel_escolaridad ? "rni-input-error" : ""}`} value={form.nivel_escolaridad} onChange={e => set("nivel_escolaridad", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {ESCOLARIDAD_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.nivel_escolaridad ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.nivel_escolaridad} defaultValue="" options={ESCOLARIDAD_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("nivel_escolaridad", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Profesión" required error={errors.profesion} hint="Título de la última formación alcanzada" icon={<IcoDoc />}>
                                     <input type="text" className={`rni-input ${errors.profesion ? "rni-input-error" : ""}`} value={form.profesion} onChange={e => set("profesion", e.target.value)} />
@@ -733,10 +787,9 @@ export default function RegistroNuevosIngresosForm() {
                             </div>
                             <div className="rni-grid">
                                 <Field label="Ciudad de Residencia" required error={errors.ciudad} hint="Ciudad donde vives actualmente">
-                                    <select className={`rni-input rni-input-noicon ${errors.ciudad ? "rni-input-error" : ""}`} value={form.ciudad} onChange={e => set("ciudad", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {CIUDAD_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.ciudad ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.ciudad} defaultValue="" options={ciudadesOpts} onChange={v => set("ciudad", v)} freeText={true} minSearch={2} />
+                                    </div>
                                 </Field>
                                 <Field label="Barrio de Residencia" required error={errors.barrio} hint="Nombre del barrio donde vives" icon={<IcoMapPin />}>
                                     <input type="text" className={`rni-input ${errors.barrio ? "rni-input-error" : ""}`} value={form.barrio} onChange={e => set("barrio", e.target.value)} />
@@ -745,10 +798,9 @@ export default function RegistroNuevosIngresosForm() {
                                     <input type="text" className={`rni-input ${errors.direccion ? "rni-input-error" : ""}`} value={form.direccion} onChange={e => set("direccion", e.target.value)} />
                                 </Field>
                                 <Field label="Estrato Socioeconómico" required error={errors.estrato} hint="De acuerdo con tus recibos públicos">
-                                    <select className={`rni-input rni-input-noicon ${errors.estrato ? "rni-input-error" : ""}`} value={form.estrato} onChange={e => set("estrato", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {ESTRATO_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.estrato ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.estrato} defaultValue="" options={ESTRATO_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("estrato", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Correo Electrónico" required error={errors.correo} hint="Donde podamos enviarte información de tu contrato" icon={<IcoMail />}>
                                     <input type="email" className={`rni-input ${errors.correo ? "rni-input-error" : ""}`} value={form.correo} onChange={e => set("correo", e.target.value)} />
@@ -779,10 +831,9 @@ export default function RegistroNuevosIngresosForm() {
                                     <input type="text" className={`rni-input ${errors.emergencia_telefono ? "rni-input-error" : ""}`} value={form.emergencia_telefono} onChange={e => set("emergencia_telefono", e.target.value)} />
                                 </Field>
                                 <Field label="Parentesco" required error={errors.emergencia_parentesco}>
-                                    <select className={`rni-input rni-input-noicon ${errors.emergencia_parentesco ? "rni-input-error" : ""}`} value={form.emergencia_parentesco} onChange={e => set("emergencia_parentesco", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {PARENTESCO_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.emergencia_parentesco ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.emergencia_parentesco} defaultValue="" options={PARENTESCO_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("emergencia_parentesco", v)} />
+                                    </div>
                                 </Field>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
@@ -801,16 +852,14 @@ export default function RegistroNuevosIngresosForm() {
                             </div>
                             <div className="rni-grid">
                                 <Field label="EPS" required error={errors.eps} hint="EPS a la cual te encuentras afiliado(a)">
-                                    <select className={`rni-input rni-input-noicon ${errors.eps ? "rni-input-error" : ""}`} value={form.eps} onChange={e => set("eps", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {EPS_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.eps ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.eps} defaultValue="" options={epsOpts.map(o => ({ value: o, label: o }))} onChange={v => set("eps", v)} />
+                                    </div>
                                 </Field>
-                                <Field label="Fondo de Pensiones (AFP)" required error={errors.afp} hint="Fondo de pensiones al cual te encuentras afiliado(a)">
-                                    <select className={`rni-input rni-input-noicon ${errors.afp ? "rni-input-error" : ""}`} value={form.afp} onChange={e => set("afp", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {AFP_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                <Field label="Fondo de Pensiones" required error={errors.afp} hint="Fondo de pensiones al cual te encuentras afiliado(a)">
+                                    <div className={`rni-select-wrap ${errors.afp ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.afp} defaultValue="" options={fondosOpts.map(o => ({ value: o, label: o }))} onChange={v => set("afp", v)} />
+                                    </div>
                                 </Field>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
@@ -829,22 +878,19 @@ export default function RegistroNuevosIngresosForm() {
                             </div>
                             <div className="rni-grid">
                                 <Field label="Talla de Camisa" required error={errors.talla_camisa} hint="Selecciona tu talla de camisa">
-                                    <select className={`rni-input rni-input-noicon ${errors.talla_camisa ? "rni-input-error" : ""}`} value={form.talla_camisa} onChange={e => set("talla_camisa", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {TALLA_CAMISA_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.talla_camisa ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.talla_camisa} defaultValue="" options={TALLA_CAMISA_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("talla_camisa", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Talla de Pantalón" required error={errors.talla_pantalon} hint="Selecciona tu talla de pantalón">
-                                    <select className={`rni-input rni-input-noicon ${errors.talla_pantalon ? "rni-input-error" : ""}`} value={form.talla_pantalon} onChange={e => set("talla_pantalon", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {TALLA_PANTALON_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.talla_pantalon ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.talla_pantalon} defaultValue="" options={TALLA_PANTALON_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("talla_pantalon", v)} />
+                                    </div>
                                 </Field>
                                 <Field label="Talla de Zapatos" required error={errors.talla_zapatos} hint="Selecciona tu talla de calzado">
-                                    <select className={`rni-input rni-input-noicon ${errors.talla_zapatos ? "rni-input-error" : ""}`} value={form.talla_zapatos} onChange={e => set("talla_zapatos", e.target.value)}>
-                                        <option value="">-- Selecciona --</option>
-                                        {TALLA_ZAPATOS_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
+                                    <div className={`rni-select-wrap ${errors.talla_zapatos ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.talla_zapatos} defaultValue="" options={TALLA_ZAPATOS_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("talla_zapatos", v)} />
+                                    </div>
                                 </Field>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>

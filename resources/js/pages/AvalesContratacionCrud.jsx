@@ -103,7 +103,13 @@ export default function AvalesContratacionCrud() {
 
   const handleOpenModal = (mode, row) => {
     setModalMode(mode);
-    setForm({ ...row });
+    const c = row.candidato ?? {};
+    setForm({
+      ...row,
+      fecha_programacion_ingreso: row.fecha_programacion_ingreso || c.fecha_programacion_ingreso || '',
+      fecha_correccion:           row.fecha_correccion           || c.fecha_correccion           || '',
+      lugar_trabajo:              row.lugar_trabajo              || c.lugar_trabajo              || '',
+    });
     setIsModalOpen(true);
   };
 

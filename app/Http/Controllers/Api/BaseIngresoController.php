@@ -132,6 +132,27 @@ class BaseIngresoController extends Controller
             }
         }
 
+        // Backfill location/date fields for existing records that have null values
+        $existingLocation = BaseIngreso::whereNotNull('candidato_id')
+            ->where(function ($q) {
+                $q->whereNull('lugar_trabajo')
+                  ->orWhereNull('fecha_correccion')
+                  ->orWhereNull('fecha_programacion_ingreso');
+            })
+            ->with('candidato')
+            ->get();
+
+        foreach ($existingLocation as $ingreso) {
+            $c = $ingreso->candidato;
+            if ($c) {
+                $ingreso->update([
+                    'lugar_trabajo'              => $ingreso->lugar_trabajo              ?? $c->lugar_trabajo,
+                    'fecha_correccion'           => $ingreso->fecha_correccion           ?? $c->fecha_correccion,
+                    'fecha_programacion_ingreso' => $ingreso->fecha_programacion_ingreso ?? $c->fecha_programacion_ingreso,
+                ]);
+            }
+        }
+
         $count = 0;
         foreach ($candidatos as $c) {
             $req = $c->requisicion;
@@ -147,9 +168,11 @@ class BaseIngresoController extends Controller
                 'telefono'                   => $c->celular,
                 'correo'                     => $c->correo,
                 'tipo_vinculacion'           => $c->tipo_vinculacion,
+                'lugar_trabajo'              => $c->lugar_trabajo,
                 'lider_inmediato'            => $req ? $req->responsable : null,
                 'empleador'                  => $req ? ($req->empleador ? $req->empleador->nombre : null) : null,
-                'fecha_programacion_ingreso' => now()->toDateString(),
+                'fecha_programacion_ingreso' => $c->fecha_programacion_ingreso ?? now()->toDateString(),
+                'fecha_correccion'           => $c->fecha_correccion,
                 'estado'                     => 'activa',
                 'tasa_riesgo_arl'            => $c->tasa_riesgo_arl,
                 'salario_basico'             => $c->salario_basico,

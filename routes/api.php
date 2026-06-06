@@ -46,10 +46,14 @@ Route::get('/registro/catalogos', function (Request $request) {
     }
 
     return response()->json([
-        'ciudades'  => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
-        'proyectos' => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
-        'negocio'   => $negocio,
-        'estado'    => $estado,
+        'ciudades'        => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
+        'proyectos'       => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
+        'eps'             => DB::table('eps')->orderBy('nombre')->pluck('nombre'),
+        'fondos_pensiones'=> DB::table('fondos_pensiones')->orderBy('nombre')->pluck('nombre'),
+        'estados_civil'   => DB::table('estados_civil')->orderBy('nombre')->pluck('nombre'),
+        'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
+        'negocio'         => $negocio,
+        'estado'          => $estado,
     ]);
 });
 
