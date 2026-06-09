@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 const inputStyle = {
     width: "100%",
@@ -11,7 +11,7 @@ const inputStyle = {
     color: "var(--text)",
     background: "var(--white)",
     outline: "none",
-    transition: "border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
     minHeight: 48,
     lineHeight: 1.2,
 };
@@ -42,51 +42,88 @@ const presetBtnStyle = {
     whiteSpace: "nowrap",
 };
 
-export function SearchableSelect({ value, onChange, options, defaultValue, disabled = false, freeText = false }) {
-    const selectedLabel =
-        value === defaultValue || value === "" || value == null
-            ? ""
-            : options.find((o) => String(o.value) === String(value))?.label ?? String(value);
+// Normaliza texto: quita acentos y pasa a minúsculas para comparar
+function norm(str) {
+    return (str ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "");
+}
 
-    const [query, setQuery] = useState(selectedLabel);
+export function SearchableSelect({
+    value,
+    onChange,
+    options,
+    defaultValue,
+    disabled = false,
+    freeText = false,
+    minSearch = 0,      // nº mínimo de caracteres para mostrar opciones
+    maxResults = 100,   // límite de opciones mostradas
+}) {
+    const getLabel = (val) => {
+        if (val === defaultValue || val === "" || val == null) return "";
+        return options.find((o) => String(o.value) === String(val))?.label ?? String(val);
+    };
+
+    const [query, setQuery] = useState(() => getLabel(value));
     const [open, setOpen] = useState(false);
     const [hovered, setHovered] = useState(-1);
     const ref = useRef(null);
+    // Rastrea si el usuario está escribiendo activamente
+    const isTyping = useRef(false);
+    const prevValue = useRef(value);
 
-    // Sync query with selected label when closed or when value changes externally
+    // Solo sincronizar query desde afuera si el value cambia externamente
+    // (no cuando el usuario está escribiendo)
     useEffect(() => {
-        if (!open) setQuery(selectedLabel);
-    }, [selectedLabel, open]);
+        if (!isTyping.current && value !== prevValue.current) {
+            setQuery(getLabel(value));
+        }
+        prevValue.current = value;
+    }, [value, options]);
 
+    // Clic fuera cierra el dropdown
     useEffect(() => {
         function onOutside(e) {
             if (ref.current && !ref.current.contains(e.target)) {
+                isTyping.current = false;
                 setOpen(false);
                 if (freeText) {
-                    // commit typed text as the value
                     const trimmed = (query ?? "").trim();
-                    if (trimmed !== selectedLabel) {
+                    const currentLabel = getLabel(value);
+                    if (trimmed !== currentLabel) {
                         onChange(trimmed || (defaultValue ?? ""));
                     }
                 } else {
-                    // revert to selected label if user didn't pick anything new
-                    setQuery(selectedLabel);
+                    // revertir al label del valor seleccionado
+                    setQuery(getLabel(value));
                 }
             }
         }
         document.addEventListener("mousedown", onOutside);
         return () => document.removeEventListener("mousedown", onOutside);
-    }, [selectedLabel, freeText, query, onChange, defaultValue]);
+    }, [value, options, freeText, query, onChange, defaultValue]);
 
-    const q = query.toLowerCase();
-    const filtered = q.length === 0
-        ? options
-        : options.filter((o) => o.label.toLowerCase().includes(q));
+    const q = norm(query);
+
+    const filtered = useMemo(() => {
+        if (q.length < minSearch) return [];
+        if (q.length === 0) return options.slice(0, maxResults);
+        const exact = [], prefix = [], contains = [];
+        for (const o of options) {
+            const l = norm(o.label);
+            if (l === q) exact.push(o);
+            else if (l.startsWith(q)) prefix.push(o);
+            else if (l.includes(q)) contains.push(o);
+        }
+        return [...exact, ...prefix, ...contains].slice(0, maxResults);
+    }, [q, options, minSearch, maxResults]);
 
     const exactMatch = freeText && q.length > 0
-        && options.some((o) => o.label.toLowerCase() === q);
+        && options.some((o) => norm(o.label) === q);
 
     const handleSelect = (optValue, optLabel) => {
+        isTyping.current = false;
         onChange(optValue);
         setQuery(optLabel);
         setOpen(false);
@@ -94,19 +131,33 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
     };
 
     const handleClear = () => {
-        onChange(defaultValue);
+        isTyping.current = false;
+        onChange(defaultValue ?? "");
         setQuery("");
         setOpen(false);
     };
 
+    const handleChange = (e) => {
+        if (disabled) return;
+        isTyping.current = true;
+        setQuery(e.target.value);
+        setOpen(true);
+        setHovered(-1);
+    };
+
+    const handleFocus = () => {
+        if (disabled) return;
+        setOpen(true);
+        setHovered(-1);
+    };
+
+    const showMinHint = open && q.length > 0 && q.length < minSearch;
+    const showTypeHint = open && minSearch > 0 && q.length === 0;
+
     return (
         <div
             ref={ref}
-            style={{
-                position: "relative",
-                borderRadius: "var(--radius-sm)",
-                display: "block",
-            }}
+            style={{ position: "relative", borderRadius: "var(--radius-sm)", display: "block" }}
         >
             <input
                 style={{
@@ -117,18 +168,19 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
                     boxShadow: open ? "0 0 0 4px rgba(26,155,140,0.14)" : "none",
                     borderColor: open ? "var(--primary)" : "var(--border)",
                 }}
-                
                 value={query}
                 disabled={disabled}
-                onFocus={() => { if (!disabled) { setOpen(true); setHovered(-1); } }}
-                onBlur={() => { if (!disabled) { setHovered(-1); } }}
-                onChange={(e) => { if (!disabled) { setQuery(e.target.value); setOpen(true); setHovered(-1); } }}
+                placeholder={minSearch > 0 ? `Escribe para buscar...` : ""}
+                onFocus={handleFocus}
+                onBlur={() => { if (!disabled) setHovered(-1); }}
+                onChange={handleChange}
             />
             <span style={{ ...chevronStyle, transform: `translateY(-50%) rotate(${open ? 180 : 0}deg)` }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
                 </svg>
             </span>
+
             {open && !disabled && (
                 <div style={{
                     position: "absolute",
@@ -138,19 +190,18 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
                     background: "var(--white)",
                     border: "1.5px solid rgba(26,155,140,0.14)",
                     borderRadius: "14px",
-                    boxShadow: "0 18px 36px rgba(26, 155, 140, 0.16)",
-                    zIndex: 1000,
-                    maxHeight: 180,
+                    boxShadow: "0 18px 36px rgba(26,155,140,0.16)",
+                    zIndex: 2000,
+                    maxHeight: 220,
                     overflowY: "auto",
                     padding: "8px",
-                    backdropFilter: "blur(6px)",
                 }}>
-                    {/* Opción limpiar (sin texto placeholder) */}
+                    {/* Limpiar */}
                     <div
                         style={{
                             padding: "9px 12px",
                             cursor: "pointer",
-                            fontSize: "0.85rem",
+                            fontSize: "0.83rem",
                             color: "var(--text-muted)",
                             background: hovered === -2 ? "rgba(26,155,140,0.08)" : "transparent",
                             borderRadius: "10px",
@@ -163,53 +214,71 @@ export function SearchableSelect({ value, onChange, options, defaultValue, disab
                     >
                         Limpiar selección
                     </div>
-                    {filtered.length === 0 ? (
-                        freeText && query.trim() ? (
-                            <div
-                                style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
-                                onMouseEnter={() => setHovered(-3)}
-                                onMouseLeave={() => setHovered(-1)}
-                                onClick={() => { onChange(query.trim()); setOpen(false); }}
-                            >
-                                Usar "{query}"
-                            </div>
-                        ) : (
-                            <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
-                                Sin resultados
-                            </div>
-                        )
-                    ) : (
+
+                    {/* Hint: escribe más */}
+                    {showTypeHint && (
+                        <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                            Escribe para buscar...
+                        </div>
+                    )}
+                    {showMinHint && (
+                        <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                            Escribe al menos {minSearch} caracteres...
+                        </div>
+                    )}
+
+                    {/* Opciones */}
+                    {!showTypeHint && !showMinHint && (
                         <>
-                            {filtered.map((o, i) => (
-                                <div
-                                    key={o.value}
-                                    style={{
-                                        padding: "10px 12px",
-                                        cursor: "pointer",
-                                        fontSize: "0.9rem",
-                                        background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
-                                        borderRadius: "10px",
-                                        marginBottom: 4,
-                                        fontWeight: String(value) === String(o.value) ? 700 : 400,
-                                        color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
-                                        transition: "background 0.15s ease, transform 0.15s ease",
-                                    }}
-                                    onMouseEnter={() => setHovered(i)}
-                                    onMouseLeave={() => setHovered(-1)}
-                                    onClick={() => handleSelect(o.value, o.label)}
-                                >
-                                    {o.label}
-                                </div>
-                            ))}
-                            {freeText && query.trim() && !exactMatch && (
-                                <div
-                                    style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", borderTop: "1px solid rgba(197,232,227,0.9)", marginTop: 4, background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
-                                    onMouseEnter={() => setHovered(-3)}
-                                    onMouseLeave={() => setHovered(-1)}
-                                    onClick={() => { onChange(query.trim()); setOpen(false); }}
-                                >
-                                    Usar "{query}"
-                                </div>
+                            {filtered.length === 0 ? (
+                                freeText && query.trim() ? (
+                                    <div
+                                        style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
+                                        onMouseEnter={() => setHovered(-3)}
+                                        onMouseLeave={() => setHovered(-1)}
+                                        onClick={() => { onChange(query.trim()); setOpen(false); }}
+                                    >
+                                        Usar "{query}"
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: "10px 12px", fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                                        Sin resultados
+                                    </div>
+                                )
+                            ) : (
+                                <>
+                                    {filtered.map((o, i) => (
+                                        <div
+                                            key={o.value}
+                                            style={{
+                                                padding: "10px 12px",
+                                                cursor: "pointer",
+                                                fontSize: "0.9rem",
+                                                background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
+                                                borderRadius: "10px",
+                                                marginBottom: 4,
+                                                fontWeight: String(value) === String(o.value) ? 700 : 400,
+                                                color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
+                                                transition: "background 0.15s ease",
+                                            }}
+                                            onMouseEnter={() => setHovered(i)}
+                                            onMouseLeave={() => setHovered(-1)}
+                                            onClick={() => handleSelect(o.value, o.label)}
+                                        >
+                                            {o.label}
+                                        </div>
+                                    ))}
+                                    {freeText && query.trim() && !exactMatch && (
+                                        <div
+                                            style={{ padding: "10px 12px", cursor: "pointer", fontSize: "0.88rem", color: "var(--primary)", fontWeight: 700, borderRadius: "10px", borderTop: "1px solid rgba(197,232,227,0.9)", marginTop: 4, background: hovered === -3 ? "rgba(26,155,140,0.08)" : "transparent" }}
+                                            onMouseEnter={() => setHovered(-3)}
+                                            onMouseLeave={() => setHovered(-1)}
+                                            onClick={() => { onChange(query.trim()); setOpen(false); }}
+                                        >
+                                            Usar "{query}"
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </>
                     )}
@@ -392,4 +461,3 @@ export function FilterDropdown({ label, value, onChange, options }) {
         </div>
     );
 }
-

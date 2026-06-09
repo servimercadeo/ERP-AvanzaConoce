@@ -113,7 +113,11 @@ export default function CandidatosCrud() {
 
     const [isProcModalOpen, setIsProcModalOpen] = useState(false);
     const [procModalCandidate, setProcModalCandidate] = useState(null);
-    const [vinculacionModal, setVinculacionModal] = useState({ open: false, candidateId: null, tipo: 'Directa' });
+    const [vinculacionModal, setVinculacionModal] = useState({
+        open: false,
+        candidateId: null,
+        tipo: "Directa",
+    });
     const [toast, setToast] = useState(null);
     const [confirmDlg, setConfirmDlg] = useState({
         open: false,
@@ -121,7 +125,11 @@ export default function CandidatosCrud() {
         msg: "",
         onConfirm: null,
     });
-    const [alertDlg, setAlertDlg] = useState({ open: false, title: "", msg: "" });
+    const [alertDlg, setAlertDlg] = useState({
+        open: false,
+        title: "",
+        msg: "",
+    });
     const showAlert = (title, msg) => setAlertDlg({ open: true, title, msg });
 
     const showToast = (msg, type = "success") => {
@@ -141,19 +149,47 @@ export default function CandidatosCrud() {
     const [procActiveTab, setProcActiveTab] = useState("assesment");
     const [procForm, setProcForm] = useState({});
 
-    const { data: _qCandidates,   isLoading: _lc } = useQuery({ queryKey: ['candidatos'],         queryFn: () => api.get('/candidatos').then(r => r.data) });
-    const { data: _qRequisitions, isLoading: _lr } = useQuery({ queryKey: ['requisiciones'],       queryFn: () => api.get('/requisiciones').then(r => r.data) });
-    const { data: _qCatalogos,    isLoading: _lk } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data) });
-    const { data: _qSedes }                        = useQuery({ queryKey: ['sedes'],               queryFn: () => api.get('/sedes').then(r => r.data) });
+    const { data: _qCandidates, isLoading: _lc } = useQuery({
+        queryKey: ["candidatos"],
+        queryFn: () => api.get("/candidatos").then((r) => r.data),
+    });
+    const { data: _qRequisitions, isLoading: _lr } = useQuery({
+        queryKey: ["requisiciones"],
+        queryFn: () => api.get("/requisiciones").then((r) => r.data),
+    });
+    const { data: _qCatalogos, isLoading: _lk } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+    });
+    const { data: _qSedes } = useQuery({
+        queryKey: ["sedes"],
+        queryFn: () => api.get("/sedes").then((r) => r.data),
+    });
     const loadingData = _lc || _lr || _lk;
 
-    useEffect(() => { if (_qCandidates)   setCandidates(_qCandidates); },   [_qCandidates]);
-    useEffect(() => { if (_qRequisitions) setRequisitions(_qRequisitions); }, [_qRequisitions]);
     useEffect(() => {
-        if (_qCatalogos) setCiudadesOpts((_qCatalogos.ciudades || []).map(ci => ({ value: String(ci.id), label: ci.nombre })));
+        if (_qCandidates) setCandidates(_qCandidates);
+    }, [_qCandidates]);
+    useEffect(() => {
+        if (_qRequisitions) setRequisitions(_qRequisitions);
+    }, [_qRequisitions]);
+    useEffect(() => {
+        if (_qCatalogos)
+            setCiudadesOpts(
+                (_qCatalogos.ciudades || []).map((ci) => ({
+                    value: String(ci.id),
+                    label: ci.nombre,
+                })),
+            );
     }, [_qCatalogos]);
     useEffect(() => {
-        if (_qSedes) setSedesOpts((_qSedes?.data ?? _qSedes ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+        if (_qSedes)
+            setSedesOpts(
+                (_qSedes?.data ?? _qSedes ?? []).map((s) => ({
+                    value: s.nombre,
+                    label: s.nombre,
+                })),
+            );
     }, [_qSedes]);
 
     const reload = () =>
@@ -185,10 +221,12 @@ export default function CandidatosCrud() {
         const extra = { ...extraData };
         if (field === "pruebas" || field === "aval") {
             const newPruebas = field === "pruebas" ? val : candidate.pruebas;
-            const newAval    = field === "aval"    ? val : candidate.aval;
+            const newAval = field === "aval" ? val : candidate.aval;
             nextEstado = newPruebas && newAval ? "Contratación" : "Entrevista";
             if (field === "aval") {
-                extra.fecha_aval = val ? new Date().toISOString().slice(0, 10) : null;
+                extra.fecha_aval = val
+                    ? new Date().toISOString().slice(0, 10)
+                    : null;
                 if (!val) extra.tipo_vinculacion = null;
             }
         }
@@ -197,17 +235,23 @@ export default function CandidatosCrud() {
             prev.map((c) =>
                 c.id === candidateId
                     ? { ...c, [field]: val, estado: nextEstado, ...extra }
-                    : c
-            )
+                    : c,
+            ),
         );
 
-        api.put(`/candidatos/${candidateId}`, { [field]: val, estado: nextEstado, ...extra })
-            .catch((err) => {
-                setCandidates((prev) =>
-                    prev.map((c) => (c.id === candidateId ? candidate : c))
-                );
-                showAlert("Error", err.response?.data?.message || "Error al guardar el cambio.");
-            });
+        api.put(`/candidatos/${candidateId}`, {
+            [field]: val,
+            estado: nextEstado,
+            ...extra,
+        }).catch((err) => {
+            setCandidates((prev) =>
+                prev.map((c) => (c.id === candidateId ? candidate : c)),
+            );
+            showAlert(
+                "Error",
+                err.response?.data?.message || "Error al guardar el cambio.",
+            );
+        });
     };
 
     const toggleCandidateField = (candidateId, field) => {
@@ -229,20 +273,26 @@ export default function CandidatosCrud() {
         if (field === "aval") {
             if (!candidate.tasa_riesgo_arl || !candidate.salario_basico) {
                 showAlert(
-                    'Remuneración incompleta',
-                    'Completa los campos de remuneración del candidato (Tasa de riesgo ARL y Salario básico) antes de activar el Aval de contratación.'
+                    "Remuneración incompleta",
+                    "Completa los campos de remuneración del candidato (Tasa de riesgo ARL y Salario básico) antes de activar el Aval de contratación.",
                 );
                 return;
             }
-            setVinculacionModal({ open: true, candidateId, tipo: 'Directa' });
+            setVinculacionModal({ open: true, candidateId, tipo: "Directa" });
             return;
         }
         doToggleField(candidateId, field);
     };
 
     const handleConfirmVinculacion = () => {
-        doToggleField(vinculacionModal.candidateId, 'aval', { tipo_vinculacion: vinculacionModal.tipo });
-        setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' });
+        doToggleField(vinculacionModal.candidateId, "aval", {
+            tipo_vinculacion: vinculacionModal.tipo,
+        });
+        setVinculacionModal({
+            open: false,
+            candidateId: null,
+            tipo: "Directa",
+        });
     };
 
     const handleAddCandidate = () => {
@@ -347,7 +397,10 @@ export default function CandidatosCrud() {
                 );
             }
         } catch (e) {
-            showAlert("Error al eliminar", e.response?.data?.message || e.message);
+            showAlert(
+                "Error al eliminar",
+                e.response?.data?.message || e.message,
+            );
         }
     };
 
@@ -378,7 +431,10 @@ export default function CandidatosCrud() {
 
     const handleAddCustomDoc = async () => {
         if (!newDocFile) {
-            showAlert("Archivo requerido", "Selecciona un archivo antes de agregar.");
+            showAlert(
+                "Archivo requerido",
+                "Selecciona un archivo antes de agregar.",
+            );
             return;
         }
         const nombre = newDocFile.name.replace(/\.[^/.]+$/, "");
@@ -486,7 +542,10 @@ export default function CandidatosCrud() {
             await api.delete(`/candidatos/${candidateId}`);
             setCandidates((prev) => prev.filter((c) => c.id !== candidateId));
         } catch (e) {
-            showAlert("Error al eliminar", e.response?.data?.message || e.message);
+            showAlert(
+                "Error al eliminar",
+                e.response?.data?.message || e.message,
+            );
         }
     };
 
@@ -505,7 +564,10 @@ export default function CandidatosCrud() {
             !candForm.celular ||
             !candForm.identificacion
         ) {
-            showAlert("Campos obligatorios", "Por favor, rellene todos los campos obligatorios (*) antes de guardar.");
+            showAlert(
+                "Campos obligatorios",
+                "Por favor, rellene todos los campos obligatorios (*) antes de guardar.",
+            );
             return;
         }
         try {
@@ -534,7 +596,10 @@ export default function CandidatosCrud() {
                     : "Candidato actualizado exitosamente",
             );
         } catch (e) {
-            showAlert("Error al guardar", e.response?.data?.message || e.message);
+            showAlert(
+                "Error al guardar",
+                e.response?.data?.message || e.message,
+            );
         }
     };
 
@@ -614,19 +679,23 @@ export default function CandidatosCrud() {
             setProcModalCandidate(null);
             showToast("Procesos guardados exitosamente");
         } catch (e) {
-            showAlert("Error al guardar procesos", e.response?.data?.message || e.message);
+            showAlert(
+                "Error al guardar procesos",
+                e.response?.data?.message || e.message,
+            );
         }
     };
 
     const filteredCandDetail = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim();
         if (!term) return candidates;
-        return candidates.filter((c) =>
-            c.nombres.toLowerCase().includes(term) ||
-            c.identificacion.includes(term) ||
-            c.correo.toLowerCase().includes(term) ||
-            (c.celular || '').includes(term) ||
-            c.estado.toLowerCase().includes(term)
+        return candidates.filter(
+            (c) =>
+                c.nombres.toLowerCase().includes(term) ||
+                c.identificacion.includes(term) ||
+                c.correo.toLowerCase().includes(term) ||
+                (c.celular || "").includes(term) ||
+                c.estado.toLowerCase().includes(term),
         );
     }, [candidates, debouncedSearch]);
 
@@ -748,11 +817,17 @@ export default function CandidatosCrud() {
                                 const docsOk = docsCount >= 2;
                                 const asmtOk = c.asmt_prom != null;
                                 const entvOk = c.entv_prom != null;
-                                const isTigo = /tigo/i.test(c.requisicion?.proyecto?.nombre || '');
+                                const isTigo = /tigo/i.test(
+                                    c.requisicion?.proyecto?.nombre || "",
+                                );
                                 const pruebasDisabled =
-                                    (!docsOk || (isTigo && !asmtOk)) && !c.pruebas;
+                                    (!docsOk || (isTigo && !asmtOk)) &&
+                                    !c.pruebas;
                                 const avalDisabled =
-                                    (!c.pruebas || !docsOk || (isTigo && !entvOk)) && !c.aval;
+                                    (!c.pruebas ||
+                                        !docsOk ||
+                                        (isTigo && !entvOk)) &&
+                                    !c.aval;
                                 const pruebasTip = !docsOk
                                     ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero'
                                     : isTigo && !asmtOk
@@ -819,7 +894,8 @@ export default function CandidatosCrud() {
                                                 color: "var(--text)",
                                             }}
                                         >
-                                            {c.requisicion?.proyecto?.nombre || "-"}
+                                            {c.requisicion?.proyecto?.nombre ||
+                                                "-"}
                                         </td>
                                         <td
                                             style={{
@@ -907,18 +983,22 @@ export default function CandidatosCrud() {
                                         <td style={{ padding: "12px 8px" }}>
                                             <div style={S.actions}>
                                                 {isTigo && (
-                                                <button
-                                                    style={S.actionBtn(
-                                                        "  #FFF8DA",
-                                                        "#000",
-                                                    )}
-                                                    title="Procesos"
-                                                    onClick={() =>
-                                                        handleOpenProcesos(c)
-                                                    }
-                                                >
-                                                    <IconGestionar size={15} />
-                                                </button>
+                                                    <button
+                                                        style={S.actionBtn(
+                                                            "  #FFF8DA",
+                                                            "#000",
+                                                        )}
+                                                        title="Procesos"
+                                                        onClick={() =>
+                                                            handleOpenProcesos(
+                                                                c,
+                                                            )
+                                                        }
+                                                    >
+                                                        <IconGestionar
+                                                            size={15}
+                                                        />
+                                                    </button>
                                                 )}
                                                 <button
                                                     style={S.actionBtn(
@@ -1206,7 +1286,6 @@ export default function CandidatosCrud() {
                                 />
                             </div>
 
-
                             {/* ── Datos de contratación (edición y vista) ── */}
                             {candModalMode !== "create" && (
                                 <>
@@ -1222,18 +1301,42 @@ export default function CandidatosCrud() {
                                         Datos de contratación
                                     </h4>
                                     <div style={S.grid3}>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
-                                            <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 5,
+                                                minWidth: 0,
+                                            }}
+                                        >
+                                            <label
+                                                style={{
+                                                    fontSize: "0.78rem",
+                                                    fontWeight: 700,
+                                                    color: "var(--text)",
+                                                    fontFamily:
+                                                        "Nunito,sans-serif",
+                                                }}
+                                            >
                                                 Lugar de trabajo (sede)
                                             </label>
                                             <SearchableSelect
                                                 key={`lugart-${candForm.lugar_trabajo ?? ""}`}
-                                                value={candForm.lugar_trabajo ?? ""}
+                                                value={
+                                                    candForm.lugar_trabajo ?? ""
+                                                }
                                                 defaultValue=""
                                                 options={sedesOpts}
                                                 freeText={true}
-                                                onChange={(val) => setCandForm((p) => ({ ...p, lugar_trabajo: val }))}
-                                                disabled={candModalMode === "view"}
+                                                onChange={(val) =>
+                                                    setCandForm((p) => ({
+                                                        ...p,
+                                                        lugar_trabajo: val,
+                                                    }))
+                                                }
+                                                disabled={
+                                                    candModalMode === "view"
+                                                }
                                             />
                                         </div>
                                         <Field
@@ -1241,7 +1344,12 @@ export default function CandidatosCrud() {
                                             k="fecha_programacion_ingreso"
                                             type="date"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1249,7 +1357,12 @@ export default function CandidatosCrud() {
                                             k="fecha_correccion"
                                             type="date"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                     </div>
@@ -1275,7 +1388,12 @@ export default function CandidatosCrud() {
                                             label="Tasa de riesgo ARL"
                                             k="tasa_riesgo_arl"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1283,7 +1401,12 @@ export default function CandidatosCrud() {
                                             k="salario_basico"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1291,7 +1414,12 @@ export default function CandidatosCrud() {
                                             k="auxilio_transporte"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1299,7 +1427,12 @@ export default function CandidatosCrud() {
                                             k="otrosi_variable"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1307,7 +1440,12 @@ export default function CandidatosCrud() {
                                             k="auxilio_rodamiento"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1315,7 +1453,12 @@ export default function CandidatosCrud() {
                                             k="auxilio_comunicacion"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                         <Field
@@ -1323,7 +1466,12 @@ export default function CandidatosCrud() {
                                             k="auxilio_alimentacion"
                                             type="number"
                                             form={candForm}
-                                            onChange={(k) => (e) => setCandForm((p) => ({ ...p, [k]: e.target.value }))}
+                                            onChange={(k) => (e) =>
+                                                setCandForm((p) => ({
+                                                    ...p,
+                                                    [k]: e.target.value,
+                                                }))
+                                            }
                                             disabled={candModalMode === "view"}
                                         />
                                     </div>
@@ -1510,7 +1658,6 @@ export default function CandidatosCrud() {
                                                 );
                                             })}
 
-                                            {/* Documentos adicionales ya subidos */}
                                             {docs
                                                 .filter(
                                                     (d) =>
@@ -2462,9 +2609,15 @@ export default function CandidatosCrud() {
                                             }
                                             style={S.formInput}
                                         >
-                                            <option value="">-- Seleccionar --</option>
-                                            <option value="Aprobado">Aprobado</option>
-                                            <option value="No Aprobado">No Aprobado</option>
+                                            <option value="">
+                                                -- Seleccionar --
+                                            </option>
+                                            <option value="Aprobado">
+                                                Aprobado
+                                            </option>
+                                            <option value="No Aprobado">
+                                                No Aprobado
+                                            </option>
                                         </select>
                                     </div>
                                 </div>
@@ -2492,7 +2645,13 @@ export default function CandidatosCrud() {
             {vinculacionModal.open && (
                 <div
                     style={{ ...S.overlay, zIndex: 6100 }}
-                    onClick={() => setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' })}
+                    onClick={() =>
+                        setVinculacionModal({
+                            open: false,
+                            candidateId: null,
+                            tipo: "Directa",
+                        })
+                    }
                 >
                     <div
                         style={{
@@ -2506,15 +2665,34 @@ export default function CandidatosCrud() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
-                            <span style={{ ...S.modalTitleWhite, fontSize: "1rem" }}>
+                            <span
+                                style={{
+                                    ...S.modalTitleWhite,
+                                    fontSize: "1rem",
+                                }}
+                            >
                                 Tipo de vinculación
                             </span>
                         </div>
                         <div style={{ padding: "24px 28px" }}>
-                            <p style={{ margin: "0 0 18px", fontSize: "0.93rem", color: "var(--text)", fontFamily: "Nunito,sans-serif", lineHeight: 1.6 }}>
+                            <p
+                                style={{
+                                    margin: "0 0 18px",
+                                    fontSize: "0.93rem",
+                                    color: "var(--text)",
+                                    fontFamily: "Nunito,sans-serif",
+                                    lineHeight: 1.6,
+                                }}
+                            >
                                 ¿Cómo será la vinculación del empleado?
                             </p>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 12,
+                                }}
+                            >
                                 {["Directa", "Indirecta"].map((op) => (
                                     <label
                                         key={op}
@@ -2526,7 +2704,10 @@ export default function CandidatosCrud() {
                                             border: `2px solid ${vinculacionModal.tipo === op ? "var(--primary)" : "var(--border)"}`,
                                             borderRadius: "var(--radius-sm)",
                                             cursor: "pointer",
-                                            background: vinculacionModal.tipo === op ? "var(--primary-light, #e8f7f5)" : "var(--white)",
+                                            background:
+                                                vinculacionModal.tipo === op
+                                                    ? "var(--primary-light, #e8f7f5)"
+                                                    : "var(--white)",
                                             fontFamily: "Nunito,sans-serif",
                                             fontWeight: 700,
                                             fontSize: "0.92rem",
@@ -2538,23 +2719,51 @@ export default function CandidatosCrud() {
                                             type="radio"
                                             name="tipo_vinculacion"
                                             value={op}
-                                            checked={vinculacionModal.tipo === op}
-                                            onChange={() => setVinculacionModal((p) => ({ ...p, tipo: op }))}
-                                            style={{ accentColor: "var(--primary)", width: 16, height: 16 }}
+                                            checked={
+                                                vinculacionModal.tipo === op
+                                            }
+                                            onChange={() =>
+                                                setVinculacionModal((p) => ({
+                                                    ...p,
+                                                    tipo: op,
+                                                }))
+                                            }
+                                            style={{
+                                                accentColor: "var(--primary)",
+                                                width: 16,
+                                                height: 16,
+                                            }}
                                         />
                                         Vinculación {op}
                                     </label>
                                 ))}
                             </div>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "14px 28px", borderTop: "1.5px solid var(--border)" }}>
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 12,
+                                padding: "14px 28px",
+                                borderTop: "1.5px solid var(--border)",
+                            }}
+                        >
                             <button
                                 style={S.btnSecondary}
-                                onClick={() => setVinculacionModal({ open: false, candidateId: null, tipo: 'Directa' })}
+                                onClick={() =>
+                                    setVinculacionModal({
+                                        open: false,
+                                        candidateId: null,
+                                        tipo: "Directa",
+                                    })
+                                }
                             >
                                 Cancelar
                             </button>
-                            <button style={S.btnPrimaryGreen} onClick={handleConfirmVinculacion}>
+                            <button
+                                style={S.btnPrimaryGreen}
+                                onClick={handleConfirmVinculacion}
+                            >
                                 Confirmar aval
                             </button>
                         </div>
@@ -2565,7 +2774,9 @@ export default function CandidatosCrud() {
             {alertDlg.open && (
                 <div
                     style={{ ...S.overlay, zIndex: 6100 }}
-                    onClick={() => setAlertDlg({ open: false, title: "", msg: "" })}
+                    onClick={() =>
+                        setAlertDlg({ open: false, title: "", msg: "" })
+                    }
                 >
                     <div
                         style={{
@@ -2579,7 +2790,12 @@ export default function CandidatosCrud() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
-                            <span style={{ ...S.modalTitleWhite, fontSize: "1rem" }}>
+                            <span
+                                style={{
+                                    ...S.modalTitleWhite,
+                                    fontSize: "1rem",
+                                }}
+                            >
                                 {alertDlg.title}
                             </span>
                         </div>
@@ -2606,7 +2822,13 @@ export default function CandidatosCrud() {
                         >
                             <button
                                 style={S.btnPrimaryGreen}
-                                onClick={() => setAlertDlg({ open: false, title: "", msg: "" })}
+                                onClick={() =>
+                                    setAlertDlg({
+                                        open: false,
+                                        title: "",
+                                        msg: "",
+                                    })
+                                }
                             >
                                 Aceptar
                             </button>

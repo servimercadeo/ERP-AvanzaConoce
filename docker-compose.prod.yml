@@ -10,7 +10,7 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: "base64:nQFz6jiBELSzs4sJdYbnGz5Aq/MkYJSpcG/bTJPnmLs="
-      APP_URL: "https://erp.local"
+      APP_URL: "http://erp.local"
 
       DB_CONNECTION: mysql
       DB_HOST: db
@@ -23,6 +23,7 @@ services:
       CACHE_STORE: file
       SESSION_DRIVER: file
       SESSION_LIFETIME: 120
+      SESSION_SECURE_COOKIE: "false"
       QUEUE_CONNECTION: sync
 
       LOG_CHANNEL: stderr
@@ -50,17 +51,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      # Router HTTPS
       - "traefik.http.routers.erp.rule=Host(`erp.local`)"
-      - "traefik.http.routers.erp.entrypoints=websecure"
-      - "traefik.http.routers.erp.tls=true"
+      - "traefik.http.routers.erp.entrypoints=web"
       - "traefik.http.services.erp.loadbalancer.server.port=80"
-      # Redirect HTTP → HTTPS
-      - "traefik.http.routers.erp-http.rule=Host(`erp.local`)"
-      - "traefik.http.routers.erp-http.entrypoints=web"
-      - "traefik.http.routers.erp-http.middlewares=redirect-https"
-      - "traefik.http.middlewares.redirect-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-https.redirectscheme.permanent=true"
 
   db:
     image: mysql:8.0

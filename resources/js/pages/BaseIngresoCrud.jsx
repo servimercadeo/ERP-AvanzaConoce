@@ -191,7 +191,13 @@ export default function BaseIngresoCrud() {
       qc.invalidateQueries({ queryKey: ['base-ingresos'] });
       showToast('Registro eliminado');
     } catch (e) {
-      alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+      if (e.response?.status === 404) {
+        setData(prev => prev.filter(r => r.id !== id));
+        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+        showToast('El registro ya no existía, lista actualizada');
+      } else {
+        alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+      }
     }
   };
 
@@ -200,7 +206,6 @@ export default function BaseIngresoCrud() {
     try {
       const res = await api.post('/base-ingresos/sync');
       showToast(res.data.message);
-      // Reload data
       const [ing, cand] = await Promise.all([
         api.get('/base-ingresos'),
         api.get('/candidatos')
@@ -236,7 +241,6 @@ export default function BaseIngresoCrud() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '10px 0' }}>
 
-      {/* Toolbar */}
       <div style={S.toolbar}>
         <div style={S.filters}>
           <div style={S.searchWrap}>
@@ -265,7 +269,6 @@ export default function BaseIngresoCrud() {
         </div>
       </div>
 
-      {/* Tabla */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif', fontSize: '0.9rem' }}>
           Cargando registros…
@@ -321,7 +324,6 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Paginación */}
       {filteredData.length > POR_PAGINA && (
         <div style={S.paginationWrap}>
           <span style={S.pageInfo}>
@@ -339,7 +341,6 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Modal */}
       {isModalOpen && (
         <div style={S.overlay} onClick={() => setIsModalOpen(false)}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
@@ -353,7 +354,6 @@ export default function BaseIngresoCrud() {
 
             <div style={S.modalBody}>
 
-              {/* Selección de candidato — solo en create */}
               {modalMode === 'create' && (
                 <div style={{ marginBottom: 22 }}>
                   <label style={S.sectionLabel}>Seleccionar candidato</label>
@@ -430,7 +430,6 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',

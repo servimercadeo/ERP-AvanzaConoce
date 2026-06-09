@@ -6,7 +6,9 @@ use App\Mail\AlertaIngresoMail;
 use App\Mail\CargaDocumentosMail;
 use App\Mail\DocumentosCompletadosMail;
 use App\Models\BaseIngreso;
+use App\Models\RespuestaIngreso;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
@@ -46,10 +48,14 @@ Route::get('/registro/catalogos', function (Request $request) {
     }
 
     return response()->json([
-        'ciudades'  => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
-        'proyectos' => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
-        'negocio'   => $negocio,
-        'estado'    => $estado,
+        'ciudades'        => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
+        'proyectos'       => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
+        'eps'             => DB::table('eps')->orderBy('nombre')->pluck('nombre'),
+        'fondos_pensiones'=> DB::table('fondos_pensiones')->orderBy('nombre')->pluck('nombre'),
+        'estados_civil'   => DB::table('estados_civil')->orderBy('nombre')->pluck('nombre'),
+        'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
+        'negocio'         => $negocio,
+        'estado'          => $estado,
     ]);
 });
 
@@ -227,14 +233,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    // Respuestas del formulario de nuevos ingresos (Guardado sin migración en JSON)
+    // Respuestas del formulario de nuevos ingresos
     Route::get('/respuestas-ingresos', function () {
-        $path = storage_path('app/respuestas_ingresos.json');
-        if (!file_exists($path)) {
-            return response()->json([]);
-        }
-        $data = json_decode(file_get_contents($path), true) ?: [];
-        return response()->json($data);
+        return response()->json(RespuestaIngreso::orderBy('created_at', 'desc')->get());
     });
 
     // Documentos de contratación por candidato (admin)
@@ -275,13 +276,11 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::delete('/respuestas-ingresos/{id}', function ($id) {
-        $path = storage_path('app/respuestas_ingresos.json');
-        if (!file_exists($path)) {
-            return response()->json(['message' => 'No se encontraron respuestas.'], 404);
+        $respuesta = RespuestaIngreso::find($id);
+        if (!$respuesta) {
+            return response()->json(['message' => 'Respuesta no encontrada.'], 404);
         }
-        $data = json_decode(file_get_contents($path), true) ?: [];
-        $filtered = array_values(array_filter($data, fn($item) => $item['id'] !== $id));
-        file_put_contents($path, json_encode($filtered, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $respuesta->delete();
         return response()->json(null, 204);
     });
 });
@@ -346,7 +345,7 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
                 $meta[$documento]['email_completado_enviado'] = true;
                 file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             } catch (\Exception $e) {
-                \Log::error('Error enviando correo de documentos completados: ' . $e->getMessage());
+                Log::error('Error enviando correo de documentos completados: ' . $e->getMessage());
             }
         }
     }
@@ -378,57 +377,46 @@ Route::get('/registro-nuevos-ingresos/prefill', function (Request $request) {
     }
 });
 
-// Registro público de nuevos ingresos (Guardado en JSON para llenado manual por el usuario)
+// Registro público de nuevos ingresos
 Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
     $data = $request->validate([
-        'documento' => 'required|string|max:40',
-        'nombres' => 'required|string|max:200',
-        'apellidos' => 'required|string|max:200',
-        'fecha_nacimiento' => 'required|date',
-        'lugar_nacimiento' => 'required|string|max:200',
-        'estado_civil' => 'required|string|max:50',
-        'numero_hijos' => 'required|string|max:10',
-        'rh' => 'required|string|max:10',
-        'nivel_escolaridad' => 'required|string|max:100',
-        'profesion' => 'required|string|max:150',
-        'ciudad' => 'required|string|max:150',
-        'barrio' => 'required|string|max:150',
-        'direccion' => 'required|string|max:250',
-        'estrato' => 'required|string|max:10',
-        'correo' => 'required|email|max:180',
-        'celular' => 'required|string|max:30',
-        'emergencia_nombre' => 'required|string|max:200',
-        'emergencia_telefono' => 'required|string|max:30',
-        'emergencia_parentesco' => 'required|string|max:100',
-        'eps' => 'required|string|max:150',
-        'afp' => 'required|string|max:150',
-        'talla_camisa' => 'required|string|max:20',
-        'talla_pantalon' => 'required|string|max:20',
-        'talla_zapatos' => 'required|string|max:20',
+        'documento'               => 'required|string|max:40',
+        'nombres'                 => 'required|string|max:200',
+        'apellidos'               => 'required|string|max:200',
+        'fecha_nacimiento'        => 'required|date',
+        'lugar_nacimiento'        => 'required|string|max:200',
+        'estado_civil'            => 'required|string|max:50',
+        'numero_hijos'            => 'required|string|max:10',
+        'rh'                      => 'required|string|max:10',
+        'nivel_escolaridad'       => 'required|string|max:100',
+        'profesion'               => 'required|string|max:150',
+        'ciudad'                  => 'required|string|max:150',
+        'barrio'                  => 'required|string|max:150',
+        'direccion'               => 'required|string|max:250',
+        'estrato'                 => 'required|string|max:10',
+        'correo'                  => 'required|email|max:180',
+        'celular'                 => 'required|string|max:30',
+        'emergencia_nombre'       => 'required|string|max:200',
+        'emergencia_telefono'     => 'required|string|max:30',
+        'emergencia_parentesco'   => 'required|string|max:100',
+        'eps'                     => 'required|string|max:150',
+        'afp'                     => 'required|string|max:150',
+        'talla_camisa'            => 'required|string|max:20',
+        'talla_pantalon'          => 'required|string|max:20',
+        'talla_zapatos'           => 'required|string|max:20',
     ]);
 
-    $path = storage_path('app/respuestas_ingresos.json');
-    $responses = [];
-    if (file_exists($path)) {
-        $responses = json_decode(file_get_contents($path), true) ?: [];
-    }
-
-    $data['id'] = time() . '_' . rand(1000, 9999);
-    $data['created_at'] = now()->toDateTimeString();
-
-    $responses[] = $data;
-
-    if (!file_exists(dirname($path))) {
-        mkdir(dirname($path), 0755, true);
-    }
-    file_put_contents($path, json_encode($responses, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    RespuestaIngreso::updateOrCreate(
+        ['documento' => $data['documento']],
+        $data
+    );
 
     try {
         Mail::to($data['correo'])->send(
             new CargaDocumentosMail($data['nombres'] . ' ' . $data['apellidos'], $data['documento'])
         );
     } catch (\Exception $e) {
-        \Log::error('Error enviando correo de carga de documentos: ' . $e->getMessage());
+        Log::error('Error enviando correo de carga de documentos: ' . $e->getMessage());
     }
 
     return response()->json(['message' => 'Información registrada con éxito.'], 201);
