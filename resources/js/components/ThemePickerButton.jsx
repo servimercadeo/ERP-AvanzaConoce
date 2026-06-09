@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-
-// ─── Iconos inline ───────────────────────────────────────────────────────────
 const IcoPalette = () => (
     <svg
         width="22"
@@ -101,8 +99,6 @@ const IcoMagic = () => (
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     </svg>
 );
-
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
 function Section({ title, children }) {
     return (
         <div className="tpb-section">
@@ -143,7 +139,6 @@ function Switch({ label, active, onToggle }) {
     );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
 export default function ThemePickerButton() {
     const { prefs, setPreference, resetPreferences } = useTheme();
     const { user } = useAuth();
@@ -190,7 +185,6 @@ export default function ThemePickerButton() {
                     </div>
 
                     <div className="tpb-scroll-area">
-                        {/* ── COLORES ── */}
                         <Section title="Paleta de Colores">
                             <div className="tpb-colors-grid">
                                 {Object.entries(THEMES).map(([key, def]) => (
@@ -209,8 +203,6 @@ export default function ThemePickerButton() {
                                 {THEMES[prefs.theme]?.label}
                             </p>
                         </Section>
-
-                        {/* ── MODO Y GLASS ── */}
                         <Section title="Efectos Visuales">
                             <div className="tpb-grid-2">
                                 <div className="tpb-toggle-group">
@@ -237,7 +229,6 @@ export default function ThemePickerButton() {
                             </div>
                         </Section>
 
-                        {/* ── TIPOGRAFÍA ── */}
                         <Section title="Textos y Tipografía">
                             <p className="tpb-sub-title">Familia de fuente</p>
                             <ToggleGroup
@@ -266,7 +257,6 @@ export default function ThemePickerButton() {
                             />
                         </Section>
 
-                        {/* ── DISEÑO ESTRUCTURAL ── */}
                         <Section title="Estructura y Sombras">
                             <p className="tpb-sub-title">
                                 Bordes de componentes
@@ -313,8 +303,6 @@ export default function ThemePickerButton() {
                                 ]}
                             />
                         </Section>
-
-                        {/* ── NAVEGACIÓN ── */}
                         <Section title="Navegación">
                             <p className="tpb-sub-title">Menú lateral</p>
                             <ToggleGroup
@@ -341,8 +329,6 @@ export default function ThemePickerButton() {
                             />
                         </Section>
                     </div>
-
-                    {/* Pie */}
                     <div className="tpb-footer tpb-footer--sticky">
                         <button
                             className="tpb-reset-btn"
@@ -357,8 +343,6 @@ export default function ThemePickerButton() {
                     </div>
                 </div>
             )}
-
-            {/* FAB */}
             <button
                 id="theme-picker-fab"
                 className={`theme-fab theme-fab--main${open ? " theme-fab--open" : ""}`}

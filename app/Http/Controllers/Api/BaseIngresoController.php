@@ -103,7 +103,7 @@ class BaseIngresoController extends Controller
 
     public function sync(Request $request)
     {
-        $existingIds = BaseIngreso::whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
+        $existingIds = BaseIngreso::withTrashed()->whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
 
         $candidatos = \App\Models\Candidato::with(['requisicion.cargo', 'requisicion.proyecto', 'requisicion.empresa', 'requisicion.empleador', 'ciudad'])
             ->where('pruebas', true)
