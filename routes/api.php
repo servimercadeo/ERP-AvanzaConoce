@@ -230,12 +230,66 @@ Route::middleware('auth:sanctum')->group(function () {
                                ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
             'empleadores'  => DB::table('empleadores')->select('id', 'nombre')->orderBy('nombre')->get(),
+            'arls'         => DB::table('arls')->select('nombre')->orderBy('nombre')->pluck('nombre'),
+            'cajas'        => DB::table('cajas_compensacion')->select('nombre')->orderBy('nombre')->pluck('nombre'),
         ]);
     });
 
     // Respuestas del formulario de nuevos ingresos
     Route::get('/respuestas-ingresos', function () {
         return response()->json(RespuestaIngreso::orderBy('created_at', 'desc')->get());
+    });
+
+    // Datos consolidados para pre-cargar el formulario de creación de contrato
+    Route::get('/respuestas-ingresos/datos-contrato', function () {
+        $respuestas = RespuestaIngreso::orderBy('nombres')->get();
+
+        return $respuestas->map(function ($resp) {
+            $candidato = \App\Models\Candidato::with([
+                'requisicion.cargo',
+                'requisicion.proyecto',
+                'requisicion.empresa',
+                'requisicion.empleador',
+            ])->where('identificacion', $resp->documento)->first();
+
+            $ingreso = $candidato
+                ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->first()
+                : null;
+
+            $req = $candidato?->requisicion;
+
+            return [
+                'documento'                => $resp->documento,
+                'nombres'                  => $resp->nombres,
+                'apellidos'                => $resp->apellidos,
+                // Seguridad social desde respuesta
+                'lps_afiliado'             => $resp->eps,
+                'fondo_pensiones'          => $resp->afp,
+                'fondo_cesantias'          => $resp->afp,
+                'ciudad'                   => $resp->ciudad,
+                // Datos laborales desde candidato
+                'tipo_vinculacion'         => $candidato?->tipo_vinculacion,
+                'arl'                      => $candidato?->arl,
+                'caja_compensacion'        => $candidato?->caja_compensacion,
+                'salario'                  => $candidato?->salario_basico,
+                'auxilio_transporte_legal' => $candidato?->auxilio_transporte,
+                'otrosi_variable'          => $candidato?->otrosi_variable,
+                'auxilio_rodamiento'       => $candidato?->auxilio_rodamiento,
+                'auxilio_comunicacion'     => $candidato?->auxilio_comunicacion,
+                'auxilio_alimentacion'     => $candidato?->auxilio_alimentacion,
+                // Desde requisición (vía candidato)
+                'cargo'                    => $req?->cargo?->nombre,
+                'empresa'                  => $req?->empresa?->nombre,
+                'cliente_proyecto'         => $req?->proyecto?->nombre,
+                'empleador'                => $ingreso?->empleador ?? $req?->empleador?->nombre,
+                'jefe_inmediato'           => $ingreso?->lider_inmediato ?? $req?->responsable,
+                // Desde base de ingresos (aval)
+                'sede'                     => $ingreso?->lugar_trabajo,
+                'fecha_ingreso'            => $ingreso?->fecha_programacion_ingreso
+                    ? \Carbon\Carbon::parse($ingreso->fecha_programacion_ingreso)->format('Y-m-d')
+                    : null,
+            ];
+        });
     });
 
     // Documentos de contratación por candidato (admin)

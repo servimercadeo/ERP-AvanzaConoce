@@ -32,6 +32,7 @@ class Contrato extends Model
         'fondo_pensiones',
         'fondo_cesantias',
         'estado_contrato',
+        'completado',
         'empleador',
         'empresa',
         'cliente_proyecto',
@@ -46,6 +47,7 @@ class Contrato extends Model
         'fecha_vinculacion_caja' => 'date',
         'salario' => 'decimal:2',
         'auxilio_transporte_legal' => 'decimal:2',
+        'completado' => 'boolean',
     ];
 
     public function empleado()

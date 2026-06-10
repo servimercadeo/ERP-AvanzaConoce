@@ -15,7 +15,8 @@ import {
 
 const POR_PAGINA = 5;
 
-const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Vencido", "Anulado"];
+const ESTADOS_CONTRATO  = ["Vigente", "Contrato anulado"];
+const TIPOS_VINCULACION = ["Directa", "Indirecta"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -47,7 +48,7 @@ const EMPTY_FORM = {
     fecha_vinculacion_caja: "",
     fondo_pensiones: "",
     fondo_cesantias: "",
-    estado_contrato: "Activo",
+    estado_contrato: "Vigente",
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
@@ -303,6 +304,133 @@ function SearchableSelect({
     );
 }
 
+function CandidatoSelector({ candidatos, empleados, onSelect }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState(null);
+    const wrapRef = useRef(null);
+    const debouncedQ = useDebounce(query, 200);
+
+    const filtered = useMemo(() => {
+        const words = debouncedQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (!words.length) return candidatos.slice(0, 80);
+        return candidatos.filter((c) => {
+            const text = `${c.nombres} ${c.apellidos} ${c.documento}`.toLowerCase();
+            return words.every((w) => text.includes(w));
+        }).slice(0, 80);
+    }, [debouncedQ, candidatos]);
+
+    useEffect(() => {
+        const h = (e) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
+    const handlePick = (c) => {
+        setSelected(c);
+        setQuery("");
+        setOpen(false);
+        // Buscar empleado_id por documento/cedula
+        const emp = empleados.find((e) => String(e.cedula) === String(c.documento));
+        onSelect({ ...c, empleado_id: emp?.id ?? "" });
+    };
+
+    return (
+        <div ref={wrapRef} style={{ width: "100%" }}>
+            {selected ? (
+                <div style={{
+                    display: "flex", alignItems: "center", gap: 14,
+                    background: "#e8f8f5", border: "2px solid var(--primary)",
+                    borderRadius: 10, padding: "14px 18px",
+                }}>
+                    <div style={{
+                        width: 46, height: 46, borderRadius: "50%",
+                        background: "var(--primary)", color: "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
+                    }}>
+                        {selected.nombres.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--primary-dark)", fontFamily: "'Poppins',sans-serif" }}>
+                            {selected.nombres} {selected.apellidos}
+                        </div>
+                        <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
+                            Doc: {selected.documento}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => { setSelected(null); onSelect(null); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem", padding: 4 }}
+                        title="Cambiar candidato"
+                    >✕</button>
+                </div>
+            ) : (
+                <div style={{ position: "relative" }}>
+                    <input
+                        style={{
+                            ...S.input, fontSize: "1rem", padding: "12px 14px",
+                            border: "2px solid var(--border)", borderRadius: 10,
+                        }}
+                        placeholder="Buscar por nombre o documento…"
+                        value={query}
+                        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                        onFocus={() => setOpen(true)}
+                        autoFocus
+                    />
+                    {open && (
+                        <div style={{
+                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                            background: "var(--white)", border: "1.5px solid var(--border)",
+                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                            zIndex: 3000, maxHeight: 280, overflowY: "auto",
+                        }}>
+                            {filtered.length === 0 ? (
+                                <div style={{ padding: "14px 16px", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                    Sin resultados
+                                </div>
+                            ) : filtered.map((c) => (
+                                <div
+                                    key={c.documento}
+                                    onMouseDown={() => handlePick(c)}
+                                    style={{
+                                        padding: "10px 16px", cursor: "pointer",
+                                        borderBottom: "1px solid var(--border)",
+                                        display: "flex", alignItems: "center", gap: 12,
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = "#f0f9f7"}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = "var(--white)"}
+                                >
+                                    <div style={{
+                                        width: 34, height: 34, borderRadius: "50%",
+                                        background: "var(--primary)", color: "#fff",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
+                                    }}>
+                                        {c.nombres.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
+                                            {c.nombres} {c.apellidos}
+                                        </div>
+                                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                            {c.documento}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function Modal({
     open,
     onClose,
@@ -311,12 +439,14 @@ function Modal({
     title,
     empleados,
     catalogs,
+    candidatosContrato = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
     const [saving, setSaving] = useState(false);
+    const isCreate = !initial?.id && !readOnly;
 
     useEffect(() => {
         if (open) {
@@ -326,9 +456,7 @@ function Modal({
                 fecha_retiro: dateOnly(initial.fecha_retiro),
                 fecha_vinculacion_arl: dateOnly(initial.fecha_vinculacion_arl),
                 fecha_vinculacion_lps: dateOnly(initial.fecha_vinculacion_lps),
-                fecha_vinculacion_caja: dateOnly(
-                    initial.fecha_vinculacion_caja,
-                ),
+                fecha_vinculacion_caja: dateOnly(initial.fecha_vinculacion_caja),
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
             });
@@ -340,6 +468,30 @@ function Modal({
 
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
+
+    const handleCandidatoSelect = (c) => {
+        if (!c) return;
+        setForm((f) => ({
+            ...f,
+            empleado_id:               c.empleado_id        || f.empleado_id,
+            cargo:                     c.cargo              || f.cargo,
+            sede:                      c.sede               || f.sede,
+            tipo_vinculacion:          c.tipo_vinculacion   || f.tipo_vinculacion,
+            empresa:                   c.empresa            || f.empresa,
+            empleador:                 c.empleador          || f.empleador,
+            jefe_inmediato:            c.jefe_inmediato     || f.jefe_inmediato,
+            cliente_proyecto:          c.cliente_proyecto   || f.cliente_proyecto,
+            fecha_ingreso:             c.fecha_ingreso      || f.fecha_ingreso,
+            salario:                   c.salario            || f.salario,
+            auxilio_transporte_legal:  c.auxilio_transporte_legal || f.auxilio_transporte_legal,
+            lps_afiliado:              c.lps_afiliado       || f.lps_afiliado,
+            fondo_pensiones:           c.fondo_pensiones    || f.fondo_pensiones,
+            fondo_cesantias:           c.fondo_cesantias    || f.fondo_cesantias,
+            arl:                       c.arl                || f.arl,
+            caja_compensacion:         c.caja_compensacion  || f.caja_compensacion,
+        }));
+        setErrors({});
+    };
 
     const handleAutoFill = (opt) => {
         setForm((f) => ({
@@ -441,6 +593,30 @@ function Modal({
                     </button>
                 </div>
 
+                {/* Selector de candidato prominente solo en modo crear */}
+                {isCreate && (
+                    <div style={{
+                        padding: "20px 28px 0",
+                        borderBottom: "2px solid var(--border)",
+                        background: "var(--bg)",
+                    }}>
+                        <div style={{
+                            fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.07em",
+                            color: "var(--primary)", fontFamily: "'Poppins',sans-serif",
+                            textTransform: "uppercase", marginBottom: 8,
+                        }}>
+                            Seleccionar candidato para el contrato
+                        </div>
+                        <div style={{ paddingBottom: 20 }}>
+                            <CandidatoSelector
+                                candidatos={candidatosContrato}
+                                empleados={empleados}
+                                onSelect={handleCandidatoSelect}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 <div className="tab-bar" style={S.tabBar}>
                     {[
                         ["principal", "Información Principal"],
@@ -461,6 +637,7 @@ function Modal({
                     {activeTab === "principal" && (
                         <>
                             <div style={S.grid3}>
+                                {!isCreate && (
                                 <SearchableSelect
                                     label="Empleado"
                                     k="empleado_id"
@@ -485,6 +662,7 @@ function Modal({
                                     onSelect={readOnly ? undefined : handleAutoFill}
                                     disabled={readOnly}
                                 />
+                                )}
                                 <Field
                                     label="Tipo de Contrato"
                                     k="tipo_contrato"
@@ -525,7 +703,7 @@ function Modal({
                                 <Field
                                     label="Tipo Vinculación"
                                     k="tipo_vinculacion"
-                                    opts={catalogs.tipos_vinculacion}
+                                    opts={TIPOS_VINCULACION}
                                     {...fp}
                                 />
                                 <Field
@@ -607,7 +785,6 @@ function Modal({
                                 <Field
                                     label="EPS (LPS Afiliado)"
                                     k="lps_afiliado"
-                                    opts={catalogs.eps}
                                     {...fp}
                                 />
                                 <Field
@@ -637,13 +814,11 @@ function Modal({
                                 <Field
                                     label="Fondo Pensiones"
                                     k="fondo_pensiones"
-                                    opts={catalogs.bancos}
                                     {...fp}
                                 />
                                 <Field
                                     label="Fondo Cesantías"
                                     k="fondo_cesantias"
-                                    opts={catalogs.bancos}
                                     {...fp}
                                 />
                                 <div />
@@ -918,12 +1093,16 @@ export default function ContratosCrud() {
     const { data: _qContratos } = useQuery({ queryKey: ['contratos'], queryFn: () => api.get('/contratos').then(r => r.data) });
     const { data: _qEmpleados } = useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
     const { data: _qCatalogos } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
+    const { data: _qCandidatosContrato } = useQuery({ queryKey: ['candidatos-contrato'], queryFn: () => api.get('/respuestas-ingresos/datos-contrato').then(r => r.data) });
+
+    const [candidatosContrato, setCandidatosContrato] = useState([]);
 
     useEffect(() => {
         if (_qContratos) { setContratos(_qContratos); setLoading(false); }
     }, [_qContratos]);
     useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
     useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
+    useEffect(() => { if (_qCandidatosContrato) setCandidatosContrato(_qCandidatosContrato); }, [_qCandidatosContrato]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -1000,9 +1179,9 @@ export default function ContratosCrud() {
     const stats = useMemo(
         () => ({
             total: contratos.length,
-            activos: contratos.filter((c) => c.estado_contrato === "Activo")
+            activos: contratos.filter((c) => c.estado_contrato === "Vigente")
                 .length,
-            vencidos: contratos.filter((c) => c.estado_contrato === "Vencido")
+            vencidos: contratos.filter((c) => c.estado_contrato === "Contrato anulado")
                 .length,
         }),
         [contratos],
@@ -1110,10 +1289,8 @@ export default function ContratosCrud() {
                         Filtros
                     </button>
                     <PresetFiltersDropdown presets={[
-                        { label: "Contratos activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
-                        { label: "Contratos vencidos", apply: () => { clearFilters(); setFiltroEstado("Vencido"); } },
-                        { label: "Contratos inactivos", apply: () => { clearFilters(); setFiltroEstado("Inactivo"); } },
-                        { label: "Contratos anulados", apply: () => { clearFilters(); setFiltroEstado("Anulado"); } },
+                        { label: "Contratos vigentes", apply: () => { clearFilters(); setFiltroEstado("Vigente"); } },
+                        { label: "Contratos anulados", apply: () => { clearFilters(); setFiltroEstado("Contrato anulado"); } },
                         { label: "Término fijo", apply: () => { clearFilters(); setFiltroTipoContrato("Término Fijo"); } },
                         { label: "Prestación de servicios", apply: () => { clearFilters(); setFiltroTipoContrato("Prestación de Servicios"); } },
                         { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
@@ -1192,10 +1369,10 @@ export default function ContratosCrud() {
                                     <td>
                                         <span
                                             style={S.badge(
-                                                c.estado_contrato === "Activo"
+                                                c.estado_contrato === "Vigente"
                                                     ? "#e0f7f4"
                                                     : "#fce8e8",
-                                                c.estado_contrato === "Activo"
+                                                c.estado_contrato === "Vigente"
                                                     ? "#0d6e5a"
                                                     : "#a33",
                                             )}
@@ -1436,6 +1613,7 @@ export default function ContratosCrud() {
                 title={editTarget ? "Editar Contrato" : "Nuevo Contrato"}
                 empleados={empleados}
                 catalogs={catalogs}
+                candidatosContrato={candidatosContrato}
             />
 
             <Modal

@@ -27,7 +27,8 @@ class Candidato extends Model
         'fraude_fecha_consulta', 'fraude_fuente',
         'seguridad_estudio',
         // Remuneración
-        'tasa_riesgo_arl', 'salario_basico', 'auxilio_transporte',
+        'tasa_riesgo_arl', 'arl', 'caja_compensacion',
+        'salario_basico', 'auxilio_transporte',
         'otrosi_variable', 'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion',
         // Datos de contratación
         'lugar_trabajo', 'fecha_programacion_ingreso', 'fecha_correccion',

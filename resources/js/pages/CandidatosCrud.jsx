@@ -75,6 +75,8 @@ export default function CandidatosCrud() {
     const [requisitions, setRequisitions] = useState([]);
     const [ciudadesOpts, setCiudadesOpts] = useState([]);
     const [sedesOpts, setSedesOpts] = useState([]);
+    const [arlsOpts, setArlsOpts] = useState([]);
+    const [cajasOpts, setCajasOpts] = useState([]);
     // loadingData is derived from React Query (see queries below)
     const [candDetailSearch, setCandDetailSearch] = useState("");
     const debouncedSearch = useDebounce(candDetailSearch, 300);
@@ -174,13 +176,16 @@ export default function CandidatosCrud() {
         if (_qRequisitions) setRequisitions(_qRequisitions);
     }, [_qRequisitions]);
     useEffect(() => {
-        if (_qCatalogos)
+        if (_qCatalogos) {
             setCiudadesOpts(
                 (_qCatalogos.ciudades || []).map((ci) => ({
                     value: String(ci.id),
                     label: ci.nombre,
                 })),
             );
+            setArlsOpts((_qCatalogos.arls || []).map((n) => ({ value: n, label: n })));
+            setCajasOpts((_qCatalogos.cajas || []).map((n) => ({ value: n, label: n })));
+        }
     }, [_qCatalogos]);
     useEffect(() => {
         if (_qSedes)
@@ -1396,6 +1401,34 @@ export default function CandidatosCrud() {
                                             }
                                             disabled={candModalMode === "view"}
                                         />
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+                                            <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                                                ARL
+                                            </label>
+                                            <SearchableSelect
+                                                key={`arl-${candForm.arl ?? ""}`}
+                                                value={candForm.arl ?? ""}
+                                                defaultValue=""
+                                                options={arlsOpts}
+                                                freeText={true}
+                                                onChange={(val) => setCandForm((p) => ({ ...p, arl: val }))}
+                                                disabled={candModalMode === "view"}
+                                            />
+                                        </div>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+                                            <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                                                Caja de Compensación
+                                            </label>
+                                            <SearchableSelect
+                                                key={`caja-${candForm.caja_compensacion ?? ""}`}
+                                                value={candForm.caja_compensacion ?? ""}
+                                                defaultValue=""
+                                                options={cajasOpts}
+                                                freeText={true}
+                                                onChange={(val) => setCandForm((p) => ({ ...p, caja_compensacion: val }))}
+                                                disabled={candModalMode === "view"}
+                                            />
+                                        </div>
                                         <Field
                                             label="Salario básico"
                                             k="salario_basico"

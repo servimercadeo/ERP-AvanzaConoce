@@ -20,8 +20,8 @@ class DatabaseSeeder extends Seeder
         // 4. Empleados (usa todos los catálogos anteriores para los lookups)
         $this->call(EmpleadosSeeder::class);
 
-        // 5. Contratos vinculados a esos empleados
-        $this->call(ContratosSeeder::class);
+        // 5. Contratos se crean manualmente desde la interfaz
+        // $this->call(ContratosSeeder::class);
 
         // 6. Proyectos ya están en su propia migración con seed inline
         // 7. Requisiciones de selección

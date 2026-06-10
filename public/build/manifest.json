@@ -1,6 +1,6 @@
 {
-  "_Layout-DyYLldsS.js": {
-    "file": "assets/Layout-DyYLldsS.js",
+  "_Layout-ZIPT8U1U.js": {
+    "file": "assets/Layout-ZIPT8U1U.js",
     "name": "Layout",
     "imports": [
       "_vendor-query-fzP4zlX8.js",
@@ -8,8 +8,8 @@
       "_vendor-router-CbT8WECF.js"
     ]
   },
-  "_SearchableSelect-74J2DYAj.js": {
-    "file": "assets/SearchableSelect-74J2DYAj.js",
+  "_SearchableSelect-_mWYlEHe.js": {
+    "file": "assets/SearchableSelect-_mWYlEHe.js",
     "name": "SearchableSelect",
     "imports": [
       "_vendor-query-fzP4zlX8.js"
@@ -38,7 +38,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-D-aaYHV0.css",
+    "file": "assets/app-DckW4f9s.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-XwXZlouD.js",
+    "file": "assets/app-DWJCfbn9.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -66,11 +66,11 @@
     ],
     "css": [
       "assets/app-BIH2KEE0.css",
-      "assets/app-D-aaYHV0.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/forms/CargaDocumentosForm.jsx": {
-    "file": "assets/CargaDocumentosForm-CNW8jRnU.js",
+    "file": "assets/CargaDocumentosForm-BCSZep4x.js",
     "name": "CargaDocumentosForm",
     "src": "resources/js/forms/CargaDocumentosForm.jsx",
     "isDynamicEntry": true,
@@ -79,41 +79,42 @@
     ]
   },
   "resources/js/forms/RegistroCandidatosForm.jsx": {
-    "file": "assets/RegistroCandidatosForm-DssyJtEW.js",
+    "file": "assets/RegistroCandidatosForm-BbsbbvYD.js",
     "name": "RegistroCandidatosForm",
     "src": "resources/js/forms/RegistroCandidatosForm.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-fzP4zlX8.js",
-      "_SearchableSelect-74J2DYAj.js"
+      "_SearchableSelect-_mWYlEHe.js"
     ]
   },
   "resources/js/forms/RegistroNuevosIngresosForm.jsx": {
-    "file": "assets/RegistroNuevosIngresosForm-CpQpQnOU.js",
+    "file": "assets/RegistroNuevosIngresosForm-B18giyDP.js",
     "name": "RegistroNuevosIngresosForm",
     "src": "resources/js/forms/RegistroNuevosIngresosForm.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js"
+      "_vendor-query-fzP4zlX8.js",
+      "_SearchableSelect-_mWYlEHe.js"
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-Qt_6V4a6.js",
+    "file": "assets/Dashboard-BLFMeI8u.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-fzP4zlX8.js",
-      "_Layout-DyYLldsS.js",
+      "_Layout-ZIPT8U1U.js",
       "_vendor-router-CbT8WECF.js",
       "resources/js/app.jsx"
     ],
     "css": [
-      "assets/app-D-aaYHV0.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-DfqL2MVz.js",
+    "file": "assets/Login-DaN6_BIu.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
@@ -123,41 +124,41 @@
       "_vendor-router-CbT8WECF.js"
     ],
     "css": [
-      "assets/app-D-aaYHV0.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-nRm7qlJx.js",
+    "file": "assets/Module-3v2uWT7U.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-fzP4zlX8.js",
-      "_Layout-DyYLldsS.js",
+      "_Layout-ZIPT8U1U.js",
       "_useDebounce-CUKvOqZq.js",
-      "_SearchableSelect-74J2DYAj.js",
+      "_SearchableSelect-_mWYlEHe.js",
       "resources/js/app.jsx",
       "_vendor-router-CbT8WECF.js"
     ],
     "css": [
-      "assets/app-D-aaYHV0.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-BCHRD8yA.js",
+    "file": "assets/Submodule-C2ra-4t_.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-fzP4zlX8.js",
-      "_Layout-DyYLldsS.js",
+      "_Layout-ZIPT8U1U.js",
       "resources/js/app.jsx",
       "_useDebounce-CUKvOqZq.js",
-      "_SearchableSelect-74J2DYAj.js",
+      "_SearchableSelect-_mWYlEHe.js",
       "_vendor-router-CbT8WECF.js"
     ],
     "css": [
-      "assets/app-D-aaYHV0.css"
+      "assets/app-DckW4f9s.css"
     ]
   }
 }

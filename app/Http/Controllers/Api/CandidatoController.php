@@ -133,6 +133,8 @@ class CandidatoController extends Controller
             'fecha_correccion'             => 'nullable|date',
             // Remuneración
             'tasa_riesgo_arl'          => 'nullable|string|max:20',
+            'arl'                      => 'nullable|string|max:120',
+            'caja_compensacion'        => 'nullable|string|max:120',
             'salario_basico'           => 'nullable|numeric',
             'auxilio_transporte'       => 'nullable|numeric',
             'otrosi_variable'          => 'nullable|numeric',

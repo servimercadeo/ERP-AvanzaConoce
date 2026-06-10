@@ -8,9 +8,34 @@ use Illuminate\Http\Request;
 
 class BaseIngresoController extends Controller
 {
+    private function resolveFromRequisicion(BaseIngreso $ingreso): BaseIngreso
+    {
+        $c = $ingreso->candidato;
+        if (!$c) return $ingreso;
+
+        $req = $c->requisicion;
+
+        $ingreso->nombre_completo  = $c->nombres;
+        $ingreso->telefono         = $c->celular;
+        $ingreso->correo           = $c->correo;
+        $ingreso->tipo_vinculacion = $c->tipo_vinculacion ?? $ingreso->tipo_vinculacion;
+        $ingreso->cargo            = $req?->cargo?->nombre;
+        $ingreso->empresa          = $req?->empresa?->nombre;
+        $ingreso->proyecto         = $req?->proyecto?->nombre;
+        $ingreso->lider_inmediato  = $req?->responsable;
+        $ingreso->empleador        = $req?->empleador?->nombre;
+
+        return $ingreso;
+    }
+
     public function index(Request $request)
     {
-        $query = BaseIngreso::with('candidato');
+        $query = BaseIngreso::with([
+            'candidato.requisicion.cargo',
+            'candidato.requisicion.proyecto',
+            'candidato.requisicion.empresa',
+            'candidato.requisicion.empleador',
+        ]);
 
         if ($request->search) {
             $s = $request->search;
@@ -21,7 +46,10 @@ class BaseIngresoController extends Controller
             });
         }
 
-        return response()->json($query->orderBy('created_at', 'desc')->get());
+        $ingresos = $query->orderBy('created_at', 'desc')->get();
+        $ingresos->transform(fn($i) => $this->resolveFromRequisicion($i));
+
+        return response()->json($ingresos);
     }
 
     public function store(Request $request)
@@ -54,12 +82,26 @@ class BaseIngresoController extends Controller
         ]);
 
         $ingreso = BaseIngreso::create($data);
-        return response()->json($ingreso->load('candidato'), 201);
+        $ingreso->load([
+            'candidato.requisicion.cargo',
+            'candidato.requisicion.proyecto',
+            'candidato.requisicion.empresa',
+            'candidato.requisicion.empleador',
+        ]);
+
+        return response()->json($this->resolveFromRequisicion($ingreso), 201);
     }
 
     public function show(BaseIngreso $baseIngreso)
     {
-        return response()->json($baseIngreso->load('candidato'));
+        $baseIngreso->load([
+            'candidato.requisicion.cargo',
+            'candidato.requisicion.proyecto',
+            'candidato.requisicion.empresa',
+            'candidato.requisicion.empleador',
+        ]);
+
+        return response()->json($this->resolveFromRequisicion($baseIngreso));
     }
 
     public function update(Request $request, BaseIngreso $baseIngreso)
@@ -92,16 +134,29 @@ class BaseIngresoController extends Controller
         ]);
 
         $baseIngreso->update($data);
-        return response()->json($baseIngreso->load('candidato'));
+        $baseIngreso->load([
+            'candidato.requisicion.cargo',
+            'candidato.requisicion.proyecto',
+            'candidato.requisicion.empresa',
+            'candidato.requisicion.empleador',
+        ]);
+
+        return response()->json($this->resolveFromRequisicion($baseIngreso));
     }
 
     public function destroy(BaseIngreso $baseIngreso)
     {
-        $baseIngreso->delete();
+        // Desactivar aval del candidato vinculado para que sync no lo recree
+        if ($baseIngreso->candidato_id) {
+            \App\Models\Candidato::where('id', $baseIngreso->candidato_id)
+                ->update(['aval' => false, 'fecha_aval' => null, 'tipo_vinculacion' => null]);
+        }
+
+        $baseIngreso->forceDelete();
         return response()->json(null, 204);
     }
 
-    public function sync(Request $request)
+    public function sync()
     {
         $existingIds = BaseIngreso::withTrashed()->whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
 
@@ -151,6 +206,28 @@ class BaseIngresoController extends Controller
                     'fecha_programacion_ingreso' => $ingreso->fecha_programacion_ingreso ?? $c->fecha_programacion_ingreso,
                 ]);
             }
+        }
+
+        // Always refresh empresa/proyecto/cargo/empleador/lider from current requisicion
+        $existingReq = BaseIngreso::whereNotNull('candidato_id')
+            ->with(['candidato.requisicion.cargo', 'candidato.requisicion.proyecto', 'candidato.requisicion.empresa', 'candidato.requisicion.empleador'])
+            ->get();
+
+        foreach ($existingReq as $ingreso) {
+            $c = $ingreso->candidato;
+            if (!$c) continue;
+            $req = $c->requisicion;
+            $ingreso->update([
+                'cargo'            => $req && $req->cargo     ? $req->cargo->nombre     : $ingreso->cargo,
+                'empresa'          => $req && $req->empresa   ? $req->empresa->nombre   : $ingreso->empresa,
+                'proyecto'         => $c->negocio ?: ($req && $req->proyecto ? $req->proyecto->nombre : $ingreso->proyecto),
+                'lider_inmediato'  => $req ? ($req->responsable ?? $ingreso->lider_inmediato) : $ingreso->lider_inmediato,
+                'empleador'        => $req && $req->empleador ? $req->empleador->nombre : $ingreso->empleador,
+                'tipo_vinculacion' => $c->tipo_vinculacion    ?? $ingreso->tipo_vinculacion,
+                'nombre_completo'  => $c->nombres             ?? $ingreso->nombre_completo,
+                'telefono'         => $c->celular             ?? $ingreso->telefono,
+                'correo'           => $c->correo              ?? $ingreso->correo,
+            ]);
         }
 
         $count = 0;
