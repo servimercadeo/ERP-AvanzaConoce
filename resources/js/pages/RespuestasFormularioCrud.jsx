@@ -43,13 +43,7 @@ const DOCS_LIST = [
     },
 ];
 
-const ESTADO_CIVIL_FILTERS = [
-    { value: "Todos", label: "Todos los estados" },
-    { value: "SOLTERO", label: "Soltero" },
-    { value: "CASADO", label: "Casado" },
-    { value: "DIVORCIADO", label: "Divorciado" },
-    { value: "VIUDO", label: "Viudo" },
-];
+
 
 function getPaginasBotones(pagina, total) {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -69,7 +63,7 @@ export default function RespuestasFormularioCrud() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [civilFilter, setCivilFilter] = useState("Todos");
+    // Filtro de estado civil removido por ser poco funcional
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedResponse, setSelectedResponse] = useState(null);
     const [pagina, setPagina] = useState(1);
@@ -262,13 +256,9 @@ export default function RespuestasFormularioCrud() {
                     .toLowerCase()
                     .includes(search.toLowerCase()),
             );
-            const matchCivil =
-                civilFilter === "Todos" ||
-                String(row.estado_civil ?? "").toUpperCase() ===
-                    civilFilter.toUpperCase();
-            return matchSearch && matchCivil;
+            return matchSearch;
         });
-    }, [data, search, civilFilter]);
+    }, [data, search]);
 
     const totalPaginas = Math.max(
         1,
@@ -318,50 +308,7 @@ export default function RespuestasFormularioCrud() {
                             style={S.searchInput}
                         />
                     </div>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                        }}
-                    >
-                        <label
-                            style={{
-                                fontSize: "0.78rem",
-                                fontWeight: 700,
-                                color: "var(--text-muted)",
-                                fontFamily: "Poppins,sans-serif",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.04em",
-                            }}
-                        >
-                            Estado Civil:
-                        </label>
-                        <select
-                            value={civilFilter}
-                            onChange={(e) => {
-                                setCivilFilter(e.target.value);
-                                setPagina(1);
-                            }}
-                            style={{
-                                padding: "9px 12px",
-                                border: "1.5px solid var(--border)",
-                                borderRadius: "var(--radius-sm)",
-                                fontSize: "0.88rem",
-                                fontFamily: "Nunito,sans-serif",
-                                outline: "none",
-                                background: "var(--white)",
-                                color: "var(--text)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            {ESTADO_CIVIL_FILTERS.map((o) => (
-                                <option key={o.value} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+
                 </div>
                 <button style={S.btnSecondary} onClick={fetchResponses}>
                     Actualizar

@@ -15,7 +15,7 @@ import {
 
 const POR_PAGINA = 5;
 
-const ESTADOS_CONTRATO  = ["Vigente", "Contrato anulado"];
+const ESTADOS_CONTRATO  = ["Activo", "Inactivo", "Cancelado", "Translado"];
 const TIPOS_VINCULACION = ["Directa", "Indirecta"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
@@ -48,7 +48,7 @@ const EMPTY_FORM = {
     fecha_vinculacion_caja: "",
     fondo_pensiones: "",
     fondo_cesantias: "",
-    estado_contrato: "Vigente",
+    estado_contrato: "Activo",
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
@@ -336,7 +336,7 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
         setOpen(false);
         // Buscar empleado_id por documento/cedula
         const emp = empleados.find((e) => String(e.cedula) === String(c.documento));
-        onSelect({ ...c, empleado_id: emp?.id ?? "" });
+        onSelect({ ...c, empleado_id: emp?.id ?? "", documento: c.documento, nombres: c.nombres, apellidos: c.apellidos, correo: c.correo });
     };
 
     return (
@@ -474,6 +474,10 @@ function Modal({
         setForm((f) => ({
             ...f,
             empleado_id:               c.empleado_id        || f.empleado_id,
+            documento:                 c.documento          || f.documento,
+            nombres:                   c.nombres            || f.nombres,
+            apellidos:                 c.apellidos          || f.apellidos,
+            correo:                    c.correo             || f.correo,
             cargo:                     c.cargo              || f.cargo,
             sede:                      c.sede               || f.sede,
             tipo_vinculacion:          c.tipo_vinculacion   || f.tipo_vinculacion,
@@ -551,7 +555,7 @@ function Modal({
 
     const validate = () => {
         const e = {};
-        if (!form.empleado_id) e.empleado_id = "Requerido";
+        if (!form.empleado_id && !form.documento) e.empleado_id = "Requerido";
         if (!form.tipo_contrato) e.tipo_contrato = "Requerido";
         if (!form.cargo) e.cargo = "Requerido";
         if (!form.sede) e.sede = "Requerido";
@@ -613,6 +617,13 @@ function Modal({
                                 empleados={empleados}
                                 onSelect={handleCandidatoSelect}
                             />
+                            {errors.empleado_id && (
+                                <div style={{ ...S.err, marginTop: 8 }}>
+                                    {errors.empleado_id === "Requerido" 
+                                        ? "Debe seleccionar un candidato válido." 
+                                        : errors.empleado_id}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1179,9 +1190,13 @@ export default function ContratosCrud() {
     const stats = useMemo(
         () => ({
             total: contratos.length,
-            activos: contratos.filter((c) => c.estado_contrato === "Vigente")
+            activos: contratos.filter((c) => c.estado_contrato === "Activo")
                 .length,
-            vencidos: contratos.filter((c) => c.estado_contrato === "Contrato anulado")
+            inactivos: contratos.filter((c) => c.estado_contrato === "Inactivo")
+                .length,
+            cancelados: contratos.filter((c) => c.estado_contrato === "Cancelado")
+                .length,
+            translados: contratos.filter((c) => c.estado_contrato === "Translado")
                 .length,
         }),
         [contratos],
@@ -1251,10 +1266,22 @@ export default function ContratosCrud() {
                     <div className="stat-label">Activos</div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-num" style={{ color: "#e74c3c" }}>
-                        {stats.vencidos}
+                    <div className="stat-num" style={{ color: "#f39c12" }}>
+                        {stats.inactivos}
                     </div>
-                    <div className="stat-label">Vencidos</div>
+                    <div className="stat-label">Inactivos</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#e74c3c" }}>
+                        {stats.cancelados}
+                    </div>
+                    <div className="stat-label">Cancelados</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#3498db" }}>
+                        {stats.translados}
+                    </div>
+                    <div className="stat-label">Translados</div>
                 </div>
             </div>
 
@@ -1289,8 +1316,10 @@ export default function ContratosCrud() {
                         Filtros
                     </button>
                     <PresetFiltersDropdown presets={[
-                        { label: "Contratos vigentes", apply: () => { clearFilters(); setFiltroEstado("Vigente"); } },
-                        { label: "Contratos anulados", apply: () => { clearFilters(); setFiltroEstado("Contrato anulado"); } },
+                        { label: "Contratos activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
+                        { label: "Contratos inactivos", apply: () => { clearFilters(); setFiltroEstado("Inactivo"); } },
+                        { label: "Contratos cancelados", apply: () => { clearFilters(); setFiltroEstado("Cancelado"); } },
+                        { label: "Contratos en translado", apply: () => { clearFilters(); setFiltroEstado("Translado"); } },
                         { label: "Término fijo", apply: () => { clearFilters(); setFiltroTipoContrato("Término Fijo"); } },
                         { label: "Prestación de servicios", apply: () => { clearFilters(); setFiltroTipoContrato("Prestación de Servicios"); } },
                         { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
@@ -1369,12 +1398,14 @@ export default function ContratosCrud() {
                                     <td>
                                         <span
                                             style={S.badge(
-                                                c.estado_contrato === "Vigente"
-                                                    ? "#e0f7f4"
-                                                    : "#fce8e8",
-                                                c.estado_contrato === "Vigente"
-                                                    ? "#0d6e5a"
-                                                    : "#a33",
+                                                c.estado_contrato === "Activo" ? "#e0f7f4" : 
+                                                c.estado_contrato === "Translado" ? "#e8f0ff" : 
+                                                c.estado_contrato === "Inactivo" ? "#fff3e0" : 
+                                                "#fce8e8",
+                                                c.estado_contrato === "Activo" ? "#0d6e5a" :
+                                                c.estado_contrato === "Translado" ? "#1a4fa8" :
+                                                c.estado_contrato === "Inactivo" ? "#e67e22" :
+                                                "#a33",
                                             )}
                                         >
                                             {c.estado_contrato}
@@ -1838,12 +1869,12 @@ const S = {
     },
     tabBar: {
         display: "flex",
-        borderBottom: "2px solid var(--border)",
         padding: "0 28px",
         gap: 0,
         overflowX: "auto",
         flexWrap: "nowrap",
         flexShrink: 0,
+        borderBottom: "2px solid var(--border)",
     },
     tab: {
         padding: "11px 20px",
