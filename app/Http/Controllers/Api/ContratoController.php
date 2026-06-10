@@ -13,6 +13,13 @@ class ContratoController extends Controller
     {
         $query = Contrato::with(['empleado', 'centrosCostos', 'anexos']);
 
+        // Anulados solo se muestran cuando se filtra explícitamente por ese estado
+        if ($request->estado === 'Contrato anulado') {
+            $query->where('completado', false);
+        } else {
+            $query->where('completado', true);
+        }
+
         if ($request->search) {
             $s = $request->search;
             $query->whereHas('empleado', function($q) use ($s) {
@@ -23,7 +30,8 @@ class ContratoController extends Controller
             })->orWhere('cargo', 'like', "%$s%");
         }
 
-        if ($request->estado && $request->estado !== 'Todos') {
+        // El filtro de estado ya fue manejado arriba via completado
+        if ($request->estado && $request->estado !== 'Todos' && $request->estado !== 'Contrato anulado') {
             $query->where('estado_contrato', $request->estado);
         }
 
@@ -66,6 +74,8 @@ class ContratoController extends Controller
         ]);
 
         return DB::transaction(function() use ($data) {
+            $data['completado'] = ($data['estado_contrato'] ?? 'Vigente') !== 'Contrato anulado';
+
             $contrato = Contrato::create($data);
 
             if (!empty($data['centros_costos'])) {
@@ -121,6 +131,8 @@ class ContratoController extends Controller
         ]);
 
         return DB::transaction(function() use ($contrato, $data) {
+            $data['completado'] = ($data['estado_contrato'] ?? $contrato->estado_contrato) !== 'Contrato anulado';
+
             $contrato->update($data);
 
             // Sincronizar centros de costos

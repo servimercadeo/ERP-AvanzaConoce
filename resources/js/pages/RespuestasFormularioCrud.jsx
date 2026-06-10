@@ -419,7 +419,7 @@ export default function RespuestasFormularioCrud() {
                                         }}
                                     >
                                         {row.created_at
-                                            ? row.created_at.substring(0, 16)
+                                            ? new Date(row.created_at).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })
                                             : "—"}
                                     </td>
                                     <td style={{ ...S.td, fontWeight: 700 }}>
@@ -617,7 +617,7 @@ export default function RespuestasFormularioCrud() {
                                 />
                                 <DetailItem
                                     label="Fecha de expedición doc."
-                                    value={expFecha ?? "—"}
+                                    value={expFecha ? expFecha.substring(0, 10) : "—"}
                                 />
                                 <DetailItem
                                     label="Nombres completos"
