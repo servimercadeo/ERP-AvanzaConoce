@@ -116,7 +116,7 @@ class EmpleadosSeeder extends Seeder
                 [
                 'name'     => 'OSCAR JULIAN VALENCIA TORO',
                 'email'    => 'gerencia.th@servimercadeo.com',
-                'password' => Hash::make('Password123'),
+                'password' => Hash::make('1088003312*'),
                 'rol'      => 'GERENTE DE TALENTO HUMANO',
                 'activo'   => true,
                 'cedula'              => '1088003312',
