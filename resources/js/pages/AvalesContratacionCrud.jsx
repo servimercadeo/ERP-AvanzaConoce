@@ -77,12 +77,17 @@ export default function AvalesContratacionCrud() {
     const [form, setForm] = useState({});
     const [pagina, setPagina] = useState(1);
     const [toast, setToast] = useState(null);
+    const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
     const POR_PAGINA = 10;
 
     const showToast = (msg, type = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
     };
+
+    const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
+    const handleConfirmOk = () => { const fn = confirmDlg.onConfirm; setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null }); fn?.(); };
+    const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
 
     const qc = useQueryClient();
     const { data: _qData } = useQuery({
@@ -180,36 +185,36 @@ export default function AvalesContratacionCrud() {
 
     const [alertLoading, setAlertLoading] = useState(null);
 
-    const handleAlertToggle = async (row) => {
+    const handleAlertToggle = (row) => {
         if (row.alerta_enviada || alertLoading === row.id) return;
-        if (
-            !window.confirm(
-                `¿Enviar alerta de registro al correo ${row.correo || "(sin correo)"}?`,
-            )
-        )
-            return;
-        setAlertLoading(row.id);
-        try {
-            await api.post(`/base-ingresos/${row.id}/alerta`);
-            setData((prev) =>
-                prev.map((r) =>
-                    r.id === row.id ? { ...r, alerta_enviada: true } : r,
-                ),
-            );
-            qc.invalidateQueries({ queryKey: ["base-ingresos"] });
-            showToast("Alerta enviada al candidato");
-        } catch (e) {
-            const status = e.response?.status;
-            const msg =
-                status === 404
-                    ? "El registro ya no existe. La lista se ha actualizado."
-                    : "Error al enviar alerta: " +
-                      (e.response?.data?.message || e.message);
-            alert(msg);
-            qc.invalidateQueries({ queryKey: ["base-ingresos"] });
-        } finally {
-            setAlertLoading(null);
-        }
+        showConfirm(
+            'Enviar alerta de registro',
+            `¿Enviar alerta de registro al correo ${row.correo || "(sin correo)"}?`,
+            async () => {
+                setAlertLoading(row.id);
+                try {
+                    await api.post(`/base-ingresos/${row.id}/alerta`);
+                    setData((prev) =>
+                        prev.map((r) =>
+                            r.id === row.id ? { ...r, alerta_enviada: true } : r,
+                        ),
+                    );
+                    qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+                    showToast("Alerta enviada al candidato");
+                } catch (e) {
+                    const status = e.response?.status;
+                    const errMsg =
+                        status === 404
+                            ? "El registro ya no existe. La lista se ha actualizado."
+                            : "Error al enviar alerta: " +
+                              (e.response?.data?.message || e.message);
+                    showToast(errMsg, "error");
+                    qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+                } finally {
+                    setAlertLoading(null);
+                }
+            },
+        );
     };
 
     const filteredData = useMemo(
@@ -769,6 +774,35 @@ export default function AvalesContratacionCrud() {
                                     </button>
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Dialog */}
+            {confirmDlg.open && (
+                <div style={S.overlay} onClick={handleConfirmCancel}>
+                    <div
+                        style={{
+                            background: "var(--white)",
+                            borderRadius: "var(--radius)",
+                            boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
+                            width: "100%",
+                            maxWidth: 440,
+                            display: "flex",
+                            flexDirection: "column",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeader}>
+                            <span style={S.modalTitle}>{confirmDlg.title}</span>
+                        </div>
+                        <div style={{ padding: "24px 28px", fontFamily: "Nunito,sans-serif", fontSize: "0.95rem", color: "var(--text)", lineHeight: 1.55 }}>
+                            {confirmDlg.msg}
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
+                            <button style={S.btnPrimary} onClick={handleConfirmOk}>Aceptar</button>
                         </div>
                     </div>
                 </div>

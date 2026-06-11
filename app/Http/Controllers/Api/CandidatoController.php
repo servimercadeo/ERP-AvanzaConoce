@@ -208,6 +208,12 @@ class CandidatoController extends Controller
         }
 
         $avalAntes = $candidato->aval;
+
+        // Si se está desactivando el aval, forzar estado = Entrevista sin importar lo que venga del frontend
+        if ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
+            $data['estado'] = 'Entrevista';
+        }
+
         $candidato->update($data);
 
         if (!$avalAntes && !empty($data['aval']) && $data['aval']) {

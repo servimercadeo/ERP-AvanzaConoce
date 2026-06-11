@@ -75,12 +75,16 @@ export default function RespuestasFormularioCrud() {
         loading: false,
     });
     const [expFecha, setExpFecha] = useState(null);
+    const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
     const POR_PAGINA = 10;
 
     const showToast = (msg, type = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3000);
     };
+    const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
+    const handleConfirmOk     = () => { const fn = confirmDlg.onConfirm; setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null }); fn?.(); };
+    const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
 
     const fetchResponses = async () => {
         setLoading(true);
@@ -114,24 +118,20 @@ export default function RespuestasFormularioCrud() {
         return () => clearInterval(interval);
     }, [docsModal.open, docsModal.row?.documento]);
 
-    const handleDelete = async (id) => {
-        if (
-            !confirm(
-                "¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.",
-            )
-        )
-            return;
-        try {
-            await api.delete(`/respuestas-ingresos/${id}`);
-            setData((prev) => prev.filter((r) => r.id !== id));
-            showToast("Respuesta eliminada correctamente");
-        } catch (e) {
-            showToast(
-                "Error al eliminar: " +
-                    (e.response?.data?.message || e.message),
-                "error",
-            );
-        }
+    const handleDelete = (id) => {
+        showConfirm(
+            '¿Eliminar respuesta de ingreso?',
+            'Esta acción eliminará el registro permanentemente y revertirá el estado del candidato asociado.',
+            async () => {
+                try {
+                    await api.delete(`/respuestas-ingresos/${id}`);
+                    setData((prev) => prev.filter((r) => r.id !== id));
+                    showToast("Respuesta eliminada correctamente");
+                } catch (e) {
+                    showToast("Error al eliminar: " + (e.response?.data?.message || e.message), "error");
+                }
+            }
+        );
     };
 
     const handleOpenDocs = async (row) => {
@@ -200,13 +200,11 @@ export default function RespuestasFormularioCrud() {
         }
     };
 
-    const handleDeleteDoc = async (documento, tipo) => {
-        if (
-            !confirm(
-                "¿Eliminar este documento? Esta acción no se puede deshacer.",
-            )
-        )
-            return;
+    const handleDeleteDoc = (documento, tipo) => {
+        showConfirm(
+            '¿Eliminar documento?',
+            'Esta acción eliminará el documento permanentemente y no se puede deshacer.',
+            async () => {
         try {
             await api.delete(
                 `/documentos-contratacion/${documento}/${encodeURIComponent(tipo)}`,
@@ -228,6 +226,8 @@ export default function RespuestasFormularioCrud() {
         } catch {
             showToast("Error al eliminar el documento", "error");
         }
+        }
+        );
     };
 
     const handleOpenView = async (row) => {
@@ -718,6 +718,23 @@ export default function RespuestasFormularioCrud() {
                     onDelete={handleDeleteDoc}
                     onRefresh={handleRefreshDocs}
                 />
+            )}
+
+            {confirmDlg.open && (
+                <div style={{ ...S.overlay, zIndex: 6000 }} onClick={handleConfirmCancel}>
+                    <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                        <div style={S.modalHeader}>
+                            <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{confirmDlg.title}</span>
+                        </div>
+                        <div style={{ padding: '22px 28px' }}>
+                            <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>{confirmDlg.msg}</p>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+                            <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
+                            <button style={S.btnPrimary} onClick={handleConfirmOk}>Aceptar</button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Toast */}

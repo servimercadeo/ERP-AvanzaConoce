@@ -75,12 +75,18 @@ export default function BaseIngresoCrud() {
   const [form, setForm]           = useState(EMPTY_FORM);
   const [pagina, setPagina]       = useState(1);
   const [toast, setToast]         = useState(null);
+  const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
+  const [alertDlg, setAlertDlg]     = useState({ open: false, title: '', msg: '' });
   const POR_PAGINA = 10;
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+  const showAlert   = (title, msg) => setAlertDlg({ open: true, title, msg });
+  const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
+  const handleConfirmOk     = () => { const fn = confirmDlg.onConfirm; setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null }); fn?.(); };
+  const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
 
   const qc = useQueryClient();
   const { data: _qBaseIngresos } = useQuery({ queryKey: ['base-ingresos'], queryFn: () => api.get('/base-ingresos').then(r => r.data) });
@@ -171,10 +177,12 @@ export default function BaseIngresoCrud() {
       if (modalMode === 'create') {
         const { data: created } = await api.post('/base-ingresos', form);
         setData(prev => [created, ...prev]);
+        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
         showToast('Ingreso registrado exitosamente');
       } else {
         const { data: updated } = await api.put(`/base-ingresos/${form.id}`, form);
         setData(prev => prev.map(r => r.id === form.id ? updated : r));
+        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
         showToast('Ingreso actualizado exitosamente');
       }
       setIsModalOpen(false);
@@ -183,22 +191,28 @@ export default function BaseIngresoCrud() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar este registro de ingreso?')) return;
-    try {
-      await api.delete(`/base-ingresos/${id}`);
-      setData(prev => prev.filter(r => r.id !== id));
-      qc.invalidateQueries({ queryKey: ['base-ingresos'] });
-      showToast('Registro eliminado');
-    } catch (e) {
-      if (e.response?.status === 404) {
-        setData(prev => prev.filter(r => r.id !== id));
-        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
-        showToast('El registro ya no existía, lista actualizada');
-      } else {
-        alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+  const handleDelete = (id) => {
+    showConfirm(
+      '¿Eliminar registro de ingreso?',
+      'Esta acción eliminará el registro permanentemente y revertirá el estado del candidato asociado.',
+      async () => {
+        try {
+          await api.delete(`/base-ingresos/${id}`);
+          setData(prev => prev.filter(r => r.id !== id));
+          qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+          qc.invalidateQueries({ queryKey: ['candidatos'] });
+          showToast('Registro eliminado');
+        } catch (e) {
+          if (e.response?.status === 404) {
+            setData(prev => prev.filter(r => r.id !== id));
+            qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+            showToast('El registro ya no existía, lista actualizada');
+          } else {
+            showAlert('Error al eliminar', e.response?.data?.message || e.message);
+          }
+        }
       }
-    }
+    );
   };
 
   const handleSync = async () => {
@@ -426,6 +440,39 @@ export default function BaseIngresoCrud() {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {alertDlg.open && (
+        <div style={{ ...S.overlay, zIndex: 6100 }} onClick={() => setAlertDlg({ open: false, title: '', msg: '' })}>
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{alertDlg.title}</span>
+            </div>
+            <div style={{ padding: '22px 28px' }}>
+              <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>{alertDlg.msg}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+              <button style={S.btnPrimaryGreen} onClick={() => setAlertDlg({ open: false, title: '', msg: '' })}>Aceptar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDlg.open && (
+        <div style={{ ...S.overlay, zIndex: 6000 }} onClick={handleConfirmCancel}>
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{confirmDlg.title}</span>
+            </div>
+            <div style={{ padding: '22px 28px' }}>
+              <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>{confirmDlg.msg}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+              <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
+              <button style={S.btnPrimaryGreen} onClick={handleConfirmOk}>Aceptar</button>
+            </div>
           </div>
         </div>
       )}

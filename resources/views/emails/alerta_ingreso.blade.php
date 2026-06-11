@@ -57,6 +57,13 @@
                 Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
                 {{ $formUrl }}
             </div>
+
+            <div style="margin-top: 28px; background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px;">
+                <p style="margin: 0; font-size: 0.88rem; color: #92400e; line-height: 1.6;">
+                    <strong>Importante:</strong> Encontrarás adjunta en este correo la <strong>Hoja de Vida SYM</strong>.
+                    Por favor diligencie este documento con toda tu información y envíalo de vuelta al correo que te llegará a continuación para continuar con el proceso de contratación.
+                </p>
+            </div>
         </div>
 
         <div class="footer">

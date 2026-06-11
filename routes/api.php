@@ -129,18 +129,39 @@ Route::get('/catalogos', function () {
 
     $ciudades = array_keys($sedesPorCiudad);
 
+    $merge = fn($base, $extra) => $base->merge($extra)->filter(fn($v) => $v && $v !== '')->unique()->sort()->values();
+
     return response()->json([
         'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'eps'               => $merge(
+                                    DB::table('eps')->pluck('nombre'),
+                                    $merge(
+                                        DB::table('contratos')->whereNotNull('lps_afiliado')->where('lps_afiliado', '!=', '')->pluck('lps_afiliado'),
+                                        DB::table('respuestas_ingresos')->whereNotNull('eps')->where('eps', '!=', '')->pluck('eps')
+                                    )
+                               ),
         'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'pensiones'         => $merge(
+                                    DB::table('contratos')->whereNotNull('fondo_pensiones')->where('fondo_pensiones', '!=', '')->pluck('fondo_pensiones'),
+                                    $merge(
+                                        DB::table('respuestas_ingresos')->whereNotNull('afp')->where('afp', '!=', '')->pluck('afp'),
+                                        collect(['PORVENIR', 'PROTECCIÓN', 'COLFONDOS', 'OLD MUTUAL', 'COLPENSIONES', 'OTRO'])
+                                    )
+                               ),
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
-        'tipos_funcionario' => DB::table('users')->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->select('tipo_funcionario')->distinct()->orderBy('tipo_funcionario')->pluck('tipo_funcionario'),
-        'tipos_vinculacion' => DB::table('users')->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->select('tipo_vinculacion')->distinct()->orderBy('tipo_vinculacion')->pluck('tipo_vinculacion'),
+        'tipos_funcionario' => $merge(
+                                    DB::table('users')->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->pluck('tipo_funcionario'),
+                                    collect([])
+                               ),
+        'tipos_vinculacion' => $merge(
+                                    DB::table('base_ingresos')->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->pluck('tipo_vinculacion'),
+                                    collect([])
+                               ),
     ]);
 });
 
@@ -173,6 +194,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store']);
 
+    // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
+    Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
     // CRUD completo de empleados
     Route::apiResource('empleados', EmpleadoController::class);
 
@@ -193,8 +216,10 @@ Route::middleware('auth:sanctum')->group(function () {
         try {
             Mail::to($baseIngreso->correo)->send(new AlertaIngresoMail($baseIngreso));
             $baseIngreso->update(['alerta_enviada' => true]);
+            Log::info('AlertaIngresoMail enviada correctamente a: ' . $baseIngreso->correo);
             return response()->json(['message' => 'Alerta enviada correctamente.']);
         } catch (\Exception $e) {
+            Log::error('AlertaIngresoMail ERROR al enviar a ' . $baseIngreso->correo . ': ' . $e->getMessage());
             return response()->json(['message' => 'Error al enviar: ' . $e->getMessage()], 500);
         }
     });
@@ -241,8 +266,18 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Datos consolidados para pre-cargar el formulario de creación de contrato
+    // Solo aparecen candidatos que tienen los 7 documentos obligatorios subidos
     Route::get('/respuestas-ingresos/datos-contrato', function () {
-        $respuestas = RespuestaIngreso::orderBy('nombres')->get();
+        $requiredDocs = ['documento_identidad','diploma_bachiller','certificados_estudio','certificados_laborales','certificacion_eps','certificacion_pension','hoja_vida'];
+        $metaPath     = storage_path('app/documentos_contratacion.json');
+        $meta         = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+
+        $conDocCompletos = array_values(array_filter(array_keys($meta), function ($doc) use ($meta, $requiredDocs) {
+            $subidos = array_keys($meta[$doc]['archivos'] ?? []);
+            return count(array_diff($requiredDocs, $subidos)) === 0;
+        }));
+
+        $respuestas = RespuestaIngreso::whereIn('documento', $conDocCompletos)->orderBy('nombres')->get();
 
         return $respuestas->map(function ($resp) {
             $candidato = \App\Models\Candidato::with([
