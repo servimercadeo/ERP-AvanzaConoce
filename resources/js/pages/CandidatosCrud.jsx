@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import {
@@ -71,6 +71,7 @@ const MOCK_OPTS = {
 };
 
 export default function CandidatosCrud() {
+    const qc = useQueryClient();
     const [candidates, setCandidates] = useState([]);
     const [requisitions, setRequisitions] = useState([]);
     const [ciudadesOpts, setCiudadesOpts] = useState([]);
@@ -248,6 +249,8 @@ export default function CandidatosCrud() {
             [field]: val,
             estado: nextEstado,
             ...extra,
+        }).then(() => {
+            qc.invalidateQueries({ queryKey: ['candidatos'] });
         }).catch((err) => {
             setCandidates((prev) =>
                 prev.map((c) => (c.id === candidateId ? candidate : c)),

@@ -44,6 +44,29 @@ class ContratoController extends Controller
 
     public function store(Request $request)
     {
+        if (empty($request->empleado_id) && $request->documento) {
+            $user = \App\Models\User::firstOrCreate(
+                ['cedula' => $request->documento],
+                [
+                    'nombres' => mb_strtoupper($request->nombres ?? '', 'UTF-8'),
+                    'apellidos' => mb_strtoupper($request->apellidos ?? '', 'UTF-8'),
+                    'name' => trim(mb_strtoupper($request->nombres ?? '', 'UTF-8') . ' ' . mb_strtoupper($request->apellidos ?? '', 'UTF-8')),
+                    'email' => $request->correo ?: ($request->documento . '@avanzaconoce.com'),
+                    'password' => \Illuminate\Support\Facades\Hash::make($request->documento),
+                    'sede' => $request->sede ?? 'Principal',
+                    'cargo' => mb_strtoupper($request->cargo ?? '', 'UTF-8') ?: 'SIN ASIGNAR',
+                    'estado_empleado' => 'Activo',
+                    'tipo_funcionario' => 'Consultor',
+                    'tipo_vinculacion' => $request->tipo_vinculacion ?? 'Indefinido',
+                    'eps' => $request->lps_afiliado ?? 'Sin asignar',
+                    'arl' => $request->arl ?? 'Sin asignar',
+                    'genero' => 'No especificado',
+                    'movil' => '0000000000',
+                ]
+            );
+            $request->merge(['empleado_id' => $user->id]);
+        }
+
         $data = $request->validate([
             'empleado_id'              => 'required|exists:users,id',
             'tipo_contrato'           => 'nullable|string',
@@ -74,7 +97,7 @@ class ContratoController extends Controller
         ]);
 
         return DB::transaction(function() use ($data) {
-            $data['completado'] = ($data['estado_contrato'] ?? 'Vigente') !== 'Contrato anulado';
+            $data['completado'] = ($data['estado_contrato'] ?? 'Activo') !== 'Cancelado';
 
             $contrato = Contrato::create($data);
 
@@ -131,7 +154,7 @@ class ContratoController extends Controller
         ]);
 
         return DB::transaction(function() use ($contrato, $data) {
-            $data['completado'] = ($data['estado_contrato'] ?? $contrato->estado_contrato) !== 'Contrato anulado';
+            $data['completado'] = ($data['estado_contrato'] ?? $contrato->estado_contrato) !== 'Cancelado';
 
             $contrato->update($data);
 

@@ -386,7 +386,7 @@ const S = {
   tabActive: {
     color: '#fff',
     background: 'var(--primary)',
-    borderBottomColor: 'var(--primary)',
+    borderBottom: '2.5px solid var(--primary)',
     borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
     boxShadow: '0 -2px 10px rgba(26, 155, 140, 0.2)',
   },

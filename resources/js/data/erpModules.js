@@ -75,16 +75,6 @@ export const ERP_MODULES = [
         ]
       },
       {
-        id: 'requisicion_personal',
-        label: 'Requisición de Personal',
-        icon: 'requisicion_personal',
-        desc: 'Gestión de requisiciones',
-        archivos: [
-          { id: 'ver_crear_requisiciones', label: 'Ver y Crear Requisiciones' },
-          { id: 'atencion_requisiciones', label: 'Atención de Requisiciones' }
-        ]
-      },
-      {
         id: 'work_orders',
         label: 'Work Orders',
         icon: 'work_orders',
@@ -103,17 +93,6 @@ export const ERP_MODULES = [
           { id: 'importar_wo_pagas_directiv', label: 'Importar Work Order Pagas por Directiv' },
           { id: 'envio_contratos', label: 'Envió de Contratos' },
           { id: 'sol_modificacion_envio_contrato', label: 'Sol. de Modificación Envió Contrato por Aprobar' }
-        ]
-      },
-      {
-        id: 'solicitud_dias',
-        label: 'Solicitud de Dias',
-        icon: 'solicitud_dias',
-        desc: 'Gestión de solicitudes',
-        archivos: [
-          { id: 'ver_crear_solicitudes', label: 'Ver y Crear Solicitudes' },
-          { id: 'solicitudes_por_aprobar', label: 'Solicitudes por Aprobar' },
-          { id: 'ver_calendario_ausentismos', label: 'Ver Calendario de Ausentismos' }
         ]
       },
       {

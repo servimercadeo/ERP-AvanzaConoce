@@ -71,6 +71,107 @@ class EmpleadoController extends Controller
         return response()->json(null, 204);
     }
 
+    public function candidatosListos(\Illuminate\Http\Request $request)
+    {
+        // Usuarios que tienen al menos un contrato vigente (completado = true)
+        $query = User::with(['empresa'])
+            ->whereHas('contratos', fn($q) => $q->where('completado', true));
+
+        if ($request->search) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->where('nombres',   'like', "%$s%")
+                  ->orWhere('apellidos', 'like', "%$s%")
+                  ->orWhere('name',      'like', "%$s%")
+                  ->orWhere('cedula',    'like', "%$s%");
+            });
+            $query->orderBy('nombres')->limit(30);
+        } else {
+            // Sin búsqueda: los 5 usuarios con el contrato más reciente
+            $latestContrato = \App\Models\Contrato::select('created_at')
+                ->whereColumn('empleado_id', 'users.id')
+                ->where('completado', true)
+                ->orderByDesc('created_at')
+                ->limit(1);
+            $query->orderByDesc($latestContrato)->limit(5);
+        }
+
+        return response()->json(
+            $query->get()->map(function ($user) {
+                $toDate = fn($v) => $v ? \Carbon\Carbon::parse($v)->format('Y-m-d') : null;
+
+                // 1. Último contrato vigente
+                $contrato = \App\Models\Contrato::where('empleado_id', $user->id)
+                    ->where('completado', true)
+                    ->latest()
+                    ->first();
+
+                // 2. Candidato vinculado por cédula
+                $candidato = $user->cedula
+                    ? \App\Models\Candidato::with(['requisicion.empresa', 'requisicion.empleador'])
+                        ->where('identificacion', $user->cedula)
+                        ->first()
+                    : null;
+
+                // 3. Base de ingresos del candidato
+                $ingreso = $candidato
+                    ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->first()
+                    : null;
+
+                // 4. Respuesta de ingreso (formulario personal del empleado)
+                $respuesta = $user->cedula
+                    ? \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first()
+                    : null;
+
+                $req = $candidato?->requisicion;
+
+                return [
+                    // ── Identificación
+                    'user_id'          => $user->id,
+                    'cedula'           => $user->cedula,
+                    'nombres'          => $user->nombres           ?? $respuesta?->nombres  ?? $user->name,
+                    'apellidos'        => $user->apellidos         ?? $respuesta?->apellidos ?? '',
+                    'email'            => $user->email             ?? $respuesta?->correo   ?? $candidato?->correo ?? $ingreso?->correo,
+                    'movil'            => $user->movil             ?? $respuesta?->celular  ?? $candidato?->celular ?? $ingreso?->telefono,
+                    'genero'           => $user->genero,
+
+                    // ── Datos personales (respuesta_ingreso > user)
+                    'fecha_nacimiento'     => $toDate($respuesta?->fecha_nacimiento  ?? $user->fecha_nacimiento),
+                    'lugar_nacimiento'     => $respuesta?->lugar_nacimiento          ?? $user->lugar_nacimiento,
+                    'estado_civil'         => $respuesta?->estado_civil              ?? $user->estado_civil,
+                    'nivel_escolaridad'    => $respuesta?->nivel_escolaridad         ?? $user->nivel_escolaridad,
+                    'direccion_residencia' => $respuesta?->direccion                 ?? $user->direccion_residencia,
+                    'estrato'              => $respuesta?->estrato                   ?? $user->estrato,
+                    'barrio'               => $respuesta?->barrio                    ?? $user->barrio,
+                    'numero_hijos'         => $respuesta?->numero_hijos              ?? $user->numero_hijos,
+                    'rh'                   => $respuesta?->rh                        ?? $user->rh,
+
+                    // ── Seguridad social (contrato > respuesta > candidato > user)
+                    'eps'              => $respuesta?->eps              ?? $contrato?->lps_afiliado ?? $user->eps,
+                    'arl'              => $contrato?->arl               ?? $candidato?->arl         ?? $user->arl,
+                    'fondo_pensiones'  => $contrato?->fondo_pensiones   ?? $respuesta?->afp         ?? $user->fondo_pensiones,
+                    'caja_compensacion'=> $contrato?->caja_compensacion ?? $candidato?->caja_compensacion ?? $user->caja_compensacion,
+
+                    // ── Datos laborales (contrato > ingreso > user)
+                    'cargo'            => $contrato?->cargo           ?? $ingreso?->cargo         ?? $user->cargo,
+                    'sede'             => $contrato?->sede            ?? $user->sede,
+                    'tipo_vinculacion' => $contrato?->tipo_vinculacion ?? $candidato?->tipo_vinculacion ?? $ingreso?->tipo_ingreso,
+                    'tipo_funcionario' => $user->tipo_funcionario,
+                    'empleador'        => $contrato?->empleador       ?? $ingreso?->empleador     ?? $req?->empleador?->nombre ?? $user->empleador,
+                    'jefe_inmediato'   => $contrato?->jefe_inmediato  ?? $ingreso?->lider_inmediato ?? $user->jefe_inmediato,
+                    'empresa_id'       => $user->empresa_id           ?? $req?->empresa_id,
+                    'empresa_nombre'   => $user->empresa?->nombre     ?? $ingreso?->empresa       ?? $req?->empresa?->nombre,
+                    'ingresos'         => $contrato?->salario         ?? $ingreso?->salario_basico ?? $candidato?->salario_basico,
+
+                    // ── Contacto de emergencia (respuesta > user)
+                    'contacto_emergencia_nombre'      => $respuesta?->emergencia_nombre      ?? $user->contacto_emergencia_nombre,
+                    'contacto_emergencia_telefono'    => $respuesta?->emergencia_telefono    ?? $user->contacto_emergencia_telefono,
+                    'contacto_emergencia_parentesco'  => $respuesta?->emergencia_parentesco  ?? $user->contacto_emergencia_parentesco,
+                ];
+            })
+        );
+    }
+
     private function normalizarNombres(array &$data): void
     {
         $campos = ['nombres', 'apellidos', 'cargo', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'];

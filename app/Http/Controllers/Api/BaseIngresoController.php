@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BaseIngreso;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class BaseIngresoController extends Controller
 {
@@ -149,7 +152,36 @@ class BaseIngresoController extends Controller
         // Desactivar aval del candidato vinculado para que sync no lo recree
         if ($baseIngreso->candidato_id) {
             \App\Models\Candidato::where('id', $baseIngreso->candidato_id)
-                ->update(['aval' => false, 'fecha_aval' => null, 'tipo_vinculacion' => null]);
+                ->update(['aval' => false, 'fecha_aval' => null, 'tipo_vinculacion' => null, 'estado' => 'Entrevista']);
+        }
+
+        // Eliminar documentos locales y en SharePoint
+        $cedula = $baseIngreso->documento_identificacion;
+        if ($cedula) {
+            // 1. Limpiar JSON y archivos físicos locales
+            $metaPath = storage_path('app/documentos_contratacion.json');
+            if (file_exists($metaPath)) {
+                $meta = json_decode(file_get_contents($metaPath), true) ?: [];
+                if (isset($meta[$cedula])) {
+                    $dirSafe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $cedula);
+                    Storage::disk('local')->deleteDirectory("documentos_contratacion/{$dirSafe}");
+                    unset($meta[$cedula]);
+                    file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                }
+            }
+
+            // 2. Llamar al Flow de Power Automate para borrar la carpeta en SharePoint
+            $flowUrl = config('services.sharepoint.delete_flow_url');
+            if ($flowUrl) {
+                try {
+                    Http::timeout(10)->post($flowUrl, [
+                        'cedula' => $cedula,
+                        'nombre' => $baseIngreso->nombre_completo ?? '',
+                    ]);
+                } catch (\Exception $e) {
+                    Log::warning('No se pudo eliminar carpeta en SharePoint para cédula ' . $cedula . ': ' . $e->getMessage());
+                }
+            }
         }
 
         $baseIngreso->forceDelete();
@@ -158,7 +190,7 @@ class BaseIngresoController extends Controller
 
     public function sync()
     {
-        $existingIds = BaseIngreso::withTrashed()->whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
+        $existingIds = BaseIngreso::whereNotNull('candidato_id')->pluck('candidato_id')->toArray();
 
         $candidatos = \App\Models\Candidato::with(['requisicion.cargo', 'requisicion.proyecto', 'requisicion.empresa', 'requisicion.empleador', 'ciudad'])
             ->where('pruebas', true)
