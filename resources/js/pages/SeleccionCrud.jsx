@@ -197,10 +197,26 @@ export default function SeleccionCrud() {
       return;
     }
     const url = `${window.location.origin}/registro-candidatos?token=${row.registro_token}`;
-    navigator.clipboard.writeText(url).then(() => {
+    const onSuccess = () => {
       setCopiedId(row.id);
       setTimeout(() => setCopiedId(null), 2500);
-    });
+    };
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (e) { alert('No se pudo copiar el enlace.'); }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(fallback);
+    } else {
+      fallback();
+    }
   };
 
   const isRO = m => m === 'view';
