@@ -14,21 +14,87 @@ class EmpleadoController extends Controller
     public function index()
     {
         return response()->json(
-            User::with('empresa')
+            User::with(['empresa', 'contratos' => function($q) {
+                $q->orderBy('fecha_ingreso', 'desc');
+            }])
                 ->whereNotNull('cedula')
                 ->where('cedula', '!=', '')
                 ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
                 ->orderByRaw('nombres IS NULL ASC, nombres ASC')
                 ->get()
+                ->map(function($user) {
+                    // 1. Buscar en respuestas_ingresos
+                    $ciudad = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
+                        ->where('documento', $user->cedula)
+                        ->value('ciudad');
+
+                    // 2. Buscar en candidatos (usando ciudad_id)
+                    if (!$ciudad) {
+                        $ciudad = \Illuminate\Support\Facades\DB::table('candidatos')
+                            ->join('ciudades', 'candidatos.ciudad_id', '=', 'ciudades.id')
+                            ->where('candidatos.identificacion', $user->cedula)
+                            ->value('ciudades.nombre');
+                    }
+
+                    // 3. Buscar en base_ingresos
+                    if (!$ciudad) {
+                        $ciudad = \Illuminate\Support\Facades\DB::table('base_ingresos')
+                            ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
+                            ->where('candidatos.identificacion', $user->cedula)
+                            ->value('base_ingresos.ciudad');
+                    }
+
+                    $user->ciudad = $ciudad;
+                    return $user;
+                })
         );
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $userByCedula = null;
+        $userByEmail = null;
+
+        if ($request->cedula) {
+            $userByCedula = User::where('cedula', $request->cedula)->first();
+        }
+        if ($request->email) {
+            $userByEmail = User::where('email', $request->email)->first();
+        }
+
+        $existingId = null;
+        if ($userByCedula && $userByEmail && $userByCedula->id !== $userByEmail->id) {
+            // Re-link contracts to userByEmail
+            \App\Models\Contrato::where('empleado_id', $userByCedula->id)
+                ->update(['empleado_id' => $userByEmail->id]);
+            
+            // Delete the duplicate userByCedula
+            $userByCedula->delete();
+
+            $existingId = $userByEmail->id;
+        } else if ($userByCedula) {
+            $existingId = $userByCedula->id;
+        } else if ($userByEmail) {
+            $existingId = $userByEmail->id;
+        }
+
+        $data = $request->validate($this->rules($existingId));
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
+
+        if ($existingId) {
+            $empleado = User::find($existingId);
+            $empleado->update($data);
+            return response()->json([
+                'empleado'     => $empleado->fresh()->load('empresa'),
+                'credenciales' => [
+                    'email'    => $empleado->email,
+                    'password' => '(Ya registrado)',
+                ],
+            ], 201);
+        }
+
         $data['rol']    = $data['rol'] ?? 'consultor';
         $data['activo'] = true;
 
@@ -54,7 +120,25 @@ class EmpleadoController extends Controller
 
     public function update(Request $request, User $empleado)
     {
-        $data = $request->validate($this->rules($empleado->id));
+        $userByEmail = null;
+        if ($request->email) {
+            $userByEmail = User::where('email', $request->email)->first();
+        }
+
+        $existingId = $empleado->id;
+        if ($userByEmail && $userByEmail->id !== $empleado->id) {
+            // Re-link contracts to userByEmail
+            \App\Models\Contrato::where('empleado_id', $empleado->id)
+                ->update(['empleado_id' => $userByEmail->id]);
+
+            // Delete the duplicate $empleado
+            $empleado->delete();
+            
+            $empleado = $userByEmail;
+            $existingId = $userByEmail->id;
+        }
+
+        $data = $request->validate($this->rules($existingId));
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);

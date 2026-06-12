@@ -29,4 +29,26 @@ api.interceptors.request.use(async config => {
   return config
 })
 
+// Maneja errores globales de autenticación
+api.interceptors.response.use(
+  response => response,
+  async error => {
+    const status = error?.response?.status
+    // 419 = CSRF token mismatch → refrescar token y reintentar una vez
+    if (status === 419 && !error.config._csrfRetried) {
+      error.config._csrfRetried = true
+      await axios.get('/sanctum/csrf-cookie', { withCredentials: true })
+      const token = getCsrfToken()
+      if (token) error.config.headers['X-XSRF-TOKEN'] = token
+      return axios(error.config)
+    }
+    // 401 = sesión expirada → redirigir al login (solo si no estamos ya en login)
+    if (status === 401 && window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
 export default api
+

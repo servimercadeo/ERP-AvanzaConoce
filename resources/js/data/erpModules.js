@@ -179,6 +179,15 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'dotacion',
+        label: 'Dotación',
+        icon: 'dotacion',
+        desc: 'Control de dotación de uniformes por empleado: tallas, cantidades, actas y renovaciones',
+        archivos: [
+          { id: 'dotacion_file', label: 'Inventario de Dotación' },
+        ]
+      },
+      {
         id: 'consultas',
         label: 'Consultas',
         icon: 'consultas',

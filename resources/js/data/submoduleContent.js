@@ -127,6 +127,22 @@ export const SUBMODULE_CONTENT = {
       ['OC-2026-042', 'Muebles Express', '$3.500.000', '22-04-2026', 'Compras', 'Pendiente'],
     ]
   },
+  dotacion: {
+    stats: [
+      { num: '992',  label: 'Empleados con dotación' },
+      { num: '0',    label: 'Actas por firmar' },
+      { num: '4',    label: 'Artículos por empleado' },
+      { num: '100%', label: 'Proyecto TIGO Express' },
+    ],
+    desc: 'Gestión completa de dotación de uniformes por empleado: polos, jeans, chaquetas, tenis, tallas, cantidades, actas y renovaciones.',
+    features: ['Inventario por empleado', 'Control de tallas y cantidades', 'Registro de actas firmadas', 'Historial de renovaciones', 'Filtros por sede y proyecto', 'Exportar reporte'],
+    cols: ['Empleado', 'Sede', 'Proyecto', 'Estado Acta', 'Pedido Inicial', 'Renovaciones'],
+    rows: [
+      ['Juan Pérez', 'Bogotá', 'TIGO Express', 'Firmada', 'PED-001', '2'],
+      ['María López', 'Medellín', 'TIGO Express', 'Pendiente firma', 'PED-002', '1'],
+      ['Carlos Ruiz', 'Cali', 'TIGO Express', 'Firmada', 'PED-003', '3'],
+    ]
+  },
   inventario: {
     stats: [
       { num: '1.240', label: 'Ítems en stock' },

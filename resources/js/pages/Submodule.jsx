@@ -12,6 +12,7 @@ import CandidatosCrud from './CandidatosCrud';
 import BaseIngresoCrud from './BaseIngresoCrud';
 import AvalesContratacionCrud from './AvalesContratacionCrud';
 import RespuestasFormularioCrud from './RespuestasFormularioCrud';
+import DotacionesCrud from './DotacionesCrud';
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -80,6 +81,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── INVENTARIOS ────────────────────────────────────── */
     case 'inventarios':
       switch (submoduleId) {
+        case 'dotacion':
+          switch (archivoId) {
+            case 'dotacion_file': return DotacionesCrud;
+            default: return null;
+          }
         case 'productos':
           switch (archivoId) {
             // case 'productos_file':         return ProductosCrud;

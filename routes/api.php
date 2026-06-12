@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
+use App\Http\Controllers\Api\DotacionController;
 use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\RequisicionController;
@@ -205,6 +206,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
+
+    // CRUD de dotación del módulo de inventarios
+    Route::get('dotaciones/options', [DotacionController::class, 'options']);
+    Route::apiResource('dotaciones', DotacionController::class);
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
@@ -510,4 +515,3 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
 
     return response()->json(['message' => 'Información registrada con éxito.'], 201);
 });
-
