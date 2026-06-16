@@ -3,9 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BaseIngreso;
+use App\Models\Candidato;
 use App\Models\Contrato;
+use App\Models\RespuestaIngreso;
+use App\Models\Sede;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ContratoController extends Controller
 {
@@ -96,7 +103,7 @@ class ContratoController extends Controller
             'anexos'                  => 'nullable|array',
         ]);
 
-        return DB::transaction(function() use ($data) {
+        $contrato = DB::transaction(function() use ($data) {
             $data['completado'] = ($data['estado_contrato'] ?? 'Activo') !== 'Cancelado';
 
             $contrato = Contrato::create($data);
@@ -113,8 +120,82 @@ class ContratoController extends Controller
                 }
             }
 
-            return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
+            return $contrato;
         });
+
+        // Fuera de la transacción: si el flujo de SharePoint falla, el contrato ya quedó creado.
+        $this->notificarSharepoint($contrato);
+
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
+    }
+
+    /**
+     * Envía los datos del contrato recién creado al flujo de Power Automate
+     * que genera el documento de la hoja de vida en SharePoint.
+     */
+    private function notificarSharepoint(Contrato $contrato): void
+    {
+        $flowUrl = config('services.sharepoint.contrato_flow_url');
+        if (!$flowUrl) {
+            return;
+        }
+
+        $contrato->loadMissing('empleado');
+        $user = $contrato->empleado;
+        if (!$user || !$user->cedula) {
+            return;
+        }
+
+        $respuesta = RespuestaIngreso::where('documento', $user->cedula)->first();
+        $candidato = Candidato::with('ciudad')->where('identificacion', $user->cedula)->first();
+        $ingreso = BaseIngreso::where('documento_identificacion', $user->cedula)->first();
+
+        $jefeEmail = null;
+        if ($contrato->sede) {
+            $jefeEmail = Sede::where('nombre', $contrato->sede)->first()?->jefe?->email;
+        }
+
+        $fecIniContrato = $contrato->fecha_ingreso
+            ? mb_strtoupper(Carbon::parse($contrato->fecha_ingreso)->locale('es')->translatedFormat('d \d\e F \d\e Y'), 'UTF-8')
+            : '';
+
+        $payload = [
+            'nombres'             => $user->nombres ?? $respuesta?->nombres ?? '',
+            'apellidos'           => $user->apellidos ?? $respuesta?->apellidos ?? '',
+            'documento'           => $user->cedula,
+            'celular'             => $user->movil ?? $respuesta?->celular ?? $candidato?->celular ?? $ingreso?->telefono ?? '',
+            'correo'              => $user->email ?? $respuesta?->correo ?? $candidato?->correo ?? $ingreso?->correo ?? '',
+            'ciudad'              => $respuesta?->ciudad ?? $ingreso?->ciudad ?? $candidato?->ciudad?->nombre ?? '',
+            'direccion'           => $respuesta?->direccion ?? $user->direccion_residencia ?? '',
+            'fecha_nacimiento'    => $this->formatFecha($user->fecha_nacimiento ?? $respuesta?->fecha_nacimiento),
+            'fecha_expedicion'    => $this->formatFecha($candidato?->fecha_expedicion),
+            'lugar_expedicion'    => '', // No existe en ninguna tabla del sistema actualmente.
+            'grupo_rh'            => $user->rh ?? $respuesta?->rh ?? '',
+            'contacto_emergencia' => $user->contacto_emergencia_nombre ?? $respuesta?->emergencia_nombre ?? '',
+            'parentesco'          => $user->contacto_emergencia_parentesco ?? $respuesta?->emergencia_parentesco ?? '',
+            'nro_contacto'        => $user->contacto_emergencia_telefono ?? $respuesta?->emergencia_telefono ?? '',
+            'fec_ini_contrato'    => $fecIniContrato,
+            't_camisa'            => $respuesta?->talla_camisa ?? '',
+            't_pantalon'          => $respuesta?->talla_pantalon ?? '',
+            't_zapatos'           => $respuesta?->talla_zapatos ?? '',
+            'CorreoSuper'         => $jefeEmail ?? '',
+            'Departamento'        => $contrato->area_empresa ?? '',
+        ];
+
+        try {
+            Http::timeout(15)->post($flowUrl, $payload);
+        } catch (\Exception $e) {
+            Log::warning('No se pudo notificar a SharePoint la creación del contrato ' . $contrato->id . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Normaliza a 'Y-m-d' un valor de fecha que puede venir como string plano
+     * (columnas sin cast, ej. RespuestaIngreso) o como instancia Carbon (columnas con cast).
+     */
+    private function formatFecha(mixed $value): string
+    {
+        return $value ? Carbon::parse($value)->format('Y-m-d') : '';
     }
 
     public function show(Contrato $contrato)

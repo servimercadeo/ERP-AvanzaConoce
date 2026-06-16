@@ -41,6 +41,7 @@ return [
 
     'sharepoint' => [
         'delete_flow_url' => env('SHAREPOINT_DELETE_FLOW_URL'),
+        'contrato_flow_url' => env('SHAREPOINT_CONTRATO_FLOW_URL'),
     ],
 
 ];

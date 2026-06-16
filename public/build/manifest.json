@@ -1,44 +1,44 @@
 {
-  "_Layout-B6aPynm-.js": {
-    "file": "assets/Layout-B6aPynm-.js",
+  "_Layout-B6DwKDev.js": {
+    "file": "assets/Layout-B6DwKDev.js",
     "name": "Layout",
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
+      "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_vendor-router-CbT8WECF.js"
+      "_vendor-router-ChHqiHGy.js"
     ]
   },
-  "_SearchableSelect-_mWYlEHe.js": {
-    "file": "assets/SearchableSelect-_mWYlEHe.js",
+  "_SearchableSelect-0BjvoiIm.js": {
+    "file": "assets/SearchableSelect-0BjvoiIm.js",
     "name": "SearchableSelect",
     "imports": [
-      "_vendor-query-fzP4zlX8.js"
+      "_vendor-query-qy_ppomC.js"
     ]
   },
-  "_useDebounce-CUKvOqZq.js": {
-    "file": "assets/useDebounce-CUKvOqZq.js",
+  "_useDebounce-B89BvJx0.js": {
+    "file": "assets/useDebounce-B89BvJx0.js",
     "name": "useDebounce",
     "imports": [
-      "_vendor-query-fzP4zlX8.js"
+      "_vendor-query-qy_ppomC.js"
     ]
   },
-  "_vendor-query-fzP4zlX8.js": {
-    "file": "assets/vendor-query-fzP4zlX8.js",
+  "_vendor-query-qy_ppomC.js": {
+    "file": "assets/vendor-query-qy_ppomC.js",
     "name": "vendor-query"
   },
   "_vendor-react-l0sNRNKZ.js": {
     "file": "assets/vendor-react-l0sNRNKZ.js",
     "name": "vendor-react"
   },
-  "_vendor-router-CbT8WECF.js": {
-    "file": "assets/vendor-router-CbT8WECF.js",
+  "_vendor-router-ChHqiHGy.js": {
+    "file": "assets/vendor-router-ChHqiHGy.js",
     "name": "vendor-router",
     "imports": [
-      "_vendor-query-fzP4zlX8.js"
+      "_vendor-query-qy_ppomC.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-DckW4f9s.css",
+    "file": "assets/app-D1xSTSQg.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -47,13 +47,13 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-DmxKxz7z.js",
+    "file": "assets/app-C1LB3o_V.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_vendor-router-CbT8WECF.js"
+      "_vendor-query-qy_ppomC.js",
+      "_vendor-router-ChHqiHGy.js"
     ],
     "dynamicImports": [
       "resources/js/pages/Login.jsx",
@@ -66,99 +66,99 @@
     ],
     "css": [
       "assets/app-6yzDHbIg.css",
-      "assets/app-DckW4f9s.css"
+      "assets/app-D1xSTSQg.css"
     ]
   },
   "resources/js/forms/CargaDocumentosForm.jsx": {
-    "file": "assets/CargaDocumentosForm-BCSZep4x.js",
+    "file": "assets/CargaDocumentosForm-j4iUqqcx.js",
     "name": "CargaDocumentosForm",
     "src": "resources/js/forms/CargaDocumentosForm.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js"
+      "_vendor-query-qy_ppomC.js"
     ]
   },
   "resources/js/forms/RegistroCandidatosForm.jsx": {
-    "file": "assets/RegistroCandidatosForm-BbsbbvYD.js",
+    "file": "assets/RegistroCandidatosForm-Dsp5XzBK.js",
     "name": "RegistroCandidatosForm",
     "src": "resources/js/forms/RegistroCandidatosForm.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_SearchableSelect-_mWYlEHe.js"
+      "_vendor-query-qy_ppomC.js",
+      "_SearchableSelect-0BjvoiIm.js"
     ]
   },
   "resources/js/forms/RegistroNuevosIngresosForm.jsx": {
-    "file": "assets/RegistroNuevosIngresosForm-B18giyDP.js",
+    "file": "assets/RegistroNuevosIngresosForm-RgMRA2PD.js",
     "name": "RegistroNuevosIngresosForm",
     "src": "resources/js/forms/RegistroNuevosIngresosForm.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_SearchableSelect-_mWYlEHe.js"
+      "_vendor-query-qy_ppomC.js",
+      "_SearchableSelect-0BjvoiIm.js"
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-1SNh6Gef.js",
+    "file": "assets/Dashboard-DFqZtb_g.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_Layout-B6aPynm-.js",
-      "_vendor-router-CbT8WECF.js",
+      "_vendor-query-qy_ppomC.js",
+      "_Layout-B6DwKDev.js",
+      "_vendor-router-ChHqiHGy.js",
       "resources/js/app.jsx"
     ],
     "css": [
-      "assets/app-DckW4f9s.css"
+      "assets/app-D1xSTSQg.css"
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-CmPc740v.js",
+    "file": "assets/Login-71ApzIML.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
+      "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_vendor-router-CbT8WECF.js"
+      "_vendor-router-ChHqiHGy.js"
     ],
     "css": [
-      "assets/app-DckW4f9s.css"
+      "assets/app-D1xSTSQg.css"
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-Cdrh8YwO.js",
+    "file": "assets/Module-ZcvM1vOR.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_Layout-B6aPynm-.js",
-      "_useDebounce-CUKvOqZq.js",
-      "_SearchableSelect-_mWYlEHe.js",
+      "_vendor-query-qy_ppomC.js",
+      "_Layout-B6DwKDev.js",
+      "_useDebounce-B89BvJx0.js",
+      "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
-      "_vendor-router-CbT8WECF.js"
+      "_vendor-router-ChHqiHGy.js"
     ],
     "css": [
-      "assets/app-DckW4f9s.css"
+      "assets/app-D1xSTSQg.css"
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-CQSVJTCR.js",
+    "file": "assets/Submodule-eEckLiVN.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
-      "_vendor-query-fzP4zlX8.js",
-      "_Layout-B6aPynm-.js",
+      "_vendor-query-qy_ppomC.js",
+      "_Layout-B6DwKDev.js",
       "resources/js/app.jsx",
-      "_useDebounce-CUKvOqZq.js",
-      "_SearchableSelect-_mWYlEHe.js",
-      "_vendor-router-CbT8WECF.js"
+      "_useDebounce-B89BvJx0.js",
+      "_SearchableSelect-0BjvoiIm.js",
+      "_vendor-router-ChHqiHGy.js"
     ],
     "css": [
-      "assets/app-DckW4f9s.css"
+      "assets/app-D1xSTSQg.css"
     ]
   }
 }
