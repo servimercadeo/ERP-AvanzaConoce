@@ -9,118 +9,270 @@ class DotacionesSeeder extends Seeder
 {
     public function run(): void
     {
-        $csvPath = database_path('seeders/data/dotaciones_tigo.csv');
+        DB::table('dotaciones')->truncate();
 
-        if (!file_exists($csvPath)) {
-            $this->command->error("CSV no encontrado en: {$csvPath}");
-            return;
-        }
-
-        $handle = fopen($csvPath, 'r');
-        $headers = fgetcsv($handle);
-        $batch = [];
-        $count = 0;
         $now = now();
 
-        $nullableDate = function ($value) {
-            $v = trim((string) $value);
-            if ($v === '') return null;
-            // Intentar parsear formatos comunes: Y-m-d, d/m/Y, m/d/Y
-            foreach (['Y-m-d', 'd/m/Y', 'm/d/Y', 'd-m-Y'] as $fmt) {
-                $d = \DateTime::createFromFormat($fmt, $v);
-                if ($d && $d->format($fmt) === $v) {
-                    return $d->format('Y-m-d');
-                }
-            }
-            // strtotime como fallback (maneja "2024-01-15", "01/15/2024", etc.)
-            $ts = strtotime($v);
-            if ($ts !== false && $ts > 0) {
-                return date('Y-m-d', $ts);
-            }
-            return null; // valor no parseable → null
-        };
-        $nullableInt = fn($value) => is_numeric($value) ? (int) $value : null;
-        $maxLen = [
-            'sede' => 180, 'cedula' => 30, 'nombres' => 150, 'apellidos' => 150,
-            'cargo' => 150, 'tipo_contrato' => 80, 'proceso' => 80,
-            'estado_contrato' => 80, 'empleador' => 150, 'proyecto' => 120,
-            'genero' => 30, 'ciudad' => 120,
-            'polo_masculino_talla' => 20, 'polo_femenino_talla' => 20,
-            'jean_masculino_talla' => 20, 'jean_femenino_talla' => 20,
-            'chaqueta_masculino_talla' => 20, 'chaqueta_femenino_talla' => 20,
-            'tenis_masculino_talla' => 20, 'tenis_femenino_talla' => 20,
-            'estado_acta' => 40, 'actas_sept' => 40,
-            'pedido_inicial' => 50,
-            'pedido_renovacion_1' => 50, 'fecha_renovacion_1' => 80,
-            'pedido_renovacion_2' => 50, 'fecha_renovacion_2' => 80,
-            'pedido_renovacion_3' => 50, 'fecha_renovacion_3' => 80,
-            'pedido_renovacion_4' => 50, 'fecha_renovacion_4' => 80,
-            'pedido_renovacion_5' => 50, 'fecha_renovacion_5' => 80,
+        $records = [
+            [
+                'sede' => 'Bogotá Centro',
+                'cedula' => '10234567',
+                'nombres' => 'Carlos Andrés',
+                'apellidos' => 'Martínez Gómez',
+                'cargo' => 'Técnico de Campo',
+                'tipo_contrato' => 'Indefinido',
+                'proceso' => 'Operaciones',
+                'fecha_ingreso' => '2022-03-15',
+                'estado_contrato' => 'Activo',
+                'empleador' => 'AvanzaConoce SAS',
+                'proyecto' => 'Tigo Red',
+                'genero' => 'M',
+                'ciudad' => 'Bogotá',
+                'polo_masculino_talla' => 'M',
+                'polo_masculino_cantidad' => 2,
+                'polo_femenino_talla' => null,
+                'polo_femenino_cantidad' => null,
+                'jean_masculino_talla' => '32',
+                'jean_masculino_cantidad' => 2,
+                'jean_femenino_talla' => null,
+                'jean_femenino_cantidad' => null,
+                'chaqueta_masculino_talla' => 'M',
+                'chaqueta_masculino_cantidad' => 1,
+                'chaqueta_femenino_talla' => null,
+                'chaqueta_femenino_cantidad' => null,
+                'tenis_masculino_talla' => '42',
+                'tenis_masculino_cantidad' => 1,
+                'tenis_femenino_talla' => null,
+                'tenis_femenino_cantidad' => null,
+                'estado_acta' => 'Firmada',
+                'actas_sept' => 'Firmada',
+                'fecha_segunda_renovacion_2025' => null,
+                'fecha_primera_renovacion_2024' => '2024-03-15',
+                'fecha_segunda_renovacion_2024' => '2024-09-15',
+                'fecha_tercera_renovacion_2024' => null,
+                'fecha_primera_renovacion_2025' => '2025-03-15',
+                'pedido_inicial' => 'PED-2022-001',
+                'fecha_inicial' => '2022-03-20',
+                'pedido_renovacion_1' => 'PED-2024-001',
+                'fecha_renovacion_1' => '2024-03-20',
+                'pedido_renovacion_2' => 'PED-2024-002',
+                'fecha_renovacion_2' => '2024-09-20',
+                'pedido_renovacion_3' => null,
+                'fecha_renovacion_3' => null,
+                'pedido_renovacion_4' => null,
+                'fecha_renovacion_4' => null,
+                'pedido_renovacion_5' => null,
+                'fecha_renovacion_5' => null,
+            ],
+            [
+                'sede' => 'Medellín Norte',
+                'cedula' => '43876543',
+                'nombres' => 'Laura Sofía',
+                'apellidos' => 'Restrepo López',
+                'cargo' => 'Supervisora',
+                'tipo_contrato' => 'Fijo',
+                'proceso' => 'Supervisión',
+                'fecha_ingreso' => '2021-07-01',
+                'estado_contrato' => 'Activo',
+                'empleador' => 'AvanzaConoce SAS',
+                'proyecto' => 'Tigo Red',
+                'genero' => 'F',
+                'ciudad' => 'Medellín',
+                'polo_masculino_talla' => null,
+                'polo_masculino_cantidad' => null,
+                'polo_femenino_talla' => 'S',
+                'polo_femenino_cantidad' => 2,
+                'jean_masculino_talla' => null,
+                'jean_masculino_cantidad' => null,
+                'jean_femenino_talla' => '28',
+                'jean_femenino_cantidad' => 2,
+                'chaqueta_masculino_talla' => null,
+                'chaqueta_masculino_cantidad' => null,
+                'chaqueta_femenino_talla' => 'S',
+                'chaqueta_femenino_cantidad' => 1,
+                'tenis_masculino_talla' => null,
+                'tenis_masculino_cantidad' => null,
+                'tenis_femenino_talla' => '37',
+                'tenis_femenino_cantidad' => 1,
+                'estado_acta' => 'Firmada',
+                'actas_sept' => 'Pendiente',
+                'fecha_segunda_renovacion_2025' => '2025-07-01',
+                'fecha_primera_renovacion_2024' => '2024-01-01',
+                'fecha_segunda_renovacion_2024' => '2024-07-01',
+                'fecha_tercera_renovacion_2024' => null,
+                'fecha_primera_renovacion_2025' => '2025-01-01',
+                'pedido_inicial' => 'PED-2021-002',
+                'fecha_inicial' => '2021-07-05',
+                'pedido_renovacion_1' => 'PED-2024-003',
+                'fecha_renovacion_1' => '2024-01-08',
+                'pedido_renovacion_2' => 'PED-2024-004',
+                'fecha_renovacion_2' => '2024-07-08',
+                'pedido_renovacion_3' => 'PED-2025-001',
+                'fecha_renovacion_3' => '2025-01-08',
+                'pedido_renovacion_4' => null,
+                'fecha_renovacion_4' => null,
+                'pedido_renovacion_5' => null,
+                'fecha_renovacion_5' => null,
+            ],
+            [
+                'sede' => 'Cali Sur',
+                'cedula' => '76543210',
+                'nombres' => 'Juan Pablo',
+                'apellidos' => 'Torres Vargas',
+                'cargo' => 'Instalador',
+                'tipo_contrato' => 'Indefinido',
+                'proceso' => 'Instalaciones',
+                'fecha_ingreso' => '2023-01-10',
+                'estado_contrato' => 'Activo',
+                'empleador' => 'AvanzaConoce SAS',
+                'proyecto' => 'Fibra Óptica',
+                'genero' => 'M',
+                'ciudad' => 'Cali',
+                'polo_masculino_talla' => 'L',
+                'polo_masculino_cantidad' => 2,
+                'polo_femenino_talla' => null,
+                'polo_femenino_cantidad' => null,
+                'jean_masculino_talla' => '34',
+                'jean_masculino_cantidad' => 2,
+                'jean_femenino_talla' => null,
+                'jean_femenino_cantidad' => null,
+                'chaqueta_masculino_talla' => 'L',
+                'chaqueta_masculino_cantidad' => 1,
+                'chaqueta_femenino_talla' => null,
+                'chaqueta_femenino_cantidad' => null,
+                'tenis_masculino_talla' => '44',
+                'tenis_masculino_cantidad' => 1,
+                'tenis_femenino_talla' => null,
+                'tenis_femenino_cantidad' => null,
+                'estado_acta' => 'Pendiente',
+                'actas_sept' => null,
+                'fecha_segunda_renovacion_2025' => null,
+                'fecha_primera_renovacion_2024' => null,
+                'fecha_segunda_renovacion_2024' => null,
+                'fecha_tercera_renovacion_2024' => null,
+                'fecha_primera_renovacion_2025' => '2025-01-10',
+                'pedido_inicial' => 'PED-2023-005',
+                'fecha_inicial' => '2023-01-15',
+                'pedido_renovacion_1' => 'PED-2025-002',
+                'fecha_renovacion_1' => '2025-01-15',
+                'pedido_renovacion_2' => null,
+                'fecha_renovacion_2' => null,
+                'pedido_renovacion_3' => null,
+                'fecha_renovacion_3' => null,
+                'pedido_renovacion_4' => null,
+                'fecha_renovacion_4' => null,
+                'pedido_renovacion_5' => null,
+                'fecha_renovacion_5' => null,
+            ],
+            [
+                'sede' => 'Barranquilla Centro',
+                'cedula' => '22334455',
+                'nombres' => 'María Fernanda',
+                'apellidos' => 'Díaz Herrera',
+                'cargo' => 'Coordinadora',
+                'tipo_contrato' => 'Indefinido',
+                'proceso' => 'Coordinación',
+                'fecha_ingreso' => '2020-05-20',
+                'estado_contrato' => 'Inactivo',
+                'empleador' => 'AvanzaConoce SAS',
+                'proyecto' => 'Tigo Red',
+                'genero' => 'F',
+                'ciudad' => 'Barranquilla',
+                'polo_masculino_talla' => null,
+                'polo_masculino_cantidad' => null,
+                'polo_femenino_talla' => 'M',
+                'polo_femenino_cantidad' => 2,
+                'jean_masculino_talla' => null,
+                'jean_masculino_cantidad' => null,
+                'jean_femenino_talla' => '30',
+                'jean_femenino_cantidad' => 2,
+                'chaqueta_masculino_talla' => null,
+                'chaqueta_masculino_cantidad' => null,
+                'chaqueta_femenino_talla' => 'M',
+                'chaqueta_femenino_cantidad' => 1,
+                'tenis_masculino_talla' => null,
+                'tenis_masculino_cantidad' => null,
+                'tenis_femenino_talla' => '38',
+                'tenis_femenino_cantidad' => 1,
+                'estado_acta' => 'Firmada',
+                'actas_sept' => 'Firmada',
+                'fecha_segunda_renovacion_2025' => null,
+                'fecha_primera_renovacion_2024' => '2024-05-20',
+                'fecha_segunda_renovacion_2024' => null,
+                'fecha_tercera_renovacion_2024' => null,
+                'fecha_primera_renovacion_2025' => null,
+                'pedido_inicial' => 'PED-2020-001',
+                'fecha_inicial' => '2020-05-25',
+                'pedido_renovacion_1' => 'PED-2024-005',
+                'fecha_renovacion_1' => '2024-05-25',
+                'pedido_renovacion_2' => null,
+                'fecha_renovacion_2' => null,
+                'pedido_renovacion_3' => null,
+                'fecha_renovacion_3' => null,
+                'pedido_renovacion_4' => null,
+                'fecha_renovacion_4' => null,
+                'pedido_renovacion_5' => null,
+                'fecha_renovacion_5' => null,
+            ],
+            [
+                'sede' => 'Bogotá Sur',
+                'cedula' => '55667788',
+                'nombres' => 'Andrés Felipe',
+                'apellidos' => 'Sánchez Mora',
+                'cargo' => 'Técnico de Red',
+                'tipo_contrato' => 'Fijo',
+                'proceso' => 'Mantenimiento',
+                'fecha_ingreso' => '2024-02-01',
+                'estado_contrato' => 'Activo',
+                'empleador' => 'AvanzaConoce SAS',
+                'proyecto' => 'Expansión 5G',
+                'genero' => 'M',
+                'ciudad' => 'Bogotá',
+                'polo_masculino_talla' => 'XL',
+                'polo_masculino_cantidad' => 2,
+                'polo_femenino_talla' => null,
+                'polo_femenino_cantidad' => null,
+                'jean_masculino_talla' => '36',
+                'jean_masculino_cantidad' => 2,
+                'jean_femenino_talla' => null,
+                'jean_femenino_cantidad' => null,
+                'chaqueta_masculino_talla' => 'XL',
+                'chaqueta_masculino_cantidad' => 1,
+                'chaqueta_femenino_talla' => null,
+                'chaqueta_femenino_cantidad' => null,
+                'tenis_masculino_talla' => '43',
+                'tenis_masculino_cantidad' => 1,
+                'tenis_femenino_talla' => null,
+                'tenis_femenino_cantidad' => null,
+                'estado_acta' => 'Pendiente',
+                'actas_sept' => null,
+                'fecha_segunda_renovacion_2025' => null,
+                'fecha_primera_renovacion_2024' => null,
+                'fecha_segunda_renovacion_2024' => null,
+                'fecha_tercera_renovacion_2024' => null,
+                'fecha_primera_renovacion_2025' => '2025-02-01',
+                'pedido_inicial' => 'PED-2024-010',
+                'fecha_inicial' => '2024-02-05',
+                'pedido_renovacion_1' => null,
+                'fecha_renovacion_1' => null,
+                'pedido_renovacion_2' => null,
+                'fecha_renovacion_2' => null,
+                'pedido_renovacion_3' => null,
+                'fecha_renovacion_3' => null,
+                'pedido_renovacion_4' => null,
+                'fecha_renovacion_4' => null,
+                'pedido_renovacion_5' => null,
+                'fecha_renovacion_5' => null,
+            ],
         ];
 
-        $nullableString = function ($value, $column = null) use ($maxLen) {
-            $v = trim((string) $value);
-            if ($v === '') return null;
-            if ($column && isset($maxLen[$column])) {
-                $v = mb_substr($v, 0, $maxLen[$column]);
-            }
-            return $v;
-        };
-
-        $dateColumns = [
-            'fecha_ingreso',
-            'fecha_segunda_renovacion_2025',
-            'fecha_primera_renovacion_2024',
-            'fecha_segunda_renovacion_2024',
-            'fecha_tercera_renovacion_2024',
-            'fecha_primera_renovacion_2025',
-            'fecha_inicial',
-        ];
-
-        $intColumns = [
-            'polo_masculino_cantidad',
-            'polo_femenino_cantidad',
-            'jean_masculino_cantidad',
-            'jean_femenino_cantidad',
-            'chaqueta_masculino_cantidad',
-            'chaqueta_femenino_cantidad',
-            'tenis_masculino_cantidad',
-            'tenis_femenino_cantidad',
-        ];
-
-        while (($row = fgetcsv($handle)) !== false) {
-            if (count(array_filter($row, fn($value) => trim((string) $value) !== '')) === 0) {
-                continue;
-            }
-
-            $record = array_combine($headers, $row);
-            foreach ($record as $key => $value) {
-                if (in_array($key, $dateColumns, true)) {
-                    $record[$key] = $nullableDate($value);
-                } elseif (in_array($key, $intColumns, true)) {
-                    $record[$key] = $nullableInt($value);
-                } else {
-                    $record[$key] = $nullableString($value, $key);
-                }
-            }
-
+        foreach ($records as &$record) {
             $record['created_at'] = $now;
             $record['updated_at'] = $now;
-            $batch[] = $record;
-            $count++;
-
-            if (count($batch) >= 200) {
-                DB::table('dotaciones')->insert($batch);
-                $batch = [];
-            }
         }
 
-        if (!empty($batch)) {
-            DB::table('dotaciones')->insert($batch);
-        }
+        DB::table('dotaciones')->insert($records);
 
-        fclose($handle);
-
-        $this->command->info("✓ {$count} registros de dotación importados desde Inventario de Tigo.xlsx");
+        $this->command->info('✓ ' . count($records) . ' registros de dotación insertados.');
     }
 }
