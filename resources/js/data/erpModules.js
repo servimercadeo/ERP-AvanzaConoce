@@ -65,21 +65,13 @@ export const ERP_MODULES = [
         icon: 'admin_contratos',
         desc: 'Gestión de contratos',
         archivos: [
+          { id: 'avales_contratacion', label: 'Avales de Contratación' },
+          { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
           { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           { id: 'empleadores', label: 'Empleadores' },
           { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
           { id: 'importar_contratos_activos', label: 'Importar Contratos Laborales Activos' }
-        ]
-      },
-      {
-        id: 'requisicion_personal',
-        label: 'Requisición de Personal',
-        icon: 'requisicion_personal',
-        desc: 'Gestión de requisiciones',
-        archivos: [
-          { id: 'ver_crear_requisiciones', label: 'Ver y Crear Requisiciones' },
-          { id: 'atencion_requisiciones', label: 'Atención de Requisiciones' }
         ]
       },
       {
@@ -101,17 +93,6 @@ export const ERP_MODULES = [
           { id: 'importar_wo_pagas_directiv', label: 'Importar Work Order Pagas por Directiv' },
           { id: 'envio_contratos', label: 'Envió de Contratos' },
           { id: 'sol_modificacion_envio_contrato', label: 'Sol. de Modificación Envió Contrato por Aprobar' }
-        ]
-      },
-      {
-        id: 'solicitud_dias',
-        label: 'Solicitud de Dias',
-        icon: 'solicitud_dias',
-        desc: 'Gestión de solicitudes',
-        archivos: [
-          { id: 'ver_crear_solicitudes', label: 'Ver y Crear Solicitudes' },
-          { id: 'solicitudes_por_aprobar', label: 'Solicitudes por Aprobar' },
-          { id: 'ver_calendario_ausentismos', label: 'Ver Calendario de Ausentismos' }
         ]
       },
       {
@@ -195,6 +176,17 @@ export const ERP_MODULES = [
         desc: 'Gestión de salidas',
         archivos: [
           { id: 'salidas_inventario', label: 'Salidas de Inventario' }
+        ]
+      },
+      {
+        id: 'dotacion',
+        label: 'Dotación',
+        icon: 'dotacion',
+        desc: 'Control de dotación de uniformes por empleado: tallas, cantidades, actas y renovaciones',
+        archivos: [
+          { id: 'productos_dotacion', label: 'Inventario de dotación' },
+          { id: 'pedidos_automaticos', label: 'Pedidos Automáticos' },
+          { id: 'pedidos_global_dotacion', label: 'Pedidos Global' },
         ]
       },
       {

@@ -14,9 +14,19 @@ export default defineConfig({
     ],
     server: {
         port: 5173,
-        hmr: { host: 'localhost' },
         watch: {
             ignored: ['**/storage/framework/views/**'],
+        },
+    },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-react': ['react', 'react-dom'],
+                    'vendor-router': ['react-router-dom'],
+                    'vendor-query': ['@tanstack/react-query'],
+                },
+            },
         },
     },
 });

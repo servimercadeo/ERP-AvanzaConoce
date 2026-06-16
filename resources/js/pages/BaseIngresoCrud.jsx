@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
-import { SearchableSelect } from '../components/SearchableSelect';
+import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
 
 const EMPTY_FORM = {
@@ -14,7 +16,7 @@ const EMPTY_FORM = {
   proyecto: '',
   telefono: '',
   correo: '',
-  tipo_ingreso: '',
+  tipo_vinculacion: '',
   lugar_trabajo: '',
   lider_inmediato: '',
   empleador: '',
@@ -30,8 +32,15 @@ const EMPTY_FORM = {
   estado: '',
 };
 
-const ESTADOS = ['en proceso', 'activa', 'finalizada', 'cancelada'];
-const TIPOS_INGRESO = ['Nuevo', 'Reemplazo'];
+const ESTADOS = ['activa', 'en proceso', 'finalizada', 'cancelada'];
+const TIPOS_VINCULACION = ['Directa', 'Indirecta'];
+const ESTADO_FILTERS = [
+  { value: 'Todos', label: 'Todos los estados' },
+  { value: 'en proceso', label: 'En proceso' },
+  { value: 'activa', label: 'Activa' },
+  { value: 'finalizada', label: 'Finalizada' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
 
 function getPaginasBotones(pagina, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -56,31 +65,43 @@ const getEstadoColors = (estado) => {
 export default function BaseIngresoCrud() {
   const [data, setData]           = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [sedes, setSedes]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const [estadoFilter, setEstadoFilter] = useState('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [form, setForm]           = useState(EMPTY_FORM);
   const [pagina, setPagina]       = useState(1);
   const [toast, setToast]         = useState(null);
+  const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
+  const [alertDlg, setAlertDlg]     = useState({ open: false, title: '', msg: '' });
   const POR_PAGINA = 10;
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   };
+  const showAlert   = (title, msg) => setAlertDlg({ open: true, title, msg });
+  const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
+  const handleConfirmOk     = () => { const fn = confirmDlg.onConfirm; setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null }); fn?.(); };
+  const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
+
+  const qc = useQueryClient();
+  const { data: _qBaseIngresos } = useQuery({ queryKey: ['base-ingresos'], queryFn: () => api.get('/base-ingresos').then(r => r.data) });
+  const { data: _qCandidates }   = useQuery({ queryKey: ['candidatos'],    queryFn: () => api.get('/candidatos').then(r => r.data) });
+  const { data: _qSedes }        = useQuery({ queryKey: ['sedes'],         queryFn: () => api.get('/sedes').then(r => r.data) });
 
   useEffect(() => {
-    Promise.all([
-      api.get('/base-ingresos'),
-      api.get('/candidatos'),
-    ])
-      .then(([ing, cand]) => { setData(ing.data); setCandidates(cand.data); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    if (_qBaseIngresos) { setData(_qBaseIngresos); setLoading(false); }
+  }, [_qBaseIngresos]);
+  useEffect(() => { if (_qCandidates) setCandidates(_qCandidates); }, [_qCandidates]);
+  useEffect(() => {
+    if (_qSedes) setSedes((_qSedes?.data ?? _qSedes ?? []).map(s => ({ value: s.nombre, label: s.nombre })));
+  }, [_qSedes]);
 
-  useEffect(() => { setPagina(1); }, [searchTerm]);
+  useEffect(() => { setPagina(1); }, [searchTerm, estadoFilter]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -106,6 +127,7 @@ export default function BaseIngresoCrud() {
     setForm(p => ({
       ...p,
       candidato_id:             c.id,
+      _fecha_exp_doc:           c.fecha_expedicion                     || '',
       documento_identificacion: c.identificacion                        || p.documento_identificacion,
       nombre_completo:          c.nombres                               || p.nombre_completo,
       cargo:                    req.cargo?.nombre                       || p.cargo,
@@ -116,17 +138,32 @@ export default function BaseIngresoCrud() {
       empresa:                  req.empresa?.nombre                    || p.empresa,
       empleador:                req.empleador?.nombre                  || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
-      tipo_ingreso:             (req.tipo_solicitud?.includes('Reemplazo') ? 'Reemplazo' : req.tipo_solicitud?.includes('Nuevo') ? 'Nuevo' : null) || p.tipo_ingreso,
+      tipo_vinculacion:         c.tipo_vinculacion                    || p.tipo_vinculacion,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,
+      lugar_trabajo:            c.lugar_trabajo                      || p.lugar_trabajo,
+      fecha_programacion_ingreso: c.fecha_programacion_ingreso       || p.fecha_programacion_ingreso,
+      fecha_correccion:         c.fecha_correccion                   || p.fecha_correccion,
+      tasa_riesgo_arl:          c.tasa_riesgo_arl                    || p.tasa_riesgo_arl,
+      salario_basico:           c.salario_basico                     || p.salario_basico,
+      auxilio_transporte:       c.auxilio_transporte                 || p.auxilio_transporte,
+      otrosi_variable:          c.otrosi_variable                    || p.otrosi_variable,
+      auxilio_rodamiento:       c.auxilio_rodamiento                 || p.auxilio_rodamiento,
+      auxilio_comunicacion:     c.auxilio_comunicacion               || p.auxilio_comunicacion,
+      auxilio_alimentacion:     c.auxilio_alimentacion               || p.auxilio_alimentacion,
     }));
   };
 
   const handleOpenModal = (mode, row = null) => {
     setModalMode(mode);
     if (row) {
-      setForm({ ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '' });
+      const base = { ...EMPTY_FORM, ...row, candidato_id: row.candidato_id ?? '', _fecha_exp_doc: row.candidato?.fecha_expedicion ?? '' };
+      if (!base.lugar_trabajo && row.candidato_id) {
+        const c = candidates.find(x => String(x.id) === String(row.candidato_id));
+        if (c?.lugar_trabajo) base.lugar_trabajo = c.lugar_trabajo;
+      }
+      setForm(base);
     } else {
-      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10) });
+      setForm({ ...EMPTY_FORM, fecha_programacion_ingreso: new Date().toISOString().slice(0, 10), estado: 'activa' });
     }
     setIsModalOpen(true);
   };
@@ -140,10 +177,12 @@ export default function BaseIngresoCrud() {
       if (modalMode === 'create') {
         const { data: created } = await api.post('/base-ingresos', form);
         setData(prev => [created, ...prev]);
+        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
         showToast('Ingreso registrado exitosamente');
       } else {
         const { data: updated } = await api.put(`/base-ingresos/${form.id}`, form);
         setData(prev => prev.map(r => r.id === form.id ? updated : r));
+        qc.invalidateQueries({ queryKey: ['base-ingresos'] });
         showToast('Ingreso actualizado exitosamente');
       }
       setIsModalOpen(false);
@@ -152,23 +191,56 @@ export default function BaseIngresoCrud() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar este registro de ingreso?')) return;
+  const handleDelete = (id) => {
+    showConfirm(
+      '¿Eliminar registro de ingreso?',
+      'Esta acción eliminará el registro permanentemente y revertirá el estado del candidato asociado.',
+      async () => {
+        try {
+          await api.delete(`/base-ingresos/${id}`);
+          setData(prev => prev.filter(r => r.id !== id));
+          qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+          qc.invalidateQueries({ queryKey: ['candidatos'] });
+          showToast('Registro eliminado');
+        } catch (e) {
+          if (e.response?.status === 404) {
+            setData(prev => prev.filter(r => r.id !== id));
+            qc.invalidateQueries({ queryKey: ['base-ingresos'] });
+            showToast('El registro ya no existía, lista actualizada');
+          } else {
+            showAlert('Error al eliminar', e.response?.data?.message || e.message);
+          }
+        }
+      }
+    );
+  };
+
+  const handleSync = async () => {
+    setLoading(true);
     try {
-      await api.delete(`/base-ingresos/${id}`);
-      setData(prev => prev.filter(r => r.id !== id));
-      showToast('Registro eliminado');
+      const res = await api.post('/base-ingresos/sync');
+      showToast(res.data.message);
+      const [ing, cand] = await Promise.all([
+        api.get('/base-ingresos'),
+        api.get('/candidatos')
+      ]);
+      setData(ing.data);
+      setCandidates(cand.data);
     } catch (e) {
-      alert('Error al eliminar: ' + (e.response?.data?.message || e.message));
+      alert('Error al sincronizar: ' + (e.response?.data?.message || e.message));
+    } finally {
+      setLoading(false);
     }
   };
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const filteredData = data.filter(row =>
-    [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
-      .some(v => String(v ?? '').toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredData = useMemo(() =>
+    data.filter(row =>
+      [row.nombre_completo, row.documento_identificacion, row.cargo, row.empresa, row.estado]
+        .some(v => String(v ?? '').toLowerCase().includes(debouncedSearch.toLowerCase())) &&
+      (estadoFilter === 'Todos' || String(row.estado ?? '').toLowerCase() === estadoFilter.toLowerCase())
+    ), [data, debouncedSearch, estadoFilter]);
 
   const totalPaginas = Math.max(1, Math.ceil(filteredData.length / POR_PAGINA));
   const paginatedData = filteredData.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -183,25 +255,34 @@ export default function BaseIngresoCrud() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: '10px 0' }}>
 
-      {/* Toolbar */}
       <div style={S.toolbar}>
-        <div style={S.searchWrap}>
-          <span style={S.searchIcon}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={S.searchInput}
+        <div style={S.filters}>
+          <div style={S.searchWrap}>
+            <span style={S.searchIcon}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={S.searchInput}
+            />
+          </div>
+          <FilterDropdown
+            label="Estado"
+            value={estadoFilter}
+            onChange={setEstadoFilter}
+            options={ESTADO_FILTERS}
           />
         </div>
-        <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button style={S.btnSecondary} onClick={handleSync}>Actualizar</button>
+          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+        </div>
       </div>
 
-      {/* Tabla */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif', fontSize: '0.9rem' }}>
           Cargando registros…
@@ -257,7 +338,6 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Paginación */}
       {filteredData.length > POR_PAGINA && (
         <div style={S.paginationWrap}>
           <span style={S.pageInfo}>
@@ -275,7 +355,6 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Modal */}
       {isModalOpen && (
         <div style={S.overlay} onClick={() => setIsModalOpen(false)}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
@@ -289,7 +368,6 @@ export default function BaseIngresoCrud() {
 
             <div style={S.modalBody}>
 
-              {/* Selección de candidato — solo en create */}
               {modalMode === 'create' && (
                 <div style={{ marginBottom: 22 }}>
                   <label style={S.sectionLabel}>Seleccionar candidato</label>
@@ -306,7 +384,8 @@ export default function BaseIngresoCrud() {
               <label style={S.sectionLabel}>Datos de identificación</label>
               <div style={{ ...S.grid3, marginBottom: 18 }}>
                 <Field label="Documento de identificación" k="documento_identificacion" req form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Nombre completo" k="nombre_completo" req span={2} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <ReadField label="Fecha exp. documento" value={form._fecha_exp_doc || '—'} />
+                <Field label="Nombre completo" k="nombre_completo" req span={3} form={form} onChange={set} disabled={modalMode === 'view'} />
               </div>
 
               <label style={S.sectionLabel}>Datos laborales</label>
@@ -317,8 +396,18 @@ export default function BaseIngresoCrud() {
                 <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Teléfono" k="telefono" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Tipo de ingreso" k="tipo_ingreso" opts={TIPOS_INGRESO} form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Lugar de trabajo" k="lugar_trabajo" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={TIPOS_VINCULACION} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>Sede</label>
+                  <SearchableSelect
+                    key={`sede-${form.lugar_trabajo ?? ''}`}
+                    value={form.lugar_trabajo ?? ''}
+                    defaultValue=""
+                    options={sedes}
+                    onChange={val => setForm(p => ({ ...p, lugar_trabajo: val }))}
+                    disabled={modalMode === 'view'}
+                  />
+                </div>
                 <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Empleador" k="empleador" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
@@ -355,7 +444,39 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
-      {/* Toast */}
+      {alertDlg.open && (
+        <div style={{ ...S.overlay, zIndex: 6100 }} onClick={() => setAlertDlg({ open: false, title: '', msg: '' })}>
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{alertDlg.title}</span>
+            </div>
+            <div style={{ padding: '22px 28px' }}>
+              <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>{alertDlg.msg}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+              <button style={S.btnPrimaryGreen} onClick={() => setAlertDlg({ open: false, title: '', msg: '' })}>Aceptar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDlg.open && (
+        <div style={{ ...S.overlay, zIndex: 6000 }} onClick={handleConfirmCancel}>
+          <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={S.modalHeader}>
+              <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{confirmDlg.title}</span>
+            </div>
+            <div style={{ padding: '22px 28px' }}>
+              <p style={{ margin: 0, fontSize: '0.93rem', color: 'var(--text)', fontFamily: 'Nunito,sans-serif', lineHeight: 1.6 }}>{confirmDlg.msg}</p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '14px 28px', borderTop: '1.5px solid var(--border)' }}>
+              <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
+              <button style={S.btnPrimaryGreen} onClick={handleConfirmOk}>Aceptar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div style={{
           position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
@@ -372,6 +493,18 @@ export default function BaseIngresoCrud() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+function ReadField({ label, value, span }) {
+  const wrap = { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, ...(span ? { gridColumn: `span ${span}` } : {}) };
+  return (
+    <div style={wrap}>
+      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>{label}</label>
+      <div style={{ padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text-muted)', background: 'var(--bg)', minHeight: 36 }}>
+        {value ?? '—'}
+      </div>
     </div>
   );
 }
@@ -405,6 +538,7 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
 
 const S = {
   toolbar:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' },
+  filters:      { display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap' },
   searchWrap:   { position: 'relative', flex: 1, minWidth: 200, maxWidth: 380 },
   searchIcon:   { position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', pointerEvents: 'none' },
   searchInput:  { width: '100%', padding: '9px 12px 9px 34px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none' },

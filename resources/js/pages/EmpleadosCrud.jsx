@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
     IconEye,
     IconEdit,
-    IconTrash,
+
     IconClose,
     IconEmptySearch,
     IconLoading,
@@ -311,6 +313,164 @@ function Field({
     );
 }
 
+/* ─── Selector de contratado (espejo de CandidatoSelector en Contratos) ── */
+function ContratadoSelector({ onSelect }) {
+    const [query, setQuery]       = useState("");
+    const [open, setOpen]         = useState(false);
+    const [selected, setSelected] = useState(null);
+    const [results, setResults]   = useState([]);
+    const [loading, setLoading]   = useState(false);
+    const wrapRef                 = useRef(null);
+    const hasFocused              = useRef(false);
+    const debouncedQ              = useDebounce(query, 350);
+
+    useEffect(() => {
+        const h = (e) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
+    const loadInitial = () => {
+        setLoading(true);
+        api.get("/empleados/candidatos-listos")
+            .then((r) => { setResults(r.data); setOpen(true); })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    };
+
+    const handleFocus = () => {
+        setOpen(true);
+        if (!hasFocused.current) {
+            hasFocused.current = true;
+            loadInitial();
+        }
+    };
+
+    useEffect(() => {
+        if (!hasFocused.current) return;
+        if (!debouncedQ) { loadInitial(); return; }
+        setLoading(true);
+        api.get("/empleados/candidatos-listos", { params: { search: debouncedQ } })
+            .then((r) => { setResults(r.data); setOpen(true); })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, [debouncedQ]);
+
+    const handlePick = (c) => {
+        setSelected(c);
+        setQuery("");
+        setOpen(false);
+        setResults([]);
+        hasFocused.current = false;
+        onSelect(c);
+    };
+
+    return (
+        <div ref={wrapRef} style={{ width: "100%" }}>
+            {selected ? (
+                <div style={{
+                    display: "flex", alignItems: "center", gap: 14,
+                    background: "#e8f8f5", border: "2px solid var(--primary)",
+                    borderRadius: 10, padding: "14px 18px",
+                }}>
+                    <div style={{
+                        width: 46, height: 46, borderRadius: "50%",
+                        background: "var(--primary)", color: "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
+                    }}>
+                        {(selected.nombres || "?").charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--primary-dark)", fontFamily: "'Poppins',sans-serif" }}>
+                            {selected.nombres} {selected.apellidos}
+                        </div>
+                        <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
+                            CC: {selected.cedula}{selected.cargo ? ` · ${selected.cargo}` : ""}{selected.empresa_nombre ? ` · ${selected.empresa_nombre}` : ""}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => { setSelected(null); onSelect(null); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem", padding: 4 }}
+                        title="Cambiar selección"
+                    >✕</button>
+                </div>
+            ) : (
+                <div style={{ position: "relative" }}>
+                    <input
+                        style={{
+                            ...S.input, fontSize: "1rem", padding: "12px 14px",
+                            border: "2px solid var(--border)", borderRadius: 10,
+                        }}
+                        placeholder="Buscar por nombre o cédula…"
+                        value={query}
+                        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                        onFocus={handleFocus}
+                        autoFocus
+                    />
+                    {loading && (
+                        <div style={{ padding: "8px 14px", fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <IconLoading size={14} /> Buscando…
+                        </div>
+                    )}
+                    {open && results.length > 0 && (
+                        <div style={{
+                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                            background: "var(--white)", border: "1.5px solid var(--border)",
+                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                            zIndex: 3000, maxHeight: 280, overflowY: "auto",
+                        }}>
+                            {results.map((c) => (
+                                <div
+                                    key={c.user_id ?? c.cedula}
+                                    onMouseDown={() => handlePick(c)}
+                                    style={{
+                                        padding: "10px 16px", cursor: "pointer",
+                                        borderBottom: "1px solid var(--border)",
+                                        display: "flex", alignItems: "center", gap: 12,
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = "#f0f9f7"}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = "var(--white)"}
+                                >
+                                    <div style={{
+                                        width: 34, height: 34, borderRadius: "50%",
+                                        background: "var(--primary)", color: "#fff",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
+                                    }}>
+                                        {(c.nombres || "?").charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
+                                            {c.nombres} {c.apellidos}
+                                        </div>
+                                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                            CC {c.cedula}{c.cargo ? ` · ${c.cargo}` : ""}{c.empresa_nombre ? ` · ${c.empresa_nombre}` : ""}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {open && !loading && query && results.length === 0 && (
+                        <div style={{
+                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                            background: "var(--white)", border: "1.5px solid var(--border)",
+                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                            zIndex: 3000, padding: "14px 16px",
+                            color: "var(--text-muted)", fontSize: "0.88rem",
+                        }}>
+                            Sin resultados
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ─── Modal ──────────────────────────────────────────────────────────── */
 function Modal({
     open,
@@ -321,11 +481,14 @@ function Modal({
     empresas,
     catalogs,
     readOnly = false,
+    empleados = [],
+    onSwitchToEdit,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("general");
     const [saving, setSaving] = useState(false);
+    const isCreate = !initial?.id && !readOnly;
 
     React.useEffect(() => {
         setForm(initial);
@@ -333,6 +496,67 @@ function Modal({
         setActive("general");
         setSaving(false);
     }, [initial, open]);
+
+    const handleSelectCand = (c) => {
+        if (!c) return;
+        // Si el usuario ya existe como empleado, cambiar a modo editar
+        if (c.user_id && empleados.length > 0) {
+            const existing = empleados.find((e) => e.id === c.user_id);
+            if (existing && onSwitchToEdit) {
+                onSwitchToEdit(existing);
+                return;
+            }
+        }
+        const v = (val, fallback) => (val != null && val !== "") ? val : fallback;
+        // Busca la opción que coincida ignorando mayúsculas, tildes y sufijo /a
+        const matchOpt = (val, opts) => {
+            if (!val || !opts?.length) return null;
+            const norm = (s) =>
+                String(s).toLowerCase()
+                    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+                    .replace(/\/[a-z]$/, "").trim();
+            const nVal = norm(val);
+            return opts.find((o) => norm(o) === nVal) ?? null;
+        };
+        setForm((f) => ({
+            ...f,
+            // Identificación
+            cedula:            v(c.cedula,            f.cedula),
+            nombres:           v(c.nombres,           f.nombres),
+            apellidos:         v(c.apellidos,         f.apellidos),
+            email:             v(c.email,             f.email),
+            movil:             v(c.movil,             f.movil),
+            // Datos personales
+            genero:                     v(matchOpt(c.genero, GENEROS),                            f.genero),
+            fecha_nacimiento:           v(c.fecha_nacimiento,                                     f.fecha_nacimiento),
+            lugar_nacimiento:           v(c.lugar_nacimiento,                                     f.lugar_nacimiento),
+            estado_civil:               v(matchOpt(c.estado_civil, EST_CIVIL),                    f.estado_civil),
+            nivel_escolaridad:          v(matchOpt(c.nivel_escolaridad, ESCOLARIDAD),             f.nivel_escolaridad),
+            direccion_residencia:       v(c.direccion_residencia,                                 f.direccion_residencia),
+            estrato:                    v(matchOpt(c.estrato, ESTRATOS),                          f.estrato),
+            barrio:                     v(c.barrio,                                               f.barrio),
+            numero_hijos:               v(c.numero_hijos != null ? String(c.numero_hijos) : null, f.numero_hijos),
+            rh:                         v(matchOpt(c.rh, catalogs.tipos_rh),                      f.rh),
+            // Seguridad social
+            eps:               v(matchOpt(c.eps, catalogs.eps),                                   f.eps),
+            arl:               v(matchOpt(c.arl, catalogs.arls),                                  f.arl),
+            fondo_pensiones:   v(matchOpt(c.fondo_pensiones, catalogs.pensiones),                 f.fondo_pensiones),
+            caja_compensacion: v(matchOpt(c.caja_compensacion, catalogs.cajas),                   f.caja_compensacion),
+            // Datos laborales
+            cargo:             v(matchOpt(c.cargo, catalogs.cargos),                              f.cargo),
+            sede:              v(matchOpt(c.sede, catalogs.sedes),                                f.sede),
+            tipo_vinculacion:  v(matchOpt(c.tipo_vinculacion, catalogs.tipos_vinculacion) ?? c.tipo_vinculacion, f.tipo_vinculacion),
+            tipo_funcionario:  v(matchOpt(c.tipo_funcionario, catalogs.tipos_funcionario),        f.tipo_funcionario),
+            empleador:         v(c.empleador,                                                     f.empleador),
+            jefe_inmediato:    v(c.jefe_inmediato,                                                f.jefe_inmediato),
+            empresa_id:        v(c.empresa_id,                                                    f.empresa_id),
+            ingresos:          v(c.ingresos,                                                      f.ingresos),
+            // Contacto de emergencia
+            contacto_emergencia_nombre:      v(c.contacto_emergencia_nombre,      f.contacto_emergencia_nombre),
+            contacto_emergencia_telefono:    v(c.contacto_emergencia_telefono,    f.contacto_emergencia_telefono),
+            contacto_emergencia_parentesco:  v(c.contacto_emergencia_parentesco,  f.contacto_emergencia_parentesco),
+        }));
+    };
 
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -397,6 +621,26 @@ function Modal({
                         <IconClose size={14} />
                     </button>
                 </div>
+
+                {/* Selector de contratado prominente solo en modo crear */}
+                {isCreate && (
+                    <div style={{
+                        padding: "20px 28px 0",
+                        borderBottom: "2px solid var(--border)",
+                        background: "var(--bg)",
+                    }}>
+                        <div style={{
+                            fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.07em",
+                            color: "var(--primary)", fontFamily: "'Poppins',sans-serif",
+                            textTransform: "uppercase", marginBottom: 8,
+                        }}>
+                            Autocompletar desde usuario con contrato
+                        </div>
+                        <div style={{ paddingBottom: 20 }}>
+                            <ContratadoSelector onSelect={handleSelectCand} />
+                        </div>
+                    </div>
+                )}
 
                 {/* Pestañas */}
                 <div className="tab-bar" style={S.tabBar}>
@@ -591,7 +835,7 @@ function Modal({
                                 <Field
                                     label="Fondo de Pensiones"
                                     k="fondo_pensiones"
-                                    opts={PENSIONES}
+                                    opts={catalogs.pensiones}
                                     req
                                     {...fp}
                                 />
@@ -786,51 +1030,6 @@ function Modal({
     );
 }
 
-/* ─── Confirmar eliminación ──────────────────────────────────────────── */
-function ConfirmDialog({ open, nombre, onConfirm, onCancel }) {
-    if (!open) return null;
-    return (
-        <div style={S.overlay} onClick={onCancel}>
-            <div
-                style={{ ...S.modal, maxWidth: 400 }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div style={S.modalHeaderGreen}>
-                    <span style={S.modalTitleWhite}>Eliminar empleado</span>
-                    <button style={S.closeBtnWhite} onClick={onCancel}>
-                        <IconClose size={14} />
-                    </button>
-                </div>
-                <div style={{ padding: "28px 28px 0" }}>
-                    <p style={{ color: "var(--text)", lineHeight: 1.7 }}>
-                        ¿Estás seguro de que deseas eliminar a{" "}
-                        <strong>{nombre}</strong>?<br />
-                        <span
-                            style={{
-                                color: "var(--text-muted)",
-                                fontSize: "0.85rem",
-                            }}
-                        >
-                            Esta acción no se puede deshacer.
-                        </span>
-                    </p>
-                </div>
-                <div style={S.modalFooter}>
-                    <button style={S.btnSecondary} onClick={onCancel}>
-                        Cancelar
-                    </button>
-                    <button
-                        style={{ ...S.btnPrimary, background: "#e74c3c" }}
-                        onClick={onConfirm}
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 /* ─── Modal de credenciales iniciales ───────────────────────────────── */
 function CredencialesModal({ open, credenciales, onClose }) {
     const [copiado, setCopiado] = useState(false);
@@ -977,8 +1176,9 @@ function getPaginasBotones(pagina, total) {
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
     const [empleados, setEmpleados] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // loading derived from React Query
     const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroCargo, setFiltroCargo] = useState("Todos");
@@ -997,6 +1197,7 @@ export default function EmpleadosCrud() {
         eps: EPS_LIST,
         arls: ARL_LIST,
         cajas: CAJAS,
+        pensiones: PENSIONES,
         bancos: BANCOS,
         tipos_rh: RH_LIST,
         ciudades: [],
@@ -1008,7 +1209,6 @@ export default function EmpleadosCrud() {
     const [editTarget, setEditTarget] = useState(null);
     const [viewOpen, setViewOpen] = useState(false);
     const [viewTarget, setViewTarget] = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null);
     const [toast, setToast] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [credenciales, setCredenciales] = useState(null);
@@ -1016,47 +1216,23 @@ export default function EmpleadosCrud() {
     const [pagina, setPagina] = useState(1);
     const [sedesActivas, setSedesActivas] = useState([]);
 
-    useEffect(() => {
-        fetch("/api/empresas")
-            .then((r) => (r.ok ? r.json() : []))
-            .then(setEmpresas)
-            .catch(() => {});
-    }, []);
+    const { data: _qEmpresas,  isLoading: _le } = useQuery({ queryKey: ['empresas'],  queryFn: () => api.get('/empresas').then(r => r.data) });
+    const { data: _qCatalogos, isLoading: _lc } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
+    const { data: _qSedes,     isLoading: _ls } = useQuery({ queryKey: ['sedes'],     queryFn: () => api.get('/sedes').then(r => r.data) });
+    const { data: _qEmpleados, isLoading: _lem }= useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
+    const loading = _lem;
 
+    useEffect(() => { if (_qEmpresas)  setEmpresas(_qEmpresas); },  [_qEmpresas]);
+    useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
     useEffect(() => {
-        fetch("/api/catalogos")
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-                if (data) setCatalogs(data);
-            })
-            .catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        fetch("/api/sedes")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => {
-                const activas = Array.isArray(data)
-                    ? data.filter((s) => s.estado === "Activa")
-                    : [];
-                setSedesActivas(activas);
-            })
-            .catch(() => {});
-    }, []);
-
-    useEffect(() => {
-        setLoading(true);
-        api.get("/empleados")
-            .then((r) => setEmpleados(r.data))
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    }, []);
+        if (_qSedes) setSedesActivas((Array.isArray(_qSedes) ? _qSedes : []).filter(s => s.estado === 'Activa'));
+    }, [_qSedes]);
+    useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
 
     React.useEffect(() => {
         const anyOpen =
             modalOpen ||
             filterOpen ||
-            deleteTarget ||
             viewOpen ||
             credencialesOpen;
         if (anyOpen) {
@@ -1070,13 +1246,13 @@ export default function EmpleadosCrud() {
             document.documentElement.style.overflowY = '';
             document.body.style.overflowY = '';
         };
-    }, [modalOpen, filterOpen, deleteTarget, viewOpen, credencialesOpen]);
+    }, [modalOpen, filterOpen, viewOpen, credencialesOpen]);
 
     /* Filtrado */
     const filtered = useMemo(
         () =>
             empleados.filter((e) => {
-                const palabras = search
+                const palabras = debouncedSearch
                     .toLowerCase()
                     .trim()
                     .split(/\s+/)
@@ -1136,7 +1312,7 @@ export default function EmpleadosCrud() {
             }),
         [
             empleados,
-            search,
+            debouncedSearch,
             filtroEstado,
             filtroSede,
             filtroCargo,
@@ -1254,21 +1430,6 @@ export default function EmpleadosCrud() {
             showToast(msg);
             throw err;
         }
-    };
-
-    const handleDelete = async () => {
-        try {
-            await api.delete(`/empleados/${deleteTarget.id}`);
-            setEmpleados((prev) =>
-                prev.filter((e) => e.id !== deleteTarget.id),
-            );
-            showToast(
-                `${deleteTarget.nombres} ${deleteTarget.apellidos} eliminado.`,
-            );
-        } catch {
-            showToast("Error al eliminar el empleado.");
-        }
-        setDeleteTarget(null);
     };
 
     return (
@@ -1526,18 +1687,6 @@ export default function EmpleadosCrud() {
                                             >
                                                 <IconEdit />
                                             </button>
-                                            <button
-                                                style={S.actionBtn(
-                                                    "#fce8e8",
-                                                    "#a33",
-                                                )}
-                                                title="Eliminar"
-                                                onClick={() =>
-                                                    setDeleteTarget(emp)
-                                                }
-                                            >
-                                                <IconTrash />
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1634,6 +1783,8 @@ export default function EmpleadosCrud() {
                 }
                 empresas={empresas}
                 catalogs={catalogs}
+                empleados={empleados}
+                onSwitchToEdit={(emp) => setEditTarget(emp)}
             />
 
             <Modal
@@ -1645,17 +1796,6 @@ export default function EmpleadosCrud() {
                 empresas={empresas}
                 catalogs={catalogs}
                 readOnly
-            />
-
-            <ConfirmDialog
-                open={!!deleteTarget}
-                nombre={
-                    deleteTarget
-                        ? `${deleteTarget.nombres} ${deleteTarget.apellidos}`
-                        : ""
-                }
-                onConfirm={handleDelete}
-                onCancel={() => setDeleteTarget(null)}
             />
 
             <CredencialesModal

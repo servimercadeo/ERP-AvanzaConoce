@@ -10,6 +10,11 @@ import ContratosCrud from './ContratosCrud';
 import SeleccionCrud from './SeleccionCrud';
 import CandidatosCrud from './CandidatosCrud';
 import BaseIngresoCrud from './BaseIngresoCrud';
+import AvalesContratacionCrud from './AvalesContratacionCrud';
+import RespuestasFormularioCrud from './RespuestasFormularioCrud';
+import PedidosAutomaticosCrud from './PedidosAutomaticosCrud';
+import ProductosDotacion from './ProductosDotacion';
+import PedidosGlobalDotacion from './PedidosGlobalDotacion';
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -39,9 +44,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'base_ingreso': return BaseIngresoCrud;
             default: return null;
           }
-      case 'admin_contratos':
-        switch (archivoId) {
-          case 'ver_crear_contratos': return ContratosCrud;
+        case 'admin_contratos':
+          switch (archivoId) {
+            case 'ver_crear_contratos': return ContratosCrud;
+            case 'avales_contratacion': return AvalesContratacionCrud;
+            case 'respuestas_formulario': return RespuestasFormularioCrud;
             default: return null;
           }
         default: return null;
@@ -76,6 +83,13 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── INVENTARIOS ────────────────────────────────────── */
     case 'inventarios':
       switch (submoduleId) {
+        case 'dotacion':
+          switch (archivoId) {
+            case 'pedidos_automaticos': return PedidosAutomaticosCrud;
+            case 'productos_dotacion': return ProductosDotacion;
+            case 'pedidos_global_dotacion': return PedidosGlobalDotacion;
+            default: return null;
+          }
         case 'productos':
           switch (archivoId) {
             // case 'productos_file':         return ProductosCrud;
@@ -382,7 +396,7 @@ const S = {
   tabActive: {
     color: '#fff',
     background: 'var(--primary)',
-    borderBottomColor: 'var(--primary)',
+    borderBottom: '2.5px solid var(--primary)',
     borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
     boxShadow: '0 -2px 10px rgba(26, 155, 140, 0.2)',
   },

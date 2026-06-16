@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
+import { useQuery } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconClose } from '../components/Icons';
@@ -53,10 +55,11 @@ export default function SeleccionCrud() {
   const [data, setData] = useState([]);
   const [catalogs, setCatalogs] = useState({ cargos: [], proyectos: [], responsables: [], ciudades: [], empleadores: [] });
   const [empresas, setEmpresas] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  // loadingData derived from React Query
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [estadoF, setEstadoF] = useState('Todas');
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState('create');
@@ -66,17 +69,15 @@ export default function SeleccionCrud() {
 
   const PER = 10;
 
-  /* ── Load initial data ─────────────────────────────────────────── */
-  useEffect(() => {
-    Promise.all([
-      api.get('/requisiciones'),
-      api.get('/seleccion/catalogos'),
-      api.get('/empresas'),
-    ])
-      .then(([r, c, e]) => { setData(r.data); setCatalogs(c.data); setEmpresas(e.data); })
-      .catch(console.error)
-      .finally(() => setLoadingData(false));
-  }, []);
+  /* ── Load initial data via React Query (cached) ────────────────── */
+  const { data: _qReqs,    isLoading: _l1 } = useQuery({ queryKey: ['requisiciones'],       queryFn: () => api.get('/requisiciones').then(r => r.data) });
+  const { data: _qCats,    isLoading: _l2 } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data) });
+  const { data: _qEmpresas,isLoading: _l3 } = useQuery({ queryKey: ['empresas'],            queryFn: () => api.get('/empresas').then(r => r.data) });
+  const loadingData = _l1 || _l2 || _l3;
+
+  useEffect(() => { if (_qReqs)     setData(_qReqs); },     [_qReqs]);
+  useEffect(() => { if (_qCats)     setCatalogs(_qCats); }, [_qCats]);
+  useEffect(() => { if (_qEmpresas) setEmpresas(_qEmpresas); }, [_qEmpresas]);
 
   useEffect(() => {
     const open = modal;
@@ -182,19 +183,40 @@ export default function SeleccionCrud() {
   };
 
   /* ── Filters & pagination ─────────────────────────────────────── */
-  const filtered = data.filter(r => {
-    const ok = Object.values(r).some(v => String(v || '').toLowerCase().includes(search.toLowerCase()));
-    return ok && (estadoF === 'Todas' || r.estado === estadoF);
-  });
+  const filtered = useMemo(() =>
+    data.filter(r => {
+      const ok = Object.values(r).some(v => String(v || '').toLowerCase().includes(debouncedSearch.toLowerCase()));
+      return ok && (estadoF === 'Todas' || r.estado === estadoF);
+    }), [data, debouncedSearch, estadoF]);
   const totalP   = Math.max(1, Math.ceil(filtered.length / PER));
   const paged    = filtered.slice((page - 1) * PER, page * PER);
 
   const copyFormLink = (row) => {
+    if (!row.registro_token) {
+      alert('Esta requisición no tiene token. Ábrela y guárdala para generarlo automáticamente.');
+      return;
+    }
     const url = `${window.location.origin}/registro-candidatos?token=${row.registro_token}`;
-    navigator.clipboard.writeText(url).then(() => {
+    const onSuccess = () => {
       setCopiedId(row.id);
       setTimeout(() => setCopiedId(null), 2500);
-    });
+    };
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onSuccess(); } catch (e) { alert('No se pudo copiar el enlace.'); }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(onSuccess).catch(fallback);
+    } else {
+      fallback();
+    }
   };
 
   const isRO = m => m === 'view';

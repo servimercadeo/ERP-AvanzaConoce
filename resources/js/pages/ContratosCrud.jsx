@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "../hooks/useDebounce";
+import {
+    SearchableSelect as FilterSelect,
+    PresetFiltersDropdown,
+} from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -13,7 +18,8 @@ import {
 
 const POR_PAGINA = 5;
 
-const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Vencido", "Anulado"];
+const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Translado"];
+const TIPOS_VINCULACION = ["Directa", "Indirecta"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -301,6 +307,242 @@ function SearchableSelect({
     );
 }
 
+function CandidatoSelector({ candidatos, empleados, onSelect }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState(null);
+    const wrapRef = useRef(null);
+    const debouncedQ = useDebounce(query, 200);
+
+    const filtered = useMemo(() => {
+        const words = debouncedQ
+            .trim()
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean);
+        if (!words.length) return candidatos.slice(0, 80);
+        return candidatos
+            .filter((c) => {
+                const text =
+                    `${c.nombres} ${c.apellidos} ${c.documento}`.toLowerCase();
+                return words.every((w) => text.includes(w));
+            })
+            .slice(0, 80);
+    }, [debouncedQ, candidatos]);
+
+    useEffect(() => {
+        const h = (e) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
+    const handlePick = (c) => {
+        setSelected(c);
+        setQuery("");
+        setOpen(false);
+        // Buscar empleado_id por documento/cedula
+        const emp = empleados.find(
+            (e) => String(e.cedula) === String(c.documento),
+        );
+        onSelect({
+            ...c,
+            empleado_id: emp?.id ?? "",
+            documento: c.documento,
+            nombres: c.nombres,
+            apellidos: c.apellidos,
+            correo: c.correo,
+        });
+    };
+
+    return (
+        <div ref={wrapRef} style={{ width: "100%" }}>
+            {selected ? (
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        background: "#e8f8f5",
+                        border: "2px solid var(--primary)",
+                        borderRadius: 10,
+                        padding: "14px 18px",
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 46,
+                            height: 46,
+                            borderRadius: "50%",
+                            background: "var(--primary)",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 800,
+                            fontSize: "1.2rem",
+                            flexShrink: 0,
+                        }}
+                    >
+                        {selected.nombres.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div
+                            style={{
+                                fontWeight: 800,
+                                fontSize: "1rem",
+                                color: "var(--primary-dark)",
+                                fontFamily: "'Poppins',sans-serif",
+                            }}
+                        >
+                            {selected.nombres} {selected.apellidos}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "0.82rem",
+                                color: "var(--text-muted)",
+                                fontFamily: "Nunito,sans-serif",
+                            }}
+                        >
+                            Doc: {selected.documento}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setSelected(null);
+                            onSelect(null);
+                        }}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            fontSize: "1.1rem",
+                            padding: 4,
+                        }}
+                        title="Cambiar candidato"
+                    >
+                        ✕
+                    </button>
+                </div>
+            ) : (
+                <div style={{ position: "relative" }}>
+                    <input
+                        style={{
+                            ...S.input,
+                            fontSize: "1rem",
+                            padding: "12px 14px",
+                            border: "2px solid var(--border)",
+                            borderRadius: 10,
+                        }}
+                        placeholder="Buscar por nombre o documento…"
+                        value={query}
+                        onChange={(e) => {
+                            setQuery(e.target.value);
+                            setOpen(true);
+                        }}
+                        onFocus={() => setOpen(true)}
+                        autoFocus
+                    />
+                    {open && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                background: "var(--white)",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                                zIndex: 3000,
+                                maxHeight: 280,
+                                overflowY: "auto",
+                            }}
+                        >
+                            {filtered.length === 0 ? (
+                                <div
+                                    style={{
+                                        padding: "14px 16px",
+                                        color: "var(--text-muted)",
+                                        fontSize: "0.88rem",
+                                    }}
+                                >
+                                    Sin resultados
+                                </div>
+                            ) : (
+                                filtered.map((c) => (
+                                    <div
+                                        key={c.documento}
+                                        onMouseDown={() => handlePick(c)}
+                                        style={{
+                                            padding: "10px 16px",
+                                            cursor: "pointer",
+                                            borderBottom:
+                                                "1px solid var(--border)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 12,
+                                        }}
+                                        onMouseEnter={(e) =>
+                                            (e.currentTarget.style.background =
+                                                "#f0f9f7")
+                                        }
+                                        onMouseLeave={(e) =>
+                                            (e.currentTarget.style.background =
+                                                "var(--white)")
+                                        }
+                                    >
+                                        <div
+                                            style={{
+                                                width: 34,
+                                                height: 34,
+                                                borderRadius: "50%",
+                                                background: "var(--primary)",
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontWeight: 800,
+                                                fontSize: "0.9rem",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {c.nombres.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div
+                                                style={{
+                                                    fontWeight: 700,
+                                                    fontSize: "0.9rem",
+                                                    color: "var(--text)",
+                                                }}
+                                            >
+                                                {c.nombres} {c.apellidos}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: "0.78rem",
+                                                    color: "var(--text-muted)",
+                                                }}
+                                            >
+                                                {c.documento}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function Modal({
     open,
     onClose,
@@ -309,12 +551,14 @@ function Modal({
     title,
     empleados,
     catalogs,
+    candidatosContrato = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
     const [saving, setSaving] = useState(false);
+    const isCreate = !initial?.id && !readOnly;
 
     useEffect(() => {
         if (open) {
@@ -339,19 +583,48 @@ function Modal({
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
 
+    const handleCandidatoSelect = (c) => {
+        if (!c) return;
+        setForm((f) => ({
+            ...f,
+            empleado_id: c.empleado_id || f.empleado_id,
+            documento: c.documento || f.documento,
+            nombres: c.nombres || f.nombres,
+            apellidos: c.apellidos || f.apellidos,
+            correo: c.correo || f.correo,
+            cargo: c.cargo || f.cargo,
+            sede: c.sede || f.sede,
+            tipo_vinculacion: c.tipo_vinculacion || f.tipo_vinculacion,
+            empresa: c.empresa || f.empresa,
+            empleador: c.empleador || f.empleador,
+            jefe_inmediato: c.jefe_inmediato || f.jefe_inmediato,
+            cliente_proyecto: c.cliente_proyecto || f.cliente_proyecto,
+            fecha_ingreso: c.fecha_ingreso || f.fecha_ingreso,
+            salario: c.salario || f.salario,
+            auxilio_transporte_legal:
+                c.auxilio_transporte_legal || f.auxilio_transporte_legal,
+            lps_afiliado: c.lps_afiliado || f.lps_afiliado,
+            fondo_pensiones: c.fondo_pensiones || f.fondo_pensiones,
+            fondo_cesantias: c.fondo_cesantias || f.fondo_cesantias,
+            arl: c.arl || f.arl,
+            caja_compensacion: c.caja_compensacion || f.caja_compensacion,
+        }));
+        setErrors({});
+    };
+
     const handleAutoFill = (opt) => {
         setForm((f) => ({
             ...f,
-            cargo:             opt.cargo             || f.cargo,
-            sede:              opt.sede              || f.sede,
-            tipo_vinculacion:  opt.tipo_vinculacion  || f.tipo_vinculacion,
-            arl:               opt.arl               || f.arl,
-            lps_afiliado:      opt.eps               || f.lps_afiliado,
+            cargo: opt.cargo || f.cargo,
+            sede: opt.sede || f.sede,
+            tipo_vinculacion: opt.tipo_vinculacion || f.tipo_vinculacion,
+            arl: opt.arl || f.arl,
+            lps_afiliado: opt.eps || f.lps_afiliado,
             caja_compensacion: opt.caja_compensacion || f.caja_compensacion,
-            fondo_pensiones:   opt.fondo_pensiones   || f.fondo_pensiones,
-            empresa:           opt.empresa_nombre    || f.empresa,
-            empleador:         opt.empleador         || f.empleador,
-            jefe_inmediato:    opt.jefe_inmediato    || f.jefe_inmediato,
+            fondo_pensiones: opt.fondo_pensiones || f.fondo_pensiones,
+            empresa: opt.empresa_nombre || f.empresa,
+            empleador: opt.empleador || f.empleador,
+            jefe_inmediato: opt.jefe_inmediato || f.jefe_inmediato,
         }));
     };
 
@@ -397,7 +670,7 @@ function Modal({
 
     const validate = () => {
         const e = {};
-        if (!form.empleado_id) e.empleado_id = "Requerido";
+        if (!form.empleado_id && !form.documento) e.empleado_id = "Requerido";
         if (!form.tipo_contrato) e.tipo_contrato = "Requerido";
         if (!form.cargo) e.cargo = "Requerido";
         if (!form.sede) e.sede = "Requerido";
@@ -439,6 +712,45 @@ function Modal({
                     </button>
                 </div>
 
+                {/* Selector de candidato prominente solo en modo crear */}
+                {isCreate && (
+                    <div
+                        style={{
+                            padding: "20px 28px 0",
+                            borderBottom: "2px solid var(--border)",
+                            background: "var(--bg)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: "0.72rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.07em",
+                                color: "var(--primary)",
+                                fontFamily: "'Poppins',sans-serif",
+                                textTransform: "uppercase",
+                                marginBottom: 8,
+                            }}
+                        >
+                            Seleccionar candidato para el contrato
+                        </div>
+                        <div style={{ paddingBottom: 20 }}>
+                            <CandidatoSelector
+                                candidatos={candidatosContrato}
+                                empleados={empleados}
+                                onSelect={handleCandidatoSelect}
+                            />
+                            {errors.empleado_id && (
+                                <div style={{ ...S.err, marginTop: 8 }}>
+                                    {errors.empleado_id === "Requerido"
+                                        ? "Debe seleccionar un candidato válido."
+                                        : errors.empleado_id}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="tab-bar" style={S.tabBar}>
                     {[
                         ["principal", "Información Principal"],
@@ -459,30 +771,39 @@ function Modal({
                     {activeTab === "principal" && (
                         <>
                             <div style={S.grid3}>
-                                <SearchableSelect
-                                    label="Empleado"
-                                    k="empleado_id"
-                                    opts={empleados.map((e) => ({
-                                        value: e.id,
-                                        label: `${e.nombres} ${e.apellidos} (${e.cedula})`,
-                                        cargo:             e.cargo,
-                                        sede:              e.sede,
-                                        tipo_vinculacion:  e.tipo_vinculacion,
-                                        arl:               e.arl,
-                                        eps:               e.eps,
-                                        caja_compensacion: e.caja_compensacion,
-                                        fondo_pensiones:   e.fondo_pensiones,
-                                        empresa_nombre:    e.empresa?.nombre ?? '',
-                                        empleador:         e.empleador,
-                                        jefe_inmediato:    e.jefe_inmediato,
-                                    }))}
-                                    req
-                                    form={form}
-                                    errors={errors}
-                                    onChange={onChange}
-                                    onSelect={readOnly ? undefined : handleAutoFill}
-                                    disabled={readOnly}
-                                />
+                                {!isCreate && (
+                                    <SearchableSelect
+                                        label="Empleado"
+                                        k="empleado_id"
+                                        opts={empleados.map((e) => ({
+                                            value: e.id,
+                                            label: `${e.nombres} ${e.apellidos} (${e.cedula})`,
+                                            cargo: e.cargo,
+                                            sede: e.sede,
+                                            tipo_vinculacion:
+                                                e.tipo_vinculacion,
+                                            arl: e.arl,
+                                            eps: e.eps,
+                                            caja_compensacion:
+                                                e.caja_compensacion,
+                                            fondo_pensiones: e.fondo_pensiones,
+                                            empresa_nombre:
+                                                e.empresa?.nombre ?? "",
+                                            empleador: e.empleador,
+                                            jefe_inmediato: e.jefe_inmediato,
+                                        }))}
+                                        req
+                                        form={form}
+                                        errors={errors}
+                                        onChange={onChange}
+                                        onSelect={
+                                            readOnly
+                                                ? undefined
+                                                : handleAutoFill
+                                        }
+                                        disabled={readOnly}
+                                    />
+                                )}
                                 <Field
                                     label="Tipo de Contrato"
                                     k="tipo_contrato"
@@ -523,7 +844,7 @@ function Modal({
                                 <Field
                                     label="Tipo Vinculación"
                                     k="tipo_vinculacion"
-                                    opts={catalogs.tipos_vinculacion}
+                                    opts={TIPOS_VINCULACION}
                                     {...fp}
                                 />
                                 <Field
@@ -605,7 +926,6 @@ function Modal({
                                 <Field
                                     label="EPS (LPS Afiliado)"
                                     k="lps_afiliado"
-                                    opts={catalogs.eps}
                                     {...fp}
                                 />
                                 <Field
@@ -635,13 +955,11 @@ function Modal({
                                 <Field
                                     label="Fondo Pensiones"
                                     k="fondo_pensiones"
-                                    opts={catalogs.bancos}
                                     {...fp}
                                 />
                                 <Field
                                     label="Fondo Cesantías"
                                     k="fondo_cesantias"
-                                    opts={catalogs.bancos}
                                     {...fp}
                                 />
                                 <div />
@@ -885,6 +1203,7 @@ export default function ContratosCrud() {
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroTipoContrato, setFiltroTipoContrato] = useState("Todos");
@@ -907,10 +1226,45 @@ export default function ContratosCrud() {
     const [editTarget, setEditTarget] = useState(null);
     const [viewOpen, setViewOpen] = useState(false);
     const [viewTarget, setViewTarget] = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null);
     const [toast, setToast] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [pagina, setPagina] = useState(1);
+
+    const { data: _qContratos } = useQuery({
+        queryKey: ["contratos"],
+        queryFn: () => api.get("/contratos").then((r) => r.data),
+    });
+    const { data: _qEmpleados } = useQuery({
+        queryKey: ["empleados"],
+        queryFn: () => api.get("/empleados").then((r) => r.data),
+    });
+    const { data: _qCatalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+    });
+    const { data: _qCandidatosContrato } = useQuery({
+        queryKey: ["candidatos-contrato"],
+        queryFn: () =>
+            api.get("/respuestas-ingresos/datos-contrato").then((r) => r.data),
+    });
+
+    const [candidatosContrato, setCandidatosContrato] = useState([]);
+
+    useEffect(() => {
+        if (_qContratos) {
+            setContratos(_qContratos);
+            setLoading(false);
+        }
+    }, [_qContratos]);
+    useEffect(() => {
+        if (_qEmpleados) setEmpleados(_qEmpleados);
+    }, [_qEmpleados]);
+    useEffect(() => {
+        if (_qCatalogos) setCatalogs(_qCatalogos);
+    }, [_qCatalogos]);
+    useEffect(() => {
+        if (_qCandidatosContrato) setCandidatosContrato(_qCandidatosContrato);
+    }, [_qCandidatosContrato]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -931,27 +1285,34 @@ export default function ContratosCrud() {
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
-
-    useEffect(() => {
         setPagina(1);
-    }, [search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones]);
+    }, [
+        search,
+        filtroEstado,
+        filtroSede,
+        filtroTipoContrato,
+        filtroVinc,
+        filtroCargo,
+        filtroArl,
+        filtroCaja,
+        filtroEmpresa,
+        filtroFondoPensiones,
+    ]);
 
     useEffect(() => {
-        const anyOpen = modalOpen || viewOpen || !!deleteTarget || filterOpen;
+        const anyOpen = modalOpen || viewOpen || filterOpen;
         if (anyOpen) {
-            document.documentElement.style.overflowY = 'hidden';
-            document.body.style.overflowY = 'hidden';
+            document.documentElement.style.overflowY = "hidden";
+            document.body.style.overflowY = "hidden";
         } else {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         }
         return () => {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         };
-    }, [modalOpen, viewOpen, deleteTarget, filterOpen]);
+    }, [modalOpen, viewOpen, filterOpen]);
 
     const showToast = (msg) => {
         setToast(msg);
@@ -961,25 +1322,59 @@ export default function ContratosCrud() {
     const filtered = useMemo(
         () =>
             contratos.filter((c) => {
-                const q = search.toLowerCase();
+                const q = debouncedSearch.toLowerCase();
                 const empName =
                     `${c.empleado?.apellidos ?? ""} ${c.empleado?.nombres ?? ""}`.toLowerCase();
                 const matchQ =
                     empName.includes(q) ||
                     (c.empleado?.cedula ?? "").includes(q) ||
                     (c.cargo ?? "").toLowerCase().includes(q);
-                const matchE = filtroEstado === "Todos" || c.estado_contrato === filtroEstado;
+                const matchE =
+                    filtroEstado === "Todos" ||
+                    c.estado_contrato === filtroEstado;
                 const matchS = filtroSede === "Todas" || c.sede === filtroSede;
-                const matchTC = filtroTipoContrato === "Todos" || c.tipo_contrato === filtroTipoContrato;
-                const matchV = filtroVinc === "Todos" || c.tipo_vinculacion === filtroVinc;
-                const matchC = filtroCargo === "Todos" || c.cargo === filtroCargo;
+                const matchTC =
+                    filtroTipoContrato === "Todos" ||
+                    c.tipo_contrato === filtroTipoContrato;
+                const matchV =
+                    filtroVinc === "Todos" || c.tipo_vinculacion === filtroVinc;
+                const matchC =
+                    filtroCargo === "Todos" || c.cargo === filtroCargo;
                 const matchArl = filtroArl === "Todas" || c.arl === filtroArl;
-                const matchCaja = filtroCaja === "Todas" || c.caja_compensacion === filtroCaja;
-                const matchEmp = filtroEmpresa === "Todas" || c.empresa === filtroEmpresa;
-                const matchFP = filtroFondoPensiones === "Todos" || c.fondo_pensiones === filtroFondoPensiones;
-                return matchQ && matchE && matchS && matchTC && matchV && matchC && matchArl && matchCaja && matchEmp && matchFP;
+                const matchCaja =
+                    filtroCaja === "Todas" ||
+                    c.caja_compensacion === filtroCaja;
+                const matchEmp =
+                    filtroEmpresa === "Todas" || c.empresa === filtroEmpresa;
+                const matchFP =
+                    filtroFondoPensiones === "Todos" ||
+                    c.fondo_pensiones === filtroFondoPensiones;
+                return (
+                    matchQ &&
+                    matchE &&
+                    matchS &&
+                    matchTC &&
+                    matchV &&
+                    matchC &&
+                    matchArl &&
+                    matchCaja &&
+                    matchEmp &&
+                    matchFP
+                );
             }),
-        [contratos, search, filtroEstado, filtroSede, filtroTipoContrato, filtroVinc, filtroCargo, filtroArl, filtroCaja, filtroEmpresa, filtroFondoPensiones],
+        [
+            contratos,
+            debouncedSearch,
+            filtroEstado,
+            filtroSede,
+            filtroTipoContrato,
+            filtroVinc,
+            filtroCargo,
+            filtroArl,
+            filtroCaja,
+            filtroEmpresa,
+            filtroFondoPensiones,
+        ],
     );
 
     const paginated = useMemo(
@@ -993,8 +1388,14 @@ export default function ContratosCrud() {
             total: contratos.length,
             activos: contratos.filter((c) => c.estado_contrato === "Activo")
                 .length,
-            vencidos: contratos.filter((c) => c.estado_contrato === "Vencido")
+            inactivos: contratos.filter((c) => c.estado_contrato === "Inactivo")
                 .length,
+            cancelados: contratos.filter(
+                (c) => c.estado_contrato === "Cancelado",
+            ).length,
+            translados: contratos.filter(
+                (c) => c.estado_contrato === "Translado",
+            ).length,
         }),
         [contratos],
     );
@@ -1034,19 +1435,6 @@ export default function ContratosCrud() {
         setFiltroFondoPensiones("Todos");
     };
 
-    const handleDelete = async () => {
-        try {
-            await api.delete(`/contratos/${deleteTarget.id}`);
-            setContratos((prev) =>
-                prev.filter((c) => c.id !== deleteTarget.id),
-            );
-            showToast("Contrato eliminado.");
-        } catch {
-            showToast("Error al eliminar.");
-        }
-        setDeleteTarget(null);
-    };
-
     return (
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
@@ -1063,10 +1451,22 @@ export default function ContratosCrud() {
                     <div className="stat-label">Activos</div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-num" style={{ color: "#e74c3c" }}>
-                        {stats.vencidos}
+                    <div className="stat-num" style={{ color: "#f39c12" }}>
+                        {stats.inactivos}
                     </div>
-                    <div className="stat-label">Vencidos</div>
+                    <div className="stat-label">Inactivos</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#e74c3c" }}>
+                        {stats.cancelados}
+                    </div>
+                    <div className="stat-label">Cancelados</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#3498db" }}>
+                        {stats.translados}
+                    </div>
+                    <div className="stat-label">Translados</div>
                 </div>
             </div>
 
@@ -1100,15 +1500,59 @@ export default function ContratosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown presets={[
-                        { label: "Contratos activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
-                        { label: "Contratos vencidos", apply: () => { clearFilters(); setFiltroEstado("Vencido"); } },
-                        { label: "Contratos inactivos", apply: () => { clearFilters(); setFiltroEstado("Inactivo"); } },
-                        { label: "Contratos anulados", apply: () => { clearFilters(); setFiltroEstado("Anulado"); } },
-                        { label: "Término fijo", apply: () => { clearFilters(); setFiltroTipoContrato("Término Fijo"); } },
-                        { label: "Prestación de servicios", apply: () => { clearFilters(); setFiltroTipoContrato("Prestación de Servicios"); } },
-                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                    ]} />
+                    <PresetFiltersDropdown
+                        presets={[
+                            {
+                                label: "Contratos activos",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Activo");
+                                },
+                            },
+                            {
+                                label: "Contratos inactivos",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Inactivo");
+                                },
+                            },
+                            {
+                                label: "Contratos cancelados",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Cancelado");
+                                },
+                            },
+                            {
+                                label: "Contratos en translado",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Translado");
+                                },
+                            },
+                            {
+                                label: "Término fijo",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroTipoContrato("Término Fijo");
+                                },
+                            },
+                            {
+                                label: "Prestación de servicios",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroTipoContrato(
+                                        "Prestación de Servicios",
+                                    );
+                                },
+                            },
+                            {
+                                label: "Limpiar filtros",
+                                apply: () => clearFilters(),
+                                clear: true,
+                            },
+                        ]}
+                    />
                 </div>
                 <button
                     className="btn-primary"
@@ -1185,10 +1629,22 @@ export default function ContratosCrud() {
                                             style={S.badge(
                                                 c.estado_contrato === "Activo"
                                                     ? "#e0f7f4"
-                                                    : "#fce8e8",
+                                                    : c.estado_contrato ===
+                                                        "Translado"
+                                                      ? "#e8f0ff"
+                                                      : c.estado_contrato ===
+                                                          "Inactivo"
+                                                        ? "#fff3e0"
+                                                        : "#fce8e8",
                                                 c.estado_contrato === "Activo"
                                                     ? "#0d6e5a"
-                                                    : "#a33",
+                                                    : c.estado_contrato ===
+                                                        "Translado"
+                                                      ? "#1a4fa8"
+                                                      : c.estado_contrato ===
+                                                          "Inactivo"
+                                                        ? "#e67e22"
+                                                        : "#a33",
                                             )}
                                         >
                                             {c.estado_contrato}
@@ -1222,18 +1678,6 @@ export default function ContratosCrud() {
                                             >
                                                 <IconEdit />
                                             </button>
-                                            <button
-                                                style={S.actionBtn(
-                                                    "#fce8e8",
-                                                    "#a33",
-                                                )}
-                                                title="Eliminar"
-                                                onClick={() =>
-                                                    setDeleteTarget(c)
-                                                }
-                                            >
-                                                <IconTrash />
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1246,10 +1690,9 @@ export default function ContratosCrud() {
             {!loading && filtered.length > 0 && (
                 <div style={S.paginationBar}>
                     <span style={S.paginationInfo}>
-                        Mostrando{" "}
-                        {(pagina - 1) * POR_PAGINA + 1}–
-                        {Math.min(pagina * POR_PAGINA, filtered.length)}{" "}
-                        de {filtered.length} contratos
+                        Mostrando {(pagina - 1) * POR_PAGINA + 1}–
+                        {Math.min(pagina * POR_PAGINA, filtered.length)} de{" "}
+                        {filtered.length} contratos
                     </span>
                     <div style={S.paginationBtns}>
                         <button
@@ -1287,7 +1730,10 @@ export default function ContratosCrud() {
                                 ) : (
                                     <button
                                         key={item}
-                                        style={S.pageBtn(false, item === pagina)}
+                                        style={S.pageBtn(
+                                            false,
+                                            item === pagina,
+                                        )}
                                         onClick={() => setPagina(item)}
                                     >
                                         {item}
@@ -1308,42 +1754,76 @@ export default function ContratosCrud() {
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
                     <div
-                        style={{ ...S.modal, maxWidth: 860, maxHeight: "none", overflow: "visible" }}
+                        style={{
+                            ...S.modal,
+                            maxWidth: 860,
+                            maxHeight: "none",
+                            overflow: "visible",
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
-                            <span style={S.modalTitleWhite}>Filtros de Búsqueda</span>
-                            <button style={S.closeBtnWhite} onClick={() => setFilterOpen(false)}>
+                            <span style={S.modalTitleWhite}>
+                                Filtros de Búsqueda
+                            </span>
+                            <button
+                                style={S.closeBtnWhite}
+                                onClick={() => setFilterOpen(false)}
+                            >
                                 <IconClose size={14} />
                             </button>
                         </div>
-                        <div style={{ ...S.modalBody, overflowY: "visible", overflowX: "visible" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 24px" }}>
+                        <div
+                            style={{
+                                ...S.modalBody,
+                                overflowY: "visible",
+                                overflowX: "visible",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, 1fr)",
+                                    gap: "16px 24px",
+                                }}
+                            >
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Estado</label>
                                     <FilterSelect
                                         value={filtroEstado}
                                         onChange={setFiltroEstado}
                                         defaultValue="Todos"
-                                        options={ESTADOS_CONTRATO.map((s) => ({ label: s, value: s }))}
+                                        options={ESTADOS_CONTRATO.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo de Contrato</label>
+                                    <label style={S.label}>
+                                        Tipo de Contrato
+                                    </label>
                                     <FilterSelect
                                         value={filtroTipoContrato}
                                         onChange={setFiltroTipoContrato}
                                         defaultValue="Todos"
-                                        options={TIPOS_CONTRATO.map((s) => ({ label: s, value: s }))}
+                                        options={TIPOS_CONTRATO.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo de Vinculación</label>
+                                    <label style={S.label}>
+                                        Tipo de Vinculación
+                                    </label>
                                     <FilterSelect
                                         value={filtroVinc}
                                         onChange={setFiltroVinc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_vinculacion.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.tipos_vinculacion.map(
+                                            (s) => ({ label: s, value: s }),
+                                        )}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1352,7 +1832,10 @@ export default function ContratosCrud() {
                                         value={filtroSede}
                                         onChange={setFiltroSede}
                                         defaultValue="Todas"
-                                        options={catalogs.sedes.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.sedes.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1361,7 +1844,10 @@ export default function ContratosCrud() {
                                         value={filtroCargo}
                                         onChange={setFiltroCargo}
                                         defaultValue="Todos"
-                                        options={catalogs.cargos.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.cargos.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1370,16 +1856,24 @@ export default function ContratosCrud() {
                                         value={filtroArl}
                                         onChange={setFiltroArl}
                                         defaultValue="Todas"
-                                        options={catalogs.arls.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.arls.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Caja de Compensación</label>
+                                    <label style={S.label}>
+                                        Caja de Compensación
+                                    </label>
                                     <FilterSelect
                                         value={filtroCaja}
                                         onChange={setFiltroCaja}
                                         defaultValue="Todas"
-                                        options={catalogs.cajas.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.cajas.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1388,29 +1882,60 @@ export default function ContratosCrud() {
                                         value={filtroEmpresa}
                                         onChange={setFiltroEmpresa}
                                         defaultValue="Todas"
-                                        options={[...new Set(contratos.map((c) => c.empresa).filter(Boolean))].map((s) => ({ label: s, value: s }))}
+                                        options={[
+                                            ...new Set(
+                                                contratos
+                                                    .map((c) => c.empresa)
+                                                    .filter(Boolean),
+                                            ),
+                                        ].map((s) => ({ label: s, value: s }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Fondo de Pensiones</label>
+                                    <label style={S.label}>
+                                        Fondo de Pensiones
+                                    </label>
                                     <FilterSelect
                                         value={filtroFondoPensiones}
                                         onChange={setFiltroFondoPensiones}
                                         defaultValue="Todos"
-                                        options={[...new Set(contratos.map((c) => c.fondo_pensiones).filter(Boolean))].map((s) => ({ label: s, value: s }))}
+                                        options={[
+                                            ...new Set(
+                                                contratos
+                                                    .map(
+                                                        (c) =>
+                                                            c.fondo_pensiones,
+                                                    )
+                                                    .filter(Boolean),
+                                            ),
+                                        ].map((s) => ({ label: s, value: s }))}
                                     />
                                 </div>
                             </div>
                         </div>
-                        <div style={{ ...S.modalFooter, justifyContent: "space-between" }}>
-                            <button style={S.btnSecondary} onClick={clearFilters}>
+                        <div
+                            style={{
+                                ...S.modalFooter,
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <button
+                                style={S.btnSecondary}
+                                onClick={clearFilters}
+                            >
                                 Limpiar filtros
                             </button>
                             <div style={{ display: "flex", gap: 12 }}>
-                                <button style={S.btnSecondary} onClick={() => setFilterOpen(false)}>
+                                <button
+                                    style={S.btnSecondary}
+                                    onClick={() => setFilterOpen(false)}
+                                >
                                     Cancelar
                                 </button>
-                                <button style={S.btnPrimary} onClick={() => setFilterOpen(false)}>
+                                <button
+                                    style={S.btnPrimary}
+                                    onClick={() => setFilterOpen(false)}
+                                >
                                     Buscar
                                 </button>
                             </div>
@@ -1427,6 +1952,7 @@ export default function ContratosCrud() {
                 title={editTarget ? "Editar Contrato" : "Nuevo Contrato"}
                 empleados={empleados}
                 catalogs={catalogs}
+                candidatosContrato={candidatosContrato}
             />
 
             <Modal
@@ -1439,47 +1965,6 @@ export default function ContratosCrud() {
                 readOnly
             />
 
-            {deleteTarget && (
-                <div style={S.overlay} onClick={() => setDeleteTarget(null)}>
-                    <div
-                        style={{ ...S.modal, maxWidth: 400 }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div style={S.modalHeaderGreen}>
-                            <span style={S.modalTitleWhite}>Eliminar</span>
-                            <button
-                                style={S.closeBtnWhite}
-                                onClick={() => setDeleteTarget(null)}
-                            >
-                                <IconClose size={14} />
-                            </button>
-                        </div>
-                        <div style={{ padding: 28 }}>
-                            <p>
-                                ¿Seguro de eliminar el contrato de{" "}
-                                <b>{deleteTarget.empleado?.apellidos}</b>?
-                            </p>
-                        </div>
-                        <div style={S.modalFooter}>
-                            <button
-                                style={S.btnSecondary}
-                                onClick={() => setDeleteTarget(null)}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                style={{
-                                    ...S.btnPrimary,
-                                    background: "#e74c3c",
-                                }}
-                                onClick={handleDelete}
-                            >
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
@@ -1651,12 +2136,12 @@ const S = {
     },
     tabBar: {
         display: "flex",
-        borderBottom: "2px solid var(--border)",
         padding: "0 28px",
         gap: 0,
         overflowX: "auto",
         flexWrap: "nowrap",
         flexShrink: 0,
+        borderBottom: "2px solid var(--border)",
     },
     tab: {
         padding: "11px 20px",

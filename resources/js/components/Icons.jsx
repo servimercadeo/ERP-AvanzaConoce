@@ -436,6 +436,78 @@ export const IconConfig = ({ size = 18 }) => (
   </svg>
 );
 
+export const IconChevronDown = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+export const IconChevronRight = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
+export const IconDownload = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+export const IconInfo = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="16" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12.01" y2="8" />
+  </svg>
+);
+
+export const IconCheckCircle = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+
+export const IconXCircle = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="15" y1="9" x2="9" y2="15" />
+    <line x1="9" y1="9" x2="15" y2="15" />
+  </svg>
+);
+
+export const IconMinusCircle = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="8" y1="12" x2="16" y2="12" />
+  </svg>
+);
+
+export const IconWarning = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+export const IconExternalLink = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
+
+export const IconCheck = ({ size = 16 }) => (
+  <svg {...props(size)}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 /* ── Mapa de id → componente (usado en erpModules.js) ─────────────── */
 export const MODULE_ICONS = {
   sedes:                   IconSedes,
