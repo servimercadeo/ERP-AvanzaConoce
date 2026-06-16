@@ -921,6 +921,71 @@ export default function DotacionesCrud() {
     const sedesActivas = new Set(registros.map((r) => r.sede).filter(Boolean))
         .size;
 
+    const handlePedidoGlobal = () => {
+        const conItems = registros.filter((r) => {
+            const has = [
+                r.polo_masculino_talla, r.polo_masculino_cantidad,
+                r.polo_femenino_talla, r.polo_femenino_cantidad,
+                r.jean_masculino_talla, r.jean_masculino_cantidad,
+                r.jean_femenino_talla, r.jean_femenino_cantidad,
+                r.chaqueta_masculino_talla, r.chaqueta_masculino_cantidad,
+                r.chaqueta_femenino_talla, r.chaqueta_femenino_cantidad,
+                r.tenis_masculino_talla, r.tenis_masculino_cantidad,
+                r.tenis_femenino_talla, r.tenis_femenino_cantidad,
+            ];
+            return has.some((v) => v !== null && v !== undefined && v !== "");
+        });
+        if (conItems.length === 0) {
+            showToast("No hay registros con dotación asignada para crear un pedido global.");
+            return;
+        }
+        const lastCounter = parseInt(localStorage.getItem("pedidos_globales_counter") || "0", 10);
+        const newCounter = lastCounter + 1;
+        const consecutivo = String(newCounter).padStart(5, "0");
+        const items = conItems.map((r, idx) => {
+            const empLabel = `${r.nombres ?? ""} ${r.apellidos ?? ""}`.trim();
+            return {
+                idx: idx + 1,
+                etiqueta: `${String(idx + 1).padStart(5, "0")} - ${r.cedula} ${empLabel}`,
+                cedula: r.cedula,
+                nombres: r.nombres,
+                apellidos: r.apellidos,
+                sede: r.sede,
+                cargo: r.cargo,
+                genero: r.genero,
+                polo_masculino_talla: r.polo_masculino_talla,
+                polo_masculino_cantidad: r.polo_masculino_cantidad,
+                polo_femenino_talla: r.polo_femenino_talla,
+                polo_femenino_cantidad: r.polo_femenino_cantidad,
+                jean_masculino_talla: r.jean_masculino_talla,
+                jean_masculino_cantidad: r.jean_masculino_cantidad,
+                jean_femenino_talla: r.jean_femenino_talla,
+                jean_femenino_cantidad: r.jean_femenino_cantidad,
+                chaqueta_masculino_talla: r.chaqueta_masculino_talla,
+                chaqueta_masculino_cantidad: r.chaqueta_masculino_cantidad,
+                chaqueta_femenino_talla: r.chaqueta_femenino_talla,
+                chaqueta_femenino_cantidad: r.chaqueta_femenino_cantidad,
+                tenis_masculino_talla: r.tenis_masculino_talla,
+                tenis_masculino_cantidad: r.tenis_masculino_cantidad,
+                tenis_femenino_talla: r.tenis_femenino_talla,
+                tenis_femenino_cantidad: r.tenis_femenino_cantidad,
+            };
+        });
+        const pedido = {
+            id: Date.now(),
+            consecutivo,
+            fecha_creacion: new Date().toISOString().split("T")[0],
+            estado: "Pendiente",
+            total_empleados: items.length,
+            items,
+        };
+        const existing = JSON.parse(localStorage.getItem("pedidos_globales") || "[]");
+        existing.unshift(pedido);
+        localStorage.setItem("pedidos_globales", JSON.stringify(existing));
+        localStorage.setItem("pedidos_globales_counter", String(newCounter));
+        showToast(`Pedido global ${consecutivo} creado con ${items.length} empleado(s). Revise la pestaña "Pedidos Global".`);
+    };
+
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
@@ -1134,10 +1199,27 @@ export default function DotacionesCrud() {
                         ]}
                     />
                 </div>
-                <button className="btn-primary" onClick={openCreate}>
-                    + Nueva dotación
-                </button>
-            </div>
+    <button className="btn-primary" onClick={openCreate}>
+        + Nueva dotación
+    </button>
+    <button
+        style={{
+            ...S.btnPrimary,
+            background: '#8e44ad',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+        }}
+        onClick={handlePedidoGlobal}
+    >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+        </svg>
+        Pedido Global
+    </button>
+</div>
 
             {/* ── Tabla ── */}
             <div style={S.tableWrap}>

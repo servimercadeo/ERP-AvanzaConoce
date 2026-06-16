@@ -13,6 +13,8 @@ import BaseIngresoCrud from './BaseIngresoCrud';
 import AvalesContratacionCrud from './AvalesContratacionCrud';
 import RespuestasFormularioCrud from './RespuestasFormularioCrud';
 import DotacionesCrud from './DotacionesCrud';
+import ProductosDotacion from './ProductosDotacion';
+import PedidosGlobalDotacion from './PedidosGlobalDotacion';
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -84,6 +86,8 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
         case 'dotacion':
           switch (archivoId) {
             case 'dotacion_file': return DotacionesCrud;
+            case 'productos_dotacion': return ProductosDotacion;
+            case 'pedidos_global_dotacion': return PedidosGlobalDotacion;
             default: return null;
           }
         case 'productos':
