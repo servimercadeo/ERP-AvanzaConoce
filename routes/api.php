@@ -13,9 +13,10 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
-use App\Http\Controllers\Api\DotacionController;
+use App\Http\Controllers\Api\PedidoAutomaticoController;
 use App\Http\Controllers\Api\EmpleadoController;
 use App\Http\Controllers\Api\EmpresaController;
+use App\Http\Controllers\Api\InventarioDotacionController;
 use App\Http\Controllers\Api\RequisicionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserPreferenceController;
@@ -207,9 +208,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
-    // CRUD de dotación del módulo de inventarios
-    Route::get('dotaciones/options', [DotacionController::class, 'options']);
-    Route::apiResource('dotaciones', DotacionController::class);
+    // CRUD de pedidos automáticos del módulo de inventarios
+    Route::get('pedidos-automaticos/options', [PedidoAutomaticoController::class, 'options']);
+    Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class);
+
+    // Inventario de prendas de dotación
+    Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);

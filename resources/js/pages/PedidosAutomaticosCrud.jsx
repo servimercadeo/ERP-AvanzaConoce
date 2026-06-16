@@ -789,7 +789,7 @@ function DeleteModal({ open, onClose, onConfirm, nombre }) {
 }
 
 /* ─── Componente principal ─────────────────────────────────── */
-export default function DotacionesCrud() {
+export default function PedidosAutomaticosCrud() {
     const [registros, setRegistros] = useState([]);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
@@ -812,12 +812,12 @@ export default function DotacionesCrud() {
     const [pagina, setPagina] = useState(1);
 
     const { data: _qRegistros, isLoading: loading } = useQuery({
-        queryKey: ["dotaciones"],
-        queryFn: () => api.get("/dotaciones").then((r) => r.data),
+        queryKey: ["pedidos_automaticos"],
+        queryFn: () => api.get("/pedidos-automaticos").then((r) => r.data),
     });
     const { data: _qOptions } = useQuery({
-        queryKey: ["dotaciones_options"],
-        queryFn: () => api.get("/dotaciones/options").then((r) => r.data),
+        queryKey: ["pedidos_automaticos_options"],
+        queryFn: () => api.get("/pedidos-automaticos/options").then((r) => r.data),
     });
     const { data: _qEmpleados } = useQuery({
         queryKey: ["empleados"],
@@ -1021,18 +1021,18 @@ export default function DotacionesCrud() {
     const handleSave = async (form) => {
         try {
             if (editTarget) {
-                await api.put(`/dotaciones/${editTarget.id}`, form);
+                await api.put(`/pedidos-automaticos/${editTarget.id}`, form);
                 const { data: fresh } = await api.get(
-                    `/dotaciones/${editTarget.id}`,
+                    `/pedidos-automaticos/${editTarget.id}`,
                 );
                 setRegistros((prev) =>
                     prev.map((r) => (r.id === editTarget.id ? fresh : r)),
                 );
-                showToast("Dotación actualizada correctamente.");
+                showToast("Pedido automático actualizado correctamente.");
             } else {
-                const { data: created } = await api.post("/dotaciones", form);
+                const { data: created } = await api.post("/pedidos-automaticos", form);
                 setRegistros((prev) => [created, ...prev]);
-                showToast("Dotación registrada correctamente.");
+                showToast("Pedido automático registrado correctamente.");
             }
             setModalOpen(false);
         } catch (err) {
@@ -1054,7 +1054,7 @@ export default function DotacionesCrud() {
     const handleDelete = async () => {
         if (!deleteTarget) return;
         try {
-            await api.delete(`/dotaciones/${deleteTarget.id}`);
+            await api.delete(`/pedidos-automaticos/${deleteTarget.id}`);
             setRegistros((prev) =>
                 prev.filter((r) => r.id !== deleteTarget.id),
             );

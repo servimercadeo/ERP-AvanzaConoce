@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import api from '../api/axios';
 import {
   IconSearch,
   IconEdit,
@@ -10,135 +12,6 @@ const TALLAS_JEAN = ['26', '28', '30', '32', '34', '36', '38', '40'];
 const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
 const ALL_TALLAS_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '26', '28', '30', '32', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
 
-const INVENTARIO_INICIAL = [
-  {
-    id: 1,
-    categoria: 'Polo',
-    subcategoria: 'Manga Corta',
-    genero: 'Masculino',
-    tallas: { XS: 5, S: 12, M: 28, L: 35, XL: 20, XXL: 8, XXXL: 3 },
-    stock_total: 111,
-    stock_minimo: 20,
-  },
-  {
-    id: 2,
-    categoria: 'Polo',
-    subcategoria: 'Manga Corta',
-    genero: 'Femenino',
-    tallas: { XS: 8, S: 18, M: 30, L: 22, XL: 14, XXL: 4, XXXL: 1 },
-    stock_total: 97,
-    stock_minimo: 15,
-  },
-  {
-    id: 3,
-    categoria: 'Polo',
-    subcategoria: 'Manga Larga',
-    genero: 'Masculino',
-    tallas: { XS: 2, S: 6, M: 15, L: 20, XL: 12, XXL: 5, XXXL: 2 },
-    stock_total: 62,
-    stock_minimo: 10,
-  },
-  {
-    id: 4,
-    categoria: 'Polo',
-    subcategoria: 'Manga Larga',
-    genero: 'Femenino',
-    tallas: { XS: 4, S: 10, M: 18, L: 14, XL: 8, XXL: 3, XXXL: 1 },
-    stock_total: 58,
-    stock_minimo: 10,
-  },
-  {
-    id: 5,
-    categoria: 'Jean',
-    subcategoria: 'Clásico',
-    genero: 'Masculino',
-    tallas: { 26: 2, 28: 8, 30: 20, 32: 35, 34: 28, 36: 15, 38: 6, 40: 3 },
-    stock_total: 117,
-    stock_minimo: 25,
-  },
-  {
-    id: 6,
-    categoria: 'Jean',
-    subcategoria: 'Clásico',
-    genero: 'Femenino',
-    tallas: { 26: 5, 28: 15, 30: 25, 32: 20, 34: 12, 36: 6, 38: 2, 40: 1 },
-    stock_total: 86,
-    stock_minimo: 20,
-  },
-  {
-    id: 7,
-    categoria: 'Chaqueta',
-    subcategoria: 'Impermeable',
-    genero: 'Masculino',
-    tallas: { XS: 3, S: 10, M: 22, L: 30, XL: 18, XXL: 8, XXXL: 2 },
-    stock_total: 93,
-    stock_minimo: 15,
-  },
-  {
-    id: 8,
-    categoria: 'Chaqueta',
-    subcategoria: 'Impermeable',
-    genero: 'Femenino',
-    tallas: { XS: 6, S: 14, M: 24, L: 18, XL: 10, XXL: 4, XXXL: 1 },
-    stock_total: 77,
-    stock_minimo: 12,
-  },
-  {
-    id: 9,
-    categoria: 'Chaqueta',
-    subcategoria: 'Reflectiva',
-    genero: 'Masculino',
-    tallas: { XS: 2, S: 8, M: 16, L: 22, XL: 14, XXL: 6, XXXL: 2 },
-    stock_total: 70,
-    stock_minimo: 10,
-  },
-  {
-    id: 10,
-    categoria: 'Chaqueta',
-    subcategoria: 'Reflectiva',
-    genero: 'Femenino',
-    tallas: { XS: 4, S: 10, M: 18, L: 14, XL: 8, XXL: 3, XXXL: 1 },
-    stock_total: 58,
-    stock_minimo: 8,
-  },
-  {
-    id: 11,
-    categoria: 'Tenis',
-    subcategoria: 'Seguridad',
-    genero: 'Masculino',
-    tallas: { 34: 2, 35: 4, 36: 8, 37: 12, 38: 20, 39: 28, 40: 30, 41: 22, 42: 14, 43: 8, 44: 4, 45: 2 },
-    stock_total: 154,
-    stock_minimo: 30,
-  },
-  {
-    id: 12,
-    categoria: 'Tenis',
-    subcategoria: 'Seguridad',
-    genero: 'Femenino',
-    tallas: { 34: 4, 35: 8, 36: 16, 37: 22, 38: 28, 39: 20, 40: 12, 41: 6, 42: 3, 43: 1, 44: 0, 45: 0 },
-    stock_total: 120,
-    stock_minimo: 20,
-  },
-  {
-    id: 13,
-    categoria: 'Tenis',
-    subcategoria: 'Casual',
-    genero: 'Masculino',
-    tallas: { 34: 3, 35: 6, 36: 12, 37: 18, 38: 25, 39: 30, 40: 28, 41: 20, 42: 12, 43: 6, 44: 3, 45: 1 },
-    stock_total: 164,
-    stock_minimo: 25,
-  },
-  {
-    id: 14,
-    categoria: 'Tenis',
-    subcategoria: 'Casual',
-    genero: 'Femenino',
-    tallas: { 34: 6, 35: 12, 36: 22, 37: 28, 38: 30, 39: 22, 40: 14, 41: 8, 42: 4, 43: 2, 44: 0, 45: 0 },
-    stock_total: 148,
-    stock_minimo: 20,
-  },
-];
-
 const CATEGORIAS = ['Polo', 'Jean', 'Chaqueta', 'Tenis'];
 const GENEROS = ['Todos', 'Masculino', 'Femenino'];
 
@@ -147,8 +20,13 @@ export default function ProductosDotacion() {
   const [categoriaFiltro, setCategoriaFiltro] = useState('Polo');
   const [generoFiltro, setGeneroFiltro] = useState('Todos');
 
+  const { data: inventario = [] } = useQuery({
+    queryKey: ['inventario_dotacion'],
+    queryFn: () => api.get('/inventario-dotacion').then((r) => r.data),
+  });
+
   const filtrados = useMemo(() => {
-    let items = [...INVENTARIO_INICIAL];
+    let items = [...inventario];
     if (categoriaFiltro !== 'Todas') items = items.filter(i => i.categoria === categoriaFiltro);
     if (generoFiltro !== 'Todos') items = items.filter(i => i.genero === generoFiltro);
     if (search.trim()) {
@@ -160,14 +38,14 @@ export default function ProductosDotacion() {
       );
     }
     return items;
-  }, [search, categoriaFiltro, generoFiltro]);
+  }, [inventario, search, categoriaFiltro, generoFiltro]);
 
-  const totalItems = INVENTARIO_INICIAL.reduce((s, i) => s + i.stock_total, 0);
-  const totalPolos = INVENTARIO_INICIAL.filter(i => i.categoria === 'Polo').reduce((s, i) => s + i.stock_total, 0);
-  const totalJeans = INVENTARIO_INICIAL.filter(i => i.categoria === 'Jean').reduce((s, i) => s + i.stock_total, 0);
-  const totalChaquetas = INVENTARIO_INICIAL.filter(i => i.categoria === 'Chaqueta').reduce((s, i) => s + i.stock_total, 0);
-  const totalTenis = INVENTARIO_INICIAL.filter(i => i.categoria === 'Tenis').reduce((s, i) => s + i.stock_total, 0);
-  const bajoStock = INVENTARIO_INICIAL.filter(i => i.stock_total <= i.stock_minimo).length;
+  const totalItems = inventario.reduce((s, i) => s + i.stock_total, 0);
+  const totalPolos = inventario.filter(i => i.categoria === 'Polo').reduce((s, i) => s + i.stock_total, 0);
+  const totalJeans = inventario.filter(i => i.categoria === 'Jean').reduce((s, i) => s + i.stock_total, 0);
+  const totalChaquetas = inventario.filter(i => i.categoria === 'Chaqueta').reduce((s, i) => s + i.stock_total, 0);
+  const totalTenis = inventario.filter(i => i.categoria === 'Tenis').reduce((s, i) => s + i.stock_total, 0);
+  const bajoStock = inventario.filter(i => i.stock_total <= i.stock_minimo).length;
 
   const badgeStock = (stock, minimo) => {
     if (stock <= minimo * 0.5) return { background: '#fce8e8', color: '#c0392b' };
@@ -193,7 +71,7 @@ export default function ProductosDotacion() {
           <div className="stat-label">Total prendas en inventario</div>
         </div>
         <div className="stat-card">
-          <div className="stat-num">{INVENTARIO_INICIAL.length}</div>
+          <div className="stat-num">{inventario.length}</div>
           <div className="stat-label">Variedades registradas</div>
         </div>
         <div className="stat-card">

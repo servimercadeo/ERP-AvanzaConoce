@@ -5,11 +5,11 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-class DotacionesSeeder extends Seeder
+class PedidosAutomaticosSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('dotaciones')->truncate();
+        DB::table('pedidos_automaticos')->truncate();
 
         $now = now();
 
@@ -271,8 +271,8 @@ class DotacionesSeeder extends Seeder
             $record['updated_at'] = $now;
         }
 
-        DB::table('dotaciones')->insert($records);
+        DB::table('pedidos_automaticos')->insert($records);
 
-        $this->command->info('✓ ' . count($records) . ' registros de dotación insertados.');
+        $this->command->info('✓ ' . count($records) . ' registros de pedidos automáticos insertados.');
     }
 }

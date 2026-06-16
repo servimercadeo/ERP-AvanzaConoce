@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Dotacion;
+use App\Models\PedidoAutomatico;
 use Illuminate\Http\Request;
 
-class DotacionController extends Controller
+class PedidoAutomaticoController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Dotacion::query();
+        $query = PedidoAutomatico::query();
 
         if ($request->search) {
             $search = $request->search;
@@ -40,7 +40,7 @@ class DotacionController extends Controller
 
     public function options()
     {
-        $pluck = fn($column) => Dotacion::query()
+        $pluck = fn($column) => PedidoAutomatico::query()
             ->whereNotNull($column)
             ->where($column, '!=', '')
             ->select($column)
@@ -60,26 +60,26 @@ class DotacionController extends Controller
 
     public function store(Request $request)
     {
-        $dotacion = Dotacion::create($this->validatedData($request));
+        $pedidoAutomatico = PedidoAutomatico::create($this->validatedData($request));
 
-        return response()->json($dotacion, 201);
+        return response()->json($pedidoAutomatico, 201);
     }
 
-    public function show(Dotacion $dotacion)
+    public function show(PedidoAutomatico $pedidoAutomatico)
     {
-        return response()->json($dotacion);
+        return response()->json($pedidoAutomatico);
     }
 
-    public function update(Request $request, Dotacion $dotacion)
+    public function update(Request $request, PedidoAutomatico $pedidoAutomatico)
     {
-        $dotacion->update($this->validatedData($request));
+        $pedidoAutomatico->update($this->validatedData($request));
 
-        return response()->json($dotacion->fresh());
+        return response()->json($pedidoAutomatico->fresh());
     }
 
-    public function destroy(Dotacion $dotacion)
+    public function destroy(PedidoAutomatico $pedidoAutomatico)
     {
-        $dotacion->delete();
+        $pedidoAutomatico->delete();
 
         return response()->json(null, 204);
     }
