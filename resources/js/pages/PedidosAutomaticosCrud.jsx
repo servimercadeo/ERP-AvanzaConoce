@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect,
@@ -547,13 +547,12 @@ function Modal({
                                     {...fp}
                                 />
                             </div>
-                            <div style={{ ...S.grid4, marginTop: 14 }}>
+                            <div style={{ ...S.grid3, marginTop: 14 }}>
                                 <Field
                                     label="Tipo Contrato"
                                     k="tipo_contrato"
                                     {...fp}
                                 />
-                                <Field label="Proceso" k="proceso" {...fp} />
                                 <Field
                                     label="Fecha Ingreso"
                                     k="fecha_ingreso"
@@ -808,6 +807,7 @@ export default function PedidosAutomaticosCrud() {
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
 
+    const queryClient = useQueryClient();
     const [toast, setToast] = useState(null);
     const [pagina, setPagina] = useState(1);
 
@@ -1005,12 +1005,22 @@ export default function PedidosAutomaticosCrud() {
         setEditTarget(null);
         setModalOpen(true);
     };
-    const openEdit = (r) => {
-        setEditTarget(r);
+    const openEdit = async (r) => {
+        try {
+            const { data: enriched } = await api.get(`/pedidos-automaticos/${r.id}/enriquecer`);
+            setEditTarget(enriched);
+        } catch {
+            setEditTarget(r);
+        }
         setModalOpen(true);
     };
-    const openView = (r) => {
-        setViewTarget(r);
+    const openView = async (r) => {
+        try {
+            const { data: enriched } = await api.get(`/pedidos-automaticos/${r.id}/enriquecer`);
+            setViewTarget(enriched);
+        } catch {
+            setViewTarget(r);
+        }
         setViewOpen(true);
     };
     const openDelete = (r) => {
@@ -1028,10 +1038,12 @@ export default function PedidosAutomaticosCrud() {
                 setRegistros((prev) =>
                     prev.map((r) => (r.id === editTarget.id ? fresh : r)),
                 );
+                queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
                 showToast("Pedido automático actualizado correctamente.");
             } else {
                 const { data: created } = await api.post("/pedidos-automaticos", form);
                 setRegistros((prev) => [created, ...prev]);
+                queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
                 showToast("Pedido automático registrado correctamente.");
             }
             setModalOpen(false);
@@ -1053,13 +1065,15 @@ export default function PedidosAutomaticosCrud() {
 
     const handleDelete = async () => {
         if (!deleteTarget) return;
+        const targetId = deleteTarget.id;
+        console.log("[Delete] targetId:", targetId, typeof targetId, "deleteTarget:", deleteTarget);
         try {
-            await api.delete(`/pedidos-automaticos/${deleteTarget.id}`);
-            setRegistros((prev) =>
-                prev.filter((r) => r.id !== deleteTarget.id),
-            );
+            await api.delete(`/pedidos-automaticos/${targetId}`);
+            setRegistros((prev) => prev.filter((r) => r.id !== targetId));
+            queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
             showToast("Registro eliminado.");
-        } catch {
+        } catch (err) {
+            console.error("[Delete] error:", err?.response?.status, err?.response?.data);
             showToast("No se pudo eliminar el registro.");
         } finally {
             setDeleteOpen(false);

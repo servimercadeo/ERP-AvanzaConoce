@@ -211,6 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD de pedidos automáticos del módulo de inventarios
     Route::get('pedidos-automaticos/options', [PedidoAutomaticoController::class, 'options']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class);
+    Route::get('pedidos-automaticos/{pedidoAutomatico}/enriquecer', [PedidoAutomaticoController::class, 'enriquecer']);
 
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);

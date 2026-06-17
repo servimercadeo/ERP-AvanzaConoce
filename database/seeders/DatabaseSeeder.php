@@ -26,7 +26,6 @@ class DatabaseSeeder extends Seeder
         // 6. Proyectos ya están en su propia migración con seed inline
         // 7. Requisiciones de selección
         $this->call(RequisicionesSeeder::class);
-        $this->call(PedidosAutomaticosSeeder::class);
         $this->call(InventarioDotacionSeeder::class);
 
     }

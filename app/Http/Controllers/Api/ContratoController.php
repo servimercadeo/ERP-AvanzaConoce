@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\Contrato;
+use App\Models\InventarioDotacion;
+use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -179,7 +181,12 @@ class ContratoController extends Controller
 
         $this->enviarContratoASharepoint($contrato);
 
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
+        $pedidoInfo = $this->crearPedidoAutomaticoDesdeContrato($contrato);
+
+        $respuesta = $contrato->load(['empleado', 'centrosCostos', 'anexos']);
+        $respuesta->pedido_automatico = $pedidoInfo;
+
+        return response()->json($respuesta, 201);
     }
 
     public function show(Contrato $contrato)
@@ -247,5 +254,165 @@ class ContratoController extends Controller
     {
         $contrato->delete();
         return response()->json(null, 204);
+    }
+
+    private function descontarInventarioPedido(?string $tallaPolo, ?string $tallaJean, string $generoInv, array &$advertencias): void
+    {
+        if ($tallaPolo) {
+            $inv = InventarioDotacion::where('categoria', 'Polo')
+                ->where('genero', $generoInv)
+                ->where('talla', $tallaPolo)
+                ->first();
+            if ($inv && $inv->cantidad >= 2) {
+                $inv->decrement('cantidad', 2);
+            } else {
+                $disponible = $inv?->cantidad ?? 0;
+                $advertencias[] = "No se pudo descontar polo {$generoInv} talla {$tallaPolo} (disponible: {$disponible})";
+            }
+        }
+
+        if ($tallaJean) {
+            $inv = InventarioDotacion::where('categoria', 'Jean')
+                ->where('genero', $generoInv)
+                ->where('talla', $tallaJean)
+                ->first();
+            if ($inv && $inv->cantidad >= 2) {
+                $inv->decrement('cantidad', 2);
+            } else {
+                $disponible = $inv?->cantidad ?? 0;
+                $advertencias[] = "No se pudo descontar jean {$generoInv} talla {$tallaJean} (disponible: {$disponible})";
+            }
+        }
+    }
+
+    private function crearPedidoAutomaticoDesdeContrato(Contrato $contrato): array
+    {
+        $empleado = $contrato->empleado;
+        if (!$empleado || !$empleado->cedula) {
+            return ['creado' => false, 'motivo' => 'empleado sin cédula'];
+        }
+
+        $cedula = $empleado->cedula;
+
+        // Si ya existe con código consecutivo, no duplicar
+        $existente = PedidoAutomatico::where('cedula', $cedula)->first();
+        if ($existente && !empty($existente->pedido_inicial)) {
+            return ['creado' => false, 'motivo' => 'ya existe un pedido automático para esta cédula'];
+        }
+
+        $respuesta     = RespuestaIngreso::where('documento', $cedula)->first();
+        $tallaCamisa   = $respuesta?->talla_camisa;
+        $tallaPantalon = $respuesta?->talla_pantalon;
+
+        $generoTexto    = strtolower($empleado->genero ?? '');
+        $esFemenino     = str_starts_with($generoTexto, 'f') || str_contains($generoTexto, 'femen');
+        $generoInv      = $esFemenino ? 'Femenino' : 'Masculino';
+        $generoPedido   = $generoInv;
+
+        $advertencias = [];
+
+        if ($tallaCamisa) {
+            $stockPolo = InventarioDotacion::where('categoria', 'Polo')
+                ->where('genero', $generoInv)
+                ->where('talla', $tallaCamisa)
+                ->sum('cantidad');
+            if ($stockPolo < 2) {
+                $advertencias[] = "Stock insuficiente: polo {$generoInv} talla {$tallaCamisa} (disponible: {$stockPolo})";
+            }
+        } else {
+            $advertencias[] = 'Talla de camisa no registrada; valida el polo manualmente.';
+        }
+
+        if ($tallaPantalon) {
+            $stockJean = InventarioDotacion::where('categoria', 'Jean')
+                ->where('genero', $generoInv)
+                ->where('talla', $tallaPantalon)
+                ->sum('cantidad');
+            if ($stockJean < 2) {
+                $advertencias[] = "Stock insuficiente: jean {$generoInv} talla {$tallaPantalon} (disponible: {$stockJean})";
+            }
+        } else {
+            $advertencias[] = 'Talla de pantalón no registrada; valida el jean manualmente.';
+        }
+
+        // Generar código consecutivo (solo considera pedido_inicial con formato numérico puro)
+        $maxNumerico = PedidoAutomatico::whereNotNull('pedido_inicial')
+            ->pluck('pedido_inicial')
+            ->filter(fn($v) => ctype_digit((string) $v))
+            ->map(fn($v) => (int) $v)
+            ->max() ?? 0;
+        $pedidoInicial = str_pad($maxNumerico + 1, 5, '0', STR_PAD_LEFT);
+
+        if ($existente) {
+            // Pedido incompleto sin código — completarlo sin crear duplicado
+            $updateData = ['pedido_inicial' => $pedidoInicial];
+            if (empty($existente->fecha_inicial)) {
+                $updateData['fecha_inicial'] = now()->format('Y-m-d');
+            }
+            if ($esFemenino) {
+                if (empty($existente->polo_femenino_talla))    $updateData['polo_femenino_talla']    = $tallaCamisa;
+                if (empty($existente->polo_femenino_cantidad)) $updateData['polo_femenino_cantidad'] = 2;
+                if (empty($existente->jean_femenino_talla))    $updateData['jean_femenino_talla']    = $tallaPantalon;
+                if (empty($existente->jean_femenino_cantidad)) $updateData['jean_femenino_cantidad'] = 2;
+            } else {
+                if (empty($existente->polo_masculino_talla))    $updateData['polo_masculino_talla']    = $tallaCamisa;
+                if (empty($existente->polo_masculino_cantidad)) $updateData['polo_masculino_cantidad'] = 2;
+                if (empty($existente->jean_masculino_talla))    $updateData['jean_masculino_talla']    = $tallaPantalon;
+                if (empty($existente->jean_masculino_cantidad)) $updateData['jean_masculino_cantidad'] = 2;
+            }
+            $existente->update($updateData);
+            $pedido = $existente;
+        } else {
+            $pedidoData = [
+                'sede'            => $contrato->sede,
+                'cedula'          => $cedula,
+                'nombres'         => $empleado->nombres ?? '',
+                'apellidos'       => $empleado->apellidos ?? '',
+                'cargo'           => $contrato->cargo,
+                'tipo_contrato'   => $contrato->tipo_contrato,
+                'fecha_ingreso'   => $contrato->fecha_ingreso?->format('Y-m-d'),
+                'estado_contrato' => $contrato->estado_contrato,
+                'empleador'       => $contrato->empleador,
+                'proyecto'        => $contrato->cliente_proyecto,
+                'ciudad'          => $respuesta?->ciudad ?? '',
+                'genero'          => $generoPedido,
+                'estado_acta'     => 'Pendiente',
+                'pedido_inicial'  => $pedidoInicial,
+                'fecha_inicial'   => now()->format('Y-m-d'),
+            ];
+
+            if ($esFemenino) {
+                $pedidoData['polo_femenino_talla']    = $tallaCamisa;
+                $pedidoData['polo_femenino_cantidad']  = 2;
+                $pedidoData['jean_femenino_talla']     = $tallaPantalon;
+                $pedidoData['jean_femenino_cantidad']  = 2;
+            } else {
+                $pedidoData['polo_masculino_talla']    = $tallaCamisa;
+                $pedidoData['polo_masculino_cantidad'] = 2;
+                $pedidoData['jean_masculino_talla']    = $tallaPantalon;
+                $pedidoData['jean_masculino_cantidad'] = 2;
+            }
+
+            try {
+                $pedido = PedidoAutomatico::create($pedidoData);
+            } catch (\Exception $e) {
+                Log::warning("No se pudo crear pedido automático para contrato {$contrato->id}: " . $e->getMessage());
+                return ['creado' => false, 'motivo' => 'error al crear el pedido: ' . $e->getMessage()];
+            }
+        }
+
+        // Descontar inventario solo si aún no se ha descontado
+        if (!($existente?->inventario_descontado ?? false)) {
+            $this->descontarInventarioPedido($tallaCamisa, $tallaPantalon, $generoInv, $advertencias);
+        }
+
+        // Marcar inventario descontado
+        try {
+            $pedido->update(['inventario_descontado' => true]);
+        } catch (\Throwable) {
+            // Columna aún no migrada — no es crítico
+        }
+
+        return ['creado' => true, 'pedido_id' => $pedido->id, 'advertencias' => $advertencias];
     }
 }

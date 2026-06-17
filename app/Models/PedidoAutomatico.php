@@ -60,9 +60,11 @@ class PedidoAutomatico extends Model
         'fecha_renovacion_4',
         'pedido_renovacion_5',
         'fecha_renovacion_5',
+        'inventario_descontado',
     ];
 
     protected $casts = [
+        'inventario_descontado' => 'boolean',
         'fecha_ingreso' => 'date:Y-m-d',
         'fecha_segunda_renovacion_2025' => 'date:Y-m-d',
         'fecha_primera_renovacion_2024' => 'date:Y-m-d',
