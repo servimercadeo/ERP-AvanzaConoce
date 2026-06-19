@@ -45,6 +45,25 @@ class EmpleadoController extends Controller
                     }
 
                     $user->ciudad = $ciudad;
+
+                    // Género: usar users.genero solo si es un valor real;
+                    // "No especificado" y vacío hacen fallback a candidatos
+                    $generosValidos = ['Masculino', 'Femenino', 'Otro'];
+                    if (!in_array($user->genero, $generosValidos)) {
+                        $user->genero = \Illuminate\Support\Facades\DB::table('candidatos')
+                            ->where('identificacion', $user->cedula)
+                            ->value('genero');
+                    }
+
+                    // Tallas de dotación desde respuestas_ingresos
+                    $tallas = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
+                        ->where('documento', $user->cedula)
+                        ->select('talla_camisa', 'talla_pantalon', 'talla_zapatos')
+                        ->first();
+                    $user->talla_camisa   = $tallas->talla_camisa   ?? null;
+                    $user->talla_pantalon = $tallas->talla_pantalon ?? null;
+                    $user->talla_zapatos  = $tallas->talla_zapatos  ?? null;
+
                     return $user;
                 })
         );

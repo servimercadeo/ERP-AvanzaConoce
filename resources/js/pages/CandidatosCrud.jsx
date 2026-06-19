@@ -92,6 +92,7 @@ export default function CandidatosCrud() {
         identificacion: "",
         fecha_expedicion: "",
         edad: "",
+        genero: "",
         fecha_postulacion: getTodayStr(),
         fuente: "Fase Inicial",
         fuente_especifica: "Pendiente de Aval",
@@ -314,6 +315,7 @@ export default function CandidatosCrud() {
             identificacion: "",
             fecha_expedicion: "",
             edad: "",
+            genero: "",
             fecha_postulacion: getTodayStr(),
             fuente: "Fase Inicial",
             fuente_especifica: "Pendiente de Aval",
@@ -1145,6 +1147,23 @@ export default function CandidatosCrud() {
                                     label="Edad"
                                     k="edad"
                                     type="number"
+                                    form={candForm}
+                                    onChange={(k) => (e) =>
+                                        setCandForm((p) => ({
+                                            ...p,
+                                            [k]: e.target.value,
+                                        }))
+                                    }
+                                    disabled={candModalMode === "view"}
+                                />
+                                <Field
+                                    label="Género"
+                                    k="genero"
+                                    opts={[
+                                        { value: "Masculino", label: "Masculino" },
+                                        { value: "Femenino",  label: "Femenino"  },
+                                        { value: "Otro",      label: "Otro"      },
+                                    ]}
                                     form={candForm}
                                     onChange={(k) => (e) =>
                                         setCandForm((p) => ({

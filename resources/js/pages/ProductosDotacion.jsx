@@ -1,23 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/axios';
-import {
-  IconSearch,
-  IconEdit,
-  IconEye,
-} from '../components/Icons';
 
 const TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 const TALLAS_JEAN = ['26', '28', '30', '32', '34', '36', '38', '40'];
 const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
 const ALL_TALLAS_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '26', '28', '30', '32', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
 
-const CATEGORIAS = ['Polo', 'Jean', 'Chaqueta', 'Tenis'];
+const CATEGORIAS = ['Todas', 'Polo', 'Jean', 'Chaqueta', 'Tenis'];
 const GENEROS = ['Todos', 'Masculino', 'Femenino'];
 
 export default function ProductosDotacion() {
   const [search, setSearch] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('Polo');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
   const [generoFiltro, setGeneroFiltro] = useState('Todos');
 
   const { data: inventario = [] } = useQuery({
@@ -79,7 +74,7 @@ export default function ProductosDotacion() {
           <div className="stat-label">Productos con stock bajo</div>
         </div>
         <div className="stat-card">
-          <div className="stat-num" style={{ color: 'var(--primary)' }}>4</div>
+          <div className="stat-num" style={{ color: 'var(--primary)' }}>{new Set(inventario.map(i => i.categoria)).size}</div>
           <div className="stat-label">Categorías de prendas</div>
         </div>
       </div>
@@ -98,7 +93,7 @@ export default function ProductosDotacion() {
               ...S.catCard,
               borderLeft: `4px solid ${cat.color}`,
             }}
-            onClick={() => setCategoriaFiltro(cat.label === 'Polos' ? 'Polo' : cat.label === 'Jeans' ? 'Jean' : cat.label === 'Chaquetas' ? 'Chaqueta' : 'Tenis')}
+            onClick={() => setCategoriaFiltro({ Polos: 'Polo', Jeans: 'Jean', Chaquetas: 'Chaqueta', Tenis: 'Tenis' }[cat.label])}
           >
             <span style={{ fontSize: '1.4rem', fontWeight: 800, color: cat.color }}>
               {cat.total}
