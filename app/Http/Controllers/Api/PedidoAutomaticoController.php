@@ -139,6 +139,30 @@ class PedidoAutomaticoController extends Controller
         });
     }
 
+    public function ultimoPorEmpleado(int $empleadoId)
+    {
+        $pedido = PedidoAutomatico::with(['items.inventario'])
+            ->where('empleado_id', $empleadoId)
+            ->where('estado', 'Completado')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (!$pedido) {
+            return response()->json(null);
+        }
+
+        return response()->json([
+            'codigo'      => $pedido->codigo,
+            'fecha_pedido'=> $pedido->fecha_pedido,
+            'estado'      => $pedido->estado,
+            'items'       => $pedido->items->map(fn($it) => [
+                'inventario_dotacion_id' => $it->inventario_dotacion_id,
+                'cantidad'               => $it->cantidad,
+                'inventario'             => $it->inventario,
+            ])->values(),
+        ]);
+    }
+
     public function destroy(PedidoAutomatico $pedidoAutomatico)
     {
         return DB::transaction(function () use ($pedidoAutomatico) {

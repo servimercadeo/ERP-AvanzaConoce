@@ -215,6 +215,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
 
     // Pedidos automáticos de dotación
+    Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
         ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
 
