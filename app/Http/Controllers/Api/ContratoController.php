@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\Contrato;
-use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -181,19 +180,6 @@ class ContratoController extends Controller
         });
 
         $this->enviarContratoASharepoint($contrato);
-
-        try {
-            PedidoAutomatico::create([
-                'codigo'       => PedidoAutomatico::generarCodigo(),
-                'contrato_id'  => $contrato->id,
-                'empleado_id'  => $contrato->empleado_id,
-                'estado'       => 'Pendiente',
-                'fecha_pedido' => now()->toDateString(),
-                'notas'        => 'Generado automáticamente al crear contrato.',
-            ]);
-        } catch (\Exception $e) {
-            Log::warning('No se pudo crear pedido automático para contrato ' . $contrato->id . ': ' . $e->getMessage());
-        }
 
         return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
     }

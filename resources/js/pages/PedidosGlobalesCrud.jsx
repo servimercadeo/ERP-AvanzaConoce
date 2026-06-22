@@ -60,6 +60,50 @@ function EditModal({ global: g, onClose, onSaved }) {
     );
 }
 
+// ── Modal confirmar pedido global ──────────────────────────────────────────
+function ConfirmModal({ global: g, onClose, onConfirmed }) {
+    const [saving, setSaving] = useState(false);
+    const [error, setError]   = useState("");
+
+    const handleConfirm = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const { data } = await api.put(`/pedidos-globales/${g.id}`, { confirmado: true });
+            onConfirmed(data);
+        } catch (e) {
+            setError(e?.response?.data?.message ?? "Error al confirmar.");
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 420 }}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800, fontSize: "1rem", color: "#0d6e5a" }}>Confirmar Pedido Global</span>
+                    <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
+                </div>
+                <div style={S.modalBody}>
+                    <p style={{ marginBottom: 10 }}>
+                        ¿Confirmar la entrega del pedido global <strong style={{ fontFamily: "monospace" }}>#{g.codigo}</strong>?
+                    </p>
+                    <div style={{ background: "#e0f7f4", border: "1.5px solid #0d6e5a", borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", color: "#0d6e5a" }}>
+                        El pedido quedará marcado como <strong>Confirmado</strong> y no podrá revertirse.
+                    </div>
+                    {error && <div style={{ ...S.errorMsg, marginTop: 10 }}>{error}</div>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
+                    <button style={{ ...S.btnPrimary, background: "#0d6e5a" }} onClick={handleConfirm} disabled={saving}>
+                        {saving ? "Confirmando…" : "Confirmar entrega"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ── Modal confirmar eliminar ────────────────────────────────────────────────
 function DeleteModal({ global: g, onClose, onDeleted }) {
     const [deleting, setDeleting] = useState(false);
@@ -111,11 +155,13 @@ function DeleteModal({ global: g, onClose, onDeleted }) {
 // ── Vista principal ────────────────────────────────────────────────────────
 export default function PedidosGlobalesCrud() {
     const qc = useQueryClient();
-    const [search, setSearch]       = useState("");
-    const [pagina, setPagina]       = useState(1);
+    const [search, setSearch]           = useState("");
+    const [filtroEstado, setFiltroEstado] = useState("Todos");
+    const [pagina, setPagina]           = useState(1);
     const [expanded, setExpanded]   = useState(null);
-    const [editTarget, setEditTarget]     = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [editTarget, setEditTarget]       = useState(null);
+    const [deleteTarget, setDeleteTarget]   = useState(null);
+    const [confirmTarget, setConfirmTarget] = useState(null);
 
     const { data: globales = [], isLoading } = useQuery({
         queryKey: ["pedidos-globales"],
@@ -133,12 +179,15 @@ export default function PedidosGlobalesCrud() {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return globales;
-        return globales.filter((g) =>
-            g.codigo.toLowerCase().includes(q) ||
-            String(g.fecha ?? "").includes(q)
-        );
-    }, [globales, search]);
+        return globales.filter((g) => {
+            const matchQ = !q || g.codigo.toLowerCase().includes(q) || String(g.fecha ?? "").includes(q);
+            const matchE =
+                filtroEstado === "Todos" ||
+                (filtroEstado === "Confirmado" && g.confirmado) ||
+                (filtroEstado === "En proceso" && !g.confirmado);
+            return matchQ && matchE;
+        });
+    }, [globales, search, filtroEstado]);
 
     const paginated    = useMemo(() => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA), [filtered, pagina]);
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
@@ -157,6 +206,13 @@ export default function PedidosGlobalesCrud() {
         qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
         setDeleteTarget(null);
         if (expanded === id) setExpanded(null);
+    };
+
+    const handleConfirmed = (updated) => {
+        qc.setQueryData(["pedidos-globales"], (old = []) =>
+            old.map((g) => (g.id === updated.id ? updated : g))
+        );
+        setConfirmTarget(null);
     };
 
     return (
@@ -188,6 +244,15 @@ export default function PedidosGlobalesCrud() {
                         onChange={(e) => { setSearch(e.target.value); setPagina(1); }}
                     />
                 </div>
+                <select
+                    style={S.selectFilter}
+                    value={filtroEstado}
+                    onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1); }}
+                >
+                    <option value="Todos">Todos los estados</option>
+                    <option value="En proceso">En proceso</option>
+                    <option value="Confirmado">Confirmado</option>
+                </select>
             </div>
 
             {/* Tabla */}
@@ -253,6 +318,24 @@ export default function PedidosGlobalesCrud() {
                                                     >
                                                         <IconEdit size={14} />
                                                     </button>
+                                                    {!g.confirmado && (
+                                                        <button
+                                                            style={{ ...S.actionBtn, color: "#0d6e5a" }}
+                                                            title="Confirmar entrega"
+                                                            onClick={() => setConfirmTarget(g)}
+                                                        >
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="20 6 9 17 4 12" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+                                                    {g.confirmado && (
+                                                        <span title="Entrega confirmada" style={{ display: "flex", alignItems: "center", color: "#0d6e5a", padding: "0 4px" }}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="20 6 9 17 4 12" />
+                                                            </svg>
+                                                        </span>
+                                                    )}
                                                     <button
                                                         style={{ ...S.actionBtn, color: "#c0392b" }}
                                                         title="Eliminar"
@@ -351,14 +434,16 @@ export default function PedidosGlobalesCrud() {
             )}
 
             {/* Modales */}
-            {editTarget   && <EditModal   global={editTarget}   onClose={() => setEditTarget(null)}   onSaved={handleSaved}   />}
-            {deleteTarget && <DeleteModal global={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={handleDeleted} />}
+            {editTarget    && <EditModal    global={editTarget}    onClose={() => setEditTarget(null)}    onSaved={handleSaved}       />}
+            {deleteTarget  && <DeleteModal  global={deleteTarget}  onClose={() => setDeleteTarget(null)}  onDeleted={handleDeleted}   />}
+            {confirmTarget && <ConfirmModal global={confirmTarget} onClose={() => setConfirmTarget(null)} onConfirmed={handleConfirmed} />}
         </div>
     );
 }
 
 const S = {
     toolbar:        { display: "flex", alignItems: "center", gap: 12, marginBottom: 20 },
+    selectFilter:   { padding: "8px 12px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", background: "var(--white)", color: "var(--text)", cursor: "pointer", outline: "none" },
     searchWrap:     { position: "relative", flex: 1, maxWidth: 360 },
     searchIcon:     { position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", color: "var(--text-muted)", pointerEvents: "none" },
     searchInput:    { width: "100%", padding: "9px 12px 9px 34px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", background: "var(--white)", color: "var(--text)", outline: "none" },

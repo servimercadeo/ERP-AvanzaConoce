@@ -1142,6 +1142,11 @@ export default function PedidosAutomaticosCrud() {
         return empleados.filter((e) => ids.has(String(e.id)));
     }, [empleados, contratos]);
 
+    const estadosUsados = useMemo(() => {
+        const usados = new Set(pedidos.map((p) => p.estado).filter(Boolean));
+        return ESTADOS.filter((e) => usados.has(e));
+    }, [pedidos]);
+
     const stats = useMemo(
         () => ({
             total: pedidos.length,
@@ -1347,9 +1352,9 @@ export default function PedidosAutomaticosCrud() {
                         onChange={(e) => setFiltroEstado(e.target.value)}
                     >
                         <option value="Todos">Todos los estados</option>
-                        {ESTADOS.map((s) => (
+                        {estadosUsados.map((s) => (
                             <option key={s} value={s}>
-                                {s}
+                                {ESTADO_LABEL[s] ?? s}
                             </option>
                         ))}
                     </select>

@@ -25,8 +25,9 @@ class PedidoGlobalController extends Controller
     public function update(Request $request, PedidoGlobal $pedidoGlobal)
     {
         $data = $request->validate([
-            'fecha' => 'nullable|date',
-            'notas' => 'nullable|string',
+            'fecha'       => 'nullable|date',
+            'notas'       => 'nullable|string',
+            'confirmado'  => 'nullable|boolean',
         ]);
 
         $pedidoGlobal->update($data);

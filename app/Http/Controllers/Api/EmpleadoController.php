@@ -46,9 +46,8 @@ class EmpleadoController extends Controller
 
                     $user->ciudad = $ciudad;
 
-                    // Género: usar users.genero solo si es un valor real;
-                    // "No especificado" y vacío hacen fallback a candidatos
-                    $generosValidos = ['Masculino', 'Femenino', 'Otro'];
+                    // Género: usar users.genero si es un valor reconocido; si no, buscar en candidatos
+                    $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
                     if (!in_array($user->genero, $generosValidos)) {
                         $user->genero = \Illuminate\Support\Facades\DB::table('candidatos')
                             ->where('identificacion', $user->cedula)

@@ -9,9 +9,9 @@ class PedidoGlobal extends Model
 {
     protected $table = 'pedidos_globales';
 
-    protected $fillable = ['codigo', 'fecha', 'total_pedidos', 'notas'];
+    protected $fillable = ['codigo', 'fecha', 'total_pedidos', 'notas', 'confirmado'];
 
-    protected $casts = ['fecha' => 'date'];
+    protected $casts = ['fecha' => 'date', 'confirmado' => 'boolean'];
 
     public function pedidosAutomaticos()
     {

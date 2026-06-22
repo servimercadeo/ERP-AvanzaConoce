@@ -60,6 +60,7 @@ class CandidatoController extends Controller
             'aval'              => 'nullable|boolean',
             'negocio'           => 'nullable|string|max:150',
             'observaciones'     => 'nullable|string',
+            'genero'            => 'nullable|string|max:30',
         ]);
 
         if (empty($data['fecha_postulacion'])) {
@@ -131,6 +132,7 @@ class CandidatoController extends Controller
             'lugar_trabajo'                => 'nullable|string|max:200',
             'fecha_programacion_ingreso'   => 'nullable|date',
             'fecha_correccion'             => 'nullable|date',
+            'genero'                       => 'nullable|string|max:30',
             // Remuneración
             'tasa_riesgo_arl'          => 'nullable|string|max:20',
             'arl'                      => 'nullable|string|max:120',
