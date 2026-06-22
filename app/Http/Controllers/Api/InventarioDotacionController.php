@@ -7,8 +7,18 @@ use App\Models\InventarioDotacion;
 
 class InventarioDotacionController extends Controller
 {
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
+        if ($request->boolean('flat')) {
+            return response()->json(
+                InventarioDotacion::orderBy('categoria')
+                    ->orderBy('subcategoria')
+                    ->orderBy('genero')
+                    ->orderBy('talla')
+                    ->get()
+            );
+        }
+
         $rows = InventarioDotacion::orderBy('categoria')
             ->orderBy('subcategoria')
             ->orderBy('genero')

@@ -13,8 +13,9 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
-use App\Http\Controllers\Api\PedidoAutomaticoController;
 use App\Http\Controllers\Api\EmpleadoController;
+use App\Http\Controllers\Api\PedidoAutomaticoController;
+use App\Http\Controllers\Api\PedidoGlobalController;
 use App\Http\Controllers\Api\EmpresaController;
 use App\Http\Controllers\Api\InventarioDotacionController;
 use App\Http\Controllers\Api\RequisicionController;
@@ -68,6 +69,7 @@ Route::post('/candidatos/registro', function (Request $request) {
         'nombres'          => 'required|string|max:120',
         'apellidos'        => 'required|string|max:120',
         'edad'             => 'required|integer|min:14|max:80',
+        'genero'           => 'nullable|string|max:30',
         'fecha_expedicion' => 'required|date',
         'ciudad_id'        => 'required|exists:ciudades,id',
         'celular'          => 'required|string|max:15',
@@ -97,6 +99,7 @@ Route::post('/candidatos/registro', function (Request $request) {
         'identificacion'   => $data['documento'],
         'fecha_expedicion' => $data['fecha_expedicion'],
         'edad'             => $data['edad'],
+        'genero'           => $data['genero'] ?? null,
         'ciudad_id'        => $data['ciudad_id'],
         'celular'          => $data['celular'],
         'correo'           => $data['correo'],
@@ -208,13 +211,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
-    // CRUD de pedidos automáticos del módulo de inventarios
-    Route::get('pedidos-automaticos/options', [PedidoAutomaticoController::class, 'options']);
-    Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class);
-    Route::get('pedidos-automaticos/{pedidoAutomatico}/enriquecer', [PedidoAutomaticoController::class, 'enriquecer']);
-
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
+
+    // Pedidos automáticos de dotación
+    Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
+    Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
+        ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
+
+    // Pedidos globales de dotación
+    Route::get('pedidos-globales', [PedidoGlobalController::class, 'index']);
+    Route::post('pedidos-globales', [PedidoGlobalController::class, 'store']);
+    Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update']);
+    Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy']);
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
@@ -310,7 +319,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 // Seguridad social desde respuesta
                 'lps_afiliado'             => $resp->eps,
                 'fondo_pensiones'          => $resp->afp,
-                'fondo_cesantias'          => $resp->afp,
+                'fondo_cesantias'          => null,
                 'ciudad'                   => $resp->ciudad,
                 // Datos laborales desde candidato
                 'tipo_vinculacion'         => $candidato?->tipo_vinculacion,

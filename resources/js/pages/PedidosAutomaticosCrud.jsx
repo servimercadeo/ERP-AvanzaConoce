@@ -1,384 +1,451 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
-import {
-    SearchableSelect,
-    PresetFiltersDropdown,
-} from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
+    IconSearch,
     IconEye,
     IconEdit,
+    IconTrash,
     IconClose,
     IconEmptySearch,
     IconLoading,
+    IconLayers,
 } from "../components/Icons";
 
-const TALLAS_ROPA = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-const TALLAS_JEAN = ["26", "28", "30", "32", "34", "36", "38", "40"];
-const TALLAS_TENIS = [
-    "34",
-    "35",
-    "36",
-    "37",
-    "38",
-    "39",
-    "40",
-    "41",
-    "42",
-    "43",
-    "44",
-    "45",
-];
-const GENEROS = ["Masculino", "Femenino"];
-const ESTADOS_ACTA = [
-    "Firmada",
-    "Pendiente firma",
-    "No aplica",
-    "Por gestionar",
-];
-const ESTADOS_CONT = [
-    "Activo",
-    "Inactivo",
-    "Retirado",
-    "En licencia",
-    "Suspendido",
-];
-const POR_PAGINA = 10;
+const POR_PAGINA = 8;
+const ESTADOS = ["Pendiente", "Activo", "Completado", "Cancelado"];
+const ESTADO_LABEL = {
+    Pendiente: "Pendiente",
+    Activo: "En proceso",
+    Completado: "Completado",
+    Cancelado: "Cancelado",
+};
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
 const EMPTY_FORM = {
-    sede: "",
-    cedula: "",
-    nombres: "",
-    apellidos: "",
-    cargo: "",
-    tipo_contrato: "",
-    proceso: "",
-    fecha_ingreso: "",
-    estado_contrato: "",
-    empleador: "",
-    proyecto: "",
-    genero: "",
-    ciudad: "",
-    polo_masculino_talla: "",
-    polo_masculino_cantidad: "",
-    polo_femenino_talla: "",
-    polo_femenino_cantidad: "",
-    jean_masculino_talla: "",
-    jean_masculino_cantidad: "",
-    jean_femenino_talla: "",
-    jean_femenino_cantidad: "",
-    chaqueta_masculino_talla: "",
-    chaqueta_masculino_cantidad: "",
-    chaqueta_femenino_talla: "",
-    chaqueta_femenino_cantidad: "",
-    tenis_masculino_talla: "",
-    tenis_masculino_cantidad: "",
-    tenis_femenino_talla: "",
-    tenis_femenino_cantidad: "",
-    estado_acta: "",
-    actas_sept: "",
-    fecha_primera_renovacion_2024: "",
-    fecha_segunda_renovacion_2024: "",
-    fecha_tercera_renovacion_2024: "",
-    fecha_primera_renovacion_2025: "",
-    fecha_segunda_renovacion_2025: "",
-    pedido_inicial: "",
-    fecha_inicial: "",
-    pedido_renovacion_1: "",
-    fecha_renovacion_1: "",
-    pedido_renovacion_2: "",
-    fecha_renovacion_2: "",
-    pedido_renovacion_3: "",
-    fecha_renovacion_3: "",
-    pedido_renovacion_4: "",
-    fecha_renovacion_4: "",
-    pedido_renovacion_5: "",
-    fecha_renovacion_5: "",
+    empleado_id: "",
+    contrato_id: "",
+    estado: "Activo",
+    fecha_pedido: new Date().toISOString().split("T")[0],
+    notas: "",
+    items: [],
 };
 
-const toForm = (d) => ({
-    ...EMPTY_FORM,
-    ...d,
-    fecha_ingreso: dateOnly(d.fecha_ingreso),
-    fecha_primera_renovacion_2024: dateOnly(d.fecha_primera_renovacion_2024),
-    fecha_segunda_renovacion_2024: dateOnly(d.fecha_segunda_renovacion_2024),
-    fecha_tercera_renovacion_2024: dateOnly(d.fecha_tercera_renovacion_2024),
-    fecha_primera_renovacion_2025: dateOnly(d.fecha_primera_renovacion_2025),
-    fecha_segunda_renovacion_2025: dateOnly(d.fecha_segunda_renovacion_2025),
-    fecha_inicial: dateOnly(d.fecha_inicial),
-});
+// ── Selector de empleado con búsqueda ──────────────────────────────────────
+function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const wrapRef = useRef(null);
 
-/* ─── Paginación ───────────────────────────────────────────── */
-function getPaginasBotones(pagina, total) {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const delta = 2,
-        left = pagina - delta,
-        right = pagina + delta;
-    const pages = [1];
-    if (left > 2) pages.push("...");
-    for (let i = Math.max(2, left); i <= Math.min(total - 1, right); i++)
-        pages.push(i);
-    if (right < total - 1) pages.push("...");
-    pages.push(total);
-    return pages;
-}
+    const selected = empleados.find((e) => String(e.id) === String(value));
 
-/* ─── Campo reutilizable ───────────────────────────────────── */
-function Field({
-    label,
-    k,
-    type = "text",
-    opts,
-    req,
-    span,
-    form,
-    errors,
-    onChange,
-    disabled,
-}) {
-    const style = {
-        ...S.formGroup,
-        ...(span ? { gridColumn: `span ${span}` } : {}),
-    };
-    const dis = disabled
-        ? {
-              background: "var(--bg)",
-              cursor: "default",
-              color: "var(--text-muted)",
-          }
-        : {};
+    const filtered = useMemo(() => {
+        const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        if (!words.length) return empleados.slice(0, 60);
+        return empleados
+            .filter((e) => {
+                const txt =
+                    `${e.nombres} ${e.apellidos} ${e.cedula}`.toLowerCase();
+                return words.every((w) => txt.includes(w));
+            })
+            .slice(0, 60);
+    }, [query, empleados]);
+
+    useEffect(() => {
+        const h = (e) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+                setOpen(false);
+                setQuery("");
+            }
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
     return (
-        <div style={style}>
-            <label style={S.label}>
-                {label}
-                {req && !disabled ? " *" : ""}
-            </label>
-            {opts ? (
-                <select
-                    style={{
-                        ...S.input,
-                        ...(errors[k] ? S.inputErr : {}),
-                        ...dis,
-                    }}
-                    value={form[k] ?? ""}
-                    onChange={onChange(k)}
-                    disabled={disabled}
-                >
-                    <option value="">Elige</option>
-                    {opts.map((o) => (
-                        <option key={o} value={o}>
-                            {o}
-                        </option>
-                    ))}
-                </select>
-            ) : type === "textarea" ? (
-                <textarea
-                    style={{
-                        ...S.input,
-                        minHeight: 64,
-                        resize: disabled ? "none" : "vertical",
-                        ...dis,
-                    }}
-                    value={form[k] ?? ""}
-                    onChange={onChange(k)}
-                    disabled={disabled}
-                />
-            ) : (
-                <input
-                    style={{
-                        ...S.input,
-                        ...(errors[k] ? S.inputErr : {}),
-                        ...dis,
-                    }}
-                    type={type}
-                    value={form[k] ?? ""}
-                    onChange={onChange(k)}
-                    disabled={disabled}
-                />
+        <div ref={wrapRef} style={{ position: "relative" }}>
+            <input
+                style={{
+                    ...S.input,
+                    ...(error ? S.inputErr : {}),
+                    ...(disabled ? S.inputDisabled : {}),
+                }}
+                value={
+                    open
+                        ? query
+                        : selected
+                          ? `${selected.nombres} ${selected.apellidos} (${selected.cedula})`
+                          : ""
+                }
+                placeholder="Buscar empleado…"
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    setOpen(true);
+                    if (!e.target.value) onChange("");
+                }}
+                onFocus={() => {
+                    if (!disabled) setOpen(true);
+                }}
+                disabled={disabled}
+            />
+            {open && !disabled && (
+                <div style={S.dropdown}>
+                    {filtered.length === 0 ? (
+                        <div style={S.dropdownEmpty}>Sin resultados</div>
+                    ) : (
+                        filtered.map((e) => (
+                            <div
+                                key={e.id}
+                                style={{
+                                    ...S.dropdownItem,
+                                    background:
+                                        String(e.id) === String(value)
+                                            ? "#e8f8f5"
+                                            : "var(--white)",
+                                }}
+                                onMouseDown={() => {
+                                    onChange(e.id);
+                                    setOpen(false);
+                                    setQuery("");
+                                }}
+                                onMouseEnter={(ev) =>
+                                    (ev.currentTarget.style.background =
+                                        "#f0f9f7")
+                                }
+                                onMouseLeave={(ev) =>
+                                    (ev.currentTarget.style.background =
+                                        String(e.id) === String(value)
+                                            ? "#e8f8f5"
+                                            : "var(--white)")
+                                }
+                            >
+                                <span style={{ fontWeight: 700 }}>
+                                    {e.nombres} {e.apellidos}
+                                </span>
+                                <span
+                                    style={{
+                                        fontSize: "0.78rem",
+                                        color: "var(--text-muted)",
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    C.C. {e.cedula}
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
             )}
-            {errors[k] && <span style={S.err}>{errors[k]}</span>}
+            {error && <span style={S.err}>{error}</span>}
         </div>
     );
 }
 
-/* ─── Fila de artículo de dotación ─────────────────────────── */
-function FilaDotacion({
-    label,
-    prefix,
-    tallasOpts,
-    form,
-    errors,
+// ── Selector de item de inventario ─────────────────────────────────────────
+// Mapea categoría/subcategoría del ítem a la talla correspondiente del empleado
+function tallaPorCategoria(categoria, subcategoria, tallasEmpleado) {
+    if (!tallasEmpleado) return null;
+    const txt = `${categoria} ${subcategoria}`.toLowerCase();
+    if (/polo|camisa|camiseta|chaqueta|blusa|buzo|sudadera|chaleco/.test(txt))
+        return tallasEmpleado.talla_camisa || null;
+    if (/pantalon|jean|short|bermuda|licra/.test(txt))
+        return tallasEmpleado.talla_pantalon || null;
+    if (/zapato|tenis|bota|calzado|zapatilla/.test(txt))
+        return tallasEmpleado.talla_zapatos || null;
+    return null;
+}
+
+function InventarioItemSelect({
+    inventarioFlat,
+    value,
     onChange,
     disabled,
+    generoEmpleado,
+    tallasEmpleado,
 }) {
-    const gM = `${prefix}_masculino`;
-    const gF = `${prefix}_femenino`;
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+    const [rect, setRect] = useState(null);
+    const wrapRef = useRef(null);
+    const inputRef = useRef(null);
 
-    const isMaleDisabled = disabled || form.genero === "Femenino";
-    const isFemaleDisabled = disabled || form.genero === "Masculino";
+    const selected = inventarioFlat.find((i) => String(i.id) === String(value));
+
+    const filtered = useMemo(() => {
+        const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        let base = inventarioFlat.filter((i) => i.cantidad > 0);
+
+        // Filtro género
+        if (generoEmpleado) {
+            const g = generoEmpleado.toLowerCase();
+            base = base.filter((i) => {
+                const ig = (i.genero ?? "").toLowerCase();
+                return ig === g || ig === "unisex";
+            });
+        }
+
+        // Filtro talla: para cada ítem, buscar la talla que le corresponde según categoría
+        if (tallasEmpleado) {
+            base = base.filter((i) => {
+                const tallaEsperada = tallaPorCategoria(
+                    i.categoria,
+                    i.subcategoria,
+                    tallasEmpleado,
+                );
+                if (!tallaEsperada) return true; // sin mapeo conocido → mostrar siempre
+                return i.talla?.toLowerCase() === tallaEsperada.toLowerCase();
+            });
+        }
+
+        if (!words.length) return base.slice(0, 80);
+        return base
+            .filter((i) => {
+                const txt =
+                    `${i.categoria} ${i.subcategoria} ${i.genero} ${i.talla}`.toLowerCase();
+                return words.every((w) => txt.includes(w));
+            })
+            .slice(0, 80);
+    }, [query, inventarioFlat, generoEmpleado, tallasEmpleado]);
+
+    useEffect(() => {
+        const h = (e) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+                setOpen(false);
+                setQuery("");
+            }
+        };
+        document.addEventListener("mousedown", h);
+        return () => document.removeEventListener("mousedown", h);
+    }, []);
+
+    const handleOpen = () => {
+        if (disabled) return;
+        if (inputRef.current) {
+            setRect(inputRef.current.getBoundingClientRect());
+        }
+        setOpen(true);
+    };
+
+    const label = selected
+        ? `${selected.categoria} · ${selected.subcategoria} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
+        : "";
+
+    const dropdown =
+        open &&
+        !disabled &&
+        rect &&
+        createPortal(
+            <div
+                style={{
+                    position: "fixed",
+                    top: rect.bottom + 2,
+                    left: rect.left,
+                    width: rect.width,
+                    background: "var(--white)",
+                    border: "1.5px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                    zIndex: 99999,
+                    maxHeight: 280,
+                    overflowY: "auto",
+                }}
+            >
+                {filtered.length === 0 ? (
+                    <div style={S.dropdownEmpty}>Sin stock disponible</div>
+                ) : (
+                    filtered.map((i) => (
+                        <div
+                            key={i.id}
+                            style={{
+                                ...S.dropdownItem,
+                                background:
+                                    String(i.id) === String(value)
+                                        ? "#e8f8f5"
+                                        : "var(--white)",
+                            }}
+                            onMouseDown={() => {
+                                onChange(i);
+                                setOpen(false);
+                                setQuery("");
+                            }}
+                            onMouseEnter={(ev) =>
+                                (ev.currentTarget.style.background = "#f0f9f7")
+                            }
+                            onMouseLeave={(ev) =>
+                                (ev.currentTarget.style.background =
+                                    String(i.id) === String(value)
+                                        ? "#e8f8f5"
+                                        : "var(--white)")
+                            }
+                        >
+                            <span style={{ fontWeight: 700 }}>
+                                {i.categoria} · {i.subcategoria}
+                            </span>
+                            <span
+                                style={{
+                                    color: "var(--text-muted)",
+                                    fontSize: "0.8rem",
+                                    marginLeft: 6,
+                                }}
+                            >
+                                {i.genero} · T:{i.talla}
+                            </span>
+                            <span
+                                style={{
+                                    marginLeft: "auto",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 700,
+                                    color:
+                                        i.cantidad <= 3 ? "#c0392b" : "#0d6e5a",
+                                    background:
+                                        i.cantidad <= 3 ? "#fce8e8" : "#e0f7f4",
+                                    borderRadius: 10,
+                                    padding: "1px 7px",
+                                }}
+                            >
+                                {i.cantidad} disp.
+                            </span>
+                        </div>
+                    ))
+                )}
+            </div>,
+            document.body,
+        );
 
     return (
-        <div style={{ marginBottom: 12 }}>
-            <div style={S.sectionHeader}>{label}</div>
-            <div style={{ ...S.grid4, marginTop: 10 }}>
-                <Field
-                    label="Talla Masc."
-                    k={`${gM}_talla`}
-                    opts={tallasOpts}
-                    form={form}
-                    errors={errors}
-                    onChange={onChange}
-                    disabled={isMaleDisabled}
-                />
-                <Field
-                    label="Cant. Masc."
-                    k={`${gM}_cantidad`}
-                    type="number"
-                    form={form}
-                    errors={errors}
-                    onChange={onChange}
-                    disabled={isMaleDisabled}
-                />
-                <Field
-                    label="Talla Fem."
-                    k={`${gF}_talla`}
-                    opts={tallasOpts}
-                    form={form}
-                    errors={errors}
-                    onChange={onChange}
-                    disabled={isFemaleDisabled}
-                />
-                <Field
-                    label="Cant. Fem."
-                    k={`${gF}_cantidad`}
-                    type="number"
-                    form={form}
-                    errors={errors}
-                    onChange={onChange}
-                    disabled={isFemaleDisabled}
-                />
-            </div>
+        <div
+            ref={wrapRef}
+            style={{ position: "relative", flex: 1, minWidth: 0 }}
+        >
+            <input
+                ref={inputRef}
+                style={{ ...S.input, ...(disabled ? S.inputDisabled : {}) }}
+                value={open ? query : label}
+                placeholder="Buscar prenda…"
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    handleOpen();
+                    if (!e.target.value) onChange(null);
+                }}
+                onFocus={handleOpen}
+                disabled={disabled}
+            />
+            {dropdown}
         </div>
     );
 }
 
-/* ─── Modal ────────────────────────────────────────────────── */
+// ── Modal crear / editar / ver ─────────────────────────────────────────────
 function Modal({
     open,
     onClose,
     onSave,
     initial,
     title,
-    options,
-    empleados = [],
-    readOnly = false,
+    empleados,
+    contratos,
+    inventarioFlat,
+    readOnly,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
-    const [activeTab, setActive] = useState("personal");
+    const [activeTab, setActive] = useState("info");
     const [saving, setSaving] = useState(false);
+    const [pedidoPrevio, setPedidoPrevio] = useState(null);
+    const [loadingHistorial, setLoadingHistorial] = useState(false);
 
-    React.useEffect(() => {
-        setForm(initial);
-        setErrors({});
-        setActive("personal");
-        setSaving(false);
+    const isNuevo = !initial?.id;
+
+    useEffect(() => {
+        if (open) {
+            setForm({
+                ...initial,
+                fecha_pedido: dateOnly(initial.fecha_pedido),
+                items: initial.items || [],
+            });
+            setErrors({});
+            setActive("info");
+            setSaving(false);
+            setPedidoPrevio(null);
+        }
     }, [initial, open]);
 
-    const onChange = (k) => (e) => {
-        const val = e.target.value;
-        setForm((f) => {
-            const next = { ...f, [k]: val };
-            if (k === "genero") {
-                if (val === "Masculino") {
-                    next.polo_femenino_talla = "";
-                    next.polo_femenino_cantidad = "";
-                    next.jean_femenino_talla = "";
-                    next.jean_femenino_cantidad = "";
-                    next.chaqueta_femenino_talla = "";
-                    next.chaqueta_femenino_cantidad = "";
-                    next.tenis_femenino_talla = "";
-                    next.tenis_femenino_cantidad = "";
-                } else if (val === "Femenino") {
-                    next.polo_masculino_talla = "";
-                    next.polo_masculino_cantidad = "";
-                    next.jean_masculino_talla = "";
-                    next.jean_masculino_cantidad = "";
-                    next.chaqueta_masculino_talla = "";
-                    next.chaqueta_masculino_cantidad = "";
-                    next.tenis_masculino_talla = "";
-                    next.tenis_masculino_cantidad = "";
-                }
-            }
-            return next;
-        });
-    };
+    const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+    const setEv = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-    const handleEmployeeSelect = (emp) => {
-        const latestContrato = emp.contratos?.[0] || {};
-        setForm((f) => {
-            const nextGender = emp.genero || f.genero;
-            const clearedFields = {};
-            if (nextGender === "Masculino") {
-                clearedFields.polo_femenino_talla = "";
-                clearedFields.polo_femenino_cantidad = "";
-                clearedFields.jean_femenino_talla = "";
-                clearedFields.jean_femenino_cantidad = "";
-                clearedFields.chaqueta_femenino_talla = "";
-                clearedFields.chaqueta_femenino_cantidad = "";
-                clearedFields.tenis_femenino_talla = "";
-                clearedFields.tenis_femenino_cantidad = "";
-            } else if (nextGender === "Femenino") {
-                clearedFields.polo_masculino_talla = "";
-                clearedFields.polo_masculino_cantidad = "";
-                clearedFields.jean_masculino_talla = "";
-                clearedFields.jean_masculino_cantidad = "";
-                clearedFields.chaqueta_masculino_talla = "";
-                clearedFields.chaqueta_masculino_cantidad = "";
-                clearedFields.tenis_masculino_talla = "";
-                clearedFields.tenis_masculino_cantidad = "";
-            }
+    // ── Items ──
+    const addItem = () =>
+        setForm((f) => ({
+            ...f,
+            items: [
+                ...f.items,
+                { inventario_dotacion_id: "", cantidad: 1, _inv: null },
+            ],
+        }));
 
-            return {
-                ...f,
-                cedula: emp.cedula || f.cedula,
-                nombres: emp.nombres || f.nombres,
-                apellidos: emp.apellidos || f.apellidos,
-                sede: latestContrato.sede || emp.sede || f.sede,
-                cargo: latestContrato.cargo || emp.cargo || f.cargo,
-                genero: nextGender,
-                tipo_contrato:
-                    latestContrato.tipo_contrato ||
-                    latestContrato.tipo_vinculacion ||
-                    emp.tipo_vinculacion ||
-                    f.tipo_contrato,
-                estado_contrato:
-                    latestContrato.estado_contrato ||
-                    emp.estado_empleado ||
-                    f.estado_contrato,
-                empleador:
-                    latestContrato.empleador || emp.empleador || f.empleador,
-                proyecto:
-                    latestContrato.cliente_proyecto ||
-                    emp.empresa?.nombre ||
-                    f.proyecto,
-                fecha_ingreso: latestContrato.fecha_ingreso
-                    ? dateOnly(latestContrato.fecha_ingreso)
-                    : f.fecha_ingreso,
-                ciudad: emp.ciudad || f.ciudad,
-                ...clearedFields,
-            };
-        });
-    };
+    const removeItem = (idx) =>
+        setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+
+    const updateItemInv = (idx, inv) =>
+        setForm((f) => ({
+            ...f,
+            items: f.items.map((it, i) =>
+                i === idx
+                    ? {
+                          ...it,
+                          inventario_dotacion_id: inv ? inv.id : "",
+                          _inv: inv,
+                      }
+                    : it,
+            ),
+        }));
+
+    const updateItemCantidad = (idx, val) =>
+        setForm((f) => ({
+            ...f,
+            items: f.items.map((it, i) =>
+                i === idx ? { ...it, cantidad: Number(val) } : it,
+            ),
+        }));
+
+    // Inventario disponible ajustado: para items de edición, sumamos de vuelta lo que ya tenía asignado
+    // para mostrar el stock real disponible en el selector
+    const inventarioAjustado = useMemo(() => {
+        if (initial?.id && initial.estado === "Activo") {
+            // sumamos lo que el pedido actual ya tenía asignado
+            const mapa = {};
+            (initial.items || []).forEach((it) => {
+                const id = it.inventario_dotacion_id ?? it.inventario?.id;
+                if (id) mapa[id] = (mapa[id] || 0) + it.cantidad;
+            });
+            return inventarioFlat.map((i) => ({
+                ...i,
+                cantidad: i.cantidad + (mapa[i.id] || 0),
+            }));
+        }
+        return inventarioFlat;
+    }, [inventarioFlat, initial]);
 
     const validate = () => {
         const e = {};
-        if (!String(form.cedula || "").trim()) e.cedula = "Requerido";
-        if (!String(form.nombres || "").trim()) e.nombres = "Requerido";
-        if (!String(form.apellidos || "").trim()) e.apellidos = "Requerido";
+        if (!form.empleado_id) e.empleado_id = "Requerido";
+        if (!form.fecha_pedido) e.fecha_pedido = "Requerido";
+        if (form.estado === "Activo") {
+            form.items.forEach((it, idx) => {
+                if (!it.inventario_dotacion_id)
+                    e[`item_${idx}_inv`] = "Selecciona una prenda";
+                if (!it.cantidad || it.cantidad < 1)
+                    e[`item_${idx}_cant`] = "Mín. 1";
+                const inv = inventarioAjustado.find(
+                    (i) => String(i.id) === String(it.inventario_dotacion_id),
+                );
+                if (inv && it.cantidad > inv.cantidad)
+                    e[`item_${idx}_cant`] = `Máx. disponible: ${inv.cantidad}`;
+            });
+        }
         return e;
     };
 
@@ -386,333 +453,582 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            setActive("personal");
             return;
         }
-
-        // Normalize: convert empty strings to null for all fields before sending
-        const cleanedForm = {};
-        Object.keys(form).forEach((k) => {
-            cleanedForm[k] = form[k] === "" ? null : form[k];
-        });
-
-        // Clear opposite-gender fields
-        if (cleanedForm.genero === "Masculino") {
-            cleanedForm.polo_femenino_talla = null;
-            cleanedForm.polo_femenino_cantidad = null;
-            cleanedForm.jean_femenino_talla = null;
-            cleanedForm.jean_femenino_cantidad = null;
-            cleanedForm.chaqueta_femenino_talla = null;
-            cleanedForm.chaqueta_femenino_cantidad = null;
-            cleanedForm.tenis_femenino_talla = null;
-            cleanedForm.tenis_femenino_cantidad = null;
-        } else if (cleanedForm.genero === "Femenino") {
-            cleanedForm.polo_masculino_talla = null;
-            cleanedForm.polo_masculino_cantidad = null;
-            cleanedForm.jean_masculino_talla = null;
-            cleanedForm.jean_masculino_cantidad = null;
-            cleanedForm.chaqueta_masculino_talla = null;
-            cleanedForm.chaqueta_masculino_cantidad = null;
-            cleanedForm.tenis_masculino_talla = null;
-            cleanedForm.tenis_masculino_cantidad = null;
-        }
-
         setSaving(true);
         try {
-            await onSave(cleanedForm);
-        } catch (err) {
-            // Error already handled and toasted by parent - just log for debug
-            console.error("[Dotacion] save error:", err);
+            await onSave(form);
+        } catch {
+            /* el padre muestra el toast de error */
         } finally {
             setSaving(false);
         }
     };
 
-    if (!open) return null;
+    const contratosFiltrados = contratos.filter(
+        (c) => String(c.empleado_id) === String(form.empleado_id),
+    );
 
-    const fp = { form, errors, onChange, disabled: readOnly };
-    const tabs = [
-        ["personal", "Datos del Empleado"],
-        ["dotacion", "Artículos"],
-        ["actas", "Actas y Fechas"],
-        ["pedidos", "Pedidos"],
-    ];
+    const generoEmpleado = useMemo(() => {
+        const emp = empleados.find(
+            (e) => String(e.id) === String(form.empleado_id),
+        );
+        const g = emp?.genero ?? null;
+        const validos = ["masculino", "femenino", "otro"];
+        return g && validos.includes(g.toLowerCase()) ? g : null;
+    }, [empleados, form.empleado_id]);
+
+    const tallasEmpleado = useMemo(() => {
+        const emp = empleados.find(
+            (e) => String(e.id) === String(form.empleado_id),
+        );
+        if (!emp) return null;
+        const t = {
+            talla_camisa: emp.talla_camisa,
+            talla_pantalon: emp.talla_pantalon,
+            talla_zapatos: emp.talla_zapatos,
+        };
+        return t.talla_camisa || t.talla_pantalon || t.talla_zapatos ? t : null;
+    }, [empleados, form.empleado_id]);
+
+    if (!open) return null;
 
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 960 }}
+                style={{ ...S.modal, maxWidth: 860 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Cabecera */}
-                <div style={S.modalHeaderGreen}>
-                    <span style={S.modalTitleWhite}>{title}</span>
-                    <button style={S.closeBtnWhite} onClick={onClose}>
+                {/* Header */}
+                <div style={S.modalHeader}>
+                    <span style={S.modalTitle}>{title}</span>
+                    <button style={S.closeBtn} onClick={onClose}>
                         <IconClose size={14} />
                     </button>
                 </div>
 
-                {/* Pestañas */}
-                <div className="tab-bar" style={S.tabBar}>
-                    {tabs.map(([key, lbl]) => (
+                {/* Tabs */}
+                <div style={S.tabBar}>
+                    {[
+                        ["info", "Información"],
+                        ["items", "Items de Dotación"],
+                    ].map(([key, lbl]) => (
                         <button
                             key={key}
                             style={activeTab === key ? S.tabActive : S.tab}
                             onClick={() => setActive(key)}
                         >
                             {lbl}
+                            {key === "items" && form.items.length > 0 && (
+                                <span style={S.tabBadge}>
+                                    {form.items.length}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
 
-                {/* Cuerpo */}
+                {/* Body */}
                 <div style={S.modalBody}>
-                    {/* ── PESTAÑA: DATOS DEL EMPLEADO ── */}
-                    {activeTab === "personal" && (
+                    {activeTab === "info" && (
                         <>
-                            {!initial.id && (
-                                <div
-                                    style={{
-                                        marginBottom: 20,
-                                        padding: "16px",
-                                        background: "var(--bg)",
-                                        borderRadius: "var(--radius-sm)",
-                                        border: "1.5px dashed var(--primary)",
-                                    }}
-                                >
-                                    <label
-                                        style={{
-                                            ...S.label,
-                                            color: "var(--primary-dark)",
-                                            fontSize: "0.82rem",
-                                            display: "block",
-                                            marginBottom: 8,
+                            <div style={S.grid2}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Empleado *</label>
+                                    <EmpleadoSearchSelect
+                                        empleados={empleados}
+                                        value={form.empleado_id}
+                                        onChange={async (v) => {
+                                            const contrato = contratos.filter(
+                                                (c) =>
+                                                    String(c.empleado_id) ===
+                                                    String(v),
+                                            )[0];
+                                            setForm((f) => ({
+                                                ...f,
+                                                empleado_id: v,
+                                                contrato_id: contrato?.id ?? "",
+                                                items: [],
+                                            }));
+                                            setPedidoPrevio(null);
+                                            if (v && isNuevo) {
+                                                setLoadingHistorial(true);
+                                                try {
+                                                    const { data } =
+                                                        await api.get(
+                                                            `/pedidos-automaticos/ultimo-empleado/${v}`,
+                                                        );
+                                                    if (
+                                                        data &&
+                                                        data.items &&
+                                                        data.items.length > 0
+                                                    ) {
+                                                        const itemsPreCargados =
+                                                            data.items.map(
+                                                                (it) => ({
+                                                                    inventario_dotacion_id:
+                                                                        it.inventario_dotacion_id,
+                                                                    cantidad:
+                                                                        it.cantidad,
+                                                                    _inv:
+                                                                        it.inventario ??
+                                                                        null,
+                                                                    inventario:
+                                                                        it.inventario ??
+                                                                        null,
+                                                                }),
+                                                            );
+                                                        setForm((f) => ({
+                                                            ...f,
+                                                            items: itemsPreCargados,
+                                                        }));
+                                                        setPedidoPrevio(data);
+                                                    }
+                                                } catch {
+                                                    // silencioso — si falla, el usuario agrega items manualmente
+                                                } finally {
+                                                    setLoadingHistorial(false);
+                                                }
+                                            }
                                         }}
-                                    >
-                                        Seleccionar Empleado
-                                    </label>
-                                    <SearchableSelect
-                                        value=""
-                                        onChange={(empId) => {
-                                            const emp = empleados.find(
-                                                (e) =>
-                                                    String(e.id) ===
-                                                    String(empId),
-                                            );
-                                            if (emp) handleEmployeeSelect(emp);
-                                        }}
-                                        options={empleados.map((e) => ({
-                                            value: e.id,
-                                            label: `${e.nombres} ${e.apellidos} (${e.cedula})`,
-                                        }))}
-                                        minSearch={0}
-                                        maxResults={100}
+                                        disabled={readOnly}
+                                        error={errors.empleado_id}
                                     />
                                 </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>
+                                        Contrato vinculado
+                                    </label>
+                                    <div
+                                        style={{
+                                            ...S.input,
+                                            ...S.inputDisabled,
+                                            minHeight: 38,
+                                            display: "flex",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        {contratosFiltrados[0]
+                                            ? `C.C. ${contratosFiltrados[0].empleado?.cedula ?? "—"} · ${contratosFiltrados[0].tipo_contrato ?? "—"} · ${dateOnly(contratosFiltrados[0].fecha_ingreso)}`
+                                            : "Sin contrato vinculado"}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ ...S.grid2, marginTop: 16 }}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>
+                                        Fecha pedido *
+                                    </label>
+                                    <input
+                                        type="date"
+                                        style={{
+                                            ...S.input,
+                                            ...(errors.fecha_pedido
+                                                ? S.inputErr
+                                                : {}),
+                                            ...(readOnly
+                                                ? S.inputDisabled
+                                                : {}),
+                                        }}
+                                        value={form.fecha_pedido}
+                                        onChange={setEv("fecha_pedido")}
+                                        disabled={readOnly}
+                                    />
+                                    {errors.fecha_pedido && (
+                                        <span style={S.err}>
+                                            {errors.fecha_pedido}
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Estado</label>
+                                    <select
+                                        style={{
+                                            ...S.input,
+                                            ...(readOnly
+                                                ? S.inputDisabled
+                                                : {}),
+                                        }}
+                                        value={form.estado}
+                                        onChange={setEv("estado")}
+                                        disabled={readOnly}
+                                    >
+                                        {ESTADOS.map((s) => (
+                                            <option key={s} value={s}>
+                                                {ESTADO_LABEL[s] ?? s}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div style={{ marginTop: 16 }}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Notas</label>
+                                    <textarea
+                                        style={{
+                                            ...S.input,
+                                            minHeight: 72,
+                                            resize: readOnly
+                                                ? "none"
+                                                : "vertical",
+                                            ...(readOnly
+                                                ? S.inputDisabled
+                                                : {}),
+                                        }}
+                                        value={form.notas ?? ""}
+                                        onChange={setEv("notas")}
+                                        disabled={readOnly}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Banner renovación en pestaña info */}
+                            {pedidoPrevio && isNuevo && !loadingHistorial && (
+                                <div
+                                    style={{
+                                        marginTop: 16,
+                                        padding: "12px 16px",
+                                        background: "#e8f8f5",
+                                        border: "1.5px solid #6fcfbd",
+                                        borderRadius: "var(--radius-sm)",
+                                        fontSize: "0.85rem",
+                                        color: "#0d6e5a",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                    }}
+                                >
+                                    <svg
+                                        style={{ flexShrink: 0 }}
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <polyline points="1 4 1 10 7 10" />
+                                        <polyline points="23 20 23 14 17 14" />
+                                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                                    </svg>
+                                    <span>
+                                        Este empleado ya recibió dotación. Se
+                                        pre-cargaron{" "}
+                                        <strong>
+                                            {pedidoPrevio.items.length} prenda
+                                            {pedidoPrevio.items.length !== 1
+                                                ? "s"
+                                                : ""}
+                                        </strong>{" "}
+                                        desde el pedido{" "}
+                                        <strong>#{pedidoPrevio.codigo}</strong>.
+                                    </span>
+                                </div>
                             )}
-                            <div style={S.grid4}>
-                                <Field label="Cédula" k="cedula" req {...fp} />
-                                <Field
-                                    label="Apellidos"
-                                    k="apellidos"
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Nombres"
-                                    k="nombres"
-                                    req
-                                    {...fp}
-                                    span={2}
-                                />
-                            </div>
-                            <div style={{ ...S.grid4, marginTop: 14 }}>
-                                <Field
-                                    label="Sede"
-                                    k="sede"
-                                    opts={options.sedes}
-                                    {...fp}
-                                />
-                                <Field label="Ciudad" k="ciudad" {...fp} />
-                                <Field
-                                    label="Cargo"
-                                    k="cargo"
-                                    opts={options.cargos}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Género"
-                                    k="genero"
-                                    opts={GENEROS}
-                                    {...fp}
-                                />
-                            </div>
-                            <div style={{ ...S.grid3, marginTop: 14 }}>
-                                <Field
-                                    label="Tipo Contrato"
-                                    k="tipo_contrato"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Fecha Ingreso"
-                                    k="fecha_ingreso"
-                                    type="date"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Estado Contrato"
-                                    k="estado_contrato"
-                                    opts={options.estados_contrato}
-                                    {...fp}
-                                />
-                            </div>
-                            <div style={{ ...S.grid4, marginTop: 14 }}>
-                                <Field
-                                    label="Empleador"
-                                    k="empleador"
-                                    {...fp}
-                                    span={2}
-                                />
-                                <Field
-                                    label="Proyecto"
-                                    k="proyecto"
-                                    {...fp}
-                                    span={2}
-                                />
-                            </div>
-                        </>
-                    )}
 
-                    {/* ── PESTAÑA: ARTÍCULOS ── */}
-                    {activeTab === "dotacion" && (
-                        <>
-                            <FilaDotacion
-                                label="Polo"
-                                prefix="polo"
-                                tallasOpts={TALLAS_ROPA}
-                                {...fp}
-                            />
-                            <FilaDotacion
-                                label="Jean"
-                                prefix="jean"
-                                tallasOpts={TALLAS_JEAN}
-                                {...fp}
-                            />
-                            <FilaDotacion
-                                label="Chaqueta"
-                                prefix="chaqueta"
-                                tallasOpts={TALLAS_ROPA}
-                                {...fp}
-                            />
-                            <FilaDotacion
-                                label="Tenis"
-                                prefix="tenis"
-                                tallasOpts={TALLAS_TENIS}
-                                {...fp}
-                            />
-                        </>
-                    )}
-
-                    {/* ── PESTAÑA: ACTAS Y FECHAS ── */}
-                    {activeTab === "actas" && (
-                        <>
-                            <div style={S.grid4}>
-                                <Field
-                                    label="Estado Acta"
-                                    k="estado_acta"
-                                    opts={options.estados_acta}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Actas Sept."
-                                    k="actas_sept"
-                                    {...fp}
-                                />
-                            </div>
-                            <div style={S.sectionHeader2}>
-                                Renovaciones 2024
-                            </div>
-                            <div style={{ ...S.grid3, marginTop: 10 }}>
-                                <Field
-                                    label="1ª Renovación 2024"
-                                    k="fecha_primera_renovacion_2024"
-                                    type="date"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="2ª Renovación 2024"
-                                    k="fecha_segunda_renovacion_2024"
-                                    type="date"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="3ª Renovación 2024"
-                                    k="fecha_tercera_renovacion_2024"
-                                    type="date"
-                                    {...fp}
-                                />
-                            </div>
-                            <div style={S.sectionHeader2}>
-                                Renovaciones 2025
-                            </div>
-                            <div style={{ ...S.grid3, marginTop: 10 }}>
-                                <Field
-                                    label="1ª Renovación 2025"
-                                    k="fecha_primera_renovacion_2025"
-                                    type="date"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="2ª Renovación 2025"
-                                    k="fecha_segunda_renovacion_2025"
-                                    type="date"
-                                    {...fp}
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    {/* ── PESTAÑA: PEDIDOS ── */}
-                    {activeTab === "pedidos" && (
-                        <>
-                            <div style={S.sectionHeader2}>Pedido Inicial</div>
-                            <div style={{ ...S.grid2, marginTop: 10 }}>
-                                <Field
-                                    label="No. Pedido Inicial"
-                                    k="pedido_inicial"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Fecha Inicial"
-                                    k="fecha_inicial"
-                                    type="date"
-                                    {...fp}
-                                />
-                            </div>
-                            {[1, 2, 3, 4, 5].map((n) => (
-                                <React.Fragment key={n}>
-                                    <div style={S.sectionHeader2}>
-                                        Renovación {n}
+                            {/* Tallas del empleado (solo lectura, desde respuestas_ingresos) */}
+                            {tallasEmpleado && (
+                                <div
+                                    style={{
+                                        marginTop: 20,
+                                        padding: "14px 16px",
+                                        background: "var(--bg)",
+                                        border: "1.5px solid var(--border)",
+                                        borderRadius: "var(--radius-sm)",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: "0.78rem",
+                                            fontWeight: 800,
+                                            color: "var(--primary)",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                            marginBottom: 12,
+                                        }}
+                                    >
+                                        Tallas del empleado
                                     </div>
-                                    <div style={{ ...S.grid2, marginTop: 10 }}>
-                                        <Field
-                                            label={`No. Pedido Renov. ${n}`}
-                                            k={`pedido_renovacion_${n}`}
-                                            {...fp}
-                                        />
-                                        <Field
-                                            label={`Fecha Renov. ${n}`}
-                                            k={`fecha_renovacion_${n}`}
-                                            {...fp}
-                                        />
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns:
+                                                "repeat(3, 1fr)",
+                                            gap: 12,
+                                        }}
+                                    >
+                                        {[
+                                            {
+                                                label: "Camisa / Chaqueta",
+                                                value: tallasEmpleado.talla_camisa,
+                                            },
+                                            {
+                                                label: "Pantalón / Jean",
+                                                value: tallasEmpleado.talla_pantalon,
+                                            },
+                                            {
+                                                label: "Zapatos / Tenis",
+                                                value: tallasEmpleado.talla_zapatos,
+                                            },
+                                        ].map(({ label, value }) => (
+                                            <div
+                                                key={label}
+                                                style={S.formGroup}
+                                            >
+                                                <label style={S.label}>
+                                                    {label}
+                                                </label>
+                                                <div
+                                                    style={{
+                                                        ...S.input,
+                                                        ...S.inputDisabled,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        fontWeight: 700,
+                                                        color: value
+                                                            ? "var(--primary)"
+                                                            : "var(--text-muted)",
+                                                    }}
+                                                >
+                                                    {value || "Sin registro"}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </React.Fragment>
-                            ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {activeTab === "items" && (
+                        <>
+                            {form.estado === "Cancelado" && (
+                                <div style={S.alertaBanner}>
+                                    El pedido está cancelado. Los items fueron
+                                    devueltos al inventario.
+                                </div>
+                            )}
+                            {form.estado === "Pendiente" && !readOnly && (
+                                <div
+                                    style={{
+                                        ...S.alertaBanner,
+                                        background: "#fff8e0",
+                                        color: "#856404",
+                                        border: "1px solid #ffd700",
+                                    }}
+                                >
+                                    Estado <strong>Pendiente</strong>: los items
+                                    NO descontarán inventario hasta que el
+                                    pedido sea <strong>Activo</strong>.
+                                </div>
+                            )}
+                            {loadingHistorial && (
+                                <div
+                                    style={{
+                                        ...S.alertaBanner,
+                                        background: "#e8f4ff",
+                                        color: "#1a5fa8",
+                                        border: "1px solid #b3d4f5",
+                                    }}
+                                >
+                                    Buscando historial de dotación…
+                                </div>
+                            )}
+
+                            <div style={{ marginTop: 12 }}>
+                                {form.items.length === 0 && (
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            padding: "28px 16px",
+                                            color: "var(--text-muted)",
+                                            fontSize: "0.88rem",
+                                        }}
+                                    >
+                                        Sin items asignados.
+                                        {!readOnly &&
+                                            " Haz clic en «+ Agregar prenda» para comenzar."}
+                                    </div>
+                                )}
+                                {form.items.map((it, idx) => {
+                                    const invRow = inventarioAjustado.find(
+                                        (i) =>
+                                            String(i.id) ===
+                                            String(it.inventario_dotacion_id),
+                                    );
+                                    const maxDisp = invRow
+                                        ? invRow.cantidad
+                                        : Infinity;
+                                    // Para modo vista: reconstruir label desde it.inventario si existe
+                                    const displayInv =
+                                        it._inv ||
+                                        (it.inventario
+                                            ? {
+                                                  id: it.inventario.id,
+                                                  categoria:
+                                                      it.inventario.categoria,
+                                                  subcategoria:
+                                                      it.inventario
+                                                          .subcategoria,
+                                                  genero: it.inventario.genero,
+                                                  talla: it.inventario.talla,
+                                                  cantidad:
+                                                      it.inventario.cantidad,
+                                              }
+                                            : null);
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            style={{
+                                                display: "flex",
+                                                gap: 10,
+                                                alignItems: "flex-end",
+                                                marginBottom: 10,
+                                            }}
+                                        >
+                                            {readOnly ? (
+                                                <div
+                                                    style={{
+                                                        ...S.input,
+                                                        flex: 1,
+                                                        minWidth: 0,
+                                                        background: "var(--bg)",
+                                                        color: "var(--text-muted)",
+                                                        cursor: "default",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                    }}
+                                                >
+                                                    {displayInv
+                                                        ? `${displayInv.categoria} · ${displayInv.subcategoria} · ${displayInv.genero} · T:${displayInv.talla}`
+                                                        : `Item #${it.inventario_dotacion_id}`}
+                                                </div>
+                                            ) : (
+                                                <InventarioItemSelect
+                                                    inventarioFlat={
+                                                        inventarioAjustado
+                                                    }
+                                                    value={
+                                                        it.inventario_dotacion_id
+                                                    }
+                                                    onChange={(inv) =>
+                                                        updateItemInv(idx, inv)
+                                                    }
+                                                    disabled={readOnly}
+                                                    generoEmpleado={
+                                                        generoEmpleado
+                                                    }
+                                                    tallasEmpleado={
+                                                        tallasEmpleado
+                                                    }
+                                                />
+                                            )}
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 4,
+                                                    minWidth: 90,
+                                                }}
+                                            >
+                                                <label
+                                                    style={{
+                                                        ...S.label,
+                                                        fontSize: "0.72rem",
+                                                    }}
+                                                >
+                                                    Cantidad
+                                                    {invRow && !readOnly
+                                                        ? ` (máx ${maxDisp})`
+                                                        : ""}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={maxDisp}
+                                                    style={{
+                                                        ...S.input,
+                                                        width: 90,
+                                                        ...(errors[
+                                                            `item_${idx}_cant`
+                                                        ]
+                                                            ? S.inputErr
+                                                            : {}),
+                                                        ...(readOnly
+                                                            ? S.inputDisabled
+                                                            : {}),
+                                                    }}
+                                                    value={it.cantidad}
+                                                    onChange={(e) =>
+                                                        updateItemCantidad(
+                                                            idx,
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    disabled={readOnly}
+                                                />
+                                                {errors[`item_${idx}_cant`] && (
+                                                    <span style={S.err}>
+                                                        {
+                                                            errors[
+                                                                `item_${idx}_cant`
+                                                            ]
+                                                        }
+                                                    </span>
+                                                )}
+                                                {errors[`item_${idx}_inv`] && (
+                                                    <span style={S.err}>
+                                                        {
+                                                            errors[
+                                                                `item_${idx}_inv`
+                                                            ]
+                                                        }
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {!readOnly && (
+                                                <button
+                                                    style={{
+                                                        ...S.actionBtn(
+                                                            "#fce8e8",
+                                                            "#a33",
+                                                        ),
+                                                        height: 38,
+                                                        flexShrink: 0,
+                                                    }}
+                                                    onClick={() =>
+                                                        removeItem(idx)
+                                                    }
+                                                >
+                                                    <IconTrash size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {!readOnly && form.estado !== "Cancelado" && (
+                                    <button
+                                        style={{
+                                            ...S.btnSecondary,
+                                            marginTop: 8,
+                                            padding: "6px 14px",
+                                            fontSize: "0.82rem",
+                                        }}
+                                        onClick={addItem}
+                                    >
+                                        + Agregar prenda
+                                    </button>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>
 
-                {/* Pie */}
+                {/* Footer */}
                 <div style={S.modalFooter}>
                     {readOnly ? (
                         <button style={S.btnSecondary} onClick={onClose}>
@@ -745,759 +1061,581 @@ function Modal({
     );
 }
 
-/* ─── Modal de confirmación de eliminación ─────────────────── */
-function DeleteModal({ open, onClose, onConfirm, nombre }) {
-    if (!open) return null;
-    return (
-        <div style={S.overlay} onClick={onClose}>
-            <div
-                style={{ ...S.modal, maxWidth: 420 }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div style={S.modalHeaderGreen}>
-                    <span style={S.modalTitleWhite}>Eliminar registro</span>
-                    <button style={S.closeBtnWhite} onClick={onClose}>
-                        <IconClose size={14} />
-                    </button>
-                </div>
-                <div style={{ padding: "28px 28px 20px" }}>
-                    <p style={{ color: "var(--text)", lineHeight: 1.6 }}>
-                        ¿Eliminar la dotación de <strong>{nombre}</strong>? Esta
-                        acción no se puede deshacer.
-                    </p>
-                </div>
-                <div
-                    style={{
-                        ...S.modalFooter,
-                        justifyContent: "space-between",
-                    }}
-                >
-                    <button style={S.btnSecondary} onClick={onClose}>
-                        Cancelar
-                    </button>
-                    <button
-                        style={{ ...S.btnPrimary, background: "#e74c3c" }}
-                        onClick={onConfirm}
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/* ─── Componente principal ─────────────────────────────────── */
+// ── Componente principal ───────────────────────────────────────────────────
 export default function PedidosAutomaticosCrud() {
-    const [registros, setRegistros] = useState([]);
+    const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
-
-    const [filtroSede, setFiltroSede] = useState("Todas");
-    const [filtroEstadoActa, setFiltroEstadoActa] = useState("Todos");
-    const [filtroGenero, setFiltroGenero] = useState("Todos");
-    const [filtroCargo, setFiltroCargo] = useState("Todos");
-    const [filtroEstadoCont, setFiltroEstadoCont] = useState("Todos");
-    const [filterOpen, setFilterOpen] = useState(false);
-
+    const [filtroEstado, setFiltroEstado] = useState("Todos");
+    const [pagina, setPagina] = useState(1);
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [viewOpen, setViewOpen] = useState(false);
     const [viewTarget, setViewTarget] = useState(null);
-    const [deleteOpen, setDeleteOpen] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState(null);
-
-    const queryClient = useQueryClient();
     const [toast, setToast] = useState(null);
-    const [pagina, setPagina] = useState(1);
+    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [globalModal, setGlobalModal] = useState(false);
+    const [globalSaving, setGlobalSaving] = useState(false);
 
-    const { data: _qRegistros, isLoading: loading } = useQuery({
-        queryKey: ["pedidos_automaticos"],
+    const { data: pedidos = [], isLoading } = useQuery({
+        queryKey: ["pedidos-automaticos"],
         queryFn: () => api.get("/pedidos-automaticos").then((r) => r.data),
     });
-    const { data: _qOptions } = useQuery({
-        queryKey: ["pedidos_automaticos_options"],
-        queryFn: () => api.get("/pedidos-automaticos/options").then((r) => r.data),
-    });
-    const { data: _qEmpleados } = useQuery({
+    const { data: empleados = [] } = useQuery({
         queryKey: ["empleados"],
         queryFn: () => api.get("/empleados").then((r) => r.data),
     });
+    const { data: contratos = [] } = useQuery({
+        queryKey: ["contratos"],
+        queryFn: () => api.get("/contratos").then((r) => r.data),
+    });
+    const { data: inventarioFlat = [] } = useQuery({
+        queryKey: ["inventario-dotacion-flat"],
+        queryFn: () =>
+            api.get("/inventario-dotacion?flat=1").then((r) => r.data),
+    });
 
     useEffect(() => {
-        if (_qRegistros) setRegistros(_qRegistros);
-    }, [_qRegistros]);
+        setPagina(1);
+    }, [debouncedSearch, filtroEstado]);
 
-    const options = useMemo(
-        () => ({
-            sedes: _qOptions?.sedes ?? [],
-            cargos: _qOptions?.cargos ?? [],
-            estados_acta: _qOptions?.estados_acta ?? ESTADOS_ACTA,
-            estados_contrato: _qOptions?.estados_contrato ?? ESTADOS_CONT,
-            generos: _qOptions?.generos ?? GENEROS,
-        }),
-        [_qOptions],
-    );
-
-    /* Bloquear scroll cuando algún overlay está abierto */
-    React.useEffect(() => {
-        const open = modalOpen || viewOpen || filterOpen || deleteOpen;
-        document.documentElement.style.overflowY = open ? "hidden" : "";
-        document.body.style.overflowY = open ? "hidden" : "";
+    useEffect(() => {
+        const anyOpen = modalOpen || viewOpen || !!confirmDelete || globalModal;
+        document.documentElement.style.overflowY = anyOpen ? "hidden" : "";
+        document.body.style.overflowY = anyOpen ? "hidden" : "";
         return () => {
             document.documentElement.style.overflowY = "";
             document.body.style.overflowY = "";
         };
-    }, [modalOpen, viewOpen, filterOpen, deleteOpen]);
+    }, [modalOpen, viewOpen, confirmDelete, globalModal]);
 
-    /* Filtrado local */
-    const filtered = useMemo(() => {
-        const palabras = debouncedSearch
-            .toLowerCase()
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
-        return registros.filter((r) => {
-            const hay = [
-                r.cedula,
-                r.nombres,
-                r.apellidos,
-                r.cargo,
-                r.sede,
-                r.proyecto,
-                r.pedido_inicial,
-            ]
-                .join(" ")
-                .toLowerCase();
-            const matchQ =
-                palabras.length === 0 || palabras.every((p) => hay.includes(p));
-            const matchS = filtroSede === "Todas" || r.sede === filtroSede;
-            const matchA =
-                filtroEstadoActa === "Todos" ||
-                r.estado_acta === filtroEstadoActa;
-            const matchG =
-                filtroGenero === "Todos" || r.genero === filtroGenero;
-            const matchC = filtroCargo === "Todos" || r.cargo === filtroCargo;
-            const matchEC =
-                filtroEstadoCont === "Todos" ||
-                r.estado_contrato === filtroEstadoCont;
-            return matchQ && matchS && matchA && matchG && matchC && matchEC;
-        });
-    }, [
-        registros,
-        debouncedSearch,
-        filtroSede,
-        filtroEstadoActa,
-        filtroGenero,
-        filtroCargo,
-        filtroEstadoCont,
-    ]);
+    const showToast = (msg, error = false) => {
+        setToast({ msg, error });
+        setTimeout(() => setToast(null), 3500);
+    };
 
-    useEffect(
-        () => setPagina(1),
-        [
-            debouncedSearch,
-            filtroSede,
-            filtroEstadoActa,
-            filtroGenero,
-            filtroCargo,
-            filtroEstadoCont,
-        ],
+    const filtered = useMemo(
+        () =>
+            pedidos.filter((p) => {
+                const q = debouncedSearch.toLowerCase();
+                const matchQ =
+                    (p.codigo ?? "").toLowerCase().includes(q) ||
+                    `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`
+                        .toLowerCase()
+                        .includes(q) ||
+                    (p.empleado?.cedula ?? "").includes(q);
+                const matchE =
+                    filtroEstado === "Todos" || p.estado === filtroEstado;
+                return matchQ && matchE;
+            }),
+        [pedidos, debouncedSearch, filtroEstado],
     );
 
-    const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
     const paginated = useMemo(
         () => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
         [filtered, pagina],
     );
+    const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
 
-    /* Indicadores */
-    const total = registros.length;
-    const firmadas = registros.filter(
-        (r) => r.estado_acta === "Firmada",
-    ).length;
-    const proyectos = new Set(registros.map((r) => r.proyecto).filter(Boolean))
-        .size;
-    const sedesActivas = new Set(registros.map((r) => r.sede).filter(Boolean))
-        .size;
+    const empleadosConContrato = useMemo(() => {
+        const ids = new Set(contratos.map((c) => String(c.empleado_id)));
+        return empleados.filter((e) => ids.has(String(e.id)));
+    }, [empleados, contratos]);
 
-    const handlePedidoGlobal = () => {
-        const conItems = registros.filter((r) => {
-            const has = [
-                r.polo_masculino_talla, r.polo_masculino_cantidad,
-                r.polo_femenino_talla, r.polo_femenino_cantidad,
-                r.jean_masculino_talla, r.jean_masculino_cantidad,
-                r.jean_femenino_talla, r.jean_femenino_cantidad,
-                r.chaqueta_masculino_talla, r.chaqueta_masculino_cantidad,
-                r.chaqueta_femenino_talla, r.chaqueta_femenino_cantidad,
-                r.tenis_masculino_talla, r.tenis_masculino_cantidad,
-                r.tenis_femenino_talla, r.tenis_femenino_cantidad,
-            ];
-            return has.some((v) => v !== null && v !== undefined && v !== "");
-        });
-        if (conItems.length === 0) {
-            showToast("No hay registros con dotación asignada para crear un pedido global.");
-            return;
-        }
-        const lastCounter = parseInt(localStorage.getItem("pedidos_globales_counter") || "0", 10);
-        const newCounter = lastCounter + 1;
-        const consecutivo = String(newCounter).padStart(5, "0");
-        const items = conItems.map((r, idx) => {
-            const empLabel = `${r.nombres ?? ""} ${r.apellidos ?? ""}`.trim();
-            return {
-                idx: idx + 1,
-                etiqueta: `${String(idx + 1).padStart(5, "0")} - ${r.cedula} ${empLabel}`,
-                cedula: r.cedula,
-                nombres: r.nombres,
-                apellidos: r.apellidos,
-                sede: r.sede,
-                cargo: r.cargo,
-                genero: r.genero,
-                polo_masculino_talla: r.polo_masculino_talla,
-                polo_masculino_cantidad: r.polo_masculino_cantidad,
-                polo_femenino_talla: r.polo_femenino_talla,
-                polo_femenino_cantidad: r.polo_femenino_cantidad,
-                jean_masculino_talla: r.jean_masculino_talla,
-                jean_masculino_cantidad: r.jean_masculino_cantidad,
-                jean_femenino_talla: r.jean_femenino_talla,
-                jean_femenino_cantidad: r.jean_femenino_cantidad,
-                chaqueta_masculino_talla: r.chaqueta_masculino_talla,
-                chaqueta_masculino_cantidad: r.chaqueta_masculino_cantidad,
-                chaqueta_femenino_talla: r.chaqueta_femenino_talla,
-                chaqueta_femenino_cantidad: r.chaqueta_femenino_cantidad,
-                tenis_masculino_talla: r.tenis_masculino_talla,
-                tenis_masculino_cantidad: r.tenis_masculino_cantidad,
-                tenis_femenino_talla: r.tenis_femenino_talla,
-                tenis_femenino_cantidad: r.tenis_femenino_cantidad,
-            };
-        });
-        const pedido = {
-            id: Date.now(),
-            consecutivo,
-            fecha_creacion: new Date().toISOString().split("T")[0],
-            estado: "Pendiente",
-            total_empleados: items.length,
-            items,
-        };
-        const existing = JSON.parse(localStorage.getItem("pedidos_globales") || "[]");
-        existing.unshift(pedido);
-        localStorage.setItem("pedidos_globales", JSON.stringify(existing));
-        localStorage.setItem("pedidos_globales_counter", String(newCounter));
-        showToast(`Pedido global ${consecutivo} creado con ${items.length} empleado(s). Revise la pestaña "Pedidos Global".`);
-    };
+    const estadosUsados = useMemo(() => {
+        const usados = new Set(pedidos.map((p) => p.estado).filter(Boolean));
+        return ESTADOS.filter((e) => usados.has(e));
+    }, [pedidos]);
 
-    const showToast = (msg) => {
-        setToast(msg);
-        setTimeout(() => setToast(null), 3000);
-    };
+    const stats = useMemo(
+        () => ({
+            total: pedidos.length,
+            pendientes: pedidos.filter((p) => p.estado === "Pendiente").length,
+            enProceso: pedidos.filter((p) => p.estado === "Activo").length,
+            completados: pedidos.filter((p) => p.estado === "Completado")
+                .length,
+            cancelados: pedidos.filter((p) => p.estado === "Cancelado").length,
+        }),
+        [pedidos],
+    );
 
-    const clearFilters = () => {
-        setSearch("");
-        setFiltroSede("Todas");
-        setFiltroEstadoActa("Todos");
-        setFiltroGenero("Todos");
-        setFiltroCargo("Todos");
-        setFiltroEstadoCont("Todos");
-    };
+    const pedidosParaGlobal = useMemo(
+        () => pedidos.filter((p) => p.estado === "Activo"),
+        [pedidos],
+    );
 
-    /* CRUD */
-    const openCreate = () => {
-        setEditTarget(null);
-        setModalOpen(true);
-    };
-    const openEdit = async (r) => {
+    const handleCrearGlobal = async () => {
+        setGlobalSaving(true);
         try {
-            const { data: enriched } = await api.get(`/pedidos-automaticos/${r.id}/enriquecer`);
-            setEditTarget(enriched);
-        } catch {
-            setEditTarget(r);
+            const { data } = await api.post("/pedidos-globales");
+            queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
+                prev.map((p) =>
+                    p.estado === "Activo" ? { ...p, estado: "Completado" } : p,
+                ),
+            );
+            queryClient.invalidateQueries({ queryKey: ["pedidos-globales"] });
+            showToast(
+                `Pedido global #${data.global.codigo} creado con ${data.total} pedido${data.total !== 1 ? "s" : ""}.`,
+            );
+            setGlobalModal(false);
+        } catch (err) {
+            const msg =
+                err?.response?.data?.message ||
+                "Error al crear el pedido global.";
+            showToast(msg, true);
+        } finally {
+            setGlobalSaving(false);
         }
-        setModalOpen(true);
-    };
-    const openView = async (r) => {
-        try {
-            const { data: enriched } = await api.get(`/pedidos-automaticos/${r.id}/enriquecer`);
-            setViewTarget(enriched);
-        } catch {
-            setViewTarget(r);
-        }
-        setViewOpen(true);
-    };
-    const openDelete = (r) => {
-        setDeleteTarget(r);
-        setDeleteOpen(true);
     };
 
     const handleSave = async (form) => {
         try {
+            const payload = {
+                ...form,
+                items: form.items.map(
+                    ({ inventario_dotacion_id, cantidad }) => ({
+                        inventario_dotacion_id,
+                        cantidad: Number(cantidad),
+                    }),
+                ),
+            };
             if (editTarget) {
-                await api.put(`/pedidos-automaticos/${editTarget.id}`, form);
-                const { data: fresh } = await api.get(
+                const { data } = await api.put(
                     `/pedidos-automaticos/${editTarget.id}`,
+                    payload,
                 );
-                setRegistros((prev) =>
-                    prev.map((r) => (r.id === editTarget.id ? fresh : r)),
+                queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
+                    prev.map((p) => (p.id === editTarget.id ? data : p)),
                 );
-                queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
-                showToast("Pedido automático actualizado correctamente.");
+                // Refrescar inventario ya que pudo cambiar
+                queryClient.invalidateQueries({
+                    queryKey: ["inventario-dotacion-flat"],
+                });
+                queryClient.invalidateQueries({
+                    queryKey: ["inventario_dotacion"],
+                });
+                showToast("Pedido actualizado.");
             } else {
-                const { data: created } = await api.post("/pedidos-automaticos", form);
-                setRegistros((prev) => [created, ...prev]);
-                queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
-                showToast("Pedido automático registrado correctamente.");
+                const { data } = await api.post(
+                    "/pedidos-automaticos",
+                    payload,
+                );
+                queryClient.setQueryData(
+                    ["pedidos-automaticos"],
+                    (prev = []) => [data, ...prev],
+                );
+                queryClient.invalidateQueries({
+                    queryKey: ["inventario-dotacion-flat"],
+                });
+                queryClient.invalidateQueries({
+                    queryKey: ["inventario_dotacion"],
+                });
+                showToast("Pedido creado.");
             }
             setModalOpen(false);
         } catch (err) {
-            console.error(
-                "[Dotacion] API error:",
-                err?.response?.status,
-                err?.response?.data,
-            );
-            const msgs = err?.response?.data?.errors;
-            const msg = msgs
-                ? Object.values(msgs)[0][0]
-                : (err?.response?.data?.message ??
-                  `Error ${err?.response?.status ?? ""}: No se pudo guardar.`);
-            showToast(msg);
+            const msg =
+                err?.response?.data?.message || "Error al guardar el pedido.";
+            showToast(msg, true);
             throw err;
         }
     };
 
-    const handleDelete = async () => {
-        if (!deleteTarget) return;
-        const targetId = deleteTarget.id;
-        console.log("[Delete] targetId:", targetId, typeof targetId, "deleteTarget:", deleteTarget);
+    const handleDelete = async (pedido) => {
         try {
-            await api.delete(`/pedidos-automaticos/${targetId}`);
-            setRegistros((prev) => prev.filter((r) => r.id !== targetId));
-            queryClient.invalidateQueries({ queryKey: ["pedidos_automaticos"] });
-            showToast("Registro eliminado.");
-        } catch (err) {
-            console.error("[Delete] error:", err?.response?.status, err?.response?.data);
-            showToast("No se pudo eliminar el registro.");
+            await api.delete(`/pedidos-automaticos/${pedido.id}`);
+            queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
+                prev.filter((p) => p.id !== pedido.id),
+            );
+            queryClient.invalidateQueries({
+                queryKey: ["inventario-dotacion-flat"],
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["inventario_dotacion"],
+            });
+            showToast("Pedido eliminado. Inventario restaurado.");
+        } catch {
+            showToast("Error al eliminar el pedido.", true);
         } finally {
-            setDeleteOpen(false);
-            setDeleteTarget(null);
+            setConfirmDelete(null);
         }
     };
 
-    const badgeActa = (estado) => {
-        if (!estado) return S.badge("#f0f0f0", "#888");
-        if (estado === "Firmada") return S.badge("#e0f7f4", "#0d6e5a");
-        if (estado.includes("Pendiente")) return S.badge("#fff7e0", "#b7780c");
-        return S.badge("#fce8e8", "#a33");
+    const estadoBadge = (estado) => {
+        const map = {
+            Pendiente: { bg: "#fff8e0", color: "#856404" },
+            Activo: { bg: "#e0f2ff", color: "#1a5fa8" },
+            Completado: { bg: "#e0f7f4", color: "#0d6e5a" },
+            Cancelado: { bg: "#fce8e8", color: "#a33333" },
+        };
+        return map[estado] ?? { bg: "#f0f0f0", color: "#555" };
     };
+
+    // Preparar form para edición: incluir _inv en items para que el selector sepa cuál está seleccionado
+    const buildEditForm = (pedido) => ({
+        empleado_id: pedido.empleado_id ?? "",
+        contrato_id: pedido.contrato_id ?? "",
+        estado: pedido.estado ?? "Pendiente",
+        fecha_pedido: dateOnly(pedido.fecha_pedido),
+        notas: pedido.notas ?? "",
+        items: (pedido.items ?? []).map((it) => ({
+            inventario_dotacion_id:
+                it.inventario_dotacion_id ?? it.inventario?.id ?? "",
+            cantidad: it.cantidad,
+            _inv: it.inventario ?? null,
+            inventario: it.inventario ?? null,
+        })),
+    });
 
     return (
         <div style={{ width: "100%" }}>
-            {toast && <div style={S.toast}>{toast}</div>}
+            {toast && (
+                <div
+                    style={{
+                        ...S.toast,
+                        background: toast.error ? "#c0392b" : "var(--primary)",
+                    }}
+                >
+                    {toast.msg}
+                </div>
+            )}
 
-            {/* ── Indicadores ── */}
+            {/* Stats */}
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{total}</div>
-                    <div className="stat-label">Total registros</div>
+                    <div className="stat-num">{stats.total}</div>
+                    <div className="stat-label">Total pedidos</div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-num" style={{ color: "#27ae60" }}>
-                        {firmadas}
+                    <div className="stat-num" style={{ color: "#856404" }}>
+                        {stats.pendientes}
                     </div>
-                    <div className="stat-label">Actas firmadas</div>
+                    <div className="stat-label">Pendientes</div>
                 </div>
                 <div className="stat-card">
-                    <div
-                        className="stat-num"
-                        style={{ color: "var(--accent)" }}
-                    >
-                        {sedesActivas}
+                    <div className="stat-num" style={{ color: "#1a5fa8" }}>
+                        {stats.enProceso}
                     </div>
-                    <div className="stat-label">Sedes con dotación</div>
+                    <div className="stat-label">En proceso</div>
                 </div>
                 <div className="stat-card">
-                    <div
-                        className="stat-num"
-                        style={{ color: "var(--primary)" }}
-                    >
-                        {proyectos}
+                    <div className="stat-num" style={{ color: "#0d6e5a" }}>
+                        {stats.completados}
                     </div>
-                    <div className="stat-label">Proyectos</div>
+                    <div className="stat-label">Completados</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#a33333" }}>
+                        {stats.cancelados}
+                    </div>
+                    <div className="stat-label">Cancelados</div>
                 </div>
             </div>
 
-            {/* ── Toolbar ── */}
+            {/* Toolbar */}
             <div style={S.toolbar}>
                 <div style={S.filters}>
                     <div style={S.searchWrap}>
                         <span style={S.searchIcon}>
-                            <svg
-                                width="15"
-                                height="15"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <circle cx="11" cy="11" r="8" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
+                            <IconSearch size={15} />
                         </span>
                         <input
                             style={S.searchInput}
-                            placeholder="Buscar por nombre, cédula, sede, proyecto…"
+                            placeholder="Buscar código, empleado, cédula…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <button
-                        style={S.filterBtn}
-                        onClick={() => setFilterOpen(true)}
+                    <select
+                        style={S.selectFilter}
+                        value={filtroEstado}
+                        onChange={(e) => setFiltroEstado(e.target.value)}
                     >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                        </svg>
-                        Filtros
-                    </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            {
-                                label: "Actas firmadas",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstadoActa("Firmada");
-                                },
-                            },
-                            {
-                                label: "Pendiente firma",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstadoActa("Pendiente firma");
-                                },
-                            },
-                            {
-                                label: "Género masculino",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroGenero("Masculino");
-                                },
-                            },
-                            {
-                                label: "Género femenino",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroGenero("Femenino");
-                                },
-                            },
-                            {
-                                label: "Contratos activos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstadoCont("Activo");
-                                },
-                            },
-                            {
-                                label: "Limpiar filtros",
-                                apply: () => clearFilters(),
-                                clear: true,
-                            },
-                        ]}
-                    />
+                        <option value="Todos">Todos los estados</option>
+                        {estadosUsados.map((s) => (
+                            <option key={s} value={s}>
+                                {ESTADO_LABEL[s] ?? s}
+                            </option>
+                        ))}
+                    </select>
                 </div>
-    <button className="btn-primary" onClick={openCreate}>
-        + Nueva dotación
-    </button>
-    <button
-        style={{
-            ...S.btnPrimary,
-            background: '#8e44ad',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-        }}
-        onClick={handlePedidoGlobal}
-    >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-        </svg>
-        Pedido Global
-    </button>
-</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                        style={{
+                            padding: "9px 18px",
+                            background:
+                                pedidosParaGlobal.length > 0
+                                    ? "var(--primary)"
+                                    : "var(--bg)",
+                            color:
+                                pedidosParaGlobal.length > 0
+                                    ? "#fff"
+                                    : "var(--text-muted)",
+                            border:
+                                pedidosParaGlobal.length > 0
+                                    ? "none"
+                                    : "1.5px solid var(--border)",
+                            borderRadius: "var(--radius-sm)",
+                            fontSize: "0.88rem",
+                            fontWeight: 700,
+                            cursor:
+                                pedidosParaGlobal.length > 0
+                                    ? "pointer"
+                                    : "not-allowed",
+                            fontFamily: "Nunito,sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 7,
+                        }}
+                        onClick={() =>
+                            pedidosParaGlobal.length > 0 && setGlobalModal(true)
+                        }
+                        title={
+                            pedidosParaGlobal.length === 0
+                                ? "No hay pedidos en proceso"
+                                : ""
+                        }
+                    >
+                        <IconLayers size={16} />
+                        Pedido global
+                        {pedidosParaGlobal.length > 0 && (
+                            <span
+                                style={{
+                                    background: "rgba(255,255,255,0.25)",
+                                    borderRadius: 20,
+                                    padding: "1px 8px",
+                                    fontSize: "0.78rem",
+                                }}
+                            >
+                                {pedidosParaGlobal.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        className="btn-primary"
+                        onClick={() => {
+                            setEditTarget(null);
+                            setModalOpen(true);
+                        }}
+                    >
+                        + Nuevo pedido
+                    </button>
+                </div>
+            </div>
 
-            {/* ── Tabla ── */}
+            {/* Tabla */}
             <div style={S.tableWrap}>
-                {loading ? (
+                {isLoading ? (
                     <div style={S.empty}>
                         <IconLoading size={32} />
-                        <p>Cargando registros…</p>
+                        <p>Cargando pedidos…</p>
                     </div>
                 ) : filtered.length === 0 ? (
                     <div style={S.empty}>
                         <IconEmptySearch size={44} />
-                        <p>
-                            No se encontraron registros con los filtros
-                            aplicados.
-                        </p>
+                        <p>No se encontraron pedidos.</p>
                     </div>
-                ) : null}
-                {!loading && filtered.length > 0 && (
+                ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th>Código</th>
                                 <th>Empleado</th>
-                                <th>Cédula</th>
-                                <th>Cargo</th>
-                                <th>Sede</th>
-                                <th>Proyecto</th>
-                                <th>Género</th>
-                                <th>Estado Acta</th>
-                                <th>Pedido Inicial</th>
+                                <th>Fecha</th>
+                                <th style={{ textAlign: "center" }}>Items</th>
+                                <th>Estado</th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
-                            {paginated.map((r) => (
-                                <tr key={r.id}>
-                                    <td>
-                                        <div style={S.avatarCell}>
-                                            <div style={S.avatar}>
-                                                {(r.nombres ?? "?")
-                                                    .charAt(0)
-                                                    .toUpperCase()}
+                            {paginated.map((p) => {
+                                const badge = estadoBadge(p.estado);
+                                return (
+                                    <tr key={p.id}>
+                                        <td>
+                                            <span
+                                                style={{
+                                                    fontFamily: "monospace",
+                                                    fontWeight: 800,
+                                                    fontSize: "0.95rem",
+                                                }}
+                                            >
+                                                #{p.codigo ?? "—"}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={S.avatarCell}>
+                                                <div style={S.avatar}>
+                                                    {(
+                                                        p.empleado?.nombres ||
+                                                        "?"
+                                                    )
+                                                        .charAt(0)
+                                                        .toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        {p.empleado?.nombres}{" "}
+                                                        {p.empleado?.apellidos}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: "0.76rem",
+                                                            color: "var(--text-muted)",
+                                                        }}
+                                                    >
+                                                        C.C.{" "}
+                                                        {p.empleado?.cedula}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span
-                                                style={{
-                                                    fontWeight: 700,
-                                                    color: "var(--text)",
-                                                }}
-                                            >
-                                                {r.nombres && r.apellidos
-                                                    ? `${r.nombres} ${r.apellidos}`
-                                                    : (r.nombres ?? "—")}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td
-                                        style={{
-                                            fontFamily: "monospace",
-                                            fontSize: "0.82rem",
-                                            color: "var(--text-muted)",
-                                        }}
-                                    >
-                                        {r.cedula ?? "—"}
-                                    </td>
-                                    <td style={{ fontSize: "0.84rem" }}>
-                                        {r.cargo ?? "—"}
-                                    </td>
-                                    <td>
-                                        {r.sede ? (
+                                        </td>
+                                        <td>{dateOnly(p.fecha_pedido)}</td>
+                                        <td style={{ textAlign: "center" }}>
                                             <span
                                                 style={S.badge(
-                                                    "#e8f8f5",
-                                                    "var(--primary-dark)",
-                                                )}
-                                            >
-                                                {r.sede}
-                                            </span>
-                                        ) : (
-                                            "—"
-                                        )}
-                                    </td>
-                                    <td
-                                        style={{
-                                            fontSize: "0.84rem",
-                                            color: "var(--text-muted)",
-                                        }}
-                                    >
-                                        {r.proyecto ?? "—"}
-                                    </td>
-                                    <td>
-                                        {r.genero ? (
-                                            <span
-                                                style={S.badge(
-                                                    r.genero === "Masculino"
-                                                        ? "#e8f0ff"
-                                                        : "#fce8f5",
-                                                    r.genero === "Masculino"
-                                                        ? "#1a4fa8"
-                                                        : "#8b267a",
-                                                )}
-                                            >
-                                                {r.genero}
-                                            </span>
-                                        ) : (
-                                            "—"
-                                        )}
-                                    </td>
-                                    <td>
-                                        <span
-                                            style={{
-                                                ...badgeActa(r.estado_acta),
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: 5,
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    width: 6,
-                                                    height: 6,
-                                                    borderRadius: "50%",
-                                                    background:
-                                                        r.estado_acta ===
-                                                        "Firmada"
-                                                            ? "#27ae60"
-                                                            : "#e5a020",
-                                                    display: "inline-block",
-                                                }}
-                                            />
-                                            {r.estado_acta ?? "—"}
-                                        </span>
-                                    </td>
-                                    <td
-                                        style={{
-                                            fontFamily: "monospace",
-                                            fontSize: "0.82rem",
-                                        }}
-                                    >
-                                        {r.pedido_inicial ?? "—"}
-                                    </td>
-                                    <td>
-                                        <div style={S.actions}>
-                                            <button
-                                                style={S.actionBtn(
                                                     "#e8f0ff",
                                                     "#1a4fa8",
                                                 )}
-                                                title="Ver"
-                                                onClick={() => openView(r)}
                                             >
-                                                <IconEye />
-                                            </button>
-                                            <button
-                                                style={S.actionBtn(
-                                                    "#e8f8f5",
-                                                    "var(--primary-dark)",
-                                                )}
-                                                title="Editar"
-                                                onClick={() => openEdit(r)}
+                                                {(p.items ?? []).length} prenda
+                                                {(p.items ?? []).length !== 1
+                                                    ? "s"
+                                                    : ""}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span
+                                                style={{
+                                                    ...S.badge(
+                                                        badge.bg,
+                                                        badge.color,
+                                                    ),
+                                                }}
                                             >
-                                                <IconEdit />
-                                            </button>
-                                            <button
-                                                style={S.actionBtn(
-                                                    "#fce8e8",
-                                                    "#c0392b",
-                                                )}
-                                                title="Eliminar"
-                                                onClick={() => openDelete(r)}
-                                            >
-                                                <svg
-                                                    width="13"
-                                                    height="13"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2.5"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
+                                                {ESTADO_LABEL[p.estado] ??
+                                                    p.estado}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={S.actions}>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#e8f0ff",
+                                                        "#1a4fa8",
+                                                    )}
+                                                    title="Ver"
+                                                    onClick={() => {
+                                                        setViewTarget({
+                                                            ...p,
+                                                            ...buildEditForm(p),
+                                                            id: p.id,
+                                                            codigo: p.codigo,
+                                                        });
+                                                        setViewOpen(true);
+                                                    }}
                                                 >
-                                                    <polyline points="3 6 5 6 21 6" />
-                                                    <path d="M19 6l-1 14H6L5 6" />
-                                                    <path d="M10 11v6" />
-                                                    <path d="M14 11v6" />
-                                                    <path d="M9 6V4h6v2" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                                    <IconEye />
+                                                </button>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#e8f8f5",
+                                                        "var(--primary-dark)",
+                                                    )}
+                                                    title="Editar"
+                                                    onClick={() => {
+                                                        setEditTarget(p);
+                                                        setModalOpen(true);
+                                                    }}
+                                                >
+                                                    <IconEdit />
+                                                </button>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#fce8e8",
+                                                        "#a33",
+                                                    )}
+                                                    title="Eliminar"
+                                                    onClick={() =>
+                                                        setConfirmDelete(p)
+                                                    }
+                                                >
+                                                    <IconTrash size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
             </div>
 
-            {/* ── Paginación ── */}
-            {!loading && filtered.length > 0 && (
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginTop: 14,
-                        flexWrap: "wrap",
-                        gap: 10,
-                    }}
-                >
-                    <span
-                        style={{
-                            color: "var(--text-muted)",
-                            fontSize: "0.82rem",
-                        }}
-                    >
-                        Página {pagina} · Mostrando{" "}
-                        {Math.min(
-                            POR_PAGINA,
-                            filtered.length - (pagina - 1) * POR_PAGINA,
-                        )}{" "}
-                        de {filtered.length}
-                        {filtered.length !== registros.length
-                            ? ` (filtrados de ${registros.length})`
-                            : " registros"}
+            {/* Paginación */}
+            {!isLoading && filtered.length > POR_PAGINA && (
+                <div style={S.paginationBar}>
+                    <span style={S.paginationInfo}>
+                        Mostrando {(pagina - 1) * POR_PAGINA + 1}–
+                        {Math.min(pagina * POR_PAGINA, filtered.length)} de{" "}
+                        {filtered.length} pedidos
                     </span>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                        }}
-                    >
+                    <div style={S.paginationBtns}>
                         <button
-                            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                            style={S.pageBtn(pagina === 1, false)}
                             disabled={pagina === 1}
-                            style={S.pageBtn(pagina === 1)}
+                            onClick={() => setPagina((p) => p - 1)}
                         >
                             ‹
                         </button>
-                        {getPaginasBotones(pagina, totalPaginas).map((n, i) =>
-                            n === "..." ? (
-                                <span key={`e-${i}`} style={S.pageEllipsis}>
-                                    …
-                                </span>
-                            ) : (
-                                <button
-                                    key={n}
-                                    onClick={() => setPagina(n)}
-                                    style={
-                                        n === pagina
-                                            ? S.pageBtnActive
-                                            : S.pageBtn(false)
-                                    }
-                                >
-                                    {n}
-                                </button>
-                            ),
-                        )}
+                        {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                            .filter(
+                                (p) =>
+                                    p === 1 ||
+                                    p === totalPaginas ||
+                                    Math.abs(p - pagina) <= 1,
+                            )
+                            .reduce((acc, p, idx, arr) => {
+                                if (idx > 0 && p - arr[idx - 1] > 1)
+                                    acc.push("…");
+                                acc.push(p);
+                                return acc;
+                            }, [])
+                            .map((item, idx) =>
+                                item === "…" ? (
+                                    <span
+                                        key={`e${idx}`}
+                                        style={{
+                                            padding: "0 4px",
+                                            color: "var(--text-muted)",
+                                            fontWeight: 700,
+                                        }}
+                                    >
+                                        …
+                                    </span>
+                                ) : (
+                                    <button
+                                        key={item}
+                                        style={S.pageBtn(
+                                            false,
+                                            item === pagina,
+                                        )}
+                                        onClick={() => setPagina(item)}
+                                    >
+                                        {item}
+                                    </button>
+                                ),
+                            )}
                         <button
-                            onClick={() =>
-                                setPagina((p) => Math.min(totalPaginas, p + 1))
-                            }
+                            style={S.pageBtn(pagina === totalPaginas, false)}
                             disabled={pagina === totalPaginas}
-                            style={S.pageBtn(pagina === totalPaginas)}
+                            onClick={() => setPagina((p) => p + 1)}
                         >
                             ›
                         </button>
@@ -1505,163 +1643,285 @@ export default function PedidosAutomaticosCrud() {
                 </div>
             )}
 
-            {/* ── Modales ── */}
-            <Modal
-                open={modalOpen}
-                onClose={() => setModalOpen(false)}
-                onSave={handleSave}
-                initial={editTarget ? toForm(editTarget) : { ...EMPTY_FORM }}
-                title={editTarget ? "Editar dotación" : "Registrar dotación"}
-                options={options}
-                empleados={_qEmpleados || []}
-            />
-            <Modal
-                open={viewOpen}
-                onClose={() => setViewOpen(false)}
-                onSave={() => {}}
-                initial={viewTarget ? toForm(viewTarget) : { ...EMPTY_FORM }}
-                title="Ver dotación"
-                options={options}
-                empleados={_qEmpleados || []}
-                readOnly
-            />
-            <DeleteModal
-                open={deleteOpen}
-                onClose={() => {
-                    setDeleteOpen(false);
-                    setDeleteTarget(null);
-                }}
-                onConfirm={handleDelete}
-                nombre={
-                    deleteTarget
-                        ? `${deleteTarget.nombres ?? ""} ${deleteTarget.apellidos ?? ""}`.trim()
-                        : ""
-                }
-            />
-
-            {/* ── Modal de filtros ── */}
-            {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+            {/* Modal pedido global */}
+            {globalModal && (
+                <div
+                    style={S.overlay}
+                    onClick={() => !globalSaving && setGlobalModal(false)}
+                >
                     <div
-                        style={{ ...S.modal, maxWidth: 700 }}
+                        style={{ ...S.modal, maxWidth: 480 }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div style={S.modalHeaderGreen}>
-                            <span style={S.modalTitleWhite}>
-                                Filtros de búsqueda
+                        <div style={S.modalHeader}>
+                            <span style={S.modalTitle}>
+                                Generar pedido global
                             </span>
                             <button
-                                style={S.closeBtnWhite}
-                                onClick={() => setFilterOpen(false)}
+                                style={S.closeBtn}
+                                onClick={() =>
+                                    !globalSaving && setGlobalModal(false)
+                                }
                             >
                                 <IconClose size={14} />
                             </button>
                         </div>
-                        <div style={S.modalBody}>
-                            <div
-                                style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(2, 1fr)",
-                                    gap: "16px 24px",
-                                }}
-                            >
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Sede</label>
-                                    <SearchableSelect
-                                        value={filtroSede}
-                                        onChange={setFiltroSede}
-                                        defaultValue="Todas"
-                                        options={options.sedes.map((s) => ({
-                                            label: s,
-                                            value: s,
-                                        }))}
-                                    />
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Estado Acta</label>
-                                    <SearchableSelect
-                                        value={filtroEstadoActa}
-                                        onChange={setFiltroEstadoActa}
-                                        defaultValue="Todos"
-                                        options={options.estados_acta.map(
-                                            (s) => ({ label: s, value: s }),
-                                        )}
-                                    />
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Género</label>
-                                    <SearchableSelect
-                                        value={filtroGenero}
-                                        onChange={setFiltroGenero}
-                                        defaultValue="Todos"
-                                        options={GENEROS.map((g) => ({
-                                            label: g,
-                                            value: g,
-                                        }))}
-                                    />
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Cargo</label>
-                                    <SearchableSelect
-                                        value={filtroCargo}
-                                        onChange={setFiltroCargo}
-                                        defaultValue="Todos"
-                                        options={options.cargos.map((c) => ({
-                                            label: c,
-                                            value: c,
-                                        }))}
-                                    />
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>
-                                        Estado Contrato
-                                    </label>
-                                    <SearchableSelect
-                                        value={filtroEstadoCont}
-                                        onChange={setFiltroEstadoCont}
-                                        defaultValue="Todos"
-                                        options={options.estados_contrato.map(
-                                            (s) => ({ label: s, value: s }),
-                                        )}
-                                    />
-                                </div>
-                            </div>
-                        </div>
                         <div
                             style={{
-                                ...S.modalFooter,
-                                justifyContent: "space-between",
+                                padding: "28px 28px 20px",
+                                fontSize: "0.93rem",
+                                color: "var(--text)",
                             }}
                         >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 14,
+                                    marginBottom: 20,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: "50%",
+                                        background:
+                                            "var(--primary-light, #e0f7f4)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        flexShrink: 0,
+                                        color: "var(--primary)",
+                                    }}
+                                >
+                                    <IconLayers size={24} />
+                                </div>
+                                <div>
+                                    <div
+                                        style={{
+                                            fontWeight: 700,
+                                            fontSize: "1rem",
+                                        }}
+                                    >
+                                        Se agruparán{" "}
+                                        <span style={{ color: "#1a5fa8" }}>
+                                            {pedidosParaGlobal.length} pedido
+                                            {pedidosParaGlobal.length !== 1
+                                                ? "s"
+                                                : ""}
+                                        </span>{" "}
+                                        en proceso
+                                    </div>
+                                    <div
+                                        style={{
+                                            color: "var(--text-muted)",
+                                            fontSize: "0.85rem",
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        Se generará un código global secuencial
+                                        y todos pasarán a estado{" "}
+                                        <strong>Completado</strong>.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                style={{
+                                    background: "var(--bg)",
+                                    border: "1.5px solid var(--border)",
+                                    borderRadius: 8,
+                                    padding: "12px 16px",
+                                    maxHeight: 180,
+                                    overflowY: "auto",
+                                }}
+                            >
+                                {pedidosParaGlobal.map((p) => (
+                                    <div
+                                        key={p.id}
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            padding: "5px 0",
+                                            borderBottom:
+                                                "1px solid var(--border)",
+                                            fontSize: "0.84rem",
+                                        }}
+                                    >
+                                        <span style={{ fontWeight: 700 }}>
+                                            #{p.codigo}
+                                        </span>
+                                        <span
+                                            style={{
+                                                color: "var(--text-muted)",
+                                            }}
+                                        >
+                                            {p.empleado?.nombres}{" "}
+                                            {p.empleado?.apellidos}
+                                        </span>
+                                        <span
+                                            style={{
+                                                color: "#1a5fa8",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {(p.items ?? []).length} prenda
+                                            {(p.items ?? []).length !== 1
+                                                ? "s"
+                                                : ""}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <p
+                                style={{
+                                    marginTop: 16,
+                                    fontSize: "0.83rem",
+                                    color: "#856404",
+                                    background: "#fff8e0",
+                                    padding: "9px 12px",
+                                    borderRadius: 8,
+                                }}
+                            >
+                                Esta acción no se puede deshacer directamente.
+                                Los pedidos completados solo pueden cancelarse
+                                individualmente.
+                            </p>
+                        </div>
+                        <div style={S.modalFooter}>
                             <button
                                 style={S.btnSecondary}
-                                onClick={clearFilters}
+                                onClick={() => setGlobalModal(false)}
+                                disabled={globalSaving}
                             >
-                                Limpiar filtros
+                                Cancelar
                             </button>
-                            <div style={{ display: "flex", gap: 12 }}>
-                                <button
-                                    style={S.btnSecondary}
-                                    onClick={() => setFilterOpen(false)}
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    style={S.btnPrimaryGreen}
-                                    onClick={() => setFilterOpen(false)}
-                                >
-                                    Buscar
-                                </button>
-                            </div>
+                            <button
+                                style={{
+                                    ...S.btnPrimary,
+                                    opacity: globalSaving ? 0.6 : 1,
+                                }}
+                                onClick={handleCrearGlobal}
+                                disabled={globalSaving}
+                            >
+                                {globalSaving
+                                    ? "Generando…"
+                                    : "Confirmar pedido global"}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Modal confirmación eliminar */}
+            {confirmDelete && (
+                <div style={S.overlay} onClick={() => setConfirmDelete(null)}>
+                    <div
+                        style={{ ...S.modal, maxWidth: 440 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeader}>
+                            <span style={S.modalTitle}>
+                                Confirmar eliminación
+                            </span>
+                            <button
+                                style={S.closeBtn}
+                                onClick={() => setConfirmDelete(null)}
+                            >
+                                <IconClose size={14} />
+                            </button>
+                        </div>
+                        <div
+                            style={{
+                                padding: "24px 28px",
+                                fontSize: "0.92rem",
+                                color: "var(--text)",
+                            }}
+                        >
+                            ¿Eliminar el pedido{" "}
+                            <strong>#{confirmDelete.codigo}</strong>?
+                            {confirmDelete.estado === "Activo" && (
+                                <p
+                                    style={{
+                                        marginTop: 10,
+                                        color: "#856404",
+                                        background: "#fff8e0",
+                                        padding: "10px 12px",
+                                        borderRadius: 8,
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    Este pedido está <strong>Activo</strong>. Al
+                                    eliminarlo, las prendas asignadas serán
+                                    devueltas al inventario.
+                                </p>
+                            )}
+                        </div>
+                        <div style={{ ...S.modalFooter }}>
+                            <button
+                                style={S.btnSecondary}
+                                onClick={() => setConfirmDelete(null)}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                style={{
+                                    ...S.btnPrimary,
+                                    background: "#c0392b",
+                                }}
+                                onClick={() => handleDelete(confirmDelete)}
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal crear / editar */}
+            <Modal
+                open={modalOpen}
+                onClose={() => setModalOpen(false)}
+                onSave={handleSave}
+                initial={
+                    editTarget
+                        ? {
+                              ...editTarget,
+                              ...buildEditForm(editTarget),
+                              id: editTarget.id,
+                              codigo: editTarget.codigo,
+                          }
+                        : EMPTY_FORM
+                }
+                title={
+                    editTarget
+                        ? `Editar Pedido #${editTarget.codigo}`
+                        : "Nuevo Pedido de Dotación"
+                }
+                empleados={empleadosConContrato}
+                contratos={contratos}
+                inventarioFlat={inventarioFlat}
+            />
+
+            {/* Modal ver */}
+            <Modal
+                open={viewOpen}
+                onClose={() => setViewOpen(false)}
+                initial={viewTarget || EMPTY_FORM}
+                title={`Ver Pedido #${viewTarget?.codigo ?? ""}`}
+                empleados={empleados}
+                contratos={contratos}
+                inventarioFlat={inventarioFlat}
+                readOnly
+            />
         </div>
     );
 }
 
-/* ─── Estilos ──────────────────────────────────────────────── */
+// ── Estilos ────────────────────────────────────────────────────────────────
 const S = {
     toolbar: {
         display: "flex",
@@ -1678,7 +1938,7 @@ const S = {
         flexWrap: "wrap",
         flex: 1,
     },
-    searchWrap: { position: "relative", flex: 1, minWidth: 220, maxWidth: 420 },
+    searchWrap: { position: "relative", flex: 1, minWidth: 200, maxWidth: 380 },
     searchIcon: {
         position: "absolute",
         left: 11,
@@ -1700,19 +1960,17 @@ const S = {
         color: "var(--text)",
         outline: "none",
     },
-    filterBtn: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "9px 16px",
-        background: "var(--white)",
+    selectFilter: {
+        padding: "9px 12px",
         border: "1.5px solid var(--border)",
         borderRadius: "var(--radius-sm)",
-        color: "var(--text)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
+        fontSize: "0.85rem",
         fontFamily: "Nunito,sans-serif",
+        background: "var(--white)",
+        color: "var(--text)",
+        outline: "none",
         cursor: "pointer",
+        minWidth: 160,
     },
     tableWrap: {
         background: "var(--white)",
@@ -1723,8 +1981,8 @@ const S = {
     },
     avatarCell: { display: "flex", alignItems: "center", gap: 10 },
     avatar: {
-        width: 32,
-        height: 32,
+        width: 34,
+        height: 34,
         borderRadius: "50%",
         background: "var(--primary)",
         color: "#fff",
@@ -1783,9 +2041,8 @@ const S = {
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
-        animation: "fadeInUp 0.22s ease",
     },
-    modalHeaderGreen: {
+    modalHeader: {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1795,13 +2052,13 @@ const S = {
         borderTopRightRadius: "var(--radius)",
         flexShrink: 0,
     },
-    modalTitleWhite: {
+    modalTitle: {
         fontFamily: "'Poppins',sans-serif",
         fontWeight: 700,
-        fontSize: "1.2rem",
+        fontSize: "1.15rem",
         color: "#fff",
     },
-    closeBtnWhite: {
+    closeBtn: {
         background: "none",
         border: "1.5px solid rgba(255,255,255,0.6)",
         borderRadius: "50%",
@@ -1815,12 +2072,10 @@ const S = {
     },
     tabBar: {
         display: "flex",
-        borderBottom: "2px solid var(--border)",
         padding: "0 28px",
         gap: 0,
-        overflowX: "auto",
-        flexWrap: "nowrap",
         flexShrink: 0,
+        borderBottom: "2px solid var(--border)",
     },
     tab: {
         padding: "11px 20px",
@@ -1833,7 +2088,9 @@ const S = {
         fontFamily: "Nunito,sans-serif",
         color: "var(--text-muted)",
         cursor: "pointer",
-        whiteSpace: "nowrap",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
     },
     tabActive: {
         padding: "11px 20px",
@@ -1846,7 +2103,17 @@ const S = {
         fontFamily: "Nunito,sans-serif",
         color: "var(--primary)",
         cursor: "pointer",
-        whiteSpace: "nowrap",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+    },
+    tabBadge: {
+        background: "var(--primary)",
+        color: "#fff",
+        borderRadius: 20,
+        padding: "1px 7px",
+        fontSize: "0.7rem",
+        fontWeight: 800,
     },
     modalBody: {
         padding: "22px 28px 28px",
@@ -1862,28 +2129,10 @@ const S = {
         borderTop: "1.5px solid var(--border)",
         flexShrink: 0,
     },
-    sectionHeader: {
-        marginTop: 20,
-        marginBottom: 4,
-        padding: "8px 14px",
-        background: "var(--primary)",
-        color: "#fff",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.82rem",
-        fontWeight: 800,
-        letterSpacing: "0.05em",
-        textAlign: "center",
-    },
-    sectionHeader2: {
-        marginTop: 20,
-        marginBottom: 0,
-        padding: "7px 12px",
-        background: "#e8f8f5",
-        color: "var(--primary-dark)",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.8rem",
-        fontWeight: 800,
-        letterSpacing: "0.04em",
+    grid2: {
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gap: 16,
     },
     formGroup: {
         display: "flex",
@@ -1903,74 +2152,15 @@ const S = {
         color: "var(--text)",
         background: "var(--white)",
         outline: "none",
-        transition: "border 0.15s",
     },
     inputErr: { borderColor: "#e74c3c" },
-    err: { color: "#e74c3c", fontSize: "0.75rem", marginTop: 2 },
-    grid4: {
-        display: "grid",
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-        gap: 14,
-    },
-    grid3: {
-        display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-        gap: 14,
-    },
-    grid2: {
-        display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-        gap: 14,
-    },
-    pageBtn: (disabled) => ({
-        minWidth: 32,
-        height: 32,
-        padding: "0 8px",
-        border: "1.5px solid var(--border)",
-        borderRadius: 6,
-        background: "var(--white)",
-        color: disabled ? "var(--text-muted)" : "var(--text)",
-        fontSize: "0.88rem",
-        fontWeight: 700,
-        fontFamily: "Nunito,sans-serif",
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-    }),
-    pageBtnActive: {
-        minWidth: 32,
-        height: 32,
-        padding: "0 8px",
-        border: "1.5px solid var(--primary)",
-        borderRadius: 6,
-        background: "var(--primary)",
-        color: "#fff",
-        fontSize: "0.88rem",
-        fontWeight: 700,
-        fontFamily: "Nunito,sans-serif",
+    inputDisabled: {
+        background: "var(--bg)",
         cursor: "default",
-    },
-    pageEllipsis: {
-        minWidth: 28,
-        height: 32,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
         color: "var(--text-muted)",
-        fontSize: "0.88rem",
-        userSelect: "none",
     },
+    err: { color: "#e74c3c", fontSize: "0.75rem", marginTop: 2 },
     btnPrimary: {
-        padding: "10px 24px",
-        background: "var(--primary)",
-        color: "#fff",
-        border: "none",
-        borderRadius: "var(--radius-sm)",
-        fontSize: "0.9rem",
-        fontWeight: 700,
-        cursor: "pointer",
-        fontFamily: "Nunito,sans-serif",
-    },
-    btnPrimaryGreen: {
         padding: "10px 24px",
         background: "var(--primary)",
         color: "#fff",
@@ -1992,11 +2182,78 @@ const S = {
         cursor: "pointer",
         fontFamily: "Nunito,sans-serif",
     },
+    alertaBanner: {
+        background: "#fce8e8",
+        color: "#a33",
+        border: "1px solid #f5c6cb",
+        borderRadius: 8,
+        padding: "10px 14px",
+        fontSize: "0.85rem",
+        marginBottom: 12,
+    },
+    dropdown: {
+        position: "absolute",
+        top: "calc(100% + 2px)",
+        left: 0,
+        right: 0,
+        background: "var(--white)",
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        boxShadow: "0 6px 20px rgba(0,0,0,0.13)",
+        zIndex: 2000,
+        maxHeight: 220,
+        overflowY: "auto",
+    },
+    dropdownItem: {
+        padding: "8px 12px",
+        cursor: "pointer",
+        fontSize: "0.86rem",
+        borderBottom: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+    },
+    dropdownEmpty: {
+        padding: "10px 12px",
+        fontSize: "0.85rem",
+        color: "var(--text-muted)",
+    },
+    paginationBar: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 4px",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    paginationInfo: {
+        fontSize: "0.84rem",
+        color: "var(--text-muted)",
+        fontWeight: 600,
+    },
+    paginationBtns: { display: "flex", alignItems: "center", gap: 4 },
+    pageBtn: (disabled, active) => ({
+        minWidth: 32,
+        height: 32,
+        padding: "0 8px",
+        border: active ? "none" : "1.5px solid var(--border)",
+        borderRadius: 6,
+        background: active
+            ? "var(--primary)"
+            : disabled
+              ? "var(--bg)"
+              : "var(--white)",
+        color: active ? "#fff" : disabled ? "var(--text-muted)" : "var(--text)",
+        fontWeight: 700,
+        fontSize: "0.88rem",
+        cursor: disabled ? "default" : "pointer",
+        fontFamily: "Nunito,sans-serif",
+        opacity: disabled ? 0.5 : 1,
+    }),
     toast: {
         position: "fixed",
         bottom: 28,
         right: 28,
-        background: "var(--primary)",
         color: "#fff",
         borderRadius: "var(--radius-sm)",
         padding: "13px 22px",
@@ -2004,6 +2261,5 @@ const S = {
         fontSize: "0.92rem",
         zIndex: 9999,
         boxShadow: "0 8px 28px rgba(26,155,140,0.35)",
-        animation: "fadeInUp 0.22s ease",
     },
 };

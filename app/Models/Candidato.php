@@ -32,6 +32,8 @@ class Candidato extends Model
         'otrosi_variable', 'auxilio_rodamiento', 'auxilio_comunicacion', 'auxilio_alimentacion',
         // Datos de contratación
         'lugar_trabajo', 'fecha_programacion_ingreso', 'fecha_correccion',
+        // Datos personales
+        'genero',
     ];
 
     protected $casts = [

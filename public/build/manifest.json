@@ -1,11 +1,11 @@
 {
-  "_Layout-B6DwKDev.js": {
-    "file": "assets/Layout-B6DwKDev.js",
+  "_Layout-DO3eyGQf.js": {
+    "file": "assets/Layout-DO3eyGQf.js",
     "name": "Layout",
     "imports": [
       "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_vendor-router-ChHqiHGy.js"
+      "_vendor-router-CDelyX25.js"
     ]
   },
   "_SearchableSelect-0BjvoiIm.js": {
@@ -30,15 +30,15 @@
     "file": "assets/vendor-react-l0sNRNKZ.js",
     "name": "vendor-react"
   },
-  "_vendor-router-ChHqiHGy.js": {
-    "file": "assets/vendor-router-ChHqiHGy.js",
+  "_vendor-router-CDelyX25.js": {
+    "file": "assets/vendor-router-CDelyX25.js",
     "name": "vendor-router",
     "imports": [
       "_vendor-query-qy_ppomC.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-D1xSTSQg.css",
+    "file": "assets/app-DckW4f9s.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -47,13 +47,13 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-C1LB3o_V.js",
+    "file": "assets/app-CAVGu1pm.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_vendor-router-ChHqiHGy.js"
+      "_vendor-router-CDelyX25.js"
     ],
     "dynamicImports": [
       "resources/js/pages/Login.jsx",
@@ -66,7 +66,7 @@
     ],
     "css": [
       "assets/app-6yzDHbIg.css",
-      "assets/app-D1xSTSQg.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/forms/CargaDocumentosForm.jsx": {
@@ -79,7 +79,7 @@
     ]
   },
   "resources/js/forms/RegistroCandidatosForm.jsx": {
-    "file": "assets/RegistroCandidatosForm-Dsp5XzBK.js",
+    "file": "assets/RegistroCandidatosForm-CNti76JZ.js",
     "name": "RegistroCandidatosForm",
     "src": "resources/js/forms/RegistroCandidatosForm.jsx",
     "isDynamicEntry": true,
@@ -99,66 +99,66 @@
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-DFqZtb_g.js",
+    "file": "assets/Dashboard-BfnikHgH.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B6DwKDev.js",
-      "_vendor-router-ChHqiHGy.js",
+      "_Layout-DO3eyGQf.js",
+      "_vendor-router-CDelyX25.js",
       "resources/js/app.jsx"
     ],
     "css": [
-      "assets/app-D1xSTSQg.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-71ApzIML.js",
+    "file": "assets/Login-BeYtnjQc.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_vendor-router-ChHqiHGy.js"
+      "_vendor-router-CDelyX25.js"
     ],
     "css": [
-      "assets/app-D1xSTSQg.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-ZcvM1vOR.js",
+    "file": "assets/Module-Bi_7c7iw.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B6DwKDev.js",
+      "_Layout-DO3eyGQf.js",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
-      "_vendor-router-ChHqiHGy.js"
+      "_vendor-router-CDelyX25.js"
     ],
     "css": [
-      "assets/app-D1xSTSQg.css"
+      "assets/app-DckW4f9s.css"
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-eEckLiVN.js",
+    "file": "assets/Submodule-9L2I1HHc.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B6DwKDev.js",
+      "_Layout-DO3eyGQf.js",
       "resources/js/app.jsx",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
-      "_vendor-router-ChHqiHGy.js"
+      "_vendor-router-CDelyX25.js"
     ],
     "css": [
-      "assets/app-D1xSTSQg.css"
+      "assets/app-DckW4f9s.css"
     ]
   }
 }

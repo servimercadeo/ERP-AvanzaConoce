@@ -88,9 +88,11 @@ function Field({
     const uppercaseStyle = uppercase ? { textTransform: "uppercase" } : {};
 
     const handleChange = (key) => (e) => {
-        let val = e.target.value;
-        if (uppercase) val = val.toUpperCase();
-        onChange(key)(e);
+        if (uppercase) {
+            onChange(key)({ target: { value: e.target.value.toUpperCase() } });
+        } else {
+            onChange(key)(e);
+        }
     };
 
     return (
@@ -1265,24 +1267,6 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qCandidatosContrato) setCandidatosContrato(_qCandidatosContrato);
     }, [_qCandidatosContrato]);
-
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [resC, resE, resCat] = await Promise.all([
-                api.get("/contratos"),
-                api.get("/empleados"),
-                api.get("/catalogos"),
-            ]);
-            setContratos(resC.data);
-            setEmpleados(resE.data);
-            setCatalogs(resCat.data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     useEffect(() => {
         setPagina(1);

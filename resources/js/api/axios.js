@@ -42,8 +42,11 @@ api.interceptors.response.use(
       if (token) error.config.headers['X-XSRF-TOKEN'] = token
       return axios(error.config)
     }
-    // 401 = sesión expirada → redirigir al login (solo si no estamos ya en login)
-    if (status === 401 && window.location.pathname !== '/login') {
+    // 401 = sesión expirada → redirigir al login
+    // No redirigir si ya estamos en login o en páginas públicas (candidatos sin sesión)
+    const publicPaths = ['/login', '/registro-candidatos', '/registro-nuevos-ingresos', '/carga-documentos']
+    const isPublicPage = publicPaths.some(p => window.location.pathname.startsWith(p))
+    if (status === 401 && !isPublicPage) {
       window.location.href = '/login'
     }
     return Promise.reject(error)
