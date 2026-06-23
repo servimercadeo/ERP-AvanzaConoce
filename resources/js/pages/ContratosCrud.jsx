@@ -388,12 +388,12 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                             fontSize: "1.2rem",
                             flexShrink: 0,
                             overflow: "hidden",
+                            position: "relative",
                         }}
                     >
-                        {selected.fotografia ? (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                            selected.nombres.charAt(0).toUpperCase()
+                        {selected.nombres.charAt(0).toUpperCase()}
+                        {selected.fotografia && (
+                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -517,12 +517,12 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                                                 fontSize: "0.9rem",
                                                 flexShrink: 0,
                                                 overflow: "hidden",
+                                                position: "relative",
                                             }}
                                         >
-                                            {c.fotografia ? (
-                                                <img src={`/storage/${c.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                            ) : (
-                                                c.nombres.charAt(0).toUpperCase()
+                                            {c.nombres.charAt(0).toUpperCase()}
+                                            {c.fotografia && (
+                                                <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                             )}
                                         </div>
                                         <div>
@@ -1591,11 +1591,10 @@ export default function ContratosCrud() {
                                 <tr key={c.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={{ ...S.avatar, overflow: "hidden" }}>
-                                                {c.empleado?.fotografia ? (
-                                                    <img src={`/storage/${c.empleado.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                                ) : (
-                                                    (c.empleado?.nombres || "?").charAt(0).toUpperCase()
+                                            <div style={{ ...S.avatar, overflow: "hidden", position: "relative" }}>
+                                                {(c.empleado?.nombres || "?").charAt(0).toUpperCase()}
+                                                {c.empleado?.fotografia && (
+                                                    <img src={`/storage/${c.empleado.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                                 )}
                                             </div>
                                             <span style={{ fontWeight: 700 }}>

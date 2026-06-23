@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Recrear symlink storage (public/storage puede ser directorio por el COPY del Dockerfile)
+rm -rf /var/www/html/public/storage
+php artisan storage:link
+
 # Migraciones (--seed solo en primer arranque si la tabla está vacía)
 php artisan migrate --force
 

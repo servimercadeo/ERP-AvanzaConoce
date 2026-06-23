@@ -379,12 +379,11 @@ function ContratadoSelector({ onSelect }) {
                         background: "var(--primary)", color: "#fff",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
-                        overflow: "hidden",
+                        overflow: "hidden", position: "relative",
                     }}>
-                        {selected.fotografia ? (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                            (selected.nombres || "?").charAt(0).toUpperCase()
+                        {(selected.nombres || "?").charAt(0).toUpperCase()}
+                        {selected.fotografia && (
+                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -443,12 +442,11 @@ function ContratadoSelector({ onSelect }) {
                                         background: "var(--primary)", color: "#fff",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
-                                        overflow: "hidden",
+                                        overflow: "hidden", position: "relative",
                                     }}>
-                                        {c.fotografia ? (
-                                            <img src={`/storage/${c.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                        ) : (
-                                            (c.nombres || "?").charAt(0).toUpperCase()
+                                        {(c.nombres || "?").charAt(0).toUpperCase()}
+                                        {c.fotografia && (
+                                            <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                         )}
                                     </div>
                                     <div>
@@ -1602,15 +1600,15 @@ export default function EmpleadosCrud() {
                                 <tr key={emp.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={S.avatar}>
-                                                {emp.fotografia ? (
+                                            <div style={{ ...S.avatar, position: "relative" }}>
+                                                {((emp.nombres || emp.name) ?? "?").charAt(0).toUpperCase()}
+                                                {emp.fotografia && (
                                                     <img
                                                         src={`/storage/${emp.fotografia}`}
                                                         alt=""
-                                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                                                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                                                        onError={(e) => { e.currentTarget.style.display = "none"; }}
                                                     />
-                                                ) : (
-                                                    ((emp.nombres || emp.name) ?? "?").charAt(0).toUpperCase()
                                                 )}
                                             </div>
                                             <span
