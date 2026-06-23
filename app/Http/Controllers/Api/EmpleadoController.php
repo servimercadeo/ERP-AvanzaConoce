@@ -54,6 +54,16 @@ class EmpleadoController extends Controller
                             ->value('genero');
                     }
 
+                    // Fotografía: si users no tiene, buscar en candidatos
+                    if (!$user->fotografia) {
+                        $fotoCandidato = \Illuminate\Support\Facades\DB::table('candidatos')
+                            ->where('identificacion', $user->cedula)
+                            ->value('fotografia');
+                        if ($fotoCandidato) {
+                            $user->fotografia = $fotoCandidato;
+                        }
+                    }
+
                     // Tallas de dotación desde respuestas_ingresos
                     $tallas = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
                         ->where('documento', $user->cedula)
@@ -100,6 +110,12 @@ class EmpleadoController extends Controller
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
+
+        if ($request->hasFile('fotografia')) {
+            $data['fotografia'] = $request->file('fotografia')->store('empleados/fotos', 'public');
+        } elseif (!array_key_exists('fotografia', $data) || $data['fotografia'] === null) {
+            unset($data['fotografia']);
+        }
 
         if ($existingId) {
             $empleado = User::find($existingId);
@@ -160,6 +176,12 @@ class EmpleadoController extends Controller
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);
+
+        if ($request->hasFile('fotografia')) {
+            $data['fotografia'] = $request->file('fotografia')->store('empleados/fotos', 'public');
+        } elseif (!array_key_exists('fotografia', $data) || $data['fotografia'] === null) {
+            unset($data['fotografia']);
+        }
 
         $empleado->update($data);
 
@@ -304,7 +326,7 @@ class EmpleadoController extends Controller
             'tipo_vinculacion' => 'required|string|max:100',
 
             // Opcionales
-            'fotografia'           => 'nullable|string|max:500',
+            'fotografia'           => 'nullable|max:5120',
             'fecha_nacimiento'     => 'nullable|date',
             'lugar_nacimiento'     => 'nullable|string|max:150',
             'raza'                 => 'nullable|string|max:80',

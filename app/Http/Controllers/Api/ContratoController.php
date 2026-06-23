@@ -102,7 +102,19 @@ class ContratoController extends Controller
             $query->where('sede', $request->sede);
         }
 
-        return response()->json($query->orderBy('created_at', 'desc')->get());
+        $contratos = $query->orderBy('created_at', 'desc')->get()->map(function ($contrato) {
+            if ($contrato->empleado && !$contrato->empleado->fotografia) {
+                $foto = \Illuminate\Support\Facades\DB::table('candidatos')
+                    ->where('identificacion', $contrato->empleado->cedula)
+                    ->value('fotografia');
+                if ($foto) {
+                    $contrato->empleado->fotografia = $foto;
+                }
+            }
+            return $contrato;
+        });
+
+        return response()->json($contratos);
     }
 
     public function store(Request $request)
@@ -127,6 +139,17 @@ class ContratoController extends Controller
                     'movil' => '0000000000',
                 ]
             );
+            // Copiar fotografia del candidato si el usuario fue creado nuevo
+            if ($user->wasRecentlyCreated) {
+                $fotoCandidato = \Illuminate\Support\Facades\DB::table('candidatos')
+                    ->where('identificacion', $request->documento)
+                    ->value('fotografia');
+                if ($fotoCandidato) {
+                    $user->fotografia = $fotoCandidato;
+                    $user->save();
+                }
+            }
+
             $request->merge(['empleado_id' => $user->id]);
         }
 

@@ -387,9 +387,14 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                             fontWeight: 800,
                             fontSize: "1.2rem",
                             flexShrink: 0,
+                            overflow: "hidden",
                         }}
                     >
-                        {selected.nombres.charAt(0).toUpperCase()}
+                        {selected.fotografia ? (
+                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                            selected.nombres.charAt(0).toUpperCase()
+                        )}
                     </div>
                     <div style={{ flex: 1 }}>
                         <div
@@ -511,9 +516,14 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                                                 fontWeight: 800,
                                                 fontSize: "0.9rem",
                                                 flexShrink: 0,
+                                                overflow: "hidden",
                                             }}
                                         >
-                                            {c.nombres.charAt(0).toUpperCase()}
+                                            {c.fotografia ? (
+                                                <img src={`/storage/${c.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                            ) : (
+                                                c.nombres.charAt(0).toUpperCase()
+                                            )}
                                         </div>
                                         <div>
                                             <div
@@ -1581,10 +1591,12 @@ export default function ContratosCrud() {
                                 <tr key={c.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={S.avatar}>
-                                                {(c.empleado?.nombres || "?")
-                                                    .charAt(0)
-                                                    .toUpperCase()}
+                                            <div style={{ ...S.avatar, overflow: "hidden" }}>
+                                                {c.empleado?.fotografia ? (
+                                                    <img src={`/storage/${c.empleado.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                ) : (
+                                                    (c.empleado?.nombres || "?").charAt(0).toUpperCase()
+                                                )}
                                             </div>
                                             <span style={{ fontWeight: 700 }}>
                                                 {c.empleado?.nombres}{" "}

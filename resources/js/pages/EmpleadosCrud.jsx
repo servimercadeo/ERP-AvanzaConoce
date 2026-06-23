@@ -174,7 +174,6 @@ const EMPTY_FORM = {
     cedula: "",
     apellidos: "",
     nombres: "",
-    fotografia: "",
     sede: "",
     fecha_nacimiento: "",
     lugar_nacimiento: "",
@@ -380,8 +379,13 @@ function ContratadoSelector({ onSelect }) {
                         background: "var(--primary)", color: "#fff",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
+                        overflow: "hidden",
                     }}>
-                        {(selected.nombres || "?").charAt(0).toUpperCase()}
+                        {selected.fotografia ? (
+                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                            (selected.nombres || "?").charAt(0).toUpperCase()
+                        )}
                     </div>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--primary-dark)", fontFamily: "'Poppins',sans-serif" }}>
@@ -439,8 +443,13 @@ function ContratadoSelector({ onSelect }) {
                                         background: "var(--primary)", color: "#fff",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
+                                        overflow: "hidden",
                                     }}>
-                                        {(c.nombres || "?").charAt(0).toUpperCase()}
+                                        {c.fotografia ? (
+                                            <img src={`/storage/${c.fotografia}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        ) : (
+                                            (c.nombres || "?").charAt(0).toUpperCase()
+                                        )}
                                     </div>
                                     <div>
                                         <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
@@ -488,6 +497,7 @@ function Modal({
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("general");
     const [saving, setSaving] = useState(false);
+    const [fotografiaFile, setFotografiaFile] = useState(null);
     const isCreate = !initial?.id && !readOnly;
 
     React.useEffect(() => {
@@ -495,6 +505,7 @@ function Modal({
         setErrors({});
         setActive("general");
         setSaving(false);
+        setFotografiaFile(null);
     }, [initial, open]);
 
     const handleSelectCand = (c) => {
@@ -596,7 +607,7 @@ function Modal({
         }
         setSaving(true);
         try {
-            await onSave(form);
+            await onSave(form, fotografiaFile);
         } catch {
             // parent handles error toast; modal stays open
         } finally {
@@ -663,8 +674,8 @@ function Modal({
                     {/* ══ PESTAÑA: INFORMACIÓN GENERAL ══ */}
                     {activeTab === "general" && (
                         <>
-                            {/* Fila 1 – Identificación */}
-                            <div style={S.grid4}>
+                            {/* Fila 1 – Identificación + Foto */}
+                            <div style={{ ...S.grid4, alignItems: "flex-end" }}>
                                 <Field label="Cédula" k="cedula" req {...fp} />
                                 <Field
                                     label="Apellidos"
@@ -680,27 +691,40 @@ function Modal({
                                     uppercase
                                     {...fp}
                                 />
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>
-                                        Fotografía Empleado
+                                {/* Campo foto */}
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                    <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
+                                        Fotografía
                                     </label>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        style={{
-                                            ...S.input,
-                                            padding: "6px 10px",
-                                            cursor: "pointer",
-                                        }}
-                                        onChange={(e) =>
-                                            setForm((f) => ({
-                                                ...f,
-                                                fotografia:
-                                                    e.target.files[0]?.name ??
-                                                    "",
-                                            }))
-                                        }
-                                    />
+                                    <label style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        padding: "6px 10px",
+                                        border: "1.5px dashed var(--border)",
+                                        borderRadius: "var(--radius-sm, 8px)",
+                                        cursor: readOnly ? "not-allowed" : "pointer",
+                                        background: "var(--white)",
+                                        overflow: "hidden",
+                                    }}>
+                                        {fotografiaFile ? (
+                                            <img src={URL.createObjectURL(fotografiaFile)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                        ) : form.fotografia ? (
+                                            <img src={`/storage/${form.fotografia}`} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                        ) : (
+                                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0 }}>
+                                                {(form.nombres || "?").charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {fotografiaFile ? fotografiaFile.name : (form.fotografia ? "Cambiar foto" : "Subir foto…")}
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={readOnly}
+                                            style={{ display: "none" }}
+                                            onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                        />
+                                    </label>
                                 </div>
                             </div>
 
@@ -1400,14 +1424,28 @@ export default function EmpleadosCrud() {
         setViewOpen(true);
     };
 
-    const handleSave = async (form) => {
-        const payload = toApi(form);
+    const handleSave = async (form, fotografiaFile) => {
+        const plain = toApi(form);
+
+        let payload;
+        if (fotografiaFile) {
+            const fd = new FormData();
+            Object.entries(plain).forEach(([k, v]) => {
+                if (v !== null && v !== undefined) fd.append(k, v);
+            });
+            fd.append("fotografia", fotografiaFile);
+            if (editTarget) fd.append("_method", "PUT");
+            payload = fd;
+            // No fijar Content-Type; Axios lo establece con el boundary correcto al detectar FormData
+        } else {
+            payload = plain;
+        }
+
         try {
             if (editTarget) {
-                const { data } = await api.put(
-                    `/empleados/${editTarget.id}`,
-                    payload,
-                );
+                const { data } = fotografiaFile
+                    ? await api.post(`/empleados/${editTarget.id}`, payload)
+                    : await api.put(`/empleados/${editTarget.id}`, payload);
                 setEmpleados((prev) =>
                     prev.map((e) => (e.id === editTarget.id ? data : e)),
                 );
@@ -1565,13 +1603,15 @@ export default function EmpleadosCrud() {
                                     <td>
                                         <div style={S.avatarCell}>
                                             <div style={S.avatar}>
-                                                {(
-                                                    (emp.nombres ||
-                                                        emp.name) ??
-                                                    "?"
-                                                )
-                                                    .charAt(0)
-                                                    .toUpperCase()}
+                                                {emp.fotografia ? (
+                                                    <img
+                                                        src={`/storage/${emp.fotografia}`}
+                                                        alt=""
+                                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                                                    />
+                                                ) : (
+                                                    ((emp.nombres || emp.name) ?? "?").charAt(0).toUpperCase()
+                                                )}
                                             </div>
                                             <span
                                                 style={{
@@ -2084,6 +2124,7 @@ const S = {
         fontWeight: 800,
         fontSize: "0.95rem",
         flexShrink: 0,
+        overflow: "hidden",
     },
     badge: (bg, color) => ({
         background: bg,

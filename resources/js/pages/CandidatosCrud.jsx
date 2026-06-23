@@ -109,7 +109,9 @@ export default function CandidatosCrud() {
         lugar_trabajo: "",
         fecha_programacion_ingreso: "",
         fecha_correccion: "",
+        fotografia: "",
     });
+    const [fotografiaFile, setFotografiaFile] = useState(null);
     const [docs, setDocs] = useState([]);
     const [docsLoading, setDocsLoading] = useState(false);
     const [uploadingDoc, setUploadingDoc] = useState(null);
@@ -305,6 +307,7 @@ export default function CandidatosCrud() {
     };
 
     const handleAddCandidate = () => {
+        setFotografiaFile(null);
         setCandModalMode("create");
         setCandForm({
             nombres: "",
@@ -323,11 +326,13 @@ export default function CandidatosCrud() {
             ...interviewDateFrom(getTodayStr()),
             observaciones: "",
             requisicion_id: "",
+            fotografia: "",
         });
         setIsCandModalOpen(true);
     };
 
     const handleEditCandidate = (c) => {
+        setFotografiaFile(null);
         setCandModalMode("edit");
         setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
         setNewDocFile(null);
@@ -582,22 +587,37 @@ export default function CandidatosCrud() {
         }
         try {
             if (candModalMode === "create") {
-                const { data: created } = await api.post("/candidatos", {
-                    ...candForm,
-                    pruebas: false,
-                    aval: false,
-                });
+                let payload;
+                if (fotografiaFile) {
+                    const fd = new FormData();
+                    Object.entries({ ...candForm, pruebas: false, aval: false }).forEach(([k, v]) => {
+                        if (v !== null && v !== undefined && v !== "") fd.append(k, v);
+                    });
+                    fd.append("fotografia", fotografiaFile);
+                    payload = fd;
+                } else {
+                    payload = { ...candForm, pruebas: false, aval: false };
+                }
+                const { data: created } = await api.post("/candidatos", payload);
                 setCandidates((prev) => [created, ...prev]);
             } else {
                 // eslint-disable-next-line no-unused-vars
                 const { pruebas: _p, aval: _a, ...editPayload } = candForm;
-                const { data: updated } = await api.put(
-                    `/candidatos/${candForm.id}`,
-                    editPayload,
-                );
-                setCandidates((prev) =>
-                    prev.map((c) => (c.id === candForm.id ? updated : c)),
-                );
+                let payload;
+                if (fotografiaFile) {
+                    const fd = new FormData();
+                    Object.entries(editPayload).forEach(([k, v]) => {
+                        if (v !== null && v !== undefined && v !== "") fd.append(k, v);
+                    });
+                    fd.append("fotografia", fotografiaFile);
+                    fd.append("_method", "PUT");
+                    payload = fd;
+                    const { data: updated } = await api.post(`/candidatos/${candForm.id}`, payload);
+                    setCandidates((prev) => prev.map((c) => (c.id === candForm.id ? updated : c)));
+                } else {
+                    const { data: updated } = await api.put(`/candidatos/${candForm.id}`, editPayload);
+                    setCandidates((prev) => prev.map((c) => (c.id === candForm.id ? updated : c)));
+                }
             }
             setIsCandModalOpen(false);
             showToast(
@@ -1229,6 +1249,36 @@ export default function CandidatosCrud() {
                                         candModalMode === "create"
                                     }
                                 />
+                                <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+                                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
+                                        Fotografía
+                                    </label>
+                                    <label style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        padding: "6px 10px",
+                                        border: "1.5px dashed var(--border)",
+                                        borderRadius: "var(--radius-sm)",
+                                        cursor: candModalMode === "view" ? "not-allowed" : "pointer",
+                                        background: candModalMode === "view" ? "var(--bg)" : "var(--white)",
+                                        overflow: "hidden",
+                                    }}>
+                                        {fotografiaFile ? (
+                                            <img src={URL.createObjectURL(fotografiaFile)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                        ) : candForm.fotografia ? (
+                                            <img src={`/storage/${candForm.fotografia}`} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                        ) : null}
+                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {fotografiaFile ? fotografiaFile.name : (candForm.fotografia ? "Cambiar foto" : "Seleccionar imagen…")}
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={candModalMode === "view"}
+                                            style={{ display: "none" }}
+                                            onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                        />
+                                    </label>
+                                </div>
                             </div>
 
                             <h4
