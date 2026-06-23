@@ -26,6 +26,10 @@ api.interceptors.request.use(async config => {
     }
     if (token) config.headers['X-XSRF-TOKEN'] = token
   }
+  // Cuando el body es FormData dejar que el browser establezca Content-Type con boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   return config
 })
 

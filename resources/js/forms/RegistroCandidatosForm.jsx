@@ -566,6 +566,7 @@ const FormStyles = () => (
 
 export default function RegistroCandidatosForm() {
     const [form, setForm] = useState(EMPTY);
+    const [fotografiaFile, setFotografiaFile] = useState(null);
     const [errors, setErrors] = useState({});
     const [step, setStep] = useState(1);
     const [submitted, setSubmitted] = useState(false);
@@ -702,14 +703,20 @@ export default function RegistroCandidatosForm() {
             const csrfToken = document.querySelector(
                 'meta[name="csrf-token"]',
             )?.content;
+
+            const fd = new FormData();
+            Object.entries({ ...form, token: tokenParam }).forEach(([k, v]) => {
+                if (v !== null && v !== undefined) fd.append(k, v);
+            });
+            if (fotografiaFile) fd.append("fotografia", fotografiaFile);
+
             const res = await fetch("/api/candidatos/registro", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
                     "X-CSRF-TOKEN": csrfToken ?? "",
                     Accept: "application/json",
                 },
-                body: JSON.stringify({ ...form, token: tokenParam }),
+                body: fd,
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -1322,6 +1329,41 @@ export default function RegistroCandidatosForm() {
                                                     </svg>
                                                 </span>
                                             </div>
+                                        </Field>
+                                    </div>
+
+                                    {/* Fotografía */}
+                                    <div style={{ gridColumn: "span 2" }}>
+                                        <Field
+                                            label="7. Fotografía"
+                                            hint="Sube una foto reciente tuya (JPG, PNG o WEBP, máx. 5 MB)."
+                                        >
+                                            <label
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 14,
+                                                    padding: "10px 14px",
+                                                    border: "1.5px dashed var(--border, #c5e8e3)",
+                                                    borderRadius: "var(--radius-sm, 10px)",
+                                                    cursor: "pointer",
+                                                    background: fotografiaFile ? "var(--bg2, #f0faf8)" : "var(--white, #fff)",
+                                                    transition: "all 0.2s ease",
+                                                }}
+                                            >
+                                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #1a9b8c)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                                                </svg>
+                                                <span style={{ fontSize: "0.88rem", fontFamily: "Nunito, sans-serif", color: fotografiaFile ? "var(--primary, #1a9b8c)" : "var(--text-muted, #5a7a75)", fontWeight: fotografiaFile ? 700 : 500 }}>
+                                                    {fotografiaFile ? fotografiaFile.name : "Seleccionar imagen…"}
+                                                </span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    style={{ display: "none" }}
+                                                    onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                                />
+                                            </label>
                                         </Field>
                                     </div>
                                 </div>

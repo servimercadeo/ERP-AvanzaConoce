@@ -61,7 +61,14 @@ class CandidatoController extends Controller
             'negocio'           => 'nullable|string|max:150',
             'observaciones'     => 'nullable|string',
             'genero'            => 'nullable|string|max:30',
+            'fotografia'        => 'nullable|max:5120',
         ]);
+
+        if ($request->hasFile('fotografia')) {
+            $data['fotografia'] = $request->file('fotografia')->store('candidatos/fotos', 'public');
+        } elseif (!array_key_exists('fotografia', $data) || $data['fotografia'] === null) {
+            unset($data['fotografia']);
+        }
 
         if (empty($data['fecha_postulacion'])) {
             $data['fecha_postulacion'] = now()->toDateString();
@@ -143,7 +150,14 @@ class CandidatoController extends Controller
             'auxilio_rodamiento'       => 'nullable|numeric',
             'auxilio_comunicacion'     => 'nullable|numeric',
             'auxilio_alimentacion'     => 'nullable|numeric',
+            'fotografia'               => 'nullable|max:5120',
         ]);
+
+        if ($request->hasFile('fotografia')) {
+            $data['fotografia'] = $request->file('fotografia')->store('candidatos/fotos', 'public');
+        } elseif (!array_key_exists('fotografia', $data) || $data['fotografia'] === null) {
+            unset($data['fotografia']);
+        }
 
         if (isset($data['nombres'])) {
             $data['nombres'] = strtoupper($data['nombres']);
