@@ -204,6 +204,23 @@ class ContratoController extends Controller
 
         $this->enviarContratoASharepoint($contrato);
 
+        // Sync campos del contrato al empleado
+        $contratoUser = \App\Models\User::find($contrato->empleado_id);
+        if ($contratoUser?->cedula) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($contratoUser->cedula, [
+                'ingresos'          => $contrato->salario,
+                'caja_compensacion' => $contrato->caja_compensacion,
+                'arl'               => $contrato->arl,
+                'fondo_pensiones'   => $contrato->fondo_pensiones,
+                'eps'               => $contrato->lps_afiliado,
+                'cargo'             => $contrato->cargo,
+                'sede'              => $contrato->sede,
+                'tipo_vinculacion'  => $contrato->tipo_vinculacion,
+                'empleador'         => $contrato->empleador,
+                'jefe_inmediato'    => $contrato->jefe_inmediato,
+            ]);
+        }
+
         return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
     }
 
@@ -243,7 +260,7 @@ class ContratoController extends Controller
             'anexos'                  => 'nullable|array',
         ]);
 
-        return DB::transaction(function() use ($contrato, $data) {
+        $result = DB::transaction(function() use ($contrato, $data) {
             $data['completado'] = true;
 
             $contrato->update($data);
@@ -264,8 +281,27 @@ class ContratoController extends Controller
                 }
             }
 
-            return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']));
+            return $contrato->load(['empleado', 'centrosCostos', 'anexos']);
         });
+
+        // Sync campos del contrato al empleado
+        $contratoUser = \App\Models\User::find($result->empleado_id);
+        if ($contratoUser?->cedula) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($contratoUser->cedula, [
+                'ingresos'          => $result->salario,
+                'caja_compensacion' => $result->caja_compensacion,
+                'arl'               => $result->arl,
+                'fondo_pensiones'   => $result->fondo_pensiones,
+                'eps'               => $result->lps_afiliado,
+                'cargo'             => $result->cargo,
+                'sede'              => $result->sede,
+                'tipo_vinculacion'  => $result->tipo_vinculacion,
+                'empleador'         => $result->empleador,
+                'jefe_inmediato'    => $result->jefe_inmediato,
+            ]);
+        }
+
+        return response()->json($result);
     }
 
     public function destroy(Contrato $contrato)

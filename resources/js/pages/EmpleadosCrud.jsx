@@ -149,17 +149,38 @@ const BANCOS = [
 // La API devuelve fechas como "1995-06-14T00:00:00.000000Z"; el <input type="date"> necesita "yyyy-MM-dd"
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+// Normaliza un valor para que coincida con las opciones del <select> (ignora mayúsculas, tildes y sufijo /a)
+const matchOpt = (val, opts) => {
+    if (!val || !opts?.length) return null;
+    const norm = (s) =>
+        String(s).toLowerCase()
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .replace(/\/[a-z]$/, "").trim();
+    const nVal = norm(val);
+    return opts.find((o) => norm(o) === nVal) ?? null;
+};
+
 const toForm = (emp) => ({
     ...EMPTY_FORM,
     ...emp,
     tiene_cert_alturas: emp.tiene_cert_alturas ? "Sí" : "No",
     empresa_id: emp.empresa_id ?? "",
-    fecha_nacimiento: dateOnly(emp.fecha_nacimiento),
+    fecha_nacimiento:     dateOnly(emp.fecha_nacimiento),
+    fecha_expedicion:     dateOnly(emp.fecha_expedicion),
     licencia_carro_vence: dateOnly(emp.licencia_carro_vence),
-    licencia_moto_vence: dateOnly(emp.licencia_moto_vence),
-    cert_alturas_vence: dateOnly(emp.cert_alturas_vence),
-    ingresos: emp.ingresos ?? "",
-    numero_hijos: emp.numero_hijos != null ? String(emp.numero_hijos) : "",
+    licencia_moto_vence:  dateOnly(emp.licencia_moto_vence),
+    cert_alturas_vence:   dateOnly(emp.cert_alturas_vence),
+    ingresos:      emp.ingresos ?? "",
+    numero_hijos:  emp.numero_hijos != null ? String(emp.numero_hijos) : "",
+    profesion:     emp.profesion ?? "",
+    talla_camisa:  emp.talla_camisa ?? "",
+    talla_pantalon:emp.talla_pantalon ?? "",
+    talla_zapatos: emp.talla_zapatos ?? "",
+    // Normalizar campos de select para que coincidan exactamente con las opciones
+    genero:            matchOpt(emp.genero,           GENEROS)    ?? emp.genero ?? "",
+    estado_civil:      matchOpt(emp.estado_civil,     EST_CIVIL)  ?? emp.estado_civil ?? "",
+    nivel_escolaridad: matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ?? emp.nivel_escolaridad ?? "",
+    estrato:           matchOpt(emp.estrato,          ESTRATOS)   ?? emp.estrato ?? "PD",
 });
 
 const toApi = (form) => ({
@@ -172,6 +193,7 @@ const toApi = (form) => ({
 
 const EMPTY_FORM = {
     cedula: "",
+    fecha_expedicion: "",
     apellidos: "",
     nombres: "",
     sede: "",
@@ -181,6 +203,7 @@ const EMPTY_FORM = {
     genero: "",
     estado_civil: "",
     nivel_escolaridad: "",
+    profesion: "",
     email: "",
     direccion_residencia: "",
     movil: "",
@@ -190,6 +213,9 @@ const EMPTY_FORM = {
     ingresos: "",
     observaciones_medicas: "",
     alergias: "",
+    talla_camisa: "",
+    talla_pantalon: "",
+    talla_zapatos: "",
     rh: "",
     eps: "",
     arl: "",
@@ -517,35 +543,30 @@ function Modal({
             }
         }
         const v = (val, fallback) => (val != null && val !== "") ? val : fallback;
-        // Busca la opción que coincida ignorando mayúsculas, tildes y sufijo /a
-        const matchOpt = (val, opts) => {
-            if (!val || !opts?.length) return null;
-            const norm = (s) =>
-                String(s).toLowerCase()
-                    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-                    .replace(/\/[a-z]$/, "").trim();
-            const nVal = norm(val);
-            return opts.find((o) => norm(o) === nVal) ?? null;
-        };
         setForm((f) => ({
             ...f,
             // Identificación
-            cedula:            v(c.cedula,            f.cedula),
-            nombres:           v(c.nombres,           f.nombres),
-            apellidos:         v(c.apellidos,         f.apellidos),
-            email:             v(c.email,             f.email),
-            movil:             v(c.movil,             f.movil),
+            cedula:           v(c.cedula,           f.cedula),
+            nombres:          v(c.nombres,          f.nombres),
+            apellidos:        v(c.apellidos,        f.apellidos),
+            email:            v(c.email,            f.email),
+            movil:            v(c.movil,            f.movil),
+            fecha_expedicion: v(c.fecha_expedicion, f.fecha_expedicion),
             // Datos personales
             genero:                     v(matchOpt(c.genero, GENEROS),                            f.genero),
             fecha_nacimiento:           v(c.fecha_nacimiento,                                     f.fecha_nacimiento),
             lugar_nacimiento:           v(c.lugar_nacimiento,                                     f.lugar_nacimiento),
             estado_civil:               v(matchOpt(c.estado_civil, EST_CIVIL),                    f.estado_civil),
             nivel_escolaridad:          v(matchOpt(c.nivel_escolaridad, ESCOLARIDAD),             f.nivel_escolaridad),
+            profesion:                  v(c.profesion,                                            f.profesion),
             direccion_residencia:       v(c.direccion_residencia,                                 f.direccion_residencia),
             estrato:                    v(matchOpt(c.estrato, ESTRATOS),                          f.estrato),
             barrio:                     v(c.barrio,                                               f.barrio),
             numero_hijos:               v(c.numero_hijos != null ? String(c.numero_hijos) : null, f.numero_hijos),
             rh:                         v(matchOpt(c.rh, catalogs.tipos_rh),                      f.rh),
+            talla_camisa:               v(c.talla_camisa,                                         f.talla_camisa),
+            talla_pantalon:             v(c.talla_pantalon,                                       f.talla_pantalon),
+            talla_zapatos:              v(c.talla_zapatos,                                        f.talla_zapatos),
             // Seguridad social
             eps:               v(matchOpt(c.eps, catalogs.eps),                                   f.eps),
             arl:               v(matchOpt(c.arl, catalogs.arls),                                  f.arl),
@@ -726,7 +747,7 @@ function Modal({
                                 </div>
                             </div>
 
-                            {/* Fila 2 – Lugar */}
+                            {/* Fila 2 – Sede y fechas */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Sede a la que pertenece"
@@ -742,15 +763,21 @@ function Modal({
                                     {...fp}
                                 />
                                 <Field
+                                    label="Fecha Expedición Documento"
+                                    k="fecha_expedicion"
+                                    type="date"
+                                    {...fp}
+                                />
+                                <Field
                                     label="Lugar Nacimiento"
                                     k="lugar_nacimiento"
                                     {...fp}
                                 />
-                                <Field label="Raza" k="raza" {...fp} />
                             </div>
 
-                            {/* Fila 3 – Datos personales */}
+                            {/* Fila 2b – Raza y género */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
+                                <Field label="Raza" k="raza" {...fp} />
                                 <Field
                                     label="Género"
                                     k="genero"
@@ -758,6 +785,11 @@ function Modal({
                                     req
                                     {...fp}
                                 />
+                                <div /><div />
+                            </div>
+
+                            {/* Fila 3 – Estado civil, escolaridad, profesión */}
+                            <div style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Estado Civil"
                                     k="estado_civil"
@@ -771,12 +803,24 @@ function Modal({
                                     {...fp}
                                 />
                                 <Field
+                                    label="Profesión"
+                                    k="profesion"
+                                    span={2}
+                                    {...fp}
+                                />
+                            </div>
+
+                            {/* Fila 3b – Email */}
+                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                                <Field
                                     label="Email"
                                     k="email"
                                     type="email"
                                     req
+                                    span={2}
                                     {...fp}
                                 />
+                                <div /><div />
                             </div>
 
                             <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -830,6 +874,17 @@ function Modal({
                                     type="textarea"
                                     {...fp}
                                 />
+                            </div>
+
+                            {/* Tallas / Dotación */}
+                            <div style={S.sectionHeader}>
+                                TALLAS / DOTACIÓN
+                            </div>
+                            <div style={{ ...S.grid4, marginTop: 12 }}>
+                                <Field label="Talla Camisa" k="talla_camisa" {...fp} />
+                                <Field label="Talla Pantalón" k="talla_pantalon" {...fp} />
+                                <Field label="Talla Zapatos" k="talla_zapatos" {...fp} />
+                                <div />
                             </div>
 
                             {/* Fila 6 – Seguridad Social */}
