@@ -374,6 +374,9 @@ export default function PedidosGlobalesCrud() {
                                                                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                                                 <div style={S.avatarSm}>
                                                                                     {(p.empleado?.nombres || "?").charAt(0).toUpperCase()}
+                                                                                    {p.empleado?.fotografia && (
+                                                                                        <img src={`/storage/${p.empleado.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                                                    )}
                                                                                 </div>
                                                                                 {p.empleado?.nombres} {p.empleado?.apellidos}
                                                                             </div>
@@ -452,7 +455,7 @@ const S = {
     badge:          (bg, color) => ({ background: bg, color, borderRadius: 20, padding: "3px 10px", fontSize: "0.76rem", fontWeight: 700, whiteSpace: "nowrap", display: "inline-block" }),
     thInner:        { padding: "8px 12px", textAlign: "left", fontWeight: 700, fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" },
     tdInner:        { padding: "9px 12px", verticalAlign: "middle" },
-    avatarSm:       { width: 26, height: 26, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.78rem", flexShrink: 0 },
+    avatarSm:       { width: 26, height: 26, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.78rem", flexShrink: 0, overflow: "hidden", position: "relative" },
     paginationBar:  { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },
     paginationInfo: { fontSize: "0.84rem", color: "var(--text-muted)", fontWeight: 600 },
     paginationBtns: { display: "flex", alignItems: "center", gap: 4 },

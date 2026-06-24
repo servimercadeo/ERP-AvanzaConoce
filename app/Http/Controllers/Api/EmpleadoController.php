@@ -64,14 +64,101 @@ class EmpleadoController extends Controller
                         }
                     }
 
-                    // Tallas de dotación desde respuestas_ingresos
-                    $tallas = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
-                        ->where('documento', $user->cedula)
-                        ->select('talla_camisa', 'talla_pantalon', 'talla_zapatos')
-                        ->first();
-                    $user->talla_camisa   = $tallas->talla_camisa   ?? null;
-                    $user->talla_pantalon = $tallas->talla_pantalon ?? null;
-                    $user->talla_zapatos  = $tallas->talla_zapatos  ?? null;
+                    // Datos desde respuestas_ingresos: tallas, profesión y datos personales nulos
+                    $respuesta = \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first();
+                    $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
+                    $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
+                    $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
+                    $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
+                    if ($respuesta) {
+                        $user->estado_civil         = $user->estado_civil         ?: $respuesta->estado_civil;
+                        $user->nivel_escolaridad    = $user->nivel_escolaridad    ?: $respuesta->nivel_escolaridad;
+                        $user->estrato              = $user->estrato              ?: $respuesta->estrato;
+                        $user->barrio               = $user->barrio               ?: $respuesta->barrio;
+                        $user->numero_hijos         = $user->numero_hijos         ?: $respuesta->numero_hijos;
+                        $user->rh                   = $user->rh                   ?: $respuesta->rh;
+                        $user->fecha_nacimiento     = $user->fecha_nacimiento     ?: $respuesta->fecha_nacimiento;
+                        $user->lugar_nacimiento     = $user->lugar_nacimiento     ?: $respuesta->lugar_nacimiento;
+                        $user->direccion_residencia = $user->direccion_residencia ?: $respuesta->direccion;
+                        $user->contacto_emergencia_nombre     = $user->contacto_emergencia_nombre     ?: $respuesta->emergencia_nombre;
+                        $user->contacto_emergencia_telefono   = $user->contacto_emergencia_telefono   ?: $respuesta->emergencia_telefono;
+                        $user->contacto_emergencia_parentesco = $user->contacto_emergencia_parentesco ?: $respuesta->emergencia_parentesco;
+                        $user->eps             = $user->eps             ?: $respuesta->eps;
+                        $user->fondo_pensiones = $user->fondo_pensiones ?: $respuesta->afp;
+                    }
+                    // fecha_expedicion desde candidatos
+                    if (!$user->fecha_expedicion) {
+                        $user->fecha_expedicion = \Illuminate\Support\Facades\DB::table('candidatos')
+                            ->where('identificacion', $user->cedula)
+                            ->value('fecha_expedicion');
+                    }
+
+                    // Móvil: si está vacío o es el placeholder por defecto
+                    if (!$user->movil || $user->movil === '0000000000') {
+                        $celular = $respuesta?->celular
+                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
+                                ->where('identificacion', $user->cedula)
+                                ->value('celular');
+                        if ($celular) $user->movil = $celular;
+                    }
+
+                    // Email: si parece auto-generado (cedula@dominio)
+                    $cedula = $user->cedula ?? '';
+                    if ($cedula && $user->email && str_starts_with($user->email, $cedula . '@')) {
+                        $realEmail = $respuesta?->correo
+                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
+                                ->where('identificacion', $cedula)
+                                ->value('correo');
+                        if ($realEmail) $user->email = $realEmail;
+                    }
+
+                    // Caja Compensación: desde contratos → candidatos
+                    if (!$user->caja_compensacion) {
+                        $caja = \Illuminate\Support\Facades\DB::table('contratos')
+                            ->where('empleado_id', $user->id)
+                            ->whereNotNull('caja_compensacion')
+                            ->orderByDesc('fecha_ingreso')
+                            ->value('caja_compensacion');
+                        if (!$caja) {
+                            $caja = \Illuminate\Support\Facades\DB::table('candidatos')
+                                ->where('identificacion', $user->cedula)
+                                ->value('caja_compensacion');
+                        }
+                        if ($caja) $user->caja_compensacion = $caja;
+                    }
+
+                    // Empresa: desde requisicion del candidato si no tiene empresa_id
+                    if (!$user->empresa_id) {
+                        $empresaId = \Illuminate\Support\Facades\DB::table('candidatos')
+                            ->join('requisiciones', 'candidatos.requisicion_id', '=', 'requisiciones.id')
+                            ->where('candidatos.identificacion', $user->cedula)
+                            ->whereNotNull('requisiciones.empresa_id')
+                            ->value('requisiciones.empresa_id');
+                        if ($empresaId) $user->empresa_id = $empresaId;
+                    }
+
+                    // Ingresos: si nulo, buscar en contratos → base_ingresos → candidatos
+                    if (is_null($user->ingresos) || $user->ingresos == 0) {
+                        $salario = \Illuminate\Support\Facades\DB::table('contratos')
+                            ->where('empleado_id', $user->id)
+                            ->whereNotNull('salario')
+                            ->orderByDesc('fecha_ingreso')
+                            ->value('salario');
+                        if (!$salario) {
+                            $salario = \Illuminate\Support\Facades\DB::table('base_ingresos')
+                                ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
+                                ->where('candidatos.identificacion', $user->cedula)
+                                ->whereNotNull('base_ingresos.salario_basico')
+                                ->orderByDesc('base_ingresos.created_at')
+                                ->value('base_ingresos.salario_basico');
+                        }
+                        if (!$salario) {
+                            $salario = \Illuminate\Support\Facades\DB::table('candidatos')
+                                ->where('identificacion', $user->cedula)
+                                ->value('salario_basico');
+                        }
+                        if ($salario) $user->ingresos = $salario;
+                    }
 
                     return $user;
                 })
@@ -138,6 +225,8 @@ class EmpleadoController extends Controller
 
         $empleado = User::create($data);
 
+        app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
+
         return response()->json([
             'empleado'     => $empleado->load('empresa'),
             'credenciales' => [
@@ -184,6 +273,8 @@ class EmpleadoController extends Controller
         }
 
         $empleado->update($data);
+
+        app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
 
         return response()->json($empleado->fresh()->load('empresa'));
     }
@@ -258,17 +349,22 @@ class EmpleadoController extends Controller
                     'email'            => $user->email             ?? $respuesta?->correo   ?? $candidato?->correo ?? $ingreso?->correo,
                     'movil'            => $user->movil             ?? $respuesta?->celular  ?? $candidato?->celular ?? $ingreso?->telefono,
                     'genero'           => $user->genero,
+                    'fecha_expedicion' => $toDate($user->fecha_expedicion ?? $candidato?->fecha_expedicion),
 
                     // ── Datos personales (respuesta_ingreso > user)
                     'fecha_nacimiento'     => $toDate($respuesta?->fecha_nacimiento  ?? $user->fecha_nacimiento),
                     'lugar_nacimiento'     => $respuesta?->lugar_nacimiento          ?? $user->lugar_nacimiento,
                     'estado_civil'         => $respuesta?->estado_civil              ?? $user->estado_civil,
                     'nivel_escolaridad'    => $respuesta?->nivel_escolaridad         ?? $user->nivel_escolaridad,
+                    'profesion'            => $respuesta?->profesion                 ?? $user->profesion,
                     'direccion_residencia' => $respuesta?->direccion                 ?? $user->direccion_residencia,
                     'estrato'              => $respuesta?->estrato                   ?? $user->estrato,
                     'barrio'               => $respuesta?->barrio                    ?? $user->barrio,
                     'numero_hijos'         => $respuesta?->numero_hijos              ?? $user->numero_hijos,
                     'rh'                   => $respuesta?->rh                        ?? $user->rh,
+                    'talla_camisa'         => $user->talla_camisa    ?? $respuesta?->talla_camisa,
+                    'talla_pantalon'       => $user->talla_pantalon  ?? $respuesta?->talla_pantalon,
+                    'talla_zapatos'        => $user->talla_zapatos   ?? $respuesta?->talla_zapatos,
 
                     // ── Seguridad social (contrato > respuesta > candidato > user)
                     'eps'              => $respuesta?->eps              ?? $contrato?->lps_afiliado ?? $user->eps,
@@ -327,11 +423,13 @@ class EmpleadoController extends Controller
 
             // Opcionales
             'fotografia'           => 'nullable|max:5120',
+            'fecha_expedicion'     => 'nullable|date',
             'fecha_nacimiento'     => 'nullable|date',
             'lugar_nacimiento'     => 'nullable|string|max:150',
             'raza'                 => 'nullable|string|max:80',
             'estado_civil'         => 'nullable|string|max:50',
             'nivel_escolaridad'    => 'nullable|string|max:80',
+            'profesion'            => 'nullable|string|max:150',
             'direccion_residencia' => 'nullable|string|max:250',
             'estrato'              => 'nullable|string|max:5',
             'barrio'               => 'nullable|string|max:100',
@@ -339,6 +437,9 @@ class EmpleadoController extends Controller
             'ingresos'             => 'nullable|numeric|min:0',
             'observaciones_medicas'=> 'nullable|string',
             'alergias'             => 'nullable|string',
+            'talla_camisa'         => 'nullable|string|max:20',
+            'talla_pantalon'       => 'nullable|string|max:20',
+            'talla_zapatos'        => 'nullable|string|max:20',
             'rh'                   => 'nullable|string|max:5',
             'caja_compensacion'    => 'nullable|string|max:100',
             'licencia_carro'       => 'nullable|string|max:20',

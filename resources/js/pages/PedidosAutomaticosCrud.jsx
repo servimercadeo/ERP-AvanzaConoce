@@ -101,6 +101,9 @@ function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
                                 key={e.id}
                                 style={{
                                     ...S.dropdownItem,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
                                     background:
                                         String(e.id) === String(value)
                                             ? "#e8f8f5"
@@ -122,18 +125,26 @@ function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
                                             : "var(--white)")
                                 }
                             >
-                                <span style={{ fontWeight: 700 }}>
-                                    {e.nombres} {e.apellidos}
-                                </span>
-                                <span
-                                    style={{
-                                        fontSize: "0.78rem",
-                                        color: "var(--text-muted)",
-                                        marginLeft: 6,
-                                    }}
-                                >
-                                    C.C. {e.cedula}
-                                </span>
+                                <div style={{
+                                    width: 32, height: 32, borderRadius: "50%",
+                                    background: "var(--primary)", color: "#fff",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontWeight: 800, fontSize: "0.85rem", flexShrink: 0,
+                                    overflow: "hidden", position: "relative",
+                                }}>
+                                    {(e.nombres || "?").charAt(0).toUpperCase()}
+                                    {e.fotografia && (
+                                        <img src={`/storage/${e.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
+                                    )}
+                                </div>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>
+                                        {e.nombres} {e.apellidos}
+                                    </div>
+                                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                        C.C. {e.cedula}
+                                    </div>
+                                </div>
                             </div>
                         ))
                     )}
@@ -1452,6 +1463,7 @@ export default function PedidosAutomaticosCrud() {
                         <tbody>
                             {paginated.map((p) => {
                                 const badge = estadoBadge(p.estado);
+                                const empData = empleados.find((e) => String(e.id) === String(p.empleado_id));
                                 return (
                                     <tr key={p.id}>
                                         <td>
@@ -1474,6 +1486,9 @@ export default function PedidosAutomaticosCrud() {
                                                     )
                                                         .charAt(0)
                                                         .toUpperCase()}
+                                                    {empData?.fotografia && (
+                                                        <img src={`/storage/${empData.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div
@@ -1992,6 +2007,8 @@ const S = {
         fontWeight: 800,
         fontSize: "0.95rem",
         flexShrink: 0,
+        overflow: "hidden",
+        position: "relative",
     },
     badge: (bg, color) => ({
         background: bg,

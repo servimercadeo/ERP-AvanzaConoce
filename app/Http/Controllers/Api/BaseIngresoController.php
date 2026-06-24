@@ -92,6 +92,15 @@ class BaseIngresoController extends Controller
             'candidato.requisicion.empleador',
         ]);
 
+        if ($ingreso->documento_identificacion) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($ingreso->documento_identificacion, [
+                'ingresos' => $ingreso->salario_basico,
+                'movil'    => $ingreso->telefono,
+                'email'    => $ingreso->correo,
+                'cargo'    => $ingreso->cargo,
+            ]);
+        }
+
         return response()->json($this->resolveFromRequisicion($ingreso), 201);
     }
 
@@ -143,6 +152,15 @@ class BaseIngresoController extends Controller
             'candidato.requisicion.empresa',
             'candidato.requisicion.empleador',
         ]);
+
+        if ($baseIngreso->documento_identificacion) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($baseIngreso->documento_identificacion, [
+                'ingresos' => $baseIngreso->salario_basico,
+                'movil'    => $baseIngreso->telefono,
+                'email'    => $baseIngreso->correo,
+                'cargo'    => $baseIngreso->cargo,
+            ]);
+        }
 
         return response()->json($this->resolveFromRequisicion($baseIngreso));
     }

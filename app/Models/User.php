@@ -26,11 +26,12 @@ class User extends Authenticatable
         'name', 'email', 'password', 'avanzaconoce_id', 'rol', 'activo', 'ultimo_sso_at',
 
         // Información General
-        'cedula', 'apellidos', 'nombres', 'fotografia',
+        'cedula', 'fecha_expedicion', 'apellidos', 'nombres', 'fotografia',
         'sede', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
-        'genero', 'estado_civil', 'nivel_escolaridad',
+        'genero', 'estado_civil', 'nivel_escolaridad', 'profesion',
         'direccion_residencia', 'movil', 'estrato', 'barrio',
         'numero_hijos', 'ingresos', 'observaciones_medicas', 'alergias',
+        'talla_camisa', 'talla_pantalon', 'talla_zapatos',
 
         // Seguridad Social
         'rh', 'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
@@ -89,6 +90,7 @@ class User extends Authenticatable
             'activo'               => 'boolean',
             'ultimo_sso_at'        => 'datetime',
             'fecha_nacimiento'     => 'date',
+            'fecha_expedicion'     => 'date',
             'licencia_carro_vence' => 'date',
             'licencia_moto_vence'  => 'date',
             'cert_alturas_vence'   => 'date',

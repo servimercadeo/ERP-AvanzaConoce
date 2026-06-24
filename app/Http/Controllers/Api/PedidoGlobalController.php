@@ -12,14 +12,16 @@ class PedidoGlobalController extends Controller
 {
     public function index()
     {
-        return response()->json(
-            PedidoGlobal::with([
-                'pedidosAutomaticos.empleado',
-                'pedidosAutomaticos.items.inventario',
-            ])
-            ->orderBy('id', 'desc')
-            ->get()
-        );
+        $globales = PedidoGlobal::with([
+            'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.items.inventario',
+        ])
+        ->orderBy('id', 'desc')
+        ->get();
+
+        $this->resolverFotografias($globales);
+
+        return response()->json($globales);
     }
 
     public function update(Request $request, PedidoGlobal $pedidoGlobal)
@@ -32,10 +34,13 @@ class PedidoGlobalController extends Controller
 
         $pedidoGlobal->update($data);
 
-        return response()->json($pedidoGlobal->fresh()->load([
+        $fresh = collect([$pedidoGlobal->fresh()->load([
             'pedidosAutomaticos.empleado',
             'pedidosAutomaticos.items.inventario',
-        ]));
+        ])]);
+        $this->resolverFotografias($fresh);
+
+        return response()->json($fresh->first());
     }
 
     public function destroy(PedidoGlobal $pedidoGlobal)
@@ -91,5 +96,19 @@ class PedidoGlobalController extends Controller
                 'total'  => $pedidos->count(),
             ], 201);
         });
+    }
+
+    private function resolverFotografias($globales): void
+    {
+        foreach ($globales as $global) {
+            foreach ($global->pedidosAutomaticos as $pedido) {
+                $emp = $pedido->empleado;
+                if ($emp && !$emp->fotografia) {
+                    $emp->fotografia = DB::table('candidatos')
+                        ->where('identificacion', $emp->cedula)
+                        ->value('fotografia');
+                }
+            }
+        }
     }
 }

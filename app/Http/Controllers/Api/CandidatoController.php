@@ -79,6 +79,16 @@ class CandidatoController extends Controller
         }
 
         $candidato = Candidato::create($data);
+
+        if ($candidato->identificacion) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($candidato->identificacion, [
+                'email'             => $candidato->correo,
+                'movil'             => $candidato->celular,
+                'fecha_expedicion'  => $candidato->fecha_expedicion,
+                'genero'            => $candidato->genero,
+            ]);
+        }
+
         return response()->json($candidato->load(['requisicion.cargo', 'ciudad']), 201);
     }
 
@@ -231,6 +241,18 @@ class CandidatoController extends Controller
         }
 
         $candidato->update($data);
+
+        if ($candidato->identificacion) {
+            app(\App\Services\EmpleadoSyncService::class)->syncToUser($candidato->identificacion, [
+                'email'             => $candidato->correo,
+                'movil'             => $candidato->celular,
+                'fecha_expedicion'  => $candidato->fecha_expedicion,
+                'arl'               => $candidato->arl,
+                'caja_compensacion' => $candidato->caja_compensacion,
+                'ingresos'          => $candidato->salario_basico,
+                'genero'            => $candidato->genero,
+            ]);
+        }
 
         if (!$avalAntes && !empty($data['aval']) && $data['aval']) {
             $candidato->refresh()->load(['requisicion.proyecto', 'requisicion.empresa', 'requisicion.cargo', 'requisicion.empleador', 'ciudad']);

@@ -567,6 +567,7 @@ const FormStyles = () => (
 export default function RegistroCandidatosForm() {
     const [form, setForm] = useState(EMPTY);
     const [fotografiaFile, setFotografiaFile] = useState(null);
+    const [fotografiaPreview, setFotografiaPreview] = useState(null);
     const [errors, setErrors] = useState({});
     const [step, setStep] = useState(1);
     const [submitted, setSubmitted] = useState(false);
@@ -1361,9 +1362,64 @@ export default function RegistroCandidatosForm() {
                                                     type="file"
                                                     accept="image/*"
                                                     style={{ display: "none" }}
-                                                    onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files[0] || null;
+                                                        setFotografiaFile(file);
+                                                        if (fotografiaPreview) URL.revokeObjectURL(fotografiaPreview);
+                                                        setFotografiaPreview(file ? URL.createObjectURL(file) : null);
+                                                    }}
                                                 />
                                             </label>
+                                            {fotografiaPreview && (
+                                                <div style={{ marginTop: 14, display: "flex", alignItems: "flex-start", gap: 14 }}>
+                                                    <img
+                                                        src={fotografiaPreview}
+                                                        alt="Vista previa"
+                                                        style={{
+                                                            width: 100,
+                                                            height: 100,
+                                                            objectFit: "cover",
+                                                            borderRadius: "50%",
+                                                            border: "3px solid var(--primary, #1a9b8c)",
+                                                            boxShadow: "0 4px 12px rgba(26,155,140,0.25)",
+                                                            flexShrink: 0,
+                                                        }}
+                                                    />
+                                                    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+                                                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--primary-dark, #127a6d)", fontFamily: "Nunito, sans-serif" }}>
+                                                            Vista previa
+                                                        </span>
+                                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted, #5a7a75)", fontFamily: "Nunito, sans-serif" }}>
+                                                            {fotografiaFile.name}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                URL.revokeObjectURL(fotografiaPreview);
+                                                                setFotografiaFile(null);
+                                                                setFotografiaPreview(null);
+                                                            }}
+                                                            style={{
+                                                                marginTop: 4,
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                gap: 5,
+                                                                background: "none",
+                                                                border: "1px solid #e74c3c",
+                                                                borderRadius: 6,
+                                                                color: "#e74c3c",
+                                                                fontSize: "0.75rem",
+                                                                fontWeight: 700,
+                                                                padding: "4px 10px",
+                                                                cursor: "pointer",
+                                                                fontFamily: "Nunito, sans-serif",
+                                                            }}
+                                                        >
+                                                            ✕ Quitar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </Field>
                                     </div>
                                 </div>
