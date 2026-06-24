@@ -344,6 +344,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'cliente_proyecto'         => $req?->proyecto?->nombre,
                 'empleador'                => $ingreso?->empleador ?? $req?->empleador?->nombre,
                 'jefe_inmediato'           => $ingreso?->lider_inmediato ?? $req?->responsable,
+                'fotografia'               => $candidato?->fotografia,
                 // Desde base de ingresos (aval)
                 'sede'                     => $ingreso?->lugar_trabajo,
                 'fecha_ingreso'            => $ingreso?->fecha_programacion_ingreso

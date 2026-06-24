@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
@@ -51,6 +51,130 @@ function getPaginasBotones(pagina, total) {
   if (right < total - 1) pages.push('...');
   pages.push(total);
   return pages;
+}
+
+function CandidatoSelectorIngreso({ candidatos, onChange }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const wrapRef = useRef(null);
+  const debouncedQ = useDebounce(query, 200);
+
+  const filtered = useMemo(() => {
+    const words = debouncedQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return candidatos.slice(0, 80);
+    return candidatos.filter(c => {
+      const text = `${c.nombres} ${c.identificacion}`.toLowerCase();
+      return words.every(w => text.includes(w));
+    }).slice(0, 80);
+  }, [debouncedQ, candidatos]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handlePick = (c) => {
+    setSelected(c);
+    setQuery('');
+    setOpen(false);
+    onChange(String(c.id));
+  };
+
+  return (
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      {selected ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          background: '#e8f8f5', border: '2px solid var(--primary)',
+          borderRadius: 10, padding: '14px 18px',
+        }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: '50%',
+            background: 'var(--primary)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: '1.2rem', flexShrink: 0,
+            overflow: 'hidden', position: 'relative',
+          }}>
+            {selected.nombres.charAt(0).toUpperCase()}
+            {selected.fotografia && (
+              <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary-dark)', fontFamily: "'Poppins',sans-serif" }}>
+              {selected.nombres}
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontFamily: 'Nunito,sans-serif' }}>
+              Doc: {selected.identificacion}
+            </div>
+          </div>
+          <button
+            onClick={() => { setSelected(null); onChange(''); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1.1rem', padding: 4 }}
+            title="Cambiar candidato"
+          >✕</button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <input
+            style={{
+              width: '100%', fontSize: '1rem', padding: '12px 14px',
+              border: '2px solid var(--border)', borderRadius: 10,
+              fontFamily: 'Nunito,sans-serif', color: 'var(--text)',
+              background: 'var(--white)', outline: 'none', boxSizing: 'border-box',
+            }}
+            placeholder="Buscar por nombre o documento…"
+            value={query}
+            onChange={e => { setQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+          />
+          {open && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+              background: 'var(--white)', border: '1.5px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
+              zIndex: 3000, maxHeight: 280, overflowY: 'auto',
+            }}>
+              {filtered.length === 0 ? (
+                <div style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>Sin resultados</div>
+              ) : (
+                filtered.map(c => (
+                  <div
+                    key={c.id}
+                    onMouseDown={() => handlePick(c)}
+                    style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f0f9f7')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--white)')}
+                  >
+                    <div style={{
+                      width: 34, height: 34, borderRadius: '50%',
+                      background: 'var(--primary)', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: '0.9rem', flexShrink: 0,
+                      overflow: 'hidden', position: 'relative',
+                    }}>
+                      {c.nombres.charAt(0).toUpperCase()}
+                      {c.fotografia && (
+                        <img src={`/storage/${c.fotografia}`} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>{c.nombres}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{c.identificacion}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const getEstadoColors = (estado) => {
@@ -369,13 +493,12 @@ export default function BaseIngresoCrud() {
             <div style={S.modalBody}>
 
               {modalMode === 'create' && (
-                <div style={{ marginBottom: 22 }}>
-                  <label style={S.sectionLabel}>Seleccionar candidato</label>
-                  <SearchableSelect
-                    key="candidato-select"
-                    value={String(form.candidato_id ?? '')}
-                    defaultValue=""
-                    options={candidatoOptions}
+                <div style={{ margin: '-22px -28px 22px', padding: '20px 28px', borderBottom: '2px solid var(--border)', background: 'var(--bg)' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.07em', color: 'var(--primary)', fontFamily: "'Poppins',sans-serif", textTransform: 'uppercase', marginBottom: 8 }}>
+                    Seleccionar candidato
+                  </div>
+                  <CandidatoSelectorIngreso
+                    candidatos={candidates.filter(c => c.aval === true)}
                     onChange={handleCandidatoSelect}
                   />
                 </div>
