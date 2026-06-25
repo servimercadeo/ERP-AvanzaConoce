@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useDebounce } from '../hooks/useDebounce';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
@@ -58,8 +57,6 @@ export default function SeleccionCrud() {
   // loadingData derived from React Query
   const [saving, setSaving] = useState(false);
 
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 300);
   const [estadoF, setEstadoF] = useState('Todas');
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState('create');
@@ -86,7 +83,7 @@ export default function SeleccionCrud() {
     return () => { document.documentElement.style.overflowY = ''; document.body.style.overflowY = ''; };
   }, [modal]);
 
-  useEffect(() => { setPage(1); }, [search, estadoF]);
+  useEffect(() => { setPage(1); }, [estadoF]);
 
   const ch    = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
   const chVal = k => val => setForm(p => ({ ...p, [k]: val }));
@@ -184,10 +181,8 @@ export default function SeleccionCrud() {
 
   /* ── Filters & pagination ─────────────────────────────────────── */
   const filtered = useMemo(() =>
-    data.filter(r => {
-      const ok = Object.values(r).some(v => String(v || '').toLowerCase().includes(debouncedSearch.toLowerCase()));
-      return ok && (estadoF === 'Todas' || r.estado === estadoF);
-    }), [data, debouncedSearch, estadoF]);
+    data.filter(r => estadoF === 'Todas' || r.estado === estadoF),
+    [data, estadoF]);
   const totalP   = Math.max(1, Math.ceil(filtered.length / PER));
   const paged    = filtered.slice((page - 1) * PER, page * PER);
 
@@ -228,12 +223,6 @@ export default function SeleccionCrud() {
       {/* Toolbar */}
       <div style={S.toolbar}>
         <div style={S.filters}>
-          <div style={S.searchWrap}>
-            <span style={S.searchIcon}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </span>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} style={S.searchInput} />
-          </div>
           <FilterDropdown
             label="Estado"
             value={estadoF}
@@ -455,9 +444,6 @@ const S = {
   toolbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   filters:     { display: 'flex', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' },
   row:         { display: 'flex', alignItems: 'center', gap: 8 },
-  searchWrap:  { position: 'relative', flex: 1, minWidth: 180, maxWidth: 360 },
-  searchIcon:  { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: 'var(--text-muted)', pointerEvents: 'none' },
-  searchInput: { ..._inp, height: 40, padding: '0 12px 0 32px' },
   label:       { fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: NUN, whiteSpace: 'nowrap' },
   btnPrimary:  { ..._btn, padding: '0 18px', background: 'var(--primary)', color: '#fff', border: 'none' },
   btnOutline:  { ..._btn, padding: '0 14px', background: 'var(--white)', color: 'var(--text)', border: BD },
