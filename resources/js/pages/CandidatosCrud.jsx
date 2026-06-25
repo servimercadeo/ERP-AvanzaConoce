@@ -91,6 +91,7 @@ export default function CandidatosCrud() {
         tipo_documento: "Cédula de Ciudadanía",
         identificacion: "",
         fecha_expedicion: "",
+        lugar_expedicion: "",
         edad: "",
         genero: "",
         fecha_postulacion: getTodayStr(),
@@ -317,6 +318,7 @@ export default function CandidatosCrud() {
             tipo_documento: "Cédula de Ciudadanía",
             identificacion: "",
             fecha_expedicion: "",
+            lugar_expedicion: "",
             edad: "",
             genero: "",
             fecha_postulacion: getTodayStr(),
@@ -1159,6 +1161,18 @@ export default function CandidatosCrud() {
                                         setCandForm((p) => ({
                                             ...p,
                                             [k]: e.target.value,
+                                        }))
+                                    }
+                                    disabled={candModalMode === "view"}
+                                />
+                                <Field
+                                    label="Lugar de expedición"
+                                    k="lugar_expedicion"
+                                    form={candForm}
+                                    onChange={(k) => (e) =>
+                                        setCandForm((p) => ({
+                                            ...p,
+                                            [k]: e.target.value.toUpperCase(),
                                         }))
                                     }
                                     disabled={candModalMode === "view"}

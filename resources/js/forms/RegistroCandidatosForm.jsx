@@ -8,6 +8,7 @@ const EMPTY = {
     edad: "",
     genero: "",
     fecha_expedicion: "",
+    lugar_expedicion: "",
     ciudad_id: "",
     celular: "",
     correo: "",
@@ -621,6 +622,7 @@ export default function RegistroCandidatosForm() {
                 e.documento = "Solo números, sin espacios, puntos (.) ni comas (,)";
             }
             if (!form.fecha_expedicion) e.fecha_expedicion = "Campo obligatorio";
+            if (!form.lugar_expedicion.trim()) e.lugar_expedicion = "Campo obligatorio";
             if (!form.edad) {
                 e.edad = "Campo obligatorio";
             } else if (
@@ -1280,10 +1282,33 @@ export default function RegistroCandidatosForm() {
                                         </Field>
                                     </div>
                                     
+                                    {/* Lugar de expedición */}
+                                    <div>
+                                        <Field
+                                            label="5. Lugar de expedición del documento"
+                                            hint="Ciudad o municipio donde fue expedido tu documento."
+                                            required
+                                            error={errors.lugar_expedicion}
+                                        >
+                                            <div className="form-input-wrapper">
+                                                <input
+                                                    data-error={!!errors.lugar_expedicion}
+                                                    className={`form-input ${errors.lugar_expedicion ? 'form-input-error' : ''}`}
+                                                    type="text"
+                                                    value={form.lugar_expedicion}
+                                                    onChange={(e) =>
+                                                        set("lugar_expedicion", e.target.value.toUpperCase())
+                                                    }
+                                                />
+                                                <span className="form-input-icon"><IconMapPin /></span>
+                                            </div>
+                                        </Field>
+                                    </div>
+
                                     {/* Edad */}
                                     <div>
                                         <Field
-                                            label="5. Edad"
+                                            label="6. Edad"
                                             hint="Cuéntanos cuántos años tienes."
                                             required
                                             error={errors.edad}
@@ -1306,7 +1331,7 @@ export default function RegistroCandidatosForm() {
                                     {/* Género */}
                                     <div>
                                         <Field
-                                            label="6. Género"
+                                            label="7. Género"
                                             hint="Selecciona tu género."
                                             required
                                             error={errors.genero}
@@ -1336,7 +1361,7 @@ export default function RegistroCandidatosForm() {
                                     {/* Fotografía */}
                                     <div style={{ gridColumn: "span 2" }}>
                                         <Field
-                                            label="7. Fotografía"
+                                            label="8. Fotografía"
                                             hint="Sube una foto reciente tuya (JPG, PNG o WEBP, máx. 5 MB)."
                                         >
                                             <label

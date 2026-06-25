@@ -10,7 +10,7 @@ class Candidato extends Model
 
     protected $fillable = [
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
-        'fecha_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
+        'fecha_expedicion', 'lugar_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
         'pruebas', 'aval', 'tipo_vinculacion', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment

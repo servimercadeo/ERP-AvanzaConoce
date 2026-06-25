@@ -1,6 +1,6 @@
 {
-  "_Layout-DO3eyGQf.js": {
-    "file": "assets/Layout-DO3eyGQf.js",
+  "_Layout-82Bg-16k.js": {
+    "file": "assets/Layout-82Bg-16k.js",
     "name": "Layout",
     "imports": [
       "_vendor-query-qy_ppomC.js",
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-CAVGu1pm.js",
+    "file": "assets/app-CtL9nuN5.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -79,7 +79,7 @@
     ]
   },
   "resources/js/forms/RegistroCandidatosForm.jsx": {
-    "file": "assets/RegistroCandidatosForm-CNti76JZ.js",
+    "file": "assets/RegistroCandidatosForm-C4WPBa70.js",
     "name": "RegistroCandidatosForm",
     "src": "resources/js/forms/RegistroCandidatosForm.jsx",
     "isDynamicEntry": true,
@@ -99,13 +99,13 @@
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-BfnikHgH.js",
+    "file": "assets/Dashboard-CikM30x7.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-DO3eyGQf.js",
+      "_Layout-82Bg-16k.js",
       "_vendor-router-CDelyX25.js",
       "resources/js/app.jsx"
     ],
@@ -114,7 +114,7 @@
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-BeYtnjQc.js",
+    "file": "assets/Login-yNaCFo3R.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
@@ -128,13 +128,13 @@
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-Bi_7c7iw.js",
+    "file": "assets/Module-DlG3E9hy.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-DO3eyGQf.js",
+      "_Layout-82Bg-16k.js",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
@@ -145,13 +145,13 @@
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-9L2I1HHc.js",
+    "file": "assets/Submodule-DFVDhmGD.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-DO3eyGQf.js",
+      "_Layout-82Bg-16k.js",
       "resources/js/app.jsx",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
