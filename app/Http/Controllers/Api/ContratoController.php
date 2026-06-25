@@ -18,7 +18,7 @@ class ContratoController extends Controller
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
     ];
 
-    private function fechaEnEspanol($fecha): string
+    private function fechaEnEspanol(\Carbon\Carbon|string|null $fecha): string
     {
         if (!$fecha) return '';
         $carbon = $fecha instanceof \Carbon\Carbon ? $fecha : \Carbon\Carbon::parse($fecha);
@@ -51,6 +51,7 @@ class ContratoController extends Controller
             'direccion'           => $respuesta?->direccion ?? '',
             'fecha_nacimiento'    => $respuesta?->fecha_nacimiento ?? '',
             'fecha_expedicion'    => optional($candidato?->fecha_expedicion)->format('Y-m-d') ?? '',
+            'lugar_expedicion'    => $candidato?->lugar_expedicion ?? '',
             'grupo_rh'            => $respuesta?->rh ?? '',
             'contacto_emergencia' => $respuesta?->emergencia_nombre ?? '',
             'parentesco'          => $respuesta?->emergencia_parentesco ?? '',
@@ -64,7 +65,7 @@ class ContratoController extends Controller
         ];
 
         try {
-            Http::timeout(15)->post($flowUrl, $data);
+            Http::timeout(15)->asJson()->post($flowUrl, $data);
         } catch (\Exception $e) {
             Log::warning('No se pudo enviar el contrato a SharePoint para cédula ' . $cedula . ': ' . $e->getMessage());
         }
