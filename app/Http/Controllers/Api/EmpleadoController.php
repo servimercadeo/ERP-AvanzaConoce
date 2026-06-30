@@ -279,6 +279,31 @@ class EmpleadoController extends Controller
         return response()->json($empleado->fresh()->load('empresa'));
     }
 
+    public function updateTallas(Request $request, User $empleado)
+    {
+        $data = $request->validate([
+            'talla_camisa'   => 'nullable|string|max:20',
+            'talla_pantalon' => 'nullable|string|max:20',
+            'talla_zapatos'  => 'nullable|string|max:20',
+        ]);
+
+        // Guardar en users
+        $empleado->update($data);
+
+        // Guardar también en respuestas_ingresos para que "Respuestas Nuevos Ingresos" refleje el cambio
+        if ($empleado->cedula) {
+            \App\Models\RespuestaIngreso::where('documento', $empleado->cedula)
+                ->update($data);
+        }
+
+        return response()->json([
+            'id'             => $empleado->id,
+            'talla_camisa'   => $empleado->talla_camisa,
+            'talla_pantalon' => $empleado->talla_pantalon,
+            'talla_zapatos'  => $empleado->talla_zapatos,
+        ]);
+    }
+
     public function destroy(User $empleado)
     {
         $empleado->delete();

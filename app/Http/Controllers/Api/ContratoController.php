@@ -103,14 +103,36 @@ class ContratoController extends Controller
             $query->where('sede', $request->sede);
         }
 
-        $contratos = $query->orderBy('created_at', 'desc')->get()->map(function ($contrato) {
+        $contratos = $query->orderBy('created_at', 'desc')->get();
+
+        // Derivar proyecto actual desde candidatos → requisicion → proyecto (sin N+1)
+        $cedulas = $contratos->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
+        $proyectoPorCedula = [];
+        if (!empty($cedulas)) {
+            Candidato::whereIn('identificacion', $cedulas)
+                ->with('requisicion.proyecto')
+                ->orderBy('id', 'desc')
+                ->get()
+                ->each(function ($c) use (&$proyectoPorCedula) {
+                    $ced = $c->identificacion;
+                    if (!isset($proyectoPorCedula[$ced]) && $c->requisicion?->proyecto?->nombre) {
+                        $proyectoPorCedula[$ced] = $c->requisicion->proyecto->nombre;
+                    }
+                });
+        }
+
+        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula) {
+            $cedula = $contrato->empleado?->cedula;
             if ($contrato->empleado && !$contrato->empleado->fotografia) {
-                $foto = \Illuminate\Support\Facades\DB::table('candidatos')
-                    ->where('identificacion', $contrato->empleado->cedula)
+                $foto = DB::table('candidatos')
+                    ->where('identificacion', $cedula)
                     ->value('fotografia');
                 if ($foto) {
                     $contrato->empleado->fotografia = $foto;
                 }
+            }
+            if ($cedula && !empty($proyectoPorCedula[$cedula])) {
+                $contrato->cliente_proyecto = $proyectoPorCedula[$cedula];
             }
             return $contrato;
         });

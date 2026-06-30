@@ -187,6 +187,7 @@ export const ERP_MODULES = [
           { id: 'productos_dotacion',   label: 'Inventario de dotación' },
           { id: 'pedidos_dotacion',    label: 'Pedidos automáticos' },
           { id: 'pedidos_globales',    label: 'Pedidos globales' },
+          { id: 'cronograma',          label: 'Cronograma' },
         ]
       },
       {

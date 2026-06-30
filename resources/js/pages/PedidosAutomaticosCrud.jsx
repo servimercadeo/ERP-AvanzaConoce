@@ -12,10 +12,33 @@ import {
     IconEmptySearch,
     IconLoading,
     IconLayers,
+    IconLock,
+    IconCalendar,
+    IconWarning,
 } from "../components/Icons";
 
 const POR_PAGINA = 8;
 const ESTADOS = ["Pendiente", "Activo", "Completado", "Cancelado"];
+
+function parseDateLocal(str) {
+    return new Date(String(str).split("T")[0] + "T00:00:00");
+}
+function fmtDateCron(d) {
+    return d.toLocaleDateString("es-CO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+function computeCronDates(fechaEntrega, cicloMeses) {
+    const n = Number(cicloMeses) || 4;
+    const entrega = parseDateLocal(fechaEntrega);
+    const inicio = new Date(entrega);
+    inicio.setMonth(inicio.getMonth() - n);
+    const corte = new Date(inicio);
+    corte.setMonth(corte.getMonth() + Math.floor(n / 2));
+    return { inicio, corte, entrega };
+}
 const ESTADO_LABEL = {
     Pendiente: "Pendiente",
     Activo: "En proceso",
@@ -125,23 +148,58 @@ function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
                                             : "var(--white)")
                                 }
                             >
-                                <div style={{
-                                    width: 32, height: 32, borderRadius: "50%",
-                                    background: "var(--primary)", color: "#fff",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontWeight: 800, fontSize: "0.85rem", flexShrink: 0,
-                                    overflow: "hidden", position: "relative",
-                                }}>
+                                <div
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: "50%",
+                                        background: "var(--primary)",
+                                        color: "#fff",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontWeight: 800,
+                                        fontSize: "0.85rem",
+                                        flexShrink: 0,
+                                        overflow: "hidden",
+                                        position: "relative",
+                                    }}
+                                >
                                     {(e.nombres || "?").charAt(0).toUpperCase()}
                                     {e.fotografia && (
-                                        <img src={`/storage/${e.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
+                                        <img
+                                            src={`/storage/${e.fotografia}`}
+                                            alt=""
+                                            style={{
+                                                position: "absolute",
+                                                inset: 0,
+                                                width: "100%",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                                borderRadius: "50%",
+                                            }}
+                                            onError={(ev) => {
+                                                ev.currentTarget.style.display =
+                                                    "none";
+                                            }}
+                                        />
                                     )}
                                 </div>
                                 <div>
-                                    <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>
+                                    <div
+                                        style={{
+                                            fontWeight: 700,
+                                            fontSize: "0.9rem",
+                                        }}
+                                    >
                                         {e.nombres} {e.apellidos}
                                     </div>
-                                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                    <div
+                                        style={{
+                                            fontSize: "0.78rem",
+                                            color: "var(--text-muted)",
+                                        }}
+                                    >
                                         C.C. {e.cedula}
                                     </div>
                                 </div>
@@ -188,15 +246,6 @@ function InventarioItemSelect({
     const filtered = useMemo(() => {
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
         let base = inventarioFlat.filter((i) => i.cantidad > 0);
-
-        // Filtro género
-        if (generoEmpleado) {
-            const g = generoEmpleado.toLowerCase();
-            base = base.filter((i) => {
-                const ig = (i.genero ?? "").toLowerCase();
-                return ig === g || ig === "unisex";
-            });
-        }
 
         // Filtro talla: para cada ítem, buscar la talla que le corresponde según categoría
         if (tallasEmpleado) {
@@ -359,7 +408,9 @@ function Modal({
     empleados,
     contratos,
     inventarioFlat,
+    cronogramas = [],
     readOnly,
+    queryClient,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
@@ -367,6 +418,16 @@ function Modal({
     const [saving, setSaving] = useState(false);
     const [pedidoPrevio, setPedidoPrevio] = useState(null);
     const [loadingHistorial, setLoadingHistorial] = useState(false);
+    const [tallasEdit, setTallasEdit] = useState({
+        talla_camisa: "",
+        talla_pantalon: "",
+        talla_zapatos: "",
+    });
+    const [tallasOrig, setTallasOrig] = useState({
+        talla_camisa: "",
+        talla_pantalon: "",
+        talla_zapatos: "",
+    });
 
     const isNuevo = !initial?.id;
 
@@ -381,6 +442,16 @@ function Modal({
             setActive("info");
             setSaving(false);
             setPedidoPrevio(null);
+            const emp = empleados.find(
+                (e) => String(e.id) === String(initial.empleado_id),
+            );
+            const t = {
+                talla_camisa: emp?.talla_camisa ?? "",
+                talla_pantalon: emp?.talla_pantalon ?? "",
+                talla_zapatos: emp?.talla_zapatos ?? "",
+            };
+            setTallasEdit(t);
+            setTallasOrig(t);
         }
     }, [initial, open]);
 
@@ -468,6 +539,23 @@ function Modal({
         }
         setSaving(true);
         try {
+            // Siempre sincronizar tallas al guardar: así users y respuestas_ingresos quedan consistentes
+            if (form.empleado_id) {
+                await api.patch(
+                    `/empleados/${form.empleado_id}/tallas`,
+                    tallasEdit,
+                );
+                if (queryClient) {
+                    queryClient.setQueryData(["empleados"], (prev = []) =>
+                        prev.map((emp) =>
+                            String(emp.id) === String(form.empleado_id)
+                                ? { ...emp, ...tallasEdit }
+                                : emp,
+                        ),
+                    );
+                }
+                setTallasOrig({ ...tallasEdit });
+            }
             await onSave(form);
         } catch {
             /* el padre muestra el toast de error */
@@ -490,17 +578,41 @@ function Modal({
     }, [empleados, form.empleado_id]);
 
     const tallasEmpleado = useMemo(() => {
-        const emp = empleados.find(
-            (e) => String(e.id) === String(form.empleado_id),
-        );
-        if (!emp) return null;
+        if (!form.empleado_id) return null;
         const t = {
-            talla_camisa: emp.talla_camisa,
-            talla_pantalon: emp.talla_pantalon,
-            talla_zapatos: emp.talla_zapatos,
+            talla_camisa: tallasEdit.talla_camisa,
+            talla_pantalon: tallasEdit.talla_pantalon,
+            talla_zapatos: tallasEdit.talla_zapatos,
         };
         return t.talla_camisa || t.talla_pantalon || t.talla_zapatos ? t : null;
-    }, [empleados, form.empleado_id]);
+    }, [form.empleado_id, tallasEdit]);
+
+    const cronogramaInfo = useMemo(() => {
+        if (!form.contrato_id) return null;
+        const contrato = contratos.find(
+            (c) => String(c.id) === String(form.contrato_id),
+        );
+        if (!contrato?.cliente_proyecto) return null;
+        const cron = cronogramas.find(
+            (c) => c.proyecto?.nombre === contrato.cliente_proyecto,
+        );
+        if (!cron?.fecha_entrega) return null;
+        const { inicio, corte, entrega } = computeCronDates(
+            cron.fecha_entrega,
+            cron.ciclo_meses,
+        );
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const locked = today >= corte;
+        return {
+            nombre: contrato.cliente_proyecto,
+            inicio,
+            corte,
+            entrega,
+            cicloMeses: cron.ciclo_meses,
+            locked,
+        };
+    }, [form.contrato_id, contratos, cronogramas]);
 
     if (!open) return null;
 
@@ -539,7 +651,6 @@ function Modal({
                     ))}
                 </div>
 
-                {/* Body */}
                 <div style={S.modalBody}>
                     {activeTab === "info" && (
                         <>
@@ -561,6 +672,21 @@ function Modal({
                                                 contrato_id: contrato?.id ?? "",
                                                 items: [],
                                             }));
+                                            // Sincronizar tallas con el nuevo empleado
+                                            const emp = empleados.find(
+                                                (e) =>
+                                                    String(e.id) === String(v),
+                                            );
+                                            const t = {
+                                                talla_camisa:
+                                                    emp?.talla_camisa ?? "",
+                                                talla_pantalon:
+                                                    emp?.talla_pantalon ?? "",
+                                                talla_zapatos:
+                                                    emp?.talla_zapatos ?? "",
+                                            };
+                                            setTallasEdit(t);
+                                            setTallasOrig(t);
                                             setPedidoPrevio(null);
                                             if (v && isNuevo) {
                                                 setLoadingHistorial(true);
@@ -625,6 +751,112 @@ function Modal({
                                     </div>
                                 </div>
                             </div>
+                            {cronogramaInfo && (
+                                <div
+                                    style={{
+                                        marginTop: 14,
+                                        padding: "12px 16px",
+                                        background: cronogramaInfo.locked
+                                            ? "#fff8e0"
+                                            : "#f0f9f7",
+                                        border: `1.5px solid ${cronogramaInfo.locked ? "#f9c74f" : "#a7f3d0"}`,
+                                        borderRadius: 8,
+                                        fontSize: "0.82rem",
+                                        color: cronogramaInfo.locked
+                                            ? "#7a5c00"
+                                            : "#065f46",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 800,
+                                            marginBottom: 8,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                        }}
+                                    >
+                                        {cronogramaInfo.locked ? (
+                                            <IconWarning size={14} />
+                                        ) : (
+                                            <IconCalendar size={14} />
+                                        )}{" "}
+                                        Cronograma · {cronogramaInfo.nombre}
+                                        {cronogramaInfo.locked && (
+                                            <span
+                                                style={{
+                                                    fontWeight: 600,
+                                                    fontSize: "0.76rem",
+                                                    background: "#fef3c7",
+                                                    borderRadius: 10,
+                                                    padding: "1px 8px",
+                                                    color: "#92400e",
+                                                }}
+                                            >
+                                                Superó punto de corte — solo
+                                                lectura
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns:
+                                                "repeat(3, 1fr)",
+                                            gap: 8,
+                                        }}
+                                    >
+                                        {[
+                                            {
+                                                label: "Inicio",
+                                                value: fmtDateCron(
+                                                    cronogramaInfo.inicio,
+                                                ),
+                                            },
+                                            {
+                                                label: "Corte (pedido global)",
+                                                value: fmtDateCron(
+                                                    cronogramaInfo.corte,
+                                                ),
+                                                warn: cronogramaInfo.locked,
+                                            },
+                                            {
+                                                label: "Entrega",
+                                                value: fmtDateCron(
+                                                    cronogramaInfo.entrega,
+                                                ),
+                                            },
+                                        ].map(({ label, value, warn }) => (
+                                            <div key={label}>
+                                                <div
+                                                    style={{
+                                                        fontSize: "0.7rem",
+                                                        fontWeight: 700,
+                                                        textTransform:
+                                                            "uppercase",
+                                                        letterSpacing: "0.04em",
+                                                        opacity: 0.7,
+                                                    }}
+                                                >
+                                                    {label}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontWeight: 800,
+                                                        fontSize: "0.88rem",
+                                                        color: warn
+                                                            ? "#b45309"
+                                                            : "inherit",
+                                                    }}
+                                                >
+                                                    {value}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div style={{ ...S.grid2, marginTop: 16 }}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>
@@ -693,7 +925,6 @@ function Modal({
                                 </div>
                             </div>
 
-                            {/* Banner renovación en pestaña info */}
                             {pedidoPrevio && isNuevo && !loadingHistorial && (
                                 <div
                                     style={{
@@ -739,8 +970,8 @@ function Modal({
                                 </div>
                             )}
 
-                            {/* Tallas del empleado (solo lectura, desde respuestas_ingresos) */}
-                            {tallasEmpleado && (
+                            {/* Tallas del empleado — editables */}
+                            {form.empleado_id && (
                                 <div
                                     style={{
                                         marginTop: 20,
@@ -758,9 +989,25 @@ function Modal({
                                             textTransform: "uppercase",
                                             letterSpacing: "0.05em",
                                             marginBottom: 12,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 8,
                                         }}
                                     >
                                         Tallas del empleado
+                                        {!readOnly && (
+                                            <span
+                                                style={{
+                                                    fontWeight: 400,
+                                                    fontSize: "0.72rem",
+                                                    color: "var(--text-muted)",
+                                                    textTransform: "none",
+                                                    letterSpacing: 0,
+                                                }}
+                                            >
+                                                (se guardan con el pedido)
+                                            </span>
+                                        )}
                                     </div>
                                     <div
                                         style={{
@@ -773,38 +1020,65 @@ function Modal({
                                         {[
                                             {
                                                 label: "Camisa / Chaqueta",
-                                                value: tallasEmpleado.talla_camisa,
+                                                key: "talla_camisa",
                                             },
                                             {
                                                 label: "Pantalón / Jean",
-                                                value: tallasEmpleado.talla_pantalon,
+                                                key: "talla_pantalon",
                                             },
                                             {
                                                 label: "Zapatos / Tenis",
-                                                value: tallasEmpleado.talla_zapatos,
+                                                key: "talla_zapatos",
                                             },
-                                        ].map(({ label, value }) => (
-                                            <div
-                                                key={label}
-                                                style={S.formGroup}
-                                            >
+                                        ].map(({ label, key }) => (
+                                            <div key={key} style={S.formGroup}>
                                                 <label style={S.label}>
                                                     {label}
                                                 </label>
-                                                <div
-                                                    style={{
-                                                        ...S.input,
-                                                        ...S.inputDisabled,
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        fontWeight: 700,
-                                                        color: value
-                                                            ? "var(--primary)"
-                                                            : "var(--text-muted)",
-                                                    }}
-                                                >
-                                                    {value || "Sin registro"}
-                                                </div>
+                                                {readOnly ? (
+                                                    <div
+                                                        style={{
+                                                            ...S.input,
+                                                            ...S.inputDisabled,
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            fontWeight: 700,
+                                                            color: tallasEdit[
+                                                                key
+                                                            ]
+                                                                ? "var(--primary)"
+                                                                : "var(--text-muted)",
+                                                        }}
+                                                    >
+                                                        {tallasEdit[key] ||
+                                                            "Sin registro"}
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        style={{
+                                                            ...S.input,
+                                                            fontWeight: 700,
+                                                            color: tallasEdit[
+                                                                key
+                                                            ]
+                                                                ? "var(--primary)"
+                                                                : "var(--text)",
+                                                        }}
+                                                        value={tallasEdit[key]}
+                                                        placeholder="Sin registro"
+                                                        onChange={(e) =>
+                                                            setTallasEdit(
+                                                                (t) => ({
+                                                                    ...t,
+                                                                    [key]: e
+                                                                        .target
+                                                                        .value,
+                                                                }),
+                                                            )
+                                                        }
+                                                    />
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -872,7 +1146,7 @@ function Modal({
                                     const maxDisp = invRow
                                         ? invRow.cantidad
                                         : Infinity;
-                                    // Para modo vista: reconstruir label desde it.inventario si existe
+
                                     const displayInv =
                                         it._inv ||
                                         (it.inventario
@@ -1072,12 +1346,12 @@ function Modal({
     );
 }
 
-// ── Componente principal ───────────────────────────────────────────────────
 export default function PedidosAutomaticosCrud() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
+    const [filtroProyecto, setFiltroProyecto] = useState("Todos");
     const [pagina, setPagina] = useState(1);
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
@@ -1105,10 +1379,15 @@ export default function PedidosAutomaticosCrud() {
         queryFn: () =>
             api.get("/inventario-dotacion?flat=1").then((r) => r.data),
     });
+    const { data: cronogramas = [] } = useQuery({
+        queryKey: ["cronograma-dotacion"],
+        queryFn: () => api.get("/cronograma-dotacion").then((r) => r.data),
+        staleTime: 5 * 60 * 1000,
+    });
 
     useEffect(() => {
         setPagina(1);
-    }, [debouncedSearch, filtroEstado]);
+    }, [debouncedSearch, filtroEstado, filtroProyecto]);
 
     useEffect(() => {
         const anyOpen = modalOpen || viewOpen || !!confirmDelete || globalModal;
@@ -1125,6 +1404,44 @@ export default function PedidosAutomaticosCrud() {
         setTimeout(() => setToast(null), 3500);
     };
 
+    const contratoProyectoMap = useMemo(() => {
+        const m = {};
+        contratos.forEach((c) => {
+            m[String(c.id)] = c.cliente_proyecto ?? "";
+        });
+        return m;
+    }, [contratos]);
+
+    const proyectosUsados = useMemo(() => {
+        const set = new Set();
+        pedidos.forEach((p) => {
+            const cp = p.contrato_id
+                ? contratoProyectoMap[String(p.contrato_id)]
+                : "";
+            if (cp) set.add(cp);
+        });
+        return Array.from(set).sort();
+    }, [pedidos, contratoProyectoMap]);
+
+    const proyectosLocked = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const locked = new Set();
+        cronogramas.forEach((c) => {
+            if (!c.proyecto?.nombre || !c.fecha_entrega) return;
+            const n = Number(c.ciclo_meses) || 4;
+            const entrega = new Date(
+                String(c.fecha_entrega).split("T")[0] + "T00:00:00",
+            );
+            const inicio = new Date(entrega);
+            inicio.setMonth(inicio.getMonth() - n);
+            const corte = new Date(inicio);
+            corte.setMonth(corte.getMonth() + Math.floor(n / 2));
+            if (today >= corte) locked.add(c.proyecto.nombre);
+        });
+        return locked;
+    }, [cronogramas]);
+
     const filtered = useMemo(
         () =>
             pedidos.filter((p) => {
@@ -1137,9 +1454,21 @@ export default function PedidosAutomaticosCrud() {
                     (p.empleado?.cedula ?? "").includes(q);
                 const matchE =
                     filtroEstado === "Todos" || p.estado === filtroEstado;
-                return matchQ && matchE;
+                const proyectoPedido = p.contrato_id
+                    ? (contratoProyectoMap[String(p.contrato_id)] ?? "")
+                    : "";
+                const matchP =
+                    filtroProyecto === "Todos" ||
+                    proyectoPedido === filtroProyecto;
+                return matchQ && matchE && matchP;
             }),
-        [pedidos, debouncedSearch, filtroEstado],
+        [
+            pedidos,
+            debouncedSearch,
+            filtroEstado,
+            filtroProyecto,
+            contratoProyectoMap,
+        ],
     );
 
     const paginated = useMemo(
@@ -1218,7 +1547,6 @@ export default function PedidosAutomaticosCrud() {
                 queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
                     prev.map((p) => (p.id === editTarget.id ? data : p)),
                 );
-                // Refrescar inventario ya que pudo cambiar
                 queryClient.invalidateQueries({
                     queryKey: ["inventario-dotacion-flat"],
                 });
@@ -1282,7 +1610,6 @@ export default function PedidosAutomaticosCrud() {
         return map[estado] ?? { bg: "#f0f0f0", color: "#555" };
     };
 
-    // Preparar form para edición: incluir _inv en items para que el selector sepa cuál está seleccionado
     const buildEditForm = (pedido) => ({
         empleado_id: pedido.empleado_id ?? "",
         contrato_id: pedido.contrato_id ?? "",
@@ -1369,6 +1696,20 @@ export default function PedidosAutomaticosCrud() {
                             </option>
                         ))}
                     </select>
+                    {proyectosUsados.length > 0 && (
+                        <select
+                            style={S.selectFilter}
+                            value={filtroProyecto}
+                            onChange={(e) => setFiltroProyecto(e.target.value)}
+                        >
+                            <option value="Todos">Todos los proyectos</option>
+                            {proyectosUsados.map((p) => (
+                                <option key={p} value={p}>
+                                    {p}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -1463,9 +1804,26 @@ export default function PedidosAutomaticosCrud() {
                         <tbody>
                             {paginated.map((p) => {
                                 const badge = estadoBadge(p.estado);
-                                const empData = empleados.find((e) => String(e.id) === String(p.empleado_id));
+                                const empData = empleados.find(
+                                    (e) =>
+                                        String(e.id) === String(p.empleado_id),
+                                );
+                                const proyectoPedido = p.contrato_id
+                                    ? (contratoProyectoMap[
+                                          String(p.contrato_id)
+                                      ] ?? "")
+                                    : "";
+                                const isLocked =
+                                    proyectosLocked.has(proyectoPedido);
                                 return (
-                                    <tr key={p.id}>
+                                    <tr
+                                        key={p.id}
+                                        style={
+                                            isLocked
+                                                ? { opacity: 0.85 }
+                                                : undefined
+                                        }
+                                    >
                                         <td>
                                             <span
                                                 style={{
@@ -1487,7 +1845,25 @@ export default function PedidosAutomaticosCrud() {
                                                         .charAt(0)
                                                         .toUpperCase()}
                                                     {empData?.fotografia && (
-                                                        <img src={`/storage/${empData.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                        <img
+                                                            src={`/storage/${empData.fotografia}`}
+                                                            alt=""
+                                                            style={{
+                                                                position:
+                                                                    "absolute",
+                                                                inset: 0,
+                                                                width: "100%",
+                                                                height: "100%",
+                                                                objectFit:
+                                                                    "cover",
+                                                                borderRadius:
+                                                                    "50%",
+                                                            }}
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display =
+                                                                    "none";
+                                                            }}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -1558,31 +1934,62 @@ export default function PedidosAutomaticosCrud() {
                                                 >
                                                     <IconEye />
                                                 </button>
-                                                <button
-                                                    style={S.actionBtn(
-                                                        "#e8f8f5",
-                                                        "var(--primary-dark)",
-                                                    )}
-                                                    title="Editar"
-                                                    onClick={() => {
-                                                        setEditTarget(p);
-                                                        setModalOpen(true);
-                                                    }}
-                                                >
-                                                    <IconEdit />
-                                                </button>
-                                                <button
-                                                    style={S.actionBtn(
-                                                        "#fce8e8",
-                                                        "#a33",
-                                                    )}
-                                                    title="Eliminar"
-                                                    onClick={() =>
-                                                        setConfirmDelete(p)
-                                                    }
-                                                >
-                                                    <IconTrash size={14} />
-                                                </button>
+                                                {isLocked ? (
+                                                    <span
+                                                        title={`Bloqueado: proyecto "${proyectoPedido}" superó el punto de corte`}
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            justifyContent:
+                                                                "center",
+                                                            width: 28,
+                                                            height: 28,
+                                                            background:
+                                                                "#fef3c7",
+                                                            borderRadius: 6,
+                                                            color: "#92400e",
+                                                        }}
+                                                    >
+                                                        <IconLock size={14} />
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            style={S.actionBtn(
+                                                                "#e8f8f5",
+                                                                "var(--primary-dark)",
+                                                            )}
+                                                            title="Editar"
+                                                            onClick={() => {
+                                                                setEditTarget(
+                                                                    p,
+                                                                );
+                                                                setModalOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <IconEdit />
+                                                        </button>
+                                                        <button
+                                                            style={S.actionBtn(
+                                                                "#fce8e8",
+                                                                "#a33",
+                                                            )}
+                                                            title="Eliminar"
+                                                            onClick={() =>
+                                                                setConfirmDelete(
+                                                                    p,
+                                                                )
+                                                            }
+                                                        >
+                                                            <IconTrash
+                                                                size={14}
+                                                            />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -1593,7 +2000,6 @@ export default function PedidosAutomaticosCrud() {
                 )}
             </div>
 
-            {/* Paginación */}
             {!isLoading && filtered.length > POR_PAGINA && (
                 <div style={S.paginationBar}>
                     <span style={S.paginationInfo}>
@@ -1658,7 +2064,6 @@ export default function PedidosAutomaticosCrud() {
                 </div>
             )}
 
-            {/* Modal pedido global */}
             {globalModal && (
                 <div
                     style={S.overlay}
@@ -1831,7 +2236,6 @@ export default function PedidosAutomaticosCrud() {
                 </div>
             )}
 
-            {/* Modal confirmación eliminar */}
             {confirmDelete && (
                 <div style={S.overlay} onClick={() => setConfirmDelete(null)}>
                     <div
@@ -1896,7 +2300,6 @@ export default function PedidosAutomaticosCrud() {
                 </div>
             )}
 
-            {/* Modal crear / editar */}
             <Modal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
@@ -1919,9 +2322,10 @@ export default function PedidosAutomaticosCrud() {
                 empleados={empleadosConContrato}
                 contratos={contratos}
                 inventarioFlat={inventarioFlat}
+                cronogramas={cronogramas}
+                queryClient={queryClient}
             />
 
-            {/* Modal ver */}
             <Modal
                 open={viewOpen}
                 onClose={() => setViewOpen(false)}
@@ -1930,13 +2334,12 @@ export default function PedidosAutomaticosCrud() {
                 empleados={empleados}
                 contratos={contratos}
                 inventarioFlat={inventarioFlat}
+                cronogramas={cronogramas}
                 readOnly
             />
         </div>
     );
 }
-
-// ── Estilos ────────────────────────────────────────────────────────────────
 const S = {
     toolbar: {
         display: "flex",

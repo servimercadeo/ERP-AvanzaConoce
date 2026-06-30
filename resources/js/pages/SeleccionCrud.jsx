@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconClose } from '../components/Icons';
@@ -51,6 +51,7 @@ const _pgb = { minWidth: 32, height: 32, padding: '0 8px', border: BD, borderRad
 
 /* ── Component ──────────────────────────────────────────────────────── */
 export default function SeleccionCrud() {
+  const qc = useQueryClient();
   const [data, setData] = useState([]);
   const [catalogs, setCatalogs] = useState({ cargos: [], proyectos: [], responsables: [], ciudades: [], empleadores: [] });
   const [empresas, setEmpresas] = useState([]);
@@ -166,10 +167,10 @@ export default function SeleccionCrud() {
       };
       if (mode === 'create') {
         const { data: nr } = await api.post('/requisiciones', payload);
-        setData(prev => [nr, ...prev]);
+        qc.setQueryData(['requisiciones'], prev => [nr, ...(prev ?? [])]);
       } else {
         const { data: upd } = await api.put(`/requisiciones/${form.id}`, payload);
-        setData(prev => prev.map(r => r.id === form.id ? upd : r));
+        qc.setQueryData(['requisiciones'], prev => (prev ?? []).map(r => r.id === form.id ? upd : r));
       }
       setModal(false);
     } catch (e) {

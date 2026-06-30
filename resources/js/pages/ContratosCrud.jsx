@@ -564,6 +564,7 @@ function Modal({
     empleados,
     catalogs,
     candidatosContrato = [],
+    proyectoOpts = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
@@ -911,6 +912,7 @@ function Modal({
                                 <Field
                                     label="Cliente / Proyecto"
                                     k="cliente_proyecto"
+                                    opts={proyectoOpts.length ? proyectoOpts : undefined}
                                     {...fp}
                                 />
                             </div>
@@ -1259,8 +1261,14 @@ export default function ContratosCrud() {
         queryFn: () =>
             api.get("/respuestas-ingresos/datos-contrato").then((r) => r.data),
     });
+    const { data: _qSeleccionCatalogos } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
     const [candidatosContrato, setCandidatosContrato] = useState([]);
+    const [proyectoOpts, setProyectoOpts] = useState([]);
 
     useEffect(() => {
         if (_qContratos) {
@@ -1277,6 +1285,10 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qCandidatosContrato) setCandidatosContrato(_qCandidatosContrato);
     }, [_qCandidatosContrato]);
+    useEffect(() => {
+        if (_qSeleccionCatalogos?.proyectos)
+            setProyectoOpts(_qSeleccionCatalogos.proyectos.map((p) => p.label));
+    }, [_qSeleccionCatalogos]);
 
     useEffect(() => {
         setPagina(1);
@@ -1948,6 +1960,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
+                proyectoOpts={proyectoOpts}
             />
 
             <Modal
@@ -1957,6 +1970,7 @@ export default function ContratosCrud() {
                 title="Ver Contrato"
                 empleados={empleados}
                 catalogs={catalogs}
+                proyectoOpts={proyectoOpts}
                 readOnly
             />
 

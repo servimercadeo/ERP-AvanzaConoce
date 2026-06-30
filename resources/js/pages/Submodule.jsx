@@ -15,6 +15,7 @@ import RespuestasFormularioCrud from './RespuestasFormularioCrud';
 import ProductosDotacion from './ProductosDotacion';
 import PedidosAutomaticosCrud from './PedidosAutomaticosCrud';
 import PedidosGlobalesCrud from './PedidosGlobalesCrud';
+import CronogramaDotacion from './CronogramaDotacion';
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -88,6 +89,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'productos_dotacion': return ProductosDotacion;
             case 'pedidos_dotacion':   return PedidosAutomaticosCrud;
             case 'pedidos_globales':   return PedidosGlobalesCrud;
+            case 'cronograma':         return CronogramaDotacion;
             default: return null;
           }
         case 'productos':
