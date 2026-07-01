@@ -42,10 +42,18 @@ class CronogramaDotacionController extends Controller
         return response()->json($cronogramaDotacion->load('proyecto'));
     }
 
+    public function toggle(CronogramaDotacion $cronogramaDotacion)
+    {
+        $cronogramaDotacion->update(['activo' => !$cronogramaDotacion->activo]);
+
+        return response()->json($cronogramaDotacion->load('proyecto'));
+    }
+
     public function destroy(CronogramaDotacion $cronogramaDotacion)
     {
-        $cronogramaDotacion->delete();
-
-        return response()->json(null, 204);
+        return response()->json(
+            ['message' => 'Los cronogramas no se pueden eliminar. Use desactivar en su lugar.'],
+            405
+        );
     }
 }

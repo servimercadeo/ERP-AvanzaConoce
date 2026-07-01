@@ -222,9 +222,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
+    Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
+    Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store']);
+    Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update']);
+    Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy']);
 
     // Pedidos automáticos de dotación
     Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
+    Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
         ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
 
@@ -238,7 +243,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('cronograma-dotacion', [CronogramaDotacionController::class, 'index']);
     Route::post('cronograma-dotacion', [CronogramaDotacionController::class, 'store']);
     Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update']);
-    Route::delete('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'destroy']);
+    Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle']);
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);

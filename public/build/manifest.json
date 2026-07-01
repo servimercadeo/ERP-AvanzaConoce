@@ -1,6 +1,6 @@
 {
-  "_Layout-B1K7XbNE.js": {
-    "file": "assets/Layout-B1K7XbNE.js",
+  "_Layout-BpRSHYpy.js": {
+    "file": "assets/Layout-BpRSHYpy.js",
     "name": "Layout",
     "imports": [
       "_vendor-query-qy_ppomC.js",
@@ -47,7 +47,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-DQ6WPID8.js",
+    "file": "assets/app-DBgfPzmk.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -99,13 +99,13 @@
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-DmOFnQkz.js",
+    "file": "assets/Dashboard-Ctwr1Pn8.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B1K7XbNE.js",
+      "_Layout-BpRSHYpy.js",
       "_vendor-router-CDelyX25.js",
       "resources/js/app.jsx"
     ],
@@ -114,7 +114,7 @@
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-CLQoXlBo.js",
+    "file": "assets/Login-B6yQx9pA.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
@@ -128,13 +128,13 @@
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-BoEoJFey.js",
+    "file": "assets/Module-DUx369-O.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B1K7XbNE.js",
+      "_Layout-BpRSHYpy.js",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
@@ -145,13 +145,13 @@
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-eUbI7g35.js",
+    "file": "assets/Submodule-Cl_LyieC.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-B1K7XbNE.js",
+      "_Layout-BpRSHYpy.js",
       "resources/js/app.jsx",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",

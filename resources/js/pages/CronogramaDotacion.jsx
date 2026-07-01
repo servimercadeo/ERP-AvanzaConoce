@@ -4,9 +4,10 @@ import api from "../api/axios";
 import {
     IconClose,
     IconEdit,
-    IconTrash,
     IconLoading,
     IconEmptySearch,
+    IconCheckCircle,
+    IconMinusCircle,
 } from "../components/Icons";
 function parseDateLocal(str) {
     return new Date(str + "T00:00:00");
@@ -49,7 +50,9 @@ function addMonths(months) {
 // ── Modal crear / editar ───────────────────────────────────────────────────
 function CronogramaModal({ entry, proyectos, cronogramas, onClose, onSaved }) {
     const isEdit = !!entry;
-    const scheduledIds = new Set(cronogramas.map((c) => String(c.proyecto_id)));
+    const scheduledIds = new Set(
+        cronogramas.filter((c) => c.activo).map((c) => String(c.proyecto_id)),
+    );
 
     const [form, setForm] = useState({
         proyecto_id: isEdit ? String(entry.proyecto_id) : "",
@@ -259,18 +262,21 @@ function CronogramaModal({ entry, proyectos, cronogramas, onClose, onSaved }) {
     );
 }
 
-function DeleteModal({ entry, onClose, onDeleted }) {
-    const [deleting, setDeleting] = useState(false);
+function ToggleModal({ entry, onClose, onToggled }) {
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const isActive = entry.activo;
 
-    const handleDelete = async () => {
-        setDeleting(true);
+    const handleToggle = async () => {
+        setLoading(true);
         try {
-            await api.delete(`/cronograma-dotacion/${entry.id}`);
-            onDeleted(entry.id);
+            const res = await api.patch(
+                `/cronograma-dotacion/${entry.id}/toggle`,
+            );
+            onToggled(res.data);
         } catch (e) {
-            setError(e?.response?.data?.message ?? "Error al eliminar.");
-            setDeleting(false);
+            setError(e?.response?.data?.message ?? "Error al cambiar estado.");
+            setLoading(false);
         }
     };
 
@@ -282,10 +288,12 @@ function DeleteModal({ entry, onClose, onDeleted }) {
                         style={{
                             fontWeight: 800,
                             fontSize: "1rem",
-                            color: "#c0392b",
+                            color: isActive ? "#b45309" : "#0d6e5a",
                         }}
                     >
-                        Eliminar cronograma
+                        {isActive
+                            ? "Desactivar cronograma"
+                            : "Activar cronograma"}
                     </span>
                     <button style={S.btnIcon} onClick={onClose}>
                         <IconClose size={16} />
@@ -293,22 +301,23 @@ function DeleteModal({ entry, onClose, onDeleted }) {
                 </div>
                 <div style={S.modalBody}>
                     <p>
-                        ¿Eliminar el cronograma de{" "}
-                        <strong>{entry.proyecto?.nombre}</strong>?
+                        {isActive ? "¿Desactivar" : "¿Activar"} el cronograma
+                        de <strong>{entry.proyecto?.nombre}</strong>?
                     </p>
                     <div
                         style={{
-                            background: "#fff8e1",
-                            border: "1.5px solid #f9c74f",
+                            background: isActive ? "#fff8e1" : "#f0f9f7",
+                            border: `1.5px solid ${isActive ? "#f9c74f" : "#a7f3d0"}`,
                             borderRadius: 8,
                             padding: "10px 14px",
                             fontSize: "0.84rem",
-                            color: "#7a5c00",
+                            color: isActive ? "#7a5c00" : "#065f46",
                             marginTop: 10,
                         }}
                     >
-                        Los pedidos automáticos de este proyecto quedarán sin
-                        bloqueo de edición.
+                        {isActive
+                            ? "El cronograma quedará inactivo y no afectará la validación de pedidos globales. Podrás reactivarlo en cualquier momento."
+                            : "El cronograma volverá a estar activo y se usará para validar los pedidos globales de este proyecto."}
                     </div>
                     {error && (
                         <div style={{ ...S.errorMsg, marginTop: 10 }}>
@@ -320,16 +329,23 @@ function DeleteModal({ entry, onClose, onDeleted }) {
                     <button
                         style={S.btnSecondary}
                         onClick={onClose}
-                        disabled={deleting}
+                        disabled={loading}
                     >
                         Cancelar
                     </button>
                     <button
-                        style={{ ...S.btnPrimary, background: "#c0392b" }}
-                        onClick={handleDelete}
-                        disabled={deleting}
+                        style={{
+                            ...S.btnPrimary,
+                            background: isActive ? "#b45309" : "#0d6e5a",
+                        }}
+                        onClick={handleToggle}
+                        disabled={loading}
                     >
-                        {deleting ? "Eliminando…" : "Eliminar"}
+                        {loading
+                            ? "Guardando…"
+                            : isActive
+                              ? "Desactivar"
+                              : "Activar"}
                     </button>
                 </div>
             </div>
@@ -338,7 +354,7 @@ function DeleteModal({ entry, onClose, onDeleted }) {
 }
 
 // ── Tarjeta de cronograma por proyecto ────────────────────────────────────
-function CronogramaCard({ entry, onEdit, onDelete }) {
+function CronogramaCard({ entry, onEdit, onToggle }) {
     const today = todayMidnight();
     const { inicio, corte, entrega } = computeDates(
         entry.fecha_entrega,
@@ -356,36 +372,47 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
     const beforeCorte = today < corte;
     const beforeEntrega = today < entrega;
 
-    const status = beforeInicio
-        ? { label: "No iniciado", color: "#475569", bg: "#f1f5f9" }
-        : beforeCorte
-          ? { label: "En preparación", color: "#0d6e5a", bg: "#dcfce7" }
-          : beforeEntrega
-            ? {
-                  label: "⚠ Pedido global requerido",
-                  color: "#92400e",
-                  bg: "#fef3c7",
-              }
-            : { label: "Ciclo completado", color: "#475569", bg: "#f1f5f9" };
+    const status = !entry.activo
+        ? { label: "Inactivo", color: "#64748b", bg: "#e2e8f0" }
+        : beforeInicio
+          ? { label: "No iniciado", color: "#475569", bg: "#f1f5f9" }
+          : beforeCorte
+            ? { label: "En preparación", color: "#0d6e5a", bg: "#dcfce7" }
+            : beforeEntrega
+              ? {
+                    label: "⚠ Pedido global requerido",
+                    color: "#92400e",
+                    bg: "#fef3c7",
+                }
+              : { label: "Ciclo completado", color: "#475569", bg: "#f1f5f9" };
 
     const daysToCorte = diffDays(today, corte);
     const daysToEntrega = diffDays(today, entrega);
 
     let urgencyMsg = null;
     let urgencyColor = "var(--text-muted)";
-    if (!beforeInicio && beforeCorte) {
-        urgencyMsg = `${daysToCorte} día${daysToCorte !== 1 ? "s" : ""} para crear el pedido global`;
-        urgencyColor = daysToCorte <= 7 ? "#b45309" : "#0d6e5a";
-    } else if (!beforeCorte && beforeEntrega) {
-        urgencyMsg = `⚠ Pedido global requerido · ${daysToEntrega} día${daysToEntrega !== 1 ? "s" : ""} para la entrega`;
-        urgencyColor = "#b45309";
-    } else if (!beforeEntrega) {
-        urgencyMsg = "Ciclo finalizado";
-        urgencyColor = "#475569";
+    if (entry.activo) {
+        if (!beforeInicio && beforeCorte) {
+            urgencyMsg = `${daysToCorte} día${daysToCorte !== 1 ? "s" : ""} para crear el pedido global`;
+            urgencyColor = daysToCorte <= 7 ? "#b45309" : "#0d6e5a";
+        } else if (!beforeCorte && beforeEntrega) {
+            urgencyMsg = `⚠ Pedido global requerido · ${daysToEntrega} día${daysToEntrega !== 1 ? "s" : ""} para la entrega`;
+            urgencyColor = "#b45309";
+        } else if (!beforeEntrega) {
+            urgencyMsg = "Ciclo finalizado";
+            urgencyColor = "#475569";
+        }
     }
 
+    const cardStyle = {
+        ...S.card,
+        opacity: entry.activo ? 1 : 0.65,
+        borderColor: entry.activo ? "var(--border)" : "#cbd5e1",
+        background: entry.activo ? "var(--white)" : "#f8fafc",
+    };
+
     return (
-        <div style={S.card}>
+        <div style={cardStyle}>
             {/* Encabezado */}
             <div
                 style={{
@@ -417,19 +444,30 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                     </span>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {entry.activo && (
+                        <button
+                            style={S.actionBtn}
+                            onClick={() => onEdit(entry)}
+                            title="Editar"
+                        >
+                            <IconEdit size={14} />
+                        </button>
+                    )}
                     <button
-                        style={S.actionBtn}
-                        onClick={() => onEdit(entry)}
-                        title="Editar"
+                        style={{
+                            ...S.actionBtn,
+                            color: entry.activo ? "#b45309" : "#0d6e5a",
+                            borderColor: entry.activo ? "#fde68a" : "#a7f3d0",
+                            background: entry.activo ? "#fffbeb" : "#f0fdf4",
+                        }}
+                        onClick={() => onToggle(entry)}
+                        title={entry.activo ? "Desactivar" : "Activar"}
                     >
-                        <IconEdit size={14} />
-                    </button>
-                    <button
-                        style={{ ...S.actionBtn, color: "#c0392b" }}
-                        onClick={() => onDelete(entry)}
-                        title="Eliminar"
-                    >
-                        <IconTrash size={14} />
+                        {entry.activo ? (
+                            <IconMinusCircle size={14} />
+                        ) : (
+                            <IconCheckCircle size={14} />
+                        )}
                     </button>
                 </div>
             </div>
@@ -449,7 +487,7 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                     {
                         label: "Corte (pedido global)",
                         value: fmtDate(corte),
-                        warn: !beforeCorte,
+                        warn: entry.activo && !beforeCorte,
                     },
                     { label: "Entrega", value: fmtDate(entrega) },
                 ].map(({ label, value, warn }) => (
@@ -470,7 +508,6 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
 
             {/* Barra de progreso */}
             <div style={{ position: "relative", paddingBottom: 44 }}>
-                {/* Track con fills */}
                 <div
                     style={{
                         position: "relative",
@@ -480,17 +517,18 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                         overflow: "hidden",
                     }}
                 >
-                    {/* Zona de preparación (verde) */}
                     <div
                         style={{
                             position: "absolute",
                             inset: 0,
                             width: `${cortePct}%`,
-                            background: beforeInicio ? "#c7d9d6" : "#0d6e5a",
+                            background:
+                                !entry.activo || beforeInicio
+                                    ? "#c7d9d6"
+                                    : "#0d6e5a",
                             transition: "width 0.3s",
                         }}
                     />
-                    {/* Zona post-corte (naranja) */}
                     <div
                         style={{
                             position: "absolute",
@@ -498,13 +536,15 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                             bottom: 0,
                             left: `${cortePct}%`,
                             width: `${100 - cortePct}%`,
-                            background: beforeInicio ? "#e2c8a0" : "#f59e0b",
+                            background:
+                                !entry.activo || beforeInicio
+                                    ? "#e2c8a0"
+                                    : "#f59e0b",
                             transition: "left 0.3s",
                         }}
                     />
                 </div>
 
-                {/* Marcador de corte */}
                 <div
                     style={{
                         position: "absolute",
@@ -536,8 +576,8 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                     </div>
                 </div>
 
-                {/* Marcador de hoy */}
-                {!beforeInicio &&
+                {entry.activo &&
+                    !beforeInicio &&
                     beforeEntrega &&
                     (() => {
                         const labelPos =
@@ -589,7 +629,6 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
                         );
                     })()}
 
-                {/* Marcador de entrega */}
                 <div
                     style={{
                         position: "absolute",
@@ -625,10 +664,13 @@ function CronogramaCard({ entry, onEdit, onDelete }) {
     );
 }
 
+const FILTROS = ["Todos", "Activo", "Inactivo"];
+
 export default function CronogramaDotacion() {
     const qc = useQueryClient();
     const [modalEntry, setModalEntry] = useState(null);
-    const [deleteEntry, setDeleteEntry] = useState(null);
+    const [toggleEntry, setToggleEntry] = useState(null);
+    const [filtro, setFiltro] = useState("Activo");
 
     const { data: cronogramas = [], isLoading } = useQuery({
         queryKey: ["cronograma-dotacion"],
@@ -647,7 +689,6 @@ export default function CronogramaDotacion() {
         staleTime: 5 * 60 * 1000,
     });
 
-    // Proyectos que tienen al menos un contrato (sin importar si tienen pedidos)
     const proyectos = useMemo(() => {
         const allProyectos = catalogos?.proyectos ?? [];
         const nombresConContrato = new Set(
@@ -656,25 +697,32 @@ export default function CronogramaDotacion() {
         return allProyectos.filter((p) => nombresConContrato.has(p.label));
     }, [catalogos, contratos]);
 
+    const cronogramasFiltrados = useMemo(() => {
+        if (filtro === "Activo") return cronogramas.filter((c) => c.activo);
+        if (filtro === "Inactivo") return cronogramas.filter((c) => !c.activo);
+        return cronogramas;
+    }, [cronogramas, filtro]);
+
     const stats = useMemo(() => {
         const today = todayMidnight();
         let enPrep = 0,
             requiereGlobal = 0,
-            noIniciado = 0;
+            inactivos = 0;
         cronogramas.forEach((c) => {
+            if (!c.activo) { inactivos++; return; }
             const { inicio, corte, entrega } = computeDates(
                 c.fecha_entrega,
                 c.ciclo_meses,
             );
-            if (today < inicio) noIniciado++;
-            else if (today < corte) enPrep++;
-            else if (today < entrega) requiereGlobal++;
+            if (today >= inicio && today < corte) enPrep++;
+            else if (today >= corte && today < entrega) requiereGlobal++;
         });
         return {
             total: cronogramas.length,
+            activos: cronogramas.filter((c) => c.activo).length,
             enPrep,
             requiereGlobal,
-            noIniciado,
+            inactivos,
         };
     }, [cronogramas]);
 
@@ -687,11 +735,11 @@ export default function CronogramaDotacion() {
         setModalEntry(null);
     };
 
-    const handleDeleted = (id) => {
+    const handleToggled = (updated) => {
         qc.setQueryData(["cronograma-dotacion"], (old = []) =>
-            old.filter((c) => c.id !== id),
+            old.map((c) => (c.id === updated.id ? updated : c)),
         );
-        setDeleteEntry(null);
+        setToggleEntry(null);
     };
 
     return (
@@ -699,8 +747,8 @@ export default function CronogramaDotacion() {
             {/* Stats */}
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{stats.total}</div>
-                    <div className="stat-label">Proyectos programados</div>
+                    <div className="stat-num">{stats.activos}</div>
+                    <div className="stat-label">Proyectos activos</div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-num" style={{ color: "#0d6e5a" }}>
@@ -714,16 +762,102 @@ export default function CronogramaDotacion() {
                     </div>
                     <div className="stat-label">Requieren pedido global</div>
                 </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#64748b" }}>
+                        {stats.inactivos}
+                    </div>
+                    <div className="stat-label">Inactivos</div>
+                </div>
             </div>
 
             {/* Toolbar */}
             <div
                 style={{
                     display: "flex",
-                    justifyContent: "flex-end",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                     marginBottom: 20,
+                    flexWrap: "wrap",
+                    gap: 10,
                 }}
             >
+                {/* Filtro estado */}
+                <div style={{ display: "flex", gap: 6 }}>
+                    {FILTROS.map((f) => (
+                        <button
+                            key={f}
+                            onClick={() => setFiltro(f)}
+                            style={{
+                                padding: "7px 16px",
+                                borderRadius: 20,
+                                border: "1.5px solid",
+                                fontSize: "0.83rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "Nunito, sans-serif",
+                                borderColor:
+                                    filtro === f
+                                        ? "var(--primary)"
+                                        : "var(--border)",
+                                background:
+                                    filtro === f
+                                        ? "var(--primary)"
+                                        : "var(--white)",
+                                color: filtro === f ? "#fff" : "var(--text)",
+                            }}
+                        >
+                            {f}
+                            {f === "Activo" && (
+                                <span
+                                    style={{
+                                        marginLeft: 6,
+                                        background:
+                                            filtro === f
+                                                ? "rgba(255,255,255,0.25)"
+                                                : "#e2e8f0",
+                                        borderRadius: 10,
+                                        padding: "1px 7px",
+                                        fontSize: "0.76rem",
+                                    }}
+                                >
+                                    {stats.activos}
+                                </span>
+                            )}
+                            {f === "Inactivo" && (
+                                <span
+                                    style={{
+                                        marginLeft: 6,
+                                        background:
+                                            filtro === f
+                                                ? "rgba(255,255,255,0.25)"
+                                                : "#e2e8f0",
+                                        borderRadius: 10,
+                                        padding: "1px 7px",
+                                        fontSize: "0.76rem",
+                                    }}
+                                >
+                                    {stats.inactivos}
+                                </span>
+                            )}
+                            {f === "Todos" && (
+                                <span
+                                    style={{
+                                        marginLeft: 6,
+                                        background:
+                                            filtro === f
+                                                ? "rgba(255,255,255,0.25)"
+                                                : "#e2e8f0",
+                                        borderRadius: 10,
+                                        padding: "1px 7px",
+                                        fontSize: "0.76rem",
+                                    }}
+                                >
+                                    {stats.total}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
                 <button
                     style={S.btnPrimary}
                     onClick={() => setModalEntry(false)}
@@ -738,11 +872,15 @@ export default function CronogramaDotacion() {
                     <IconLoading size={32} />
                     <p>Cargando cronograma…</p>
                 </div>
-            ) : cronogramas.length === 0 ? (
+            ) : cronogramasFiltrados.length === 0 ? (
                 <div style={S.empty}>
                     <IconEmptySearch size={44} />
                     <p style={{ fontWeight: 700, marginBottom: 4 }}>
-                        Sin cronogramas configurados
+                        {filtro === "Inactivo"
+                            ? "No hay cronogramas inactivos"
+                            : filtro === "Activo"
+                              ? "Sin cronogramas activos"
+                              : "Sin cronogramas configurados"}
                     </p>
                     <p
                         style={{
@@ -750,18 +888,21 @@ export default function CronogramaDotacion() {
                             color: "var(--text-muted)",
                         }}
                     >
-                        Agrega uno para cada proyecto y define sus fechas de
-                        entrega y puntos de corte.
+                        {filtro === "Activo"
+                            ? "Agrega uno para cada proyecto y define sus fechas de entrega y puntos de corte."
+                            : filtro === "Inactivo"
+                              ? "Los cronogramas desactivados aparecerán aquí."
+                              : "Agrega uno para cada proyecto y define sus fechas de entrega y puntos de corte."}
                     </p>
                 </div>
             ) : (
                 <div style={S.grid}>
-                    {cronogramas.map((c) => (
+                    {cronogramasFiltrados.map((c) => (
                         <CronogramaCard
                             key={c.id}
                             entry={c}
                             onEdit={() => setModalEntry(c)}
-                            onDelete={() => setDeleteEntry(c)}
+                            onToggle={() => setToggleEntry(c)}
                         />
                     ))}
                 </div>
@@ -777,11 +918,11 @@ export default function CronogramaDotacion() {
                     onSaved={handleSaved}
                 />
             )}
-            {deleteEntry && (
-                <DeleteModal
-                    entry={deleteEntry}
-                    onClose={() => setDeleteEntry(null)}
-                    onDeleted={handleDeleted}
+            {toggleEntry && (
+                <ToggleModal
+                    entry={toggleEntry}
+                    onClose={() => setToggleEntry(null)}
+                    onToggled={handleToggled}
                 />
             )}
         </div>
@@ -801,6 +942,7 @@ const S = {
         borderRadius: "var(--radius)",
         padding: "22px 24px",
         boxShadow: "var(--shadow)",
+        transition: "opacity 0.2s, background 0.2s",
     },
     proyectoBadge: {
         background: "var(--primary)",

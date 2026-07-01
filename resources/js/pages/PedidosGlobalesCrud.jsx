@@ -6,6 +6,155 @@ import api from "../api/axios";
 const POR_PAGINA = 8;
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+function parseDateLocal(str) {
+    return new Date(String(str).split("T")[0] + "T00:00:00");
+}
+function fmtDateCron(d) {
+    return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+}
+function computeCronDates(fechaEntrega, cicloMeses) {
+    const n = Number(cicloMeses) || 4;
+    const entrega = parseDateLocal(fechaEntrega);
+    const inicio = new Date(entrega);
+    inicio.setMonth(inicio.getMonth() - n);
+    const corte = new Date(inicio);
+    corte.setMonth(corte.getMonth() + Math.floor(n / 2));
+    return { inicio, corte, entrega };
+}
+
+// Para cada proyecto presente en los pedidos del global, busca su cronograma
+// y evalúa si la fecha del pedido global se generó dentro del plazo (a más tardar en el corte).
+// Generar antes del corte está bien; pasarse del corte es lo que no se permite.
+function getCronogramaInfo(g, pedidos, cronogramas) {
+    const proyectos = [...new Set(pedidos.map((p) => p.contrato?.cliente_proyecto).filter(Boolean))];
+    if (proyectos.length === 0) return [];
+    const fechaGlobal = g.fecha ? parseDateLocal(g.fecha) : null;
+    return proyectos.map((nombre) => {
+        const cron = cronogramas.find((c) => c.activo && c.proyecto?.nombre === nombre);
+        if (!cron?.fecha_entrega) return { proyecto: nombre, cron: null };
+        const { corte, entrega } = computeCronDates(cron.fecha_entrega, cron.ciclo_meses);
+        const matches = fechaGlobal ? fechaGlobal <= corte : null;
+        return { proyecto: nombre, cron, corte, entrega, matches };
+    });
+}
+
+// ── Helpers de estado para pedido incluido ─────────────────────────────────
+function estadoDisplay(pedido, globalConfirmado) {
+    if (pedido.estado === "Devolución") return { label: "Devolución",  bg: "#fce8e8", color: "#c0392b" };
+    if (globalConfirmado)               return { label: "Completado",  bg: "#dcfce7", color: "#0d6e5a" };
+    return                                     { label: "En proceso",  bg: "#e8f0ff", color: "#1a4fa8" };
+}
+
+// ── Modal pedido incluido (ver / devolver) ─────────────────────────────────
+function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
+    const [saving, setSaving] = useState(false);
+    const [error, setError]   = useState("");
+    const [confirm, setConfirm] = useState(false);
+
+    const est = estadoDisplay(pedido, g.confirmado);
+    const puedeDevolver = pedido.estado === "Completado";
+
+    const handleDevolver = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const { data } = await api.post(`/pedidos-automaticos/${pedido.id}/devolver`);
+            onDevuelto(data);
+        } catch (e) {
+            setError(e?.response?.data?.message ?? "Error al procesar la devolución.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 500 }}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800, fontSize: "1rem" }}>
+                        Pedido <span style={{ fontFamily: "monospace" }}>#{pedido.codigo}</span>
+                    </span>
+                    <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
+                </div>
+                <div style={S.modalBody}>
+                    {/* Empleado */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                        <div style={{ ...S.avatarSm, flexShrink: 0 }}>
+                            {(pedido.empleado?.nombres || "?").charAt(0).toUpperCase()}
+                            {pedido.empleado?.fotografia && (
+                                <img src={`/storage/${pedido.empleado.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            )}
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 800, fontSize: "0.95rem" }}>
+                                {pedido.empleado?.nombres} {pedido.empleado?.apellidos}
+                            </div>
+                            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                                C.C. {pedido.empleado?.cedula ?? "—"}
+                            </div>
+                        </div>
+                        <span style={{ marginLeft: "auto", padding: "4px 12px", borderRadius: 20, fontWeight: 700, fontSize: "0.78rem", background: est.bg, color: est.color }}>
+                            {est.label}
+                        </span>
+                    </div>
+
+                    {/* Items */}
+                    <div style={{ background: "var(--bg)", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-muted)", marginBottom: 8 }}>
+                            Prendas asignadas
+                        </div>
+                        {(pedido.items ?? []).length === 0 ? (
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.84rem" }}>Sin items</span>
+                        ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {(pedido.items ?? []).map((it, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem" }}>
+                                        <span>{it.inventario?.categoria} {it.inventario?.subcategoria} T:{it.inventario?.talla}</span>
+                                        <span style={{ fontWeight: 700, color: "var(--primary)" }}>×{it.cantidad}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {pedido.estado === "Devolución" && (
+                        <div style={{ background: "#fce8e8", border: "1.5px solid #e57373", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#c0392b" }}>
+                            Este pedido ya fue marcado como devolución y el inventario fue restaurado.
+                        </div>
+                    )}
+
+                    {puedeDevolver && !confirm && (
+                        <div style={{ background: "#fff8e0", border: "1.5px solid #f9c74f", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#7a5c00" }}>
+                            Al marcar como <strong>Devolución</strong>, todas las prendas de este pedido volverán al inventario.
+                        </div>
+                    )}
+
+                    {puedeDevolver && confirm && (
+                        <div style={{ background: "#fce8e8", border: "1.5px solid #e57373", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#c0392b" }}>
+                            ¿Confirmar devolución? Esta acción restaurará el inventario y no se puede deshacer.
+                        </div>
+                    )}
+
+                    {error && <div style={{ ...S.errorMsg, marginTop: 10 }}>{error}</div>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cerrar</button>
+                    {puedeDevolver && !confirm && (
+                        <button style={{ ...S.btnPrimary, background: "#c0392b" }} onClick={() => setConfirm(true)}>
+                            Marcar devolución
+                        </button>
+                    )}
+                    {puedeDevolver && confirm && (
+                        <button style={{ ...S.btnPrimary, background: "#c0392b" }} onClick={handleDevolver} disabled={saving}>
+                            {saving ? "Procesando…" : "Confirmar devolución"}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ── Modal editar ───────────────────────────────────────────────────────────
 function EditModal({ global: g, onClose, onSaved }) {
     const [form, setForm]     = useState({ fecha: dateOnly(g.fecha), notas: g.notas ?? "" });
@@ -159,13 +308,20 @@ export default function PedidosGlobalesCrud() {
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [pagina, setPagina]           = useState(1);
     const [expanded, setExpanded]   = useState(null);
+    const [subSearch, setSubSearch] = useState("");
     const [editTarget, setEditTarget]       = useState(null);
     const [deleteTarget, setDeleteTarget]   = useState(null);
     const [confirmTarget, setConfirmTarget] = useState(null);
+    const [editPedido, setEditPedido]       = useState(null); // { pedido, global }
 
     const { data: globales = [], isLoading } = useQuery({
         queryKey: ["pedidos-globales"],
         queryFn: () => api.get("/pedidos-globales").then((r) => r.data),
+    });
+
+    const { data: cronogramas = [] } = useQuery({
+        queryKey: ["cronograma-dotacion"],
+        queryFn: () => api.get("/cronograma-dotacion").then((r) => r.data),
     });
 
     const stats = useMemo(() => ({
@@ -192,7 +348,10 @@ export default function PedidosGlobalesCrud() {
     const paginated    = useMemo(() => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA), [filtered, pagina]);
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
 
-    const toggle = (id) => setExpanded((prev) => (prev === id ? null : id));
+    const toggle = (id) => {
+        setExpanded((prev) => (prev === id ? null : id));
+        setSubSearch("");
+    };
 
     const handleSaved = (updated) => {
         qc.setQueryData(["pedidos-globales"], (old = []) =>
@@ -206,6 +365,21 @@ export default function PedidosGlobalesCrud() {
         qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
         setDeleteTarget(null);
         if (expanded === id) setExpanded(null);
+    };
+
+    const handleDevuelto = (updatedPedido) => {
+        qc.setQueryData(["pedidos-globales"], (old = []) =>
+            old.map((g) => ({
+                ...g,
+                pedidos_automaticos: (g.pedidos_automaticos ?? []).map((p) =>
+                    p.id === updatedPedido.id ? updatedPedido : p
+                ),
+            }))
+        );
+        qc.invalidateQueries({ queryKey: ["inventario-dotacion-flat"] });
+        qc.invalidateQueries({ queryKey: ["inventario_dotacion"] });
+        qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+        setEditPedido(null);
     };
 
     const handleConfirmed = (updated) => {
@@ -268,8 +442,11 @@ export default function PedidosGlobalesCrud() {
                                 <th style={{ width: 32 }}></th>
                                 <th>Código</th>
                                 <th>Fecha</th>
+                                <th>Fecha de corte</th>
+                                <th>Fecha de entrega</th>
                                 <th style={{ textAlign: "center" }}>Pedidos</th>
                                 <th style={{ textAlign: "center" }}>Prendas</th>
+                                <th>Cronograma</th>
                                 <th>Notas</th>
                                 <th style={{ width: 80 }}></th>
                             </tr>
@@ -280,6 +457,14 @@ export default function PedidosGlobalesCrud() {
                                 const pedidos = (g.pedidos_automaticos ?? []).filter(p => p.codigo);
                                 const prendas = pedidos.reduce((s, p) =>
                                     s + (p.items ?? []).reduce((ss, it) => ss + it.cantidad, 0), 0);
+                                const qSub = subSearch.trim().toLowerCase();
+                                const pedidosVisibles = !qSub ? pedidos : pedidos.filter((p) => {
+                                    const nombre = `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.toLowerCase();
+                                    const cedula = String(p.empleado?.cedula ?? "").toLowerCase();
+                                    const codigo = String(p.codigo ?? "").toLowerCase();
+                                    return nombre.includes(qSub) || cedula.includes(qSub) || codigo.includes(qSub);
+                                });
+                                const cronInfo = getCronogramaInfo(g, pedidos, cronogramas);
 
                                 return (
                                     <React.Fragment key={g.id}>
@@ -295,7 +480,29 @@ export default function PedidosGlobalesCrud() {
                                                     #{g.codigo}
                                                 </span>
                                             </td>
-                                            <td>{dateOnly(g.fecha)}</td>
+                                            <td>{g.fecha ? fmtDateCron(parseDateLocal(g.fecha)) : "—"}</td>
+                                            <td style={{ fontSize: "0.84rem" }}>
+                                                {cronInfo.length === 0 ? (
+                                                    <span style={{ color: "var(--text-muted)" }}>—</span>
+                                                ) : (
+                                                    cronInfo.map(({ proyecto, cron, corte }) => (
+                                                        <div key={proyecto} title={proyecto}>
+                                                            {cron ? fmtDateCron(corte) : <span style={{ color: "var(--text-muted)" }}>—</span>}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </td>
+                                            <td style={{ fontSize: "0.84rem" }}>
+                                                {cronInfo.length === 0 ? (
+                                                    <span style={{ color: "var(--text-muted)" }}>—</span>
+                                                ) : (
+                                                    cronInfo.map(({ proyecto, cron, entrega }) => (
+                                                        <div key={proyecto} title={proyecto}>
+                                                            {cron ? fmtDateCron(entrega) : <span style={{ color: "var(--text-muted)" }}>—</span>}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </td>
                                             <td style={{ textAlign: "center" }}>
                                                 <span style={S.badge("#e0f7f4", "#0d6e5a")}>
                                                     {pedidos.length} pedido{pedidos.length !== 1 ? "s" : ""}
@@ -305,6 +512,35 @@ export default function PedidosGlobalesCrud() {
                                                 <span style={S.badge("#e8f0ff", "#1a4fa8")}>
                                                     {prendas} prenda{prendas !== 1 ? "s" : ""}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                {(() => {
+                                                    if (cronInfo.length === 0) {
+                                                        return <span style={{ color: "var(--text-muted)" }}>—</span>;
+                                                    }
+                                                    return (
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                                            {cronInfo.map(({ proyecto, cron, corte, entrega, matches }) => (
+                                                                <span
+                                                                    key={proyecto}
+                                                                    title={
+                                                                        cron
+                                                                            ? matches
+                                                                                ? `Generado a tiempo · Corte: ${fmtDateCron(corte)}`
+                                                                                : `Se generó después del corte (${fmtDateCron(corte)}) · Entrega: ${fmtDateCron(entrega)}`
+                                                                            : "Sin cronograma configurado para este proyecto"
+                                                                    }
+                                                                    style={S.badge(
+                                                                        !cron ? "#f1f5f9" : matches ? "#dcfce7" : "#fef3c7",
+                                                                        !cron ? "#475569" : matches ? "#0d6e5a" : "#92400e"
+                                                                    )}
+                                                                >
+                                                                    {proyecto} {!cron ? "· sin cronograma" : matches ? "✓" : "⚠ pasó el corte"}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td style={{ color: "var(--text-muted)", fontSize: "0.84rem" }}>
                                                 {g.notas ?? "—"}
@@ -349,11 +585,26 @@ export default function PedidosGlobalesCrud() {
 
                                         {isOpen && (
                                             <tr>
-                                                <td colSpan={7} style={{ padding: 0, background: "#f8fffe", borderBottom: "2px solid var(--primary)" }}>
+                                                <td colSpan={10} style={{ padding: 0, background: "#f8fffe", borderBottom: "2px solid var(--primary)" }}>
                                                     <div style={{ padding: "16px 28px 20px" }}>
-                                                        <p style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem", marginBottom: 12 }}>
-                                                            Pedidos incluidos en #{g.codigo}
-                                                        </p>
+                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                                                            <p style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.85rem", margin: 0 }}>
+                                                                Pedidos incluidos en #{g.codigo}
+                                                            </p>
+                                                            {pedidos.length > 1 && (
+                                                                <div style={{ position: "relative", width: 220 }} onClick={(e) => e.stopPropagation()}>
+                                                                    <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
+                                                                        <IconSearch size={13} />
+                                                                    </span>
+                                                                    <input
+                                                                        style={{ width: "100%", padding: "6px 10px 6px 28px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.8rem", fontFamily: "Nunito,sans-serif", outline: "none" }}
+                                                                        placeholder="Buscar nombre, cédula, # pedido…"
+                                                                        value={subSearch}
+                                                                        onChange={(e) => setSubSearch(e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
                                                             <thead>
                                                                 <tr style={{ borderBottom: "1.5px solid var(--border)" }}>
@@ -362,10 +613,21 @@ export default function PedidosGlobalesCrud() {
                                                                     <th style={S.thInner}>Cédula</th>
                                                                     <th style={{ ...S.thInner, textAlign: "center" }}>Items</th>
                                                                     <th style={S.thInner}>Prendas asignadas</th>
+                                                                    <th style={{ ...S.thInner, textAlign: "center" }}>Estado</th>
+                                                                    <th style={{ width: 40 }}></th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {pedidos.map((p) => (
+                                                                {pedidosVisibles.length === 0 && (
+                                                                    <tr>
+                                                                        <td colSpan={7} style={{ ...S.tdInner, textAlign: "center", color: "var(--text-muted)", padding: "14px 0" }}>
+                                                                            Sin resultados para "{subSearch}"
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+                                                                {pedidosVisibles.map((p) => {
+                                                                    const est = estadoDisplay(p, g.confirmado);
+                                                                    return (
                                                                     <tr key={p.id} style={{ borderBottom: "1px solid var(--border)" }}>
                                                                         <td style={S.tdInner}>
                                                                             <span style={{ fontFamily: "monospace", fontWeight: 700 }}>#{p.codigo}</span>
@@ -397,8 +659,23 @@ export default function PedidosGlobalesCrud() {
                                                                                 )}
                                                                             </div>
                                                                         </td>
+                                                                        <td style={{ ...S.tdInner, textAlign: "center" }}>
+                                                                            <span style={{ padding: "3px 10px", borderRadius: 20, fontWeight: 700, fontSize: "0.76rem", background: est.bg, color: est.color, whiteSpace: "nowrap" }}>
+                                                                                {est.label}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td style={{ ...S.tdInner, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                                                                            <button
+                                                                                style={{ ...S.actionBtn, width: 26, height: 26 }}
+                                                                                title="Ver / Devolver"
+                                                                                onClick={() => setEditPedido({ pedido: p, global: g })}
+                                                                            >
+                                                                                <IconEdit size={13} />
+                                                                            </button>
+                                                                        </td>
                                                                     </tr>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>
@@ -440,6 +717,7 @@ export default function PedidosGlobalesCrud() {
             {editTarget    && <EditModal    global={editTarget}    onClose={() => setEditTarget(null)}    onSaved={handleSaved}       />}
             {deleteTarget  && <DeleteModal  global={deleteTarget}  onClose={() => setDeleteTarget(null)}  onDeleted={handleDeleted}   />}
             {confirmTarget && <ConfirmModal global={confirmTarget} onClose={() => setConfirmTarget(null)} onConfirmed={handleConfirmed} />}
+            {editPedido    && <PedidoIncluidoModal pedido={editPedido.pedido} global={editPedido.global} onClose={() => setEditPedido(null)} onDevuelto={handleDevuelto} />}
         </div>
     );
 }

@@ -234,6 +234,7 @@ function InventarioItemSelect({
     disabled,
     generoEmpleado,
     tallasEmpleado,
+    proyecto,
 }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
@@ -246,6 +247,8 @@ function InventarioItemSelect({
     const filtered = useMemo(() => {
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
         let base = inventarioFlat.filter((i) => i.cantidad > 0);
+
+        if (proyecto) base = base.filter((i) => i.proyecto === proyecto);
 
         // Filtro talla: para cada ítem, buscar la talla que le corresponde según categoría
         if (tallasEmpleado) {
@@ -314,7 +317,11 @@ function InventarioItemSelect({
                 }}
             >
                 {filtered.length === 0 ? (
-                    <div style={S.dropdownEmpty}>Sin stock disponible</div>
+                    <div style={{ ...S.dropdownEmpty, padding: '14px 16px', lineHeight: 1.5 }}>
+                        {proyecto
+                            ? <>Sin dotación para <strong>{proyecto}</strong>. Agrega items en <em>Inventario de dotación</em>.</>
+                            : 'Sin stock disponible'}
+                    </div>
                 ) : (
                     filtered.map((i) => (
                         <div
@@ -455,10 +462,13 @@ function Modal({
         }
     }, [initial, open]);
 
-    const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+    const set = (k) => (v) =>
+        setForm((f) => ({
+            f,
+            [k]: v,
+        }));
     const setEv = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-    // ── Items ──
     const addItem = () =>
         setForm((f) => ({
             ...f,
@@ -568,6 +578,8 @@ function Modal({
         (c) => String(c.empleado_id) === String(form.empleado_id),
     );
 
+    const proyectoEmpleado = contratosFiltrados[0]?.cliente_proyecto ?? null;
+
     const generoEmpleado = useMemo(() => {
         const emp = empleados.find(
             (e) => String(e.id) === String(form.empleado_id),
@@ -622,7 +634,6 @@ function Modal({
                 style={{ ...S.modal, maxWidth: 860 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
                 <div style={S.modalHeader}>
                     <span style={S.modalTitle}>{title}</span>
                     <button style={S.closeBtn} onClick={onClose}>
@@ -630,7 +641,6 @@ function Modal({
                     </button>
                 </div>
 
-                {/* Tabs */}
                 <div style={S.tabBar}>
                     {[
                         ["info", "Información"],
@@ -1089,6 +1099,25 @@ function Modal({
 
                     {activeTab === "items" && (
                         <>
+                            {proyectoEmpleado && !readOnly && (() => {
+                                const hayStock = inventarioAjustado.some(
+                                    (i) => i.proyecto === proyectoEmpleado && i.cantidad > 0
+                                );
+                                return !hayStock ? (
+                                    <div style={{
+                                        padding: '14px 18px', background: '#fff8e0',
+                                        border: '1.5px solid #f9c74f', borderRadius: 8,
+                                        fontSize: '0.86rem', color: '#7a5c00', marginBottom: 14,
+                                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                                    }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        <div>
+                                            No hay dotación en inventario para <strong>{proyectoEmpleado}</strong>.
+                                            Ve a <strong>Inventario de dotación</strong> y agrega items para este proyecto antes de crear el pedido.
+                                        </div>
+                                    </div>
+                                ) : null;
+                            })()}
                             {form.estado === "Cancelado" && (
                                 <div style={S.alertaBanner}>
                                     El pedido está cancelado. Los items fueron
@@ -1209,6 +1238,7 @@ function Modal({
                                                     tallasEmpleado={
                                                         tallasEmpleado
                                                     }
+                                                    proyecto={proyectoEmpleado}
                                                 />
                                             )}
                                             <div
@@ -1887,7 +1917,15 @@ export default function PedidosAutomaticosCrud() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{dateOnly(p.fecha_pedido)}</td>
+                                        <td>
+                                            {p.fecha_pedido
+                                                ? fmtDateCron(
+                                                      parseDateLocal(
+                                                          p.fecha_pedido,
+                                                      ),
+                                                  )
+                                                : "—"}
+                                        </td>
                                         <td style={{ textAlign: "center" }}>
                                             <span
                                                 style={S.badge(

@@ -163,6 +163,26 @@ class PedidoAutomaticoController extends Controller
         ]);
     }
 
+    public function devolver(PedidoAutomatico $pedidoAutomatico)
+    {
+        if ($pedidoAutomatico->estado === 'Devolución') {
+            return response()->json(['message' => 'El pedido ya está en estado Devolución.'], 422);
+        }
+
+        if (!in_array($pedidoAutomatico->estado, ['Completado'])) {
+            return response()->json(['message' => 'Solo se pueden devolver pedidos en estado Completado.'], 422);
+        }
+
+        return DB::transaction(function () use ($pedidoAutomatico) {
+            $this->restaurarInventario($pedidoAutomatico);
+            $pedidoAutomatico->update(['estado' => 'Devolución']);
+
+            return response()->json(
+                $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
+            );
+        });
+    }
+
     public function destroy(PedidoAutomatico $pedidoAutomatico)
     {
         return DB::transaction(function () use ($pedidoAutomatico) {

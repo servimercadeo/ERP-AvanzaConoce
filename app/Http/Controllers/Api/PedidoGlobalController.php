@@ -14,6 +14,7 @@ class PedidoGlobalController extends Controller
     {
         $globales = PedidoGlobal::with([
             'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
         ])
         ->orderBy('id', 'desc')
@@ -36,6 +37,7 @@ class PedidoGlobalController extends Controller
 
         $fresh = collect([$pedidoGlobal->fresh()->load([
             'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
         ])]);
         $this->resolverFotografias($fresh);
