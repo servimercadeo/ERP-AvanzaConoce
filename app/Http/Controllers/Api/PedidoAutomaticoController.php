@@ -177,9 +177,16 @@ class PedidoAutomaticoController extends Controller
             $this->restaurarInventario($pedidoAutomatico);
             $pedidoAutomatico->update(['estado' => 'Devolución']);
 
-            return response()->json(
-                $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
-            );
+            $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario']);
+
+            $emp = $pedidoAutomatico->empleado;
+            if ($emp && !$emp->fotografia) {
+                $emp->fotografia = DB::table('candidatos')
+                    ->where('identificacion', $emp->cedula)
+                    ->value('fotografia');
+            }
+
+            return response()->json($pedidoAutomatico);
         });
     }
 

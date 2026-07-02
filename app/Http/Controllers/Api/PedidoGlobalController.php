@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CronogramaDotacion;
 use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
 use Illuminate\Http\Request;
@@ -28,10 +29,26 @@ class PedidoGlobalController extends Controller
     public function update(Request $request, PedidoGlobal $pedidoGlobal)
     {
         $data = $request->validate([
-            'fecha'       => 'nullable|date',
-            'notas'       => 'nullable|string',
-            'confirmado'  => 'nullable|boolean',
+            'fecha'              => 'nullable|date',
+            'notas'              => 'nullable|string',
+            'confirmado'         => 'nullable|boolean',
+            'entrega_confirmada' => 'nullable|boolean',
         ]);
+
+        if (($data['entrega_confirmada'] ?? false) && !$pedidoGlobal->entrega_confirmada) {
+            if (!$pedidoGlobal->confirmado && !($data['confirmado'] ?? false)) {
+                return response()->json([
+                    'message' => 'Primero debes confirmar el pedido antes de confirmar la entrega.',
+                ], 422);
+            }
+
+            $pendientes = $this->proyectosPendientesDeCorte($pedidoGlobal);
+            if (!empty($pendientes)) {
+                return response()->json([
+                    'message' => 'Aún no se puede confirmar la entrega: falta llegar a la fecha de corte para ' . implode(', ', $pendientes) . '.',
+                ], 422);
+            }
+        }
 
         $pedidoGlobal->update($data);
 
@@ -98,6 +115,47 @@ class PedidoGlobalController extends Controller
                 'total'  => $pedidos->count(),
             ], 201);
         });
+    }
+
+    // Proyectos incluidos en el pedido global cuya fecha de corte (mitad del ciclo
+    // de dotación, entrega - ciclo/2 meses) todavía no ha llegado. Proyectos sin
+    // cronograma activo configurado no restringen la confirmación.
+    private function proyectosPendientesDeCorte(PedidoGlobal $pedidoGlobal): array
+    {
+        $proyectos = $pedidoGlobal->pedidosAutomaticos()
+            ->whereNotNull('codigo')
+            ->with('contrato')
+            ->get()
+            ->pluck('contrato.cliente_proyecto')
+            ->filter()
+            ->unique();
+
+        if ($proyectos->isEmpty()) {
+            return [];
+        }
+
+        $hoy = now()->startOfDay();
+        $pendientes = [];
+
+        foreach ($proyectos as $nombre) {
+            $cron = CronogramaDotacion::where('activo', true)
+                ->whereHas('proyecto', fn ($q) => $q->where('nombre', $nombre))
+                ->first();
+
+            if (!$cron || !$cron->fecha_entrega) {
+                continue;
+            }
+
+            $ciclo  = (int) ($cron->ciclo_meses ?: 4);
+            $inicio = $cron->fecha_entrega->copy()->subMonths($ciclo);
+            $corte  = $inicio->copy()->addMonths(intdiv($ciclo, 2));
+
+            if ($hoy->lt($corte)) {
+                $pendientes[] = $nombre;
+            }
+        }
+
+        return $pendientes;
     }
 
     private function resolverFotografias($globales): void

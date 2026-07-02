@@ -38,11 +38,30 @@ function getCronogramaInfo(g, pedidos, cronogramas) {
     });
 }
 
+function todayMidnight() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+// La entrega solo se puede confirmar a partir de (o el mismo día de) la fecha de corte.
+// Proyectos sin cronograma configurado no restringen.
+function puedeConfirmarEntrega(cronInfo) {
+    return cronInfo.every(({ cron, corte }) => !cron || todayMidnight() >= corte);
+}
+
+function proximoCorte(cronInfo) {
+    const pendientes = cronInfo.filter(({ cron, corte }) => cron && todayMidnight() < corte);
+    if (pendientes.length === 0) return null;
+    return pendientes.reduce((min, c) => (c.corte < min ? c.corte : min), pendientes[0].corte);
+}
+
 // ── Helpers de estado para pedido incluido ─────────────────────────────────
-function estadoDisplay(pedido, globalConfirmado) {
-    if (pedido.estado === "Devolución") return { label: "Devolución",  bg: "#fce8e8", color: "#c0392b" };
-    if (globalConfirmado)               return { label: "Completado",  bg: "#dcfce7", color: "#0d6e5a" };
-    return                                     { label: "En proceso",  bg: "#e8f0ff", color: "#1a4fa8" };
+function estadoDisplay(pedido, g) {
+    if (pedido.estado === "Devolución") return { label: "Devolución",         bg: "#fce8e8", color: "#c0392b" };
+    if (g.entrega_confirmada)           return { label: "Completado",        bg: "#dcfce7", color: "#0d6e5a" };
+    if (g.confirmado)                   return { label: "Pedido confirmado", bg: "#e8f0ff", color: "#1a4fa8" };
+    return                                     { label: "En proceso",        bg: "#f1f5f9", color: "#475569" };
 }
 
 // ── Modal pedido incluido (ver / devolver) ─────────────────────────────────
@@ -51,8 +70,8 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
     const [error, setError]   = useState("");
     const [confirm, setConfirm] = useState(false);
 
-    const est = estadoDisplay(pedido, g.confirmado);
-    const puedeDevolver = pedido.estado === "Completado";
+    const est = estadoDisplay(pedido, g);
+    const puedeDevolver = pedido.estado === "Completado" && g.confirmado && !g.entrega_confirmada;
 
     const handleDevolver = async () => {
         setSaving(true);
@@ -120,6 +139,18 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                     {pedido.estado === "Devolución" && (
                         <div style={{ background: "#fce8e8", border: "1.5px solid #e57373", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#c0392b" }}>
                             Este pedido ya fue marcado como devolución y el inventario fue restaurado.
+                        </div>
+                    )}
+
+                    {pedido.estado === "Completado" && !g.confirmado && (
+                        <div style={{ background: "#f1f5f9", border: "1.5px solid #cbd5e1", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#475569" }}>
+                            La devolución se podrá marcar una vez se confirme el pedido global.
+                        </div>
+                    )}
+
+                    {pedido.estado === "Completado" && g.confirmado && g.entrega_confirmada && (
+                        <div style={{ background: "#f1f5f9", border: "1.5px solid #cbd5e1", borderRadius: 8, padding: "10px 14px", fontSize: "0.84rem", color: "#475569" }}>
+                            La entrega de este pedido global ya fue confirmada, no es posible marcar devoluciones.
                         </div>
                     )}
 
@@ -209,10 +240,14 @@ function EditModal({ global: g, onClose, onSaved }) {
     );
 }
 
-// ── Modal confirmar pedido global ──────────────────────────────────────────
-function ConfirmModal({ global: g, onClose, onConfirmed }) {
+// ── Modal confirmar pedido global (etapa 1) ─────────────────────────────────
+function ConfirmModal({ global: g, cronogramas, onClose, onConfirmed }) {
     const [saving, setSaving] = useState(false);
     const [error, setError]   = useState("");
+
+    const pedidos = (g.pedidos_automaticos ?? []).filter((p) => p.codigo);
+    const cronInfo = getCronogramaInfo(g, pedidos, cronogramas);
+    const vencidos = cronInfo.filter((c) => c.cron && c.matches === false);
 
     const handleConfirm = async () => {
         setSaving(true);
@@ -235,16 +270,77 @@ function ConfirmModal({ global: g, onClose, onConfirmed }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ marginBottom: 10 }}>
-                        ¿Confirmar la entrega del pedido global <strong style={{ fontFamily: "monospace" }}>#{g.codigo}</strong>?
+                        ¿Confirmar el pedido global <strong style={{ fontFamily: "monospace" }}>#{g.codigo}</strong>?
                     </p>
                     <div style={{ background: "#e0f7f4", border: "1.5px solid #0d6e5a", borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", color: "#0d6e5a" }}>
-                        El pedido quedará marcado como <strong>Confirmado</strong> y no podrá revertirse.
+                        Al confirmarlo se habilitará el paso para <strong>confirmar la entrega</strong> una vez el empleado la reciba (o registrar la devolución si no la recibió).
                     </div>
+                    {vencidos.length > 0 && (
+                        <div style={{ background: "#fef3c7", border: "1.5px solid #f9c74f", borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", color: "#92400e", marginTop: 10 }}>
+                            ⚠ Ya pasó la fecha de corte para: {vencidos.map((v) => v.proyecto).join(", ")}. El pedido debía confirmarse antes o el mismo día del corte.
+                        </div>
+                    )}
                     {error && <div style={{ ...S.errorMsg, marginTop: 10 }}>{error}</div>}
                 </div>
                 <div style={S.modalFooter}>
                     <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
                     <button style={{ ...S.btnPrimary, background: "#0d6e5a" }} onClick={handleConfirm} disabled={saving}>
+                        {saving ? "Confirmando…" : "Confirmar pedido"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Modal confirmar entrega (etapa 2) ───────────────────────────────────────
+function EntregaModal({ global: g, cronogramas, onClose, onConfirmed }) {
+    const [saving, setSaving] = useState(false);
+    const [error, setError]   = useState("");
+
+    const pedidos = (g.pedidos_automaticos ?? []).filter((p) => p.codigo);
+    const cronInfo = getCronogramaInfo(g, pedidos, cronogramas);
+    const habilitado = puedeConfirmarEntrega(cronInfo);
+    const corte = proximoCorte(cronInfo);
+
+    const handleConfirm = async () => {
+        if (!habilitado) return;
+        setSaving(true);
+        setError("");
+        try {
+            const { data } = await api.put(`/pedidos-globales/${g.id}`, { entrega_confirmada: true });
+            onConfirmed(data);
+        } catch (e) {
+            setError(e?.response?.data?.message ?? "Error al confirmar la entrega.");
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 420 }}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800, fontSize: "1rem", color: "#1a4fa8" }}>Confirmar Entrega</span>
+                    <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
+                </div>
+                <div style={S.modalBody}>
+                    <p style={{ marginBottom: 10 }}>
+                        ¿Confirmar la entrega del pedido global <strong style={{ fontFamily: "monospace" }}>#{g.codigo}</strong>?
+                    </p>
+                    {habilitado ? (
+                        <div style={{ background: "#e8f0ff", border: "1.5px solid #1a4fa8", borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", color: "#1a4fa8" }}>
+                            Si algún empleado no recibió su dotación, márcalo primero como <strong>Devolución</strong> antes de confirmar. Esta acción quedará como <strong>Completado</strong> y no podrá revertirse.
+                        </div>
+                    ) : (
+                        <div style={{ background: "#fef3c7", border: "1.5px solid #f9c74f", borderRadius: 8, padding: "10px 14px", fontSize: "0.85rem", color: "#92400e" }}>
+                            ⚠ Todavía no se puede confirmar la entrega: falta llegar a la fecha de corte{corte ? ` (${fmtDateCron(corte)})` : ""}. Antes del corte solo está disponible la confirmación del pedido.
+                        </div>
+                    )}
+                    {error && <div style={{ ...S.errorMsg, marginTop: 10 }}>{error}</div>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
+                    <button style={{ ...S.btnPrimary, background: "#1a4fa8" }} onClick={handleConfirm} disabled={saving || !habilitado}>
                         {saving ? "Confirmando…" : "Confirmar entrega"}
                     </button>
                 </div>
@@ -312,6 +408,7 @@ export default function PedidosGlobalesCrud() {
     const [editTarget, setEditTarget]       = useState(null);
     const [deleteTarget, setDeleteTarget]   = useState(null);
     const [confirmTarget, setConfirmTarget] = useState(null);
+    const [entregaTarget, setEntregaTarget] = useState(null);
     const [editPedido, setEditPedido]       = useState(null); // { pedido, global }
 
     const { data: globales = [], isLoading } = useQuery({
@@ -339,7 +436,8 @@ export default function PedidosGlobalesCrud() {
             const matchQ = !q || g.codigo.toLowerCase().includes(q) || String(g.fecha ?? "").includes(q);
             const matchE =
                 filtroEstado === "Todos" ||
-                (filtroEstado === "Confirmado" && g.confirmado) ||
+                (filtroEstado === "Completado" && g.entrega_confirmada) ||
+                (filtroEstado === "Pedido confirmado" && g.confirmado && !g.entrega_confirmada) ||
                 (filtroEstado === "En proceso" && !g.confirmado);
             return matchQ && matchE;
         });
@@ -389,6 +487,13 @@ export default function PedidosGlobalesCrud() {
         setConfirmTarget(null);
     };
 
+    const handleEntregaConfirmed = (updated) => {
+        qc.setQueryData(["pedidos-globales"], (old = []) =>
+            old.map((g) => (g.id === updated.id ? updated : g))
+        );
+        setEntregaTarget(null);
+    };
+
     return (
         <div style={{ width: "100%" }}>
             {/* Stats */}
@@ -425,7 +530,8 @@ export default function PedidosGlobalesCrud() {
                 >
                     <option value="Todos">Todos los estados</option>
                     <option value="En proceso">En proceso</option>
-                    <option value="Confirmado">Confirmado</option>
+                    <option value="Pedido confirmado">Pedido confirmado</option>
+                    <option value="Completado">Completado</option>
                 </select>
             </div>
 
@@ -557,7 +663,7 @@ export default function PedidosGlobalesCrud() {
                                                     {!g.confirmado && (
                                                         <button
                                                             style={{ ...S.actionBtn, color: "#0d6e5a" }}
-                                                            title="Confirmar entrega"
+                                                            title="Confirmar pedido"
                                                             onClick={() => setConfirmTarget(g)}
                                                         >
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -565,7 +671,30 @@ export default function PedidosGlobalesCrud() {
                                                             </svg>
                                                         </button>
                                                     )}
-                                                    {g.confirmado && (
+                                                    {g.confirmado && !g.entrega_confirmada && (() => {
+                                                        const habilitado = puedeConfirmarEntrega(cronInfo);
+                                                        const corte = proximoCorte(cronInfo);
+                                                        return (
+                                                            <button
+                                                                style={{
+                                                                    ...S.actionBtn,
+                                                                    color: habilitado ? "#1a4fa8" : "var(--text-muted)",
+                                                                    cursor: habilitado ? "pointer" : "not-allowed",
+                                                                    opacity: habilitado ? 1 : 0.5,
+                                                                }}
+                                                                title={habilitado ? "Confirmar entrega" : `Disponible desde la fecha de corte${corte ? ` (${fmtDateCron(corte)})` : ""}`}
+                                                                onClick={() => habilitado && setEntregaTarget(g)}
+                                                            >
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <rect x="2.5" y="8" width="12" height="8" rx="1" />
+                                                                    <path d="M14.5 11h3l3 3v2h-6" />
+                                                                    <circle cx="6.5" cy="18.5" r="1.4" />
+                                                                    <circle cx="17" cy="18.5" r="1.4" />
+                                                                </svg>
+                                                            </button>
+                                                        );
+                                                    })()}
+                                                    {g.entrega_confirmada && (
                                                         <span title="Entrega confirmada" style={{ display: "flex", alignItems: "center", color: "#0d6e5a", padding: "0 4px" }}>
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                                                 <polyline points="20 6 9 17 4 12" />
@@ -626,7 +755,7 @@ export default function PedidosGlobalesCrud() {
                                                                     </tr>
                                                                 )}
                                                                 {pedidosVisibles.map((p) => {
-                                                                    const est = estadoDisplay(p, g.confirmado);
+                                                                    const est = estadoDisplay(p, g);
                                                                     return (
                                                                     <tr key={p.id} style={{ borderBottom: "1px solid var(--border)" }}>
                                                                         <td style={S.tdInner}>
@@ -716,7 +845,8 @@ export default function PedidosGlobalesCrud() {
             {/* Modales */}
             {editTarget    && <EditModal    global={editTarget}    onClose={() => setEditTarget(null)}    onSaved={handleSaved}       />}
             {deleteTarget  && <DeleteModal  global={deleteTarget}  onClose={() => setDeleteTarget(null)}  onDeleted={handleDeleted}   />}
-            {confirmTarget && <ConfirmModal global={confirmTarget} onClose={() => setConfirmTarget(null)} onConfirmed={handleConfirmed} />}
+            {confirmTarget && <ConfirmModal global={confirmTarget} cronogramas={cronogramas} onClose={() => setConfirmTarget(null)} onConfirmed={handleConfirmed} />}
+            {entregaTarget && <EntregaModal global={entregaTarget} cronogramas={cronogramas} onClose={() => setEntregaTarget(null)} onConfirmed={handleEntregaConfirmed} />}
             {editPedido    && <PedidoIncluidoModal pedido={editPedido.pedido} global={editPedido.global} onClose={() => setEditPedido(null)} onDevuelto={handleDevuelto} />}
         </div>
     );
