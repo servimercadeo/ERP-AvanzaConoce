@@ -12,6 +12,7 @@ import CandidatosCrud from './CandidatosCrud';
 import BaseIngresoCrud from './BaseIngresoCrud';
 import AvalesContratacionCrud from './AvalesContratacionCrud';
 import RespuestasFormularioCrud from './RespuestasFormularioCrud';
+import SeguimientoMedicoCrud from './SeguimientoMedicoCrud';
 import ProductosDotacion from './ProductosDotacion';
 import PedidosAutomaticosCrud from './PedidosAutomaticosCrud';
 import PedidosGlobalesCrud from './PedidosGlobalesCrud';
@@ -50,6 +51,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'ver_crear_contratos': return ContratosCrud;
             case 'avales_contratacion': return AvalesContratacionCrud;
             case 'respuestas_formulario': return RespuestasFormularioCrud;
+            case 'Seguros_medicos': return SeguimientoMedicoCrud;
             default: return null;
           }
         default: return null;
