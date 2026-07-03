@@ -37,6 +37,8 @@ class Contrato extends Model
         'empresa',
         'cliente_proyecto',
         'origen_seguimiento',
+        'seguimiento_fecha_cierre',
+        'seguimiento_observaciones',
     ];
 
     protected $casts = [
@@ -47,7 +49,9 @@ class Contrato extends Model
         'fecha_vinculacion_caja' => 'date',
         'salario' => 'decimal:2',
         'auxilio_transporte_legal' => 'decimal:2',
-        'completado' => 'boolean',
+        'completado'                  => 'boolean',
+        'seguimiento_fecha_cierre'    => 'date',
+        'seguimiento_observaciones'   => 'array',
     ];
 
     public function empleado()
@@ -63,5 +67,10 @@ class Contrato extends Model
     public function anexos()
     {
         return $this->hasMany(ContratoAnexo::class, 'contrato_id');
+    }
+
+    public function eventosMedicos()
+    {
+        return $this->hasMany(ContratoEventoMedico::class, 'contrato_id');
     }
 }

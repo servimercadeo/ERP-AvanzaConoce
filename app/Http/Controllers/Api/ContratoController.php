@@ -73,7 +73,7 @@ class ContratoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos']);
+        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']);
 
         // Anulados solo se muestran cuando se filtra explícitamente por ese estado
         if ($request->estado === 'Contrato anulado') {
@@ -201,8 +201,11 @@ class ContratoController extends Controller
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'          => 'nullable|array',
-            'anexos'                  => 'nullable|array',
+            'centros_costos'               => 'nullable|array',
+            'anexos'                       => 'nullable|array',
+            'eventos_medicos'              => 'nullable|array',
+            'seguimiento_fecha_cierre'     => 'nullable|date',
+            'seguimiento_observaciones'    => 'nullable|array',
         ]);
 
         $contrato = DB::transaction(function() use ($data) {
@@ -219,6 +222,12 @@ class ContratoController extends Controller
             if (!empty($data['anexos'])) {
                 foreach ($data['anexos'] as $anexo) {
                     $contrato->anexos()->create($anexo);
+                }
+            }
+
+            if (!empty($data['eventos_medicos'])) {
+                foreach ($data['eventos_medicos'] as $ev) {
+                    $contrato->eventosMedicos()->create($ev);
                 }
             }
 
@@ -244,12 +253,12 @@ class ContratoController extends Controller
             ]);
         }
 
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']), 201);
     }
 
     public function show(Contrato $contrato)
     {
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']));
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']));
     }
 
     public function update(Request $request, Contrato $contrato)
@@ -279,8 +288,11 @@ class ContratoController extends Controller
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'          => 'nullable|array',
-            'anexos'                  => 'nullable|array',
+            'centros_costos'               => 'nullable|array',
+            'anexos'                       => 'nullable|array',
+            'eventos_medicos'              => 'nullable|array',
+            'seguimiento_fecha_cierre'     => 'nullable|date',
+            'seguimiento_observaciones'    => 'nullable|array',
         ]);
 
         $result = DB::transaction(function() use ($contrato, $data) {
@@ -304,7 +316,15 @@ class ContratoController extends Controller
                 }
             }
 
-            return $contrato->load(['empleado', 'centrosCostos', 'anexos']);
+            // Sincronizar eventos médicos
+            $contrato->eventosMedicos()->delete();
+            if (!empty($data['eventos_medicos'])) {
+                foreach ($data['eventos_medicos'] as $ev) {
+                    $contrato->eventosMedicos()->create($ev);
+                }
+            }
+
+            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']);
         });
 
         // Sync campos del contrato al empleado
