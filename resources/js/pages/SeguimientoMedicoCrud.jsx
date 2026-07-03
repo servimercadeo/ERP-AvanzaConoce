@@ -321,6 +321,7 @@ export default function SeguimientoMedicoCrud() {
     const filtered = useMemo(() => {
         const q = norm(debSearch);
         return contratos.filter(c => {
+            if ((c.eventos_medicos ?? []).length === 0) return false;
             if (!q) return true;
             return [
                 c.empleado?.cedula,
@@ -335,11 +336,14 @@ export default function SeguimientoMedicoCrud() {
     const paginated    = filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
 
     /* ── Stats ── */
-    const stats = useMemo(() => ({
-        total:     contratos.length,
-        conEventos: contratos.filter(c => (c.eventos_medicos ?? []).length > 0).length,
-        conCierre:  contratos.filter(c => c.seguimiento_fecha_cierre).length,
-    }), [contratos]);
+    const stats = useMemo(() => {
+        const conEventos = contratos.filter(c => (c.eventos_medicos ?? []).length > 0);
+        return {
+            total:      conEventos.length,
+            conEventos: conEventos.length,
+            conCierre:  conEventos.filter(c => c.seguimiento_fecha_cierre).length,
+        };
+    }, [contratos]);
 
     /* ── Guardar ── */
     const handleSave = async (id, payload) => {
