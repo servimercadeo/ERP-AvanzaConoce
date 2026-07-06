@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect as FilterSelect,
@@ -30,7 +30,6 @@ const TIPOS_CONTRATO = [
 ];
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
-const TODAY = new Date().toISOString().split("T")[0];
 
 const EMPTY_FORM = {
     empleado_id: "",
@@ -56,11 +55,10 @@ const EMPTY_FORM = {
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
+    regional_id: "",
     origen_seguimiento: "",
     centros_costos: [],
     anexos: [],
-    seguimiento_fecha_cierre: "",
-    seguimiento_observaciones: {},
 };
 
 function Field({
@@ -396,7 +394,21 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                     >
                         {selected.nombres.charAt(0).toUpperCase()}
                         {selected.fotografia && (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            <img
+                                src={`/storage/${selected.fotografia}`}
+                                alt=""
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                }}
+                            />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -525,7 +537,22 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                                         >
                                             {c.nombres.charAt(0).toUpperCase()}
                                             {c.fotografia && (
-                                                <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                <img
+                                                    src={`/storage/${c.fotografia}`}
+                                                    alt=""
+                                                    style={{
+                                                        position: "absolute",
+                                                        inset: 0,
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        objectFit: "cover",
+                                                        borderRadius: "50%",
+                                                    }}
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display =
+                                                            "none";
+                                                    }}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -573,10 +600,12 @@ function Modal({
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
-    const [eventosMedicos, setEventosMedicos] = useState([]);
-    const [eventosCollapsed, setEventosCollapsed] = useState([]);
     const [saving, setSaving] = useState(false);
     const isCreate = !initial?.id && !readOnly;
+    const regionalOpts = (catalogs.regionales || []).map((r) => ({
+        value: r.id,
+        label: r.nombre,
+    }));
 
     useEffect(() => {
         if (open) {
@@ -591,20 +620,10 @@ function Modal({
                 ),
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
-                seguimiento_fecha_cierre: dateOnly(initial.seguimiento_fecha_cierre),
-                seguimiento_observaciones: initial.seguimiento_observaciones || {},
             });
             setErrors({});
             setActive("principal");
             setSaving(false);
-            const _evs = (initial.eventos_medicos || []).map((ev) => ({
-                ...ev,
-                fecha_ingreso_seguimiento: dateOnly(ev.fecha_ingreso_seguimiento),
-                vigencia_desde:            dateOnly(ev.vigencia_desde),
-                vigencia_hasta:            dateOnly(ev.vigencia_hasta),
-            }));
-            setEventosMedicos(_evs);
-            setEventosCollapsed(_evs.map((_, __, arr) => arr.length > 1));
         }
     }, [initial, open]);
 
@@ -696,22 +715,6 @@ function Modal({
             anexos: f.anexos.map((a, i) => (i === idx ? { ...a, [k]: v } : a)),
         }));
 
-    const EVENTO_VACIO = {
-        fecha_ingreso_seguimiento: "",
-        tipo_evento: "",
-        origen_diagnostico: "",
-        diagnostico: "",
-        recomendaciones: "",
-        vigencia_desde: "",
-        vigencia_hasta: "",
-        condicion: "",
-        estado: "",
-    };
-    const addEvento    = () => { setEventosMedicos(ev => [...ev, { ...EVENTO_VACIO }]); setEventosCollapsed(c => [...c, false]); };
-    const removeEvento = (idx) => { setEventosMedicos(ev => ev.filter((_, i) => i !== idx)); setEventosCollapsed(c => c.filter((_, i) => i !== idx)); };
-    const updateEvento = (idx, k, v) => setEventosMedicos((ev) => ev.map((e, i) => (i === idx ? { ...e, [k]: v } : e)));
-    const toggleEvento = (idx) => setEventosCollapsed(c => c.map((v, i) => i === idx ? !v : v));
-
     const validate = () => {
         const e = {};
         if (!form.empleado_id && !form.documento) e.empleado_id = "Requerido";
@@ -731,7 +734,7 @@ function Modal({
         }
         setSaving(true);
         try {
-            await onSave({ ...form, eventos_medicos: eventosMedicos });
+            await onSave(form);
         } catch {
             // parent handles error toast
         } finally {
@@ -800,7 +803,6 @@ function Modal({
                         ["principal", "Información Principal"],
                         ["seguridad", "Seguridad Social"],
                         ["costos", "Costos y Anexos"],
-                        ["Seguimiento_medico","Seguimiento medico" ]
                     ].map(([key, lbl]) => (
                         <button
                             key={key}
@@ -944,9 +946,23 @@ function Modal({
                                 <Field
                                     label="Cliente / Proyecto"
                                     k="cliente_proyecto"
-                                    opts={proyectoOpts.length ? proyectoOpts : undefined}
+                                    opts={
+                                        proyectoOpts.length
+                                            ? proyectoOpts
+                                            : undefined
+                                    }
                                     {...fp}
                                 />
+                            </div>
+                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                                <Field
+                                    label="Regional"
+                                    k="regional_id"
+                                    opts={regionalOpts}
+                                    {...fp}
+                                />
+                                <div />
+                                <div />
                             </div>
                         </>
                     )}
@@ -1012,229 +1028,6 @@ function Modal({
                             </div>
                         </>
                     )}
-
-                    {activeTab === "Seguimiento_medico" && (() => {
-                        const emp = empleados.find(
-                            (e) => String(e.id) === String(form.empleado_id),
-                        );
-                        const cedula = emp?.cedula ?? form.documento ?? "";
-                        const nombre = emp
-                            ? `${emp.nombres ?? ""} ${emp.apellidos ?? ""}`.trim()
-                            : "";
-                        return (
-                            <>
-                                <div style={S.sectionHeader}>INFORMACIÓN DEL EMPLEADO</div>
-                                <div style={{ ...S.grid3, marginTop: 16 }}>
-                                    <Field
-                                        label="Cédula"
-                                        k="_cedula_display"
-                                        form={{ _cedula_display: cedula }}
-                                        errors={{}}
-                                        onChange={() => () => {}}
-                                        disabled
-                                    />
-                                    <Field
-                                        label="Nombre Completo"
-                                        k="_nombre_display"
-                                        form={{ _nombre_display: nombre }}
-                                        errors={{}}
-                                        onChange={() => () => {}}
-                                        disabled
-                                    />
-                                    <Field
-                                        label="Empleador"
-                                        k="empleador"
-                                        {...fp}
-                                    />
-                                </div>
-                                <div style={{ ...S.grid3, marginTop: 16 }}>
-                                    <Field
-                                        label="Proyecto"
-                                        k="cliente_proyecto"
-                                        opts={proyectoOpts.length ? proyectoOpts : undefined}
-                                        {...fp}
-                                    />
-                                    <Field
-                                        label="Fecha de Ingreso"
-                                        k="fecha_ingreso"
-                                        type="date"
-                                        req
-                                        {...fp}
-                                    />
-                                    <Field
-                                        label="Ciudad / Sede"
-                                        k="sede"
-                                        opts={catalogs.sedes}
-                                        req
-                                        {...fp}
-                                    />
-                                </div>
-                                <div style={{ ...S.grid3, marginTop: 16 }}>
-                                    <Field
-                                        label="Cargo"
-                                        k="cargo"
-                                        opts={catalogs.cargos}
-                                        req
-                                        {...fp}
-                                    />
-                                    <Field
-                                        label="EPS"
-                                        k="lps_afiliado"
-                                        {...fp}
-                                    />
-                                    <Field
-                                        label="ARL"
-                                        k="arl"
-                                        opts={catalogs.arls}
-                                        {...fp}
-                                    />
-                                </div>
-
-                                {/* ── División 2: Eventos de seguimiento médico ── */}
-                                <div style={{ ...S.sectionHeader, marginTop: 32 }}>
-                                    EVENTOS DE SEGUIMIENTO MÉDICO
-                                </div>
-                                {eventosMedicos.length === 0 && (
-                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontStyle: "italic", marginTop: 12 }}>
-                                        Sin eventos registrados. Haz clic en "+ Agregar evento" para añadir uno.
-                                    </p>
-                                )}
-
-                                {eventosMedicos.map((ev, i) => {
-                                    const collapsed = !!eventosCollapsed[i];
-                                    const evFp = {
-                                        form: ev,
-                                        errors: {},
-                                        onChange: (k) => (e) => updateEvento(i, k, e.target.value),
-                                        disabled: readOnly,
-                                    };
-                                    const vigBadge = (() => {
-                                        const { vigencia_desde, vigencia_hasta } = ev;
-                                        const cierre = form.seguimiento_fecha_cierre;
-                                        if (cierre && TODAY > cierre) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
-                                        if (!vigencia_desde && !vigencia_hasta) return null;
-                                        if (vigencia_hasta && TODAY > vigencia_hasta) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
-                                        if (vigencia_desde && TODAY >= vigencia_desde) return { label: "Activa", bg: "#e0f7f4", color: "#0d6e5a" };
-                                        return { label: "Pendiente", bg: "#fff3e0", color: "#e67e22" };
-                                    })();
-                                    return (
-                                        <div key={i} style={{ border: `1.5px solid ${vigBadge?.label === "Activa" ? "rgba(13,110,90,0.35)" : "var(--border)"}`, borderRadius: "var(--radius-sm)", padding: "12px 18px", marginTop: 16, background: "var(--bg)" }}>
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : 14 }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                                                    <button
-                                                        onClick={() => toggleEvento(i)}
-                                                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "0.85rem", padding: "2px 4px", display: "flex", alignItems: "center", flexShrink: 0 }}
-                                                        title={collapsed ? "Expandir" : "Colapsar"}
-                                                    >
-                                                        {collapsed ? "▶" : "▼"}
-                                                    </button>
-                                                    <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--primary)", letterSpacing: "0.06em", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
-                                                        EVENTO #{i + 1}
-                                                    </span>
-                                                    {(ev.tipo_evento || ev.fecha_ingreso_seguimiento) && (
-                                                        <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                            {[ev.tipo_evento, ev.fecha_ingreso_seguimiento].filter(Boolean).join(" · ")}
-                                                        </span>
-                                                    )}
-                                                    {vigBadge && (
-                                                        <span style={{ background: vigBadge.bg, color: vigBadge.color, borderRadius: 20, padding: "2px 9px", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 }}>
-                                                            {vigBadge.label}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {!readOnly && (
-                                                    <button
-                                                        onClick={() => removeEvento(i)}
-                                                        style={{ background: "#fce8e8", border: "none", borderRadius: 4, color: "#a33", cursor: "pointer", padding: "4px 9px", fontSize: "0.78rem", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}
-                                                    >
-                                                        ✕ Eliminar
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {!collapsed && (
-                                                <>
-                                                    <div style={S.grid3}>
-                                                        <Field label="Fecha de Ingreso a Seguimiento" k="fecha_ingreso_seguimiento" type="date" {...evFp} />
-                                                        <Field label="Tipo de Evento"         k="tipo_evento"         {...evFp} />
-                                                        <Field label="Origen del Diagnóstico" k="origen_diagnostico"  {...evFp} />
-                                                    </div>
-                                                    <div style={{ ...S.grid2, marginTop: 14 }}>
-                                                        <Field label="Diagnóstico" k="diagnostico" type="textarea" {...evFp} />
-                                                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                                            <Field label="Recomendaciones y/o Restricciones Médico Laborales" k="recomendaciones" type="textarea" {...evFp} />
-                                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                                                <Field label="Vigencia Desde" k="vigencia_desde" type="date" {...evFp} />
-                                                                <Field label="Vigencia Hasta" k="vigencia_hasta" type="date" {...evFp} />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ ...S.grid2, marginTop: 14 }}>
-                                                        <Field label="Condición" k="condicion" {...evFp} />
-                                                        <Field label="Estado"    k="estado"    {...evFp} />
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-
-                                {!readOnly && (
-                                    <button
-                                        style={{ ...S.btnSecondary, marginTop: 14, padding: "7px 16px", fontSize: "0.82rem" }}
-                                        onClick={addEvento}
-                                    >
-                                        + Agregar evento
-                                    </button>
-                                )}
-
-                                {/* ── División 3: Fecha de cierre + observaciones mensuales ── */}
-                                <div style={{ ...S.sectionHeader, marginTop: 32 }}>
-                                    FECHA DE CIERRE Y OBSERVACIONES MENSUALES
-                                </div>
-                                <div style={{ ...S.grid3, marginTop: 16 }}>
-                                    <Field
-                                        label="Fecha de Cierre"
-                                        k="seguimiento_fecha_cierre"
-                                        type="date"
-                                        form={form}
-                                        errors={errors}
-                                        onChange={onChange}
-                                        disabled={readOnly}
-                                    />
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 20 }}>
-                                    {[
-                                        ["ene", "Enero"],   ["feb", "Febrero"],  ["mar", "Marzo"],
-                                        ["abr", "Abril"],   ["may", "Mayo"],     ["jun", "Junio"],
-                                        ["jul", "Julio"],   ["ago", "Agosto"],   ["sep", "Septiembre"],
-                                        ["oct", "Octubre"], ["nov", "Noviembre"],["dic", "Diciembre"],
-                                    ].map(([key, label]) => (
-                                        <div key={key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                            <label style={{ ...S.label, color: "var(--primary)", fontWeight: 800, fontSize: "0.72rem", letterSpacing: "0.05em" }}>
-                                                {label.toUpperCase()}
-                                            </label>
-                                            <textarea
-                                                rows={3}
-                                                disabled={readOnly}
-                                                value={form.seguimiento_observaciones?.[key] ?? ""}
-                                                onChange={(e) =>
-                                                    setForm((f) => ({
-                                                        ...f,
-                                                        seguimiento_observaciones: {
-                                                            ...(f.seguimiento_observaciones || {}),
-                                                            [key]: e.target.value,
-                                                        },
-                                                    }))
-                                                }
-                                                placeholder={`Observaciones ${label}…`}
-                                                style={{ ...S.input, minHeight: 72, resize: readOnly ? "none" : "vertical", fontSize: "0.82rem" }}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        );
-                    })()}
 
                     {activeTab === "costos" && (
                         <>
@@ -1468,7 +1261,6 @@ function Modal({
 }
 
 export default function ContratosCrud() {
-    const qc = useQueryClient();
     const [contratos, setContratos] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1491,6 +1283,7 @@ export default function ContratosCrud() {
         cajas: [],
         bancos: [],
         tipos_vinculacion: [],
+        regionales: [],
     });
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
@@ -1672,15 +1465,10 @@ export default function ContratosCrud() {
                 setContratos((prev) =>
                     prev.map((c) => (c.id === editTarget.id ? data : c)),
                 );
-                // Sincroniza cache de seguimiento médico con el dato actualizado
-                qc.setQueryData(["contratos-seguimiento"], (old = []) =>
-                    old.map(c => c.id === editTarget.id ? data : c)
-                );
                 showToast("Contrato actualizado.");
             } else {
                 const { data } = await api.post("/contratos", form);
                 setContratos((prev) => [data, ...prev]);
-                qc.invalidateQueries({ queryKey: ["contratos-seguimiento"] });
                 showToast("Contrato creado.");
             }
             setModalOpen(false);
@@ -1864,10 +1652,34 @@ export default function ContratosCrud() {
                                 <tr key={c.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={{ ...S.avatar, overflow: "hidden", position: "relative" }}>
-                                                {(c.empleado?.nombres || "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    ...S.avatar,
+                                                    overflow: "hidden",
+                                                    position: "relative",
+                                                }}
+                                            >
+                                                {(c.empleado?.nombres || "?")
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                                 {c.empleado?.fotografia && (
-                                                    <img src={`/storage/${c.empleado.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                    <img
+                                                        src={`/storage/${c.empleado.fotografia}`}
+                                                        alt=""
+                                                        style={{
+                                                            position:
+                                                                "absolute",
+                                                            inset: 0,
+                                                            width: "100%",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            borderRadius: "50%",
+                                                        }}
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display =
+                                                                "none";
+                                                        }}
+                                                    />
                                                 )}
                                             </div>
                                             <span style={{ fontWeight: 700 }}>
@@ -2234,7 +2046,6 @@ export default function ContratosCrud() {
                 proyectoOpts={proyectoOpts}
                 readOnly
             />
-
         </div>
     );
 }

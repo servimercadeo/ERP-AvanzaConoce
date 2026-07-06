@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\CronogramaDotacion;
 use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
 use Illuminate\Http\Request;
@@ -14,6 +13,7 @@ class PedidoGlobalController extends Controller
     public function index()
     {
         $globales = PedidoGlobal::with([
+            'regional',
             'pedidosAutomaticos.empleado',
             'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
@@ -41,18 +41,12 @@ class PedidoGlobalController extends Controller
                     'message' => 'Primero debes confirmar el pedido antes de confirmar la entrega.',
                 ], 422);
             }
-
-            $pendientes = $this->proyectosPendientesDeCorte($pedidoGlobal);
-            if (!empty($pendientes)) {
-                return response()->json([
-                    'message' => 'Aún no se puede confirmar la entrega: falta llegar a la fecha de corte para ' . implode(', ', $pendientes) . '.',
-                ], 422);
-            }
         }
 
         $pedidoGlobal->update($data);
 
         $fresh = collect([$pedidoGlobal->fresh()->load([
+            'regional',
             'pedidosAutomaticos.empleado',
             'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
@@ -81,27 +75,35 @@ class PedidoGlobalController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'notas' => 'nullable|string',
+            'notas'       => 'nullable|string',
+            'proyecto'    => 'required|string',
+            'regional_id' => 'required|exists:regionales,id',
         ]);
 
         return DB::transaction(function () use ($data) {
             $pedidos = PedidoAutomatico::where('estado', 'Activo')
                 ->whereNull('pedido_global_id')
                 ->whereNotNull('codigo')
+                ->whereHas('contrato', function ($q) use ($data) {
+                    $q->where('cliente_proyecto', $data['proyecto'])
+                      ->where('regional_id', $data['regional_id']);
+                })
                 ->lockForUpdate()
                 ->get();
 
             if ($pedidos->isEmpty()) {
                 return response()->json([
-                    'message' => 'No hay pedidos en proceso para generar un pedido global.',
+                    'message' => 'No hay pedidos en proceso para el proyecto y la regional seleccionados.',
                 ], 422);
             }
 
             $global = PedidoGlobal::create([
-                'codigo'        => PedidoGlobal::generarCodigo(),
-                'fecha'         => now()->toDateString(),
-                'total_pedidos' => $pedidos->count(),
-                'notas'         => $data['notas'] ?? null,
+                'codigo'           => PedidoGlobal::generarCodigo(),
+                'fecha'            => now()->toDateString(),
+                'total_pedidos'    => $pedidos->count(),
+                'notas'            => $data['notas'] ?? null,
+                'cliente_proyecto' => $data['proyecto'],
+                'regional_id'      => $data['regional_id'],
             ]);
 
             PedidoAutomatico::whereIn('id', $pedidos->pluck('id'))
@@ -115,47 +117,6 @@ class PedidoGlobalController extends Controller
                 'total'  => $pedidos->count(),
             ], 201);
         });
-    }
-
-    // Proyectos incluidos en el pedido global cuya fecha de corte (mitad del ciclo
-    // de dotación, entrega - ciclo/2 meses) todavía no ha llegado. Proyectos sin
-    // cronograma activo configurado no restringen la confirmación.
-    private function proyectosPendientesDeCorte(PedidoGlobal $pedidoGlobal): array
-    {
-        $proyectos = $pedidoGlobal->pedidosAutomaticos()
-            ->whereNotNull('codigo')
-            ->with('contrato')
-            ->get()
-            ->pluck('contrato.cliente_proyecto')
-            ->filter()
-            ->unique();
-
-        if ($proyectos->isEmpty()) {
-            return [];
-        }
-
-        $hoy = now()->startOfDay();
-        $pendientes = [];
-
-        foreach ($proyectos as $nombre) {
-            $cron = CronogramaDotacion::where('activo', true)
-                ->whereHas('proyecto', fn ($q) => $q->where('nombre', $nombre))
-                ->first();
-
-            if (!$cron || !$cron->fecha_entrega) {
-                continue;
-            }
-
-            $ciclo  = (int) ($cron->ciclo_meses ?: 4);
-            $inicio = $cron->fecha_entrega->copy()->subMonths($ciclo);
-            $corte  = $inicio->copy()->addMonths(intdiv($ciclo, 2));
-
-            if ($hoy->lt($corte)) {
-                $pendientes[] = $nombre;
-            }
-        }
-
-        return $pendientes;
     }
 
     private function resolverFotografias($globales): void

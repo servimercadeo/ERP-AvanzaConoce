@@ -9,13 +9,18 @@ class PedidoGlobal extends Model
 {
     protected $table = 'pedidos_globales';
 
-    protected $fillable = ['codigo', 'fecha', 'total_pedidos', 'notas', 'confirmado', 'entrega_confirmada'];
+    protected $fillable = ['codigo', 'fecha', 'total_pedidos', 'notas', 'confirmado', 'entrega_confirmada', 'cliente_proyecto', 'regional_id'];
 
     protected $casts = ['fecha' => 'date', 'confirmado' => 'boolean', 'entrega_confirmada' => 'boolean'];
 
     public function pedidosAutomaticos()
     {
         return $this->hasMany(PedidoAutomatico::class);
+    }
+
+    public function regional()
+    {
+        return $this->belongsTo(Regional::class);
     }
 
     public static function generarCodigo(): string

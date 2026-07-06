@@ -12,7 +12,6 @@ import {
     IconEmptySearch,
     IconLoading,
     IconLayers,
-    IconLock,
     IconCalendar,
     IconWarning,
 } from "../components/Icons";
@@ -803,8 +802,7 @@ function Modal({
                                                     color: "#92400e",
                                                 }}
                                             >
-                                                Superó punto de corte — solo
-                                                lectura
+                                                Superó punto de corte
                                             </span>
                                         )}
                                     </div>
@@ -1382,6 +1380,7 @@ export default function PedidosAutomaticosCrud() {
     const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
     const [filtroProyecto, setFiltroProyecto] = useState("Todos");
+    const [filtroRegional, setFiltroRegional] = useState("Todos");
     const [pagina, setPagina] = useState(1);
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
@@ -1417,7 +1416,7 @@ export default function PedidosAutomaticosCrud() {
 
     useEffect(() => {
         setPagina(1);
-    }, [debouncedSearch, filtroEstado, filtroProyecto]);
+    }, [debouncedSearch, filtroEstado, filtroProyecto, filtroRegional]);
 
     useEffect(() => {
         const anyOpen = modalOpen || viewOpen || !!confirmDelete || globalModal;
@@ -1453,24 +1452,28 @@ export default function PedidosAutomaticosCrud() {
         return Array.from(set).sort();
     }, [pedidos, contratoProyectoMap]);
 
-    const proyectosLocked = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const locked = new Set();
-        cronogramas.forEach((c) => {
-            if (!c.proyecto?.nombre || !c.fecha_entrega) return;
-            const n = Number(c.ciclo_meses) || 4;
-            const entrega = new Date(
-                String(c.fecha_entrega).split("T")[0] + "T00:00:00",
-            );
-            const inicio = new Date(entrega);
-            inicio.setMonth(inicio.getMonth() - n);
-            const corte = new Date(inicio);
-            corte.setMonth(corte.getMonth() + Math.floor(n / 2));
-            if (today >= corte) locked.add(c.proyecto.nombre);
+    const contratoRegionalMap = useMemo(() => {
+        const m = {};
+        contratos.forEach((c) => {
+            m[String(c.id)] = c.regional
+                ? { id: c.regional.id, nombre: c.regional.nombre }
+                : null;
         });
-        return locked;
-    }, [cronogramas]);
+        return m;
+    }, [contratos]);
+
+    const regionalesUsados = useMemo(() => {
+        const map = new Map();
+        pedidos.forEach((p) => {
+            const rg = p.contrato_id
+                ? contratoRegionalMap[String(p.contrato_id)]
+                : null;
+            if (rg) map.set(rg.id, rg.nombre);
+        });
+        return Array.from(map.entries())
+            .map(([id, nombre]) => ({ id, nombre }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }, [pedidos, contratoRegionalMap]);
 
     const filtered = useMemo(
         () =>
@@ -1490,14 +1493,22 @@ export default function PedidosAutomaticosCrud() {
                 const matchP =
                     filtroProyecto === "Todos" ||
                     proyectoPedido === filtroProyecto;
-                return matchQ && matchE && matchP;
+                const regionalPedidoId = p.contrato_id
+                    ? (contratoRegionalMap[String(p.contrato_id)]?.id ?? "")
+                    : "";
+                const matchR =
+                    filtroRegional === "Todos" ||
+                    String(regionalPedidoId) === String(filtroRegional);
+                return matchQ && matchE && matchP && matchR;
             }),
         [
             pedidos,
             debouncedSearch,
             filtroEstado,
             filtroProyecto,
+            filtroRegional,
             contratoProyectoMap,
+            contratoRegionalMap,
         ],
     );
 
@@ -1529,18 +1540,48 @@ export default function PedidosAutomaticosCrud() {
         [pedidos],
     );
 
-    const pedidosParaGlobal = useMemo(
-        () => pedidos.filter((p) => p.estado === "Activo"),
-        [pedidos],
+    const filtrosGlobalListos =
+        filtroProyecto !== "Todos" && filtroRegional !== "Todos";
+
+    const pedidosParaGlobal = useMemo(() => {
+        if (!filtrosGlobalListos) return [];
+        return pedidos.filter((p) => {
+            if (p.estado !== "Activo") return false;
+            const proyectoPedido = p.contrato_id
+                ? (contratoProyectoMap[String(p.contrato_id)] ?? "")
+                : "";
+            const regionalPedidoId = p.contrato_id
+                ? (contratoRegionalMap[String(p.contrato_id)]?.id ?? "")
+                : "";
+            return (
+                proyectoPedido === filtroProyecto &&
+                String(regionalPedidoId) === String(filtroRegional)
+            );
+        });
+    }, [
+        pedidos,
+        filtrosGlobalListos,
+        filtroProyecto,
+        filtroRegional,
+        contratoProyectoMap,
+        contratoRegionalMap,
+    ]);
+
+    const regionalSeleccionada = regionalesUsados.find(
+        (r) => String(r.id) === String(filtroRegional),
     );
 
     const handleCrearGlobal = async () => {
         setGlobalSaving(true);
         try {
-            const { data } = await api.post("/pedidos-globales");
+            const { data } = await api.post("/pedidos-globales", {
+                proyecto: filtroProyecto,
+                regional_id: filtroRegional,
+            });
+            const idsGlobal = new Set(pedidosParaGlobal.map((p) => p.id));
             queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
                 prev.map((p) =>
-                    p.estado === "Activo" ? { ...p, estado: "Completado" } : p,
+                    idsGlobal.has(p.id) ? { ...p, estado: "Completado" } : p,
                 ),
             );
             queryClient.invalidateQueries({ queryKey: ["pedidos-globales"] });
@@ -1740,6 +1781,20 @@ export default function PedidosAutomaticosCrud() {
                             ))}
                         </select>
                     )}
+                    {regionalesUsados.length > 0 && (
+                        <select
+                            style={S.selectFilter}
+                            value={filtroRegional}
+                            onChange={(e) => setFiltroRegional(e.target.value)}
+                        >
+                            <option value="Todos">Todas las regionales</option>
+                            {regionalesUsados.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                    {r.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                     <button
@@ -1773,9 +1828,11 @@ export default function PedidosAutomaticosCrud() {
                             pedidosParaGlobal.length > 0 && setGlobalModal(true)
                         }
                         title={
-                            pedidosParaGlobal.length === 0
-                                ? "No hay pedidos en proceso"
-                                : ""
+                            !filtrosGlobalListos
+                                ? "Selecciona un proyecto y una regional específicos para generar el pedido global"
+                                : pedidosParaGlobal.length === 0
+                                  ? "No hay pedidos en proceso para ese proyecto y regional"
+                                  : ""
                         }
                     >
                         <IconLayers size={16} />
@@ -1824,6 +1881,7 @@ export default function PedidosAutomaticosCrud() {
                                 <th>Código</th>
                                 <th>Empleado</th>
                                 <th>Fecha</th>
+                                <th>Regional</th>
                                 <th style={{ textAlign: "center" }}>Items</th>
                                 <th>Estado</th>
                                 <th style={{ textAlign: "center" }}>
@@ -1838,22 +1896,13 @@ export default function PedidosAutomaticosCrud() {
                                     (e) =>
                                         String(e.id) === String(p.empleado_id),
                                 );
-                                const proyectoPedido = p.contrato_id
-                                    ? (contratoProyectoMap[
+                                const regionalPedido = p.contrato_id
+                                    ? (contratoRegionalMap[
                                           String(p.contrato_id)
-                                      ] ?? "")
+                                      ]?.nombre ?? "")
                                     : "";
-                                const isLocked =
-                                    proyectosLocked.has(proyectoPedido);
                                 return (
-                                    <tr
-                                        key={p.id}
-                                        style={
-                                            isLocked
-                                                ? { opacity: 0.85 }
-                                                : undefined
-                                        }
-                                    >
+                                    <tr key={p.id}>
                                         <td>
                                             <span
                                                 style={{
@@ -1926,6 +1975,7 @@ export default function PedidosAutomaticosCrud() {
                                                   )
                                                 : "—"}
                                         </td>
+                                        <td>{regionalPedido || "—"}</td>
                                         <td style={{ textAlign: "center" }}>
                                             <span
                                                 style={S.badge(
@@ -1972,62 +2022,31 @@ export default function PedidosAutomaticosCrud() {
                                                 >
                                                     <IconEye />
                                                 </button>
-                                                {isLocked ? (
-                                                    <span
-                                                        title={`Bloqueado: proyecto "${proyectoPedido}" superó el punto de corte`}
-                                                        style={{
-                                                            display: "flex",
-                                                            alignItems:
-                                                                "center",
-                                                            justifyContent:
-                                                                "center",
-                                                            width: 28,
-                                                            height: 28,
-                                                            background:
-                                                                "#fef3c7",
-                                                            borderRadius: 6,
-                                                            color: "#92400e",
-                                                        }}
-                                                    >
-                                                        <IconLock size={14} />
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            style={S.actionBtn(
-                                                                "#e8f8f5",
-                                                                "var(--primary-dark)",
-                                                            )}
-                                                            title="Editar"
-                                                            onClick={() => {
-                                                                setEditTarget(
-                                                                    p,
-                                                                );
-                                                                setModalOpen(
-                                                                    true,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <IconEdit />
-                                                        </button>
-                                                        <button
-                                                            style={S.actionBtn(
-                                                                "#fce8e8",
-                                                                "#a33",
-                                                            )}
-                                                            title="Eliminar"
-                                                            onClick={() =>
-                                                                setConfirmDelete(
-                                                                    p,
-                                                                )
-                                                            }
-                                                        >
-                                                            <IconTrash
-                                                                size={14}
-                                                            />
-                                                        </button>
-                                                    </>
-                                                )}
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#e8f8f5",
+                                                        "var(--primary-dark)",
+                                                    )}
+                                                    title="Editar"
+                                                    onClick={() => {
+                                                        setEditTarget(p);
+                                                        setModalOpen(true);
+                                                    }}
+                                                >
+                                                    <IconEdit />
+                                                </button>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#fce8e8",
+                                                        "#a33",
+                                                    )}
+                                                    title="Eliminar"
+                                                    onClick={() =>
+                                                        setConfirmDelete(p)
+                                                    }
+                                                >
+                                                    <IconTrash size={14} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -2170,6 +2189,19 @@ export default function PedidosAutomaticosCrud() {
                                                 : ""}
                                         </span>{" "}
                                         en proceso
+                                    </div>
+                                    <div
+                                        style={{
+                                            color: "var(--text-muted)",
+                                            fontSize: "0.85rem",
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        Proyecto <strong>{filtroProyecto}</strong>{" "}
+                                        · Regional{" "}
+                                        <strong>
+                                            {regionalSeleccionada?.nombre ?? ""}
+                                        </strong>
                                     </div>
                                     <div
                                         style={{

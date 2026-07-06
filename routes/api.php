@@ -165,6 +165,7 @@ Route::get('/catalogos', function () {
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
         'tipos_funcionario' => $merge(

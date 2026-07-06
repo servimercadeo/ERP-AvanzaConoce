@@ -73,7 +73,7 @@ class ContratoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']);
+        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
 
         // Anulados solo se muestran cuando se filtra explícitamente por ese estado
         if ($request->estado === 'Contrato anulado') {
@@ -200,6 +200,7 @@ class ContratoController extends Controller
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
+            'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
             'centros_costos'               => 'nullable|array',
             'anexos'                       => 'nullable|array',
@@ -253,12 +254,12 @@ class ContratoController extends Controller
             ]);
         }
 
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']), 201);
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']), 201);
     }
 
     public function show(Contrato $contrato)
     {
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']));
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']));
     }
 
     public function update(Request $request, Contrato $contrato)
@@ -287,6 +288,7 @@ class ContratoController extends Controller
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
+            'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
             'centros_costos'               => 'nullable|array',
             'anexos'                       => 'nullable|array',
@@ -324,7 +326,7 @@ class ContratoController extends Controller
                 }
             }
 
-            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos']);
+            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
         });
 
         // Sync campos del contrato al empleado

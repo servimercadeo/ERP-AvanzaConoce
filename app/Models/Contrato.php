@@ -36,6 +36,7 @@ class Contrato extends Model
         'empleador',
         'empresa',
         'cliente_proyecto',
+        'regional_id',
         'origen_seguimiento',
         'seguimiento_fecha_cierre',
         'seguimiento_observaciones',
@@ -57,6 +58,11 @@ class Contrato extends Model
     public function empleado()
     {
         return $this->belongsTo(User::class, 'empleado_id');
+    }
+
+    public function regional()
+    {
+        return $this->belongsTo(Regional::class);
     }
 
     public function centrosCostos()
