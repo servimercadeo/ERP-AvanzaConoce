@@ -12,6 +12,7 @@ class InventarioDotacion extends Model
     protected $table = 'inventario_dotacion';
 
     protected $fillable = [
+        'proyecto',
         'categoria',
         'subcategoria',
         'genero',

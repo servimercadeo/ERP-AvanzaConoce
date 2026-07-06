@@ -13,7 +13,9 @@ class PedidoGlobalController extends Controller
     public function index()
     {
         $globales = PedidoGlobal::with([
+            'regional',
             'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
         ])
         ->orderBy('id', 'desc')
@@ -27,15 +29,26 @@ class PedidoGlobalController extends Controller
     public function update(Request $request, PedidoGlobal $pedidoGlobal)
     {
         $data = $request->validate([
-            'fecha'       => 'nullable|date',
-            'notas'       => 'nullable|string',
-            'confirmado'  => 'nullable|boolean',
+            'fecha'              => 'nullable|date',
+            'notas'              => 'nullable|string',
+            'confirmado'         => 'nullable|boolean',
+            'entrega_confirmada' => 'nullable|boolean',
         ]);
+
+        if (($data['entrega_confirmada'] ?? false) && !$pedidoGlobal->entrega_confirmada) {
+            if (!$pedidoGlobal->confirmado && !($data['confirmado'] ?? false)) {
+                return response()->json([
+                    'message' => 'Primero debes confirmar el pedido antes de confirmar la entrega.',
+                ], 422);
+            }
+        }
 
         $pedidoGlobal->update($data);
 
         $fresh = collect([$pedidoGlobal->fresh()->load([
+            'regional',
             'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
         ])]);
         $this->resolverFotografias($fresh);
@@ -62,27 +75,35 @@ class PedidoGlobalController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'notas' => 'nullable|string',
+            'notas'       => 'nullable|string',
+            'proyecto'    => 'required|string',
+            'regional_id' => 'required|exists:regionales,id',
         ]);
 
         return DB::transaction(function () use ($data) {
             $pedidos = PedidoAutomatico::where('estado', 'Activo')
                 ->whereNull('pedido_global_id')
                 ->whereNotNull('codigo')
+                ->whereHas('contrato', function ($q) use ($data) {
+                    $q->where('cliente_proyecto', $data['proyecto'])
+                      ->where('regional_id', $data['regional_id']);
+                })
                 ->lockForUpdate()
                 ->get();
 
             if ($pedidos->isEmpty()) {
                 return response()->json([
-                    'message' => 'No hay pedidos en proceso para generar un pedido global.',
+                    'message' => 'No hay pedidos en proceso para el proyecto y la regional seleccionados.',
                 ], 422);
             }
 
             $global = PedidoGlobal::create([
-                'codigo'        => PedidoGlobal::generarCodigo(),
-                'fecha'         => now()->toDateString(),
-                'total_pedidos' => $pedidos->count(),
-                'notas'         => $data['notas'] ?? null,
+                'codigo'           => PedidoGlobal::generarCodigo(),
+                'fecha'            => now()->toDateString(),
+                'total_pedidos'    => $pedidos->count(),
+                'notas'            => $data['notas'] ?? null,
+                'cliente_proyecto' => $data['proyecto'],
+                'regional_id'      => $data['regional_id'],
             ]);
 
             PedidoAutomatico::whereIn('id', $pedidos->pluck('id'))

@@ -73,7 +73,7 @@ class ContratoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos']);
+        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
 
         // Anulados solo se muestran cuando se filtra explícitamente por ese estado
         if ($request->estado === 'Contrato anulado') {
@@ -103,14 +103,36 @@ class ContratoController extends Controller
             $query->where('sede', $request->sede);
         }
 
-        $contratos = $query->orderBy('created_at', 'desc')->get()->map(function ($contrato) {
+        $contratos = $query->orderBy('created_at', 'desc')->get();
+
+        // Derivar proyecto actual desde candidatos → requisicion → proyecto (sin N+1)
+        $cedulas = $contratos->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
+        $proyectoPorCedula = [];
+        if (!empty($cedulas)) {
+            Candidato::whereIn('identificacion', $cedulas)
+                ->with('requisicion.proyecto')
+                ->orderBy('id', 'desc')
+                ->get()
+                ->each(function ($c) use (&$proyectoPorCedula) {
+                    $ced = $c->identificacion;
+                    if (!isset($proyectoPorCedula[$ced]) && $c->requisicion?->proyecto?->nombre) {
+                        $proyectoPorCedula[$ced] = $c->requisicion->proyecto->nombre;
+                    }
+                });
+        }
+
+        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula) {
+            $cedula = $contrato->empleado?->cedula;
             if ($contrato->empleado && !$contrato->empleado->fotografia) {
-                $foto = \Illuminate\Support\Facades\DB::table('candidatos')
-                    ->where('identificacion', $contrato->empleado->cedula)
+                $foto = DB::table('candidatos')
+                    ->where('identificacion', $cedula)
                     ->value('fotografia');
                 if ($foto) {
                     $contrato->empleado->fotografia = $foto;
                 }
+            }
+            if ($cedula && !empty($proyectoPorCedula[$cedula])) {
+                $contrato->cliente_proyecto = $proyectoPorCedula[$cedula];
             }
             return $contrato;
         });
@@ -178,9 +200,13 @@ class ContratoController extends Controller
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
+            'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'          => 'nullable|array',
-            'anexos'                  => 'nullable|array',
+            'centros_costos'               => 'nullable|array',
+            'anexos'                       => 'nullable|array',
+            'eventos_medicos'              => 'nullable|array',
+            'seguimiento_fecha_cierre'     => 'nullable|date',
+            'seguimiento_observaciones'    => 'nullable|array',
         ]);
 
         $contrato = DB::transaction(function() use ($data) {
@@ -197,6 +223,12 @@ class ContratoController extends Controller
             if (!empty($data['anexos'])) {
                 foreach ($data['anexos'] as $anexo) {
                     $contrato->anexos()->create($anexo);
+                }
+            }
+
+            if (!empty($data['eventos_medicos'])) {
+                foreach ($data['eventos_medicos'] as $ev) {
+                    $contrato->eventosMedicos()->create($ev);
                 }
             }
 
@@ -222,12 +254,12 @@ class ContratoController extends Controller
             ]);
         }
 
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']), 201);
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']), 201);
     }
 
     public function show(Contrato $contrato)
     {
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos']));
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']));
     }
 
     public function update(Request $request, Contrato $contrato)
@@ -256,9 +288,13 @@ class ContratoController extends Controller
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
+            'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'          => 'nullable|array',
-            'anexos'                  => 'nullable|array',
+            'centros_costos'               => 'nullable|array',
+            'anexos'                       => 'nullable|array',
+            'eventos_medicos'              => 'nullable|array',
+            'seguimiento_fecha_cierre'     => 'nullable|date',
+            'seguimiento_observaciones'    => 'nullable|array',
         ]);
 
         $result = DB::transaction(function() use ($contrato, $data) {
@@ -282,7 +318,15 @@ class ContratoController extends Controller
                 }
             }
 
-            return $contrato->load(['empleado', 'centrosCostos', 'anexos']);
+            // Sincronizar eventos médicos
+            $contrato->eventosMedicos()->delete();
+            if (!empty($data['eventos_medicos'])) {
+                foreach ($data['eventos_medicos'] as $ev) {
+                    $contrato->eventosMedicos()->create($ev);
+                }
+            }
+
+            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
         });
 
         // Sync campos del contrato al empleado

@@ -55,6 +55,7 @@ const EMPTY_FORM = {
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
+    regional_id: "",
     origen_seguimiento: "",
     centros_costos: [],
     anexos: [],
@@ -393,7 +394,21 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                     >
                         {selected.nombres.charAt(0).toUpperCase()}
                         {selected.fotografia && (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            <img
+                                src={`/storage/${selected.fotografia}`}
+                                alt=""
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                }}
+                            />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -522,7 +537,22 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                                         >
                                             {c.nombres.charAt(0).toUpperCase()}
                                             {c.fotografia && (
-                                                <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                <img
+                                                    src={`/storage/${c.fotografia}`}
+                                                    alt=""
+                                                    style={{
+                                                        position: "absolute",
+                                                        inset: 0,
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        objectFit: "cover",
+                                                        borderRadius: "50%",
+                                                    }}
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display =
+                                                            "none";
+                                                    }}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -564,6 +594,7 @@ function Modal({
     empleados,
     catalogs,
     candidatosContrato = [],
+    proyectoOpts = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
@@ -571,6 +602,10 @@ function Modal({
     const [activeTab, setActive] = useState("principal");
     const [saving, setSaving] = useState(false);
     const isCreate = !initial?.id && !readOnly;
+    const regionalOpts = (catalogs.regionales || []).map((r) => ({
+        value: r.id,
+        label: r.nombre,
+    }));
 
     useEffect(() => {
         if (open) {
@@ -911,8 +946,23 @@ function Modal({
                                 <Field
                                     label="Cliente / Proyecto"
                                     k="cliente_proyecto"
+                                    opts={
+                                        proyectoOpts.length
+                                            ? proyectoOpts
+                                            : undefined
+                                    }
                                     {...fp}
                                 />
+                            </div>
+                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                                <Field
+                                    label="Regional"
+                                    k="regional_id"
+                                    opts={regionalOpts}
+                                    {...fp}
+                                />
+                                <div />
+                                <div />
                             </div>
                         </>
                     )}
@@ -1233,6 +1283,7 @@ export default function ContratosCrud() {
         cajas: [],
         bancos: [],
         tipos_vinculacion: [],
+        regionales: [],
     });
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
@@ -1259,8 +1310,14 @@ export default function ContratosCrud() {
         queryFn: () =>
             api.get("/respuestas-ingresos/datos-contrato").then((r) => r.data),
     });
+    const { data: _qSeleccionCatalogos } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
     const [candidatosContrato, setCandidatosContrato] = useState([]);
+    const [proyectoOpts, setProyectoOpts] = useState([]);
 
     useEffect(() => {
         if (_qContratos) {
@@ -1277,6 +1334,10 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qCandidatosContrato) setCandidatosContrato(_qCandidatosContrato);
     }, [_qCandidatosContrato]);
+    useEffect(() => {
+        if (_qSeleccionCatalogos?.proyectos)
+            setProyectoOpts(_qSeleccionCatalogos.proyectos.map((p) => p.label));
+    }, [_qSeleccionCatalogos]);
 
     useEffect(() => {
         setPagina(1);
@@ -1591,10 +1652,34 @@ export default function ContratosCrud() {
                                 <tr key={c.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={{ ...S.avatar, overflow: "hidden", position: "relative" }}>
-                                                {(c.empleado?.nombres || "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    ...S.avatar,
+                                                    overflow: "hidden",
+                                                    position: "relative",
+                                                }}
+                                            >
+                                                {(c.empleado?.nombres || "?")
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                                 {c.empleado?.fotografia && (
-                                                    <img src={`/storage/${c.empleado.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                    <img
+                                                        src={`/storage/${c.empleado.fotografia}`}
+                                                        alt=""
+                                                        style={{
+                                                            position:
+                                                                "absolute",
+                                                            inset: 0,
+                                                            width: "100%",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            borderRadius: "50%",
+                                                        }}
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display =
+                                                                "none";
+                                                        }}
+                                                    />
                                                 )}
                                             </div>
                                             <span style={{ fontWeight: 700 }}>
@@ -1948,6 +2033,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
+                proyectoOpts={proyectoOpts}
             />
 
             <Modal
@@ -1957,9 +2043,9 @@ export default function ContratosCrud() {
                 title="Ver Contrato"
                 empleados={empleados}
                 catalogs={catalogs}
+                proyectoOpts={proyectoOpts}
                 readOnly
             />
-
         </div>
     );
 }

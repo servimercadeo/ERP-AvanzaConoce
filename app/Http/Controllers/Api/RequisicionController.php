@@ -92,6 +92,26 @@ class RequisicionController extends Controller
         ]);
 
         $requisicion->update($data);
+
+        // Propagar cliente_proyecto a los contratos de los candidatos vinculados
+        // Se ejecuta siempre que proyecto_id venga en el request (para mantener consistencia)
+        if (array_key_exists('proyecto_id', $data)) {
+            $nuevoProyectoId = $data['proyecto_id'];
+            $nuevoNombre = $nuevoProyectoId
+                ? \App\Models\Proyecto::find($nuevoProyectoId)?->nombre
+                : null;
+
+            $cedulas = $requisicion->candidatos()->pluck('identificacion')->filter()->unique();
+
+            if ($cedulas->isNotEmpty()) {
+                $empleadoIds = \App\Models\User::whereIn('cedula', $cedulas)->pluck('id');
+                if ($empleadoIds->isNotEmpty()) {
+                    \App\Models\Contrato::whereIn('empleado_id', $empleadoIds)
+                        ->update(['cliente_proyecto' => $nuevoNombre]);
+                }
+            }
+        }
+
         return response()->json($requisicion->load(['proyecto', 'empresa', 'cargo', 'ciudad', 'empleador']));
     }
 

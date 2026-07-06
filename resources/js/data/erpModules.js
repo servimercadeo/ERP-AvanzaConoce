@@ -68,6 +68,7 @@ export const ERP_MODULES = [
           { id: 'avales_contratacion', label: 'Avales de Contratación' },
           { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
+          { id: 'Seguros_medicos', label: 'Seguimiento Medico' },
           { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           { id: 'empleadores', label: 'Empleadores' },
           { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
@@ -187,6 +188,7 @@ export const ERP_MODULES = [
           { id: 'productos_dotacion',   label: 'Inventario de dotación' },
           { id: 'pedidos_dotacion',    label: 'Pedidos automáticos' },
           { id: 'pedidos_globales',    label: 'Pedidos globales' },
+          { id: 'cronograma',          label: 'Cronograma' },
         ]
       },
       {

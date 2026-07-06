@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CandidatoController;
 use App\Http\Controllers\Api\CandidatoDocumentoController;
 use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\EmpleadoController;
+use App\Http\Controllers\Api\CronogramaDotacionController;
 use App\Http\Controllers\Api\PedidoAutomaticoController;
 use App\Http\Controllers\Api\PedidoGlobalController;
 use App\Http\Controllers\Api\EmpresaController;
@@ -164,6 +165,7 @@ Route::get('/catalogos', function () {
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
         'tipos_funcionario' => $merge(
@@ -209,6 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
     Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
     // CRUD completo de empleados
+    Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
     Route::apiResource('empleados', EmpleadoController::class);
 
     // CRUD completo de contratos
@@ -220,9 +223,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
+    Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
+    Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store']);
+    Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update']);
+    Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy']);
 
     // Pedidos automáticos de dotación
     Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
+    Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
         ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
 
@@ -231,6 +239,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pedidos-globales', [PedidoGlobalController::class, 'store']);
     Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update']);
     Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy']);
+
+    // Cronograma de entregas de dotación por proyecto
+    Route::get('cronograma-dotacion', [CronogramaDotacionController::class, 'index']);
+    Route::post('cronograma-dotacion', [CronogramaDotacionController::class, 'store']);
+    Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update']);
+    Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle']);
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
