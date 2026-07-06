@@ -23,6 +23,10 @@ const EVENTO_VACIO = {
     condicion: "", estado: "",
 };
 
+const CUR_YEAR = new Date().getFullYear();
+const YEAR_OPTS = Array.from({ length: CUR_YEAR - 2021 }, (_, i) => String(2022 + i)).concat([String(CUR_YEAR + 1)]);
+const MONTH_KEYS_SET = new Set(["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]);
+
 /* ─── helpers ──────────────────────────────────────────────────────── */
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 const norm     = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -64,9 +68,16 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     const [eventos, setEventos]       = useState([]);
     const [eventosCollapsed, setEventosCollapsed] = useState([]);
     const [saving, setSaving]         = useState(false);
+    const [obsYear, setObsYear]       = useState(String(CUR_YEAR));
+    const [activeTab, setActive]      = useState("empleado");
 
     useEffect(() => {
         if (open && contrato) {
+            const rawObs = contrato.seguimiento_observaciones ?? {};
+            const obs = Object.keys(rawObs).some(k => MONTH_KEYS_SET.has(k))
+                ? { [String(CUR_YEAR)]: rawObs }
+                : rawObs;
+            setObsYear(String(CUR_YEAR));
             setForm({
                 empleador:                 contrato.empleador ?? "",
                 cliente_proyecto:          contrato.cliente_proyecto ?? "",
@@ -76,7 +87,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 lps_afiliado:              contrato.lps_afiliado ?? "",
                 arl:                       contrato.arl ?? "",
                 seguimiento_fecha_cierre:  dateOnly(contrato.seguimiento_fecha_cierre),
-                seguimiento_observaciones: contrato.seguimiento_observaciones ?? {},
+                seguimiento_observaciones: obs,
             });
             const _evs = (contrato.eventos_medicos ?? []).map(ev => ({
                 ...ev,
@@ -87,6 +98,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             setEventos(_evs);
             setEventosCollapsed(_evs.map((_, __, arr) => arr.length > 1));
             setSaving(false);
+            setActive("empleado");
         }
     }, [open, contrato]);
 
@@ -120,160 +132,209 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
         <div style={S.overlay} onClick={onClose}>
             <div style={{ ...S.modal, maxWidth: 980 }} onClick={e => e.stopPropagation()}>
 
-                {/* header */}
+                {/* Cabecera verde */}
                 <div style={S.modalHeaderGreen}>
-                    <span style={S.modalTitleWhite}>
-                        {readOnly ? "Ver" : "Editar"} Seguimiento Médico — {nombre}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={S.modalTitleWhite}>
+                            {readOnly ? "Ver" : "Editar"} Seguimiento Médico
+                        </span>
+                        <span style={{ color: "rgba(255,255,255,0.78)", fontSize: "0.85rem", fontFamily: "Nunito,sans-serif" }}>
+                            {nombre}{cedula ? ` · CC ${cedula}` : ""}
+                        </span>
+                    </div>
                     <button style={S.closeBtnWhite} onClick={onClose}>
                         <IconClose size={14} />
                     </button>
                 </div>
 
-                <div style={S.modalBody}>
-
-                    {/* ── División 1 ── */}
-                    <div style={S.sectionHeader}>INFORMACIÓN DEL EMPLEADO</div>
-                    <div style={{ ...S.grid3, marginTop: 14 }}>
-                        <div style={S.formGroup}>
-                            <label style={S.label}>Cédula</label>
-                            <input style={{ ...S.input, background: "var(--bg)", color: "var(--text-muted)" }} value={cedula} disabled />
-                        </div>
-                        <div style={S.formGroup}>
-                            <label style={S.label}>Nombre Completo</label>
-                            <input style={{ ...S.input, background: "var(--bg)", color: "var(--text-muted)" }} value={nombre} disabled />
-                        </div>
-                        <Field label="Empleador"        k="empleador"       {...fp} />
-                    </div>
-                    <div style={{ ...S.grid3, marginTop: 14 }}>
-                        <Field label="Proyecto"         k="cliente_proyecto" opts={proyectoOpts.length ? proyectoOpts : undefined} {...fp} />
-                        <Field label="Fecha de Ingreso" k="fecha_ingreso"    type="date" {...fp} />
-                        <Field label="Ciudad / Sede"    k="sede"             opts={catalogs.sedes} {...fp} />
-                    </div>
-                    <div style={{ ...S.grid3, marginTop: 14 }}>
-                        <Field label="Cargo"            k="cargo"            opts={catalogs.cargos} {...fp} />
-                        <Field label="EPS"              k="lps_afiliado"     {...fp} />
-                        <Field label="ARL"              k="arl"              opts={catalogs.arls}   {...fp} />
-                    </div>
-
-                    {/* ── División 2 ── */}
-                    <div style={S.sectionHeader}>EVENTOS DE SEGUIMIENTO MÉDICO</div>
-                    {eventos.length === 0 && (
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontStyle: "italic", marginTop: 10 }}>
-                            Sin eventos registrados.
-                        </p>
-                    )}
-                    {eventos.map((ev, i) => {
-                        const collapsed = !!eventosCollapsed[i];
-                        const evFp = {
-                            form: ev, errors: {},
-                            onChange: k => e => updateEvento(i, k, e.target.value),
-                            disabled: readOnly,
-                        };
-                        const vigBadge = (() => {
-                            const { vigencia_desde, vigencia_hasta } = ev;
-                            const cierre = form.seguimiento_fecha_cierre;
-                            if (cierre && TODAY > cierre) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
-                            if (!vigencia_desde && !vigencia_hasta) return null;
-                            if (vigencia_hasta && TODAY > vigencia_hasta) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
-                            if (vigencia_desde && TODAY >= vigencia_desde) return { label: "Activa", bg: "#e0f7f4", color: "#0d6e5a" };
-                            return { label: "Pendiente", bg: "#fff3e0", color: "#e67e22" };
-                        })();
-                        return (
-                            <div key={i} style={{ border: `1.5px solid ${vigBadge?.label === "Activa" ? "rgba(13,110,90,0.35)" : "var(--border)"}`, borderRadius: "var(--radius-sm)", padding: "12px 18px", marginTop: 14, background: "var(--bg)" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : 12 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                                        <button
-                                            onClick={() => toggleEvento(i)}
-                                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "0.85rem", padding: "2px 4px", display: "flex", alignItems: "center", flexShrink: 0 }}
-                                            title={collapsed ? "Expandir" : "Colapsar"}
-                                        >
-                                            {collapsed ? "▶" : "▼"}
-                                        </button>
-                                        <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--primary)", letterSpacing: "0.06em", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
-                                            EVENTO #{i + 1}
-                                        </span>
-                                        {(ev.tipo_evento || ev.fecha_ingreso_seguimiento) && (
-                                            <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {[ev.tipo_evento, ev.fecha_ingreso_seguimiento].filter(Boolean).join(" · ")}
-                                            </span>
-                                        )}
-                                        {vigBadge && (
-                                            <span style={{ background: vigBadge.bg, color: vigBadge.color, borderRadius: 20, padding: "2px 9px", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 }}>
-                                                {vigBadge.label}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {!readOnly && (
-                                        <button onClick={() => removeEvento(i)} style={{ background: "#fce8e8", border: "none", borderRadius: 4, color: "#a33", cursor: "pointer", padding: "4px 9px", fontSize: "0.75rem", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
-                                            ✕ Eliminar
-                                        </button>
-                                    )}
-                                </div>
-                                {!collapsed && (
-                                    <>
-                                        <div style={S.grid3}>
-                                            <Field label="Fecha Ingreso a Seguimiento" k="fecha_ingreso_seguimiento" type="date" {...evFp} />
-                                            <Field label="Tipo de Evento"              k="tipo_evento"               {...evFp} />
-                                            <Field label="Origen del Diagnóstico"      k="origen_diagnostico"        {...evFp} />
-                                        </div>
-                                        <div style={{ ...S.grid2, marginTop: 12 }}>
-                                            <Field label="Diagnóstico" k="diagnostico" type="textarea" {...evFp} />
-                                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                                <Field label="Recomendaciones / Restricciones Médico Laborales" k="recomendaciones" type="textarea" {...evFp} />
-                                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                                    <Field label="Vigencia Desde" k="vigencia_desde" type="date" {...evFp} />
-                                                    <Field label="Vigencia Hasta" k="vigencia_hasta" type="date" {...evFp} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style={{ ...S.grid2, marginTop: 12 }}>
-                                            <Field label="Condición" k="condicion" {...evFp} />
-                                            <Field label="Estado"    k="estado"    {...evFp} />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {!readOnly && (
-                        <button style={{ ...S.btnSecondary, marginTop: 12, padding: "6px 14px", fontSize: "0.82rem" }} onClick={addEvento}>
-                            + Agregar evento
+                {/* Pestañas */}
+                <div className="tab-bar" style={S.tabBar}>
+                    {[
+                        ["empleado", "Información del Empleado"],
+                        ["eventos",  `Eventos Médicos${eventos.length ? ` (${eventos.length})` : ""}`],
+                        ["cierre",   "Cierre y Observaciones"],
+                    ].map(([key, lbl]) => (
+                        <button key={key} style={activeTab === key ? S.tabActive : S.tab} onClick={() => setActive(key)}>
+                            {lbl}
                         </button>
-                    )}
-
-                    {/* ── División 3 ── */}
-                    <div style={S.sectionHeader}>FECHA DE CIERRE Y OBSERVACIONES MENSUALES</div>
-                    <div style={{ ...S.grid3, marginTop: 14 }}>
-                        <Field label="Fecha de Cierre" k="seguimiento_fecha_cierre" type="date" {...fp} />
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginTop: 18 }}>
-                        {MESES.map(([key, label]) => (
-                            <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                                <label style={{ ...S.label, color: "var(--primary)", fontWeight: 800, fontSize: "0.72rem", letterSpacing: "0.05em" }}>
-                                    {label.toUpperCase()}
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    disabled={readOnly}
-                                    value={form.seguimiento_observaciones?.[key] ?? ""}
-                                    onChange={e => setForm(f => ({ ...f, seguimiento_observaciones: { ...(f.seguimiento_observaciones || {}), [key]: e.target.value } }))}
-                                    placeholder={`Observaciones ${label}…`}
-                                    style={{ ...S.input, minHeight: 68, resize: readOnly ? "none" : "vertical", fontSize: "0.81rem", ...(readOnly ? { background: "var(--bg)", color: "var(--text-muted)" } : {}) }}
-                                />
-                            </div>
-                        ))}
-                    </div>
+                    ))}
                 </div>
 
-                {/* footer */}
+                {/* Cuerpo */}
+                <div style={S.modalBody}>
+
+                    {/* ── Tab 1: Información del Empleado ── */}
+                    {activeTab === "empleado" && (
+                        <>
+                            <div style={S.sectionHeader}>DATOS GENERALES</div>
+                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Cédula</label>
+                                    <input style={{ ...S.input, background: "var(--bg)", color: "var(--text-muted)" }} value={cedula} disabled />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Nombre Completo</label>
+                                    <input style={{ ...S.input, background: "var(--bg)", color: "var(--text-muted)" }} value={nombre} disabled />
+                                </div>
+                                <Field label="Empleador" k="empleador" {...fp} />
+                            </div>
+                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                                <Field label="Proyecto"         k="cliente_proyecto" opts={proyectoOpts.length ? proyectoOpts : undefined} {...fp} />
+                                <Field label="Fecha de Ingreso" k="fecha_ingreso"    type="date" {...fp} />
+                                <Field label="Ciudad / Sede"    k="sede"             opts={catalogs.sedes} {...fp} />
+                            </div>
+                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                                <Field label="Cargo"        k="cargo"        opts={catalogs.cargos} {...fp} />
+                                <Field label="EPS"          k="lps_afiliado" {...fp} />
+                                <Field label="ARL"          k="arl"          opts={catalogs.arls}   {...fp} />
+                            </div>
+                        </>
+                    )}
+
+                    {/* ── Tab 2: Eventos Médicos ── */}
+                    {activeTab === "eventos" && (
+                        <>
+                            {eventos.length === 0 && (
+                                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                                        <path d="M9 12h6m-3-3v6M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"/>
+                                    </svg>
+                                    <p style={{ margin: 0, fontSize: "0.9rem" }}>Sin eventos registrados.</p>
+                                    {!readOnly && <p style={{ margin: 0, fontSize: "0.82rem" }}>Usa el botón de abajo para agregar el primer evento.</p>}
+                                </div>
+                            )}
+                            {eventos.map((ev, i) => {
+                                const collapsed = !!eventosCollapsed[i];
+                                const evFp = {
+                                    form: ev, errors: {},
+                                    onChange: k => e => updateEvento(i, k, e.target.value),
+                                    disabled: readOnly,
+                                };
+                                const vigBadge = (() => {
+                                    const { vigencia_desde, vigencia_hasta } = ev;
+                                    const cierre = form.seguimiento_fecha_cierre;
+                                    if (cierre && TODAY > cierre) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
+                                    if (!vigencia_desde && !vigencia_hasta) return null;
+                                    if (vigencia_hasta && TODAY > vigencia_hasta) return { label: "Vencida", bg: "#fce8e8", color: "#a33" };
+                                    if (vigencia_desde && TODAY >= vigencia_desde) return { label: "Activa", bg: "#e0f7f4", color: "#0d6e5a" };
+                                    return { label: "Pendiente", bg: "#fff3e0", color: "#e67e22" };
+                                })();
+                                return (
+                                    <div key={i} style={{ border: `1.5px solid ${vigBadge?.label === "Activa" ? "rgba(13,110,90,0.35)" : "var(--border)"}`, borderRadius: "var(--radius-sm)", padding: "12px 18px", marginTop: i === 0 ? 0 : 14, background: "var(--bg)" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: collapsed ? 0 : 12 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                                                <button
+                                                    onClick={() => toggleEvento(i)}
+                                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "0.85rem", padding: "2px 4px", display: "flex", alignItems: "center", flexShrink: 0 }}
+                                                    title={collapsed ? "Expandir" : "Colapsar"}
+                                                >
+                                                    {collapsed ? "▶" : "▼"}
+                                                </button>
+                                                <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--primary)", letterSpacing: "0.06em", fontFamily: "'Poppins',sans-serif", whiteSpace: "nowrap" }}>
+                                                    EVENTO #{i + 1}
+                                                </span>
+                                                {(ev.tipo_evento || ev.fecha_ingreso_seguimiento) && (
+                                                    <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {[ev.tipo_evento, ev.fecha_ingreso_seguimiento].filter(Boolean).join(" · ")}
+                                                    </span>
+                                                )}
+                                                {vigBadge && (
+                                                    <span style={{ background: vigBadge.bg, color: vigBadge.color, borderRadius: 20, padding: "2px 9px", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 }}>
+                                                        {vigBadge.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {!readOnly && (
+                                                <button onClick={() => removeEvento(i)} style={{ background: "#fce8e8", border: "none", borderRadius: 4, color: "#a33", cursor: "pointer", padding: "4px 9px", fontSize: "0.75rem", fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>
+                                                    ✕ Eliminar
+                                                </button>
+                                            )}
+                                        </div>
+                                        {!collapsed && (
+                                            <>
+                                                <div style={S.grid3}>
+                                                    <Field label="Fecha Ingreso a Seguimiento" k="fecha_ingreso_seguimiento" type="date" {...evFp} />
+                                                    <Field label="Tipo de Evento"              k="tipo_evento"               {...evFp} />
+                                                    <Field label="Origen del Diagnóstico"      k="origen_diagnostico"        {...evFp} />
+                                                </div>
+                                                <div style={{ ...S.grid2, marginTop: 12 }}>
+                                                    <Field label="Diagnóstico" k="diagnostico" type="textarea" {...evFp} />
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                                        <Field label="Recomendaciones / Restricciones Médico Laborales" k="recomendaciones" type="textarea" {...evFp} />
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                                                            <Field label="Vigencia Desde" k="vigencia_desde" type="date" {...evFp} />
+                                                            <Field label="Vigencia Hasta" k="vigencia_hasta" type="date" {...evFp} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ ...S.grid2, marginTop: 12 }}>
+                                                    <Field label="Condición" k="condicion" {...evFp} />
+                                                    <Field label="Estado"    k="estado"    {...evFp} />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {!readOnly && (
+                                <button className="btn-secondary" style={{ marginTop: 16, padding: "7px 16px", fontSize: "0.85rem" }} onClick={addEvento}>
+                                    + Agregar evento
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    {/* ── Tab 3: Cierre y Observaciones ── */}
+                    {activeTab === "cierre" && (
+                        <>
+                            <div style={S.sectionHeader}>FECHA DE CIERRE</div>
+                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                                <Field label="Fecha de Cierre" k="seguimiento_fecha_cierre" type="date" {...fp} />
+                            </div>
+
+                            <div style={S.sectionHeader}>OBSERVACIONES MENSUALES</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-muted)" }}>Año:</span>
+                                <select
+                                    value={obsYear}
+                                    onChange={e => setObsYear(e.target.value)}
+                                    style={{ ...S.input, width: "auto", padding: "4px 12px", fontSize: "0.85rem", cursor: "pointer" }}
+                                >
+                                    {[...new Set([...YEAR_OPTS, ...Object.keys(form.seguimiento_observaciones ?? {}).filter(k => /^\d{4}$/.test(k))])].sort().map(y => {
+                                        const hasMeses = Object.values(form.seguimiento_observaciones?.[y] ?? {}).some(Boolean);
+                                        return <option key={y} value={y}>{y}{hasMeses ? " ✓" : ""}</option>;
+                                    })}
+                                </select>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginTop: 14 }}>
+                                {MESES.map(([key, label]) => (
+                                    <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                                        <label style={{ ...S.label, color: "var(--primary)", fontWeight: 800, fontSize: "0.72rem", letterSpacing: "0.05em" }}>
+                                            {label.toUpperCase()}
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            disabled={readOnly}
+                                            value={form.seguimiento_observaciones?.[obsYear]?.[key] ?? ""}
+                                            onChange={e => setForm(f => ({ ...f, seguimiento_observaciones: { ...(f.seguimiento_observaciones || {}), [obsYear]: { ...(f.seguimiento_observaciones?.[obsYear] || {}), [key]: e.target.value } } }))}
+                                            placeholder={`Observaciones ${label}…`}
+                                            style={{ ...S.input, minHeight: 68, resize: readOnly ? "none" : "vertical", fontSize: "0.81rem", ...(readOnly ? { background: "var(--bg)", color: "var(--text-muted)" } : {}) }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Pie del modal */}
                 <div style={S.modalFooter}>
                     {readOnly ? (
-                        <button style={S.btnSecondary} onClick={onClose}>Cerrar</button>
+                        <button className="btn-secondary" onClick={onClose}>Cerrar</button>
                     ) : (
                         <>
-                            <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
-                            <button style={{ ...S.btnPrimary, opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+                            <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
+                            <button className="btn-primary" style={{ opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
                                 {saving ? "Guardando…" : "Guardar"}
                             </button>
                         </>
@@ -526,10 +587,13 @@ const S = {
     /* modal */
     overlay:         { position: "fixed", inset: 0, background: "rgba(26,58,53,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 5000, padding: "32px 16px", overflowY: "auto" },
     modal:           { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 16px 60px rgba(26,155,140,0.22)", width: "100%", display: "flex", flexDirection: "column" },
-    modalHeaderGreen:{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 28px", background: "var(--primary)", borderTopLeftRadius: "var(--radius)", borderTopRightRadius: "var(--radius)", flexShrink: 0 },
+    modalHeaderGreen:{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px", background: "var(--primary)", borderTopLeftRadius: "var(--radius)", borderTopRightRadius: "var(--radius)", flexShrink: 0 },
     modalTitleWhite: { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "#fff" },
     closeBtnWhite:   { background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" },
-    modalBody:       { padding: "22px 28px 28px", overflowY: "auto", flex: 1, maxHeight: "74vh" },
+    tabBar:          { display: "flex", borderBottom: "2px solid var(--border)", padding: "0 28px", gap: 0, overflowX: "auto", flexWrap: "nowrap", flexShrink: 0 },
+    tab:             { padding: "11px 20px", background: "transparent", border: "none", borderBottom: "2px solid transparent", marginBottom: -2, fontSize: "0.88rem", fontWeight: 700, fontFamily: "Nunito,sans-serif", color: "var(--text-muted)", cursor: "pointer", whiteSpace: "nowrap" },
+    tabActive:       { padding: "11px 20px", background: "transparent", border: "none", borderBottom: "2px solid var(--primary)", marginBottom: -2, fontSize: "0.88rem", fontWeight: 700, fontFamily: "Nunito,sans-serif", color: "var(--primary)", cursor: "pointer", whiteSpace: "nowrap" },
+    modalBody:       { padding: "22px 28px 28px", overflowY: "auto", flex: 1, maxHeight: "68vh" },
     modalFooter:     { display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 28px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
     sectionHeader:   { marginTop: 24, marginBottom: 4, padding: "9px 14px", background: "var(--primary)", color: "#fff", borderRadius: "var(--radius-sm)", fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.05em", textAlign: "center" },
 
@@ -540,6 +604,4 @@ const S = {
     label:     { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input:     { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },
     err:       { color: "#e74c3c", fontSize: "0.75rem", marginTop: 2 },
-    btnPrimary:   { padding: "10px 24px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "Nunito,sans-serif" },
-    btnSecondary: { padding: "10px 20px", background: "var(--bg)", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "Nunito,sans-serif" },
 };
