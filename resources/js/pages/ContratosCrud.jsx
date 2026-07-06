@@ -31,6 +31,9 @@ const TIPOS_CONTRATO = [
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 const TODAY = new Date().toISOString().split("T")[0];
+const CUR_YEAR = new Date().getFullYear();
+const YEAR_OPTS = Array.from({ length: CUR_YEAR - 2021 }, (_, i) => String(2022 + i)).concat([String(CUR_YEAR + 1)]);
+const MONTH_KEYS_SET = new Set(["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]);
 
 const EMPTY_FORM = {
     empleado_id: "",
@@ -576,6 +579,7 @@ function Modal({
     const [eventosMedicos, setEventosMedicos] = useState([]);
     const [eventosCollapsed, setEventosCollapsed] = useState([]);
     const [saving, setSaving] = useState(false);
+    const [obsYear, setObsYear] = useState(String(CUR_YEAR));
     const isCreate = !initial?.id && !readOnly;
 
     useEffect(() => {
@@ -592,8 +596,14 @@ function Modal({
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
                 seguimiento_fecha_cierre: dateOnly(initial.seguimiento_fecha_cierre),
-                seguimiento_observaciones: initial.seguimiento_observaciones || {},
+                seguimiento_observaciones: (() => {
+                    const raw = initial.seguimiento_observaciones || {};
+                    return Object.keys(raw).some(k => MONTH_KEYS_SET.has(k))
+                        ? { [String(CUR_YEAR)]: raw }
+                        : raw;
+                })(),
             });
+            setObsYear(String(CUR_YEAR));
             setErrors({});
             setActive("principal");
             setSaving(false);
@@ -1202,7 +1212,20 @@ function Modal({
                                         disabled={readOnly}
                                     />
                                 </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 20 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20 }}>
+                                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text-muted)" }}>Año:</span>
+                                    <select
+                                        value={obsYear}
+                                        onChange={e => setObsYear(e.target.value)}
+                                        style={{ ...S.input, width: "auto", padding: "4px 12px", fontSize: "0.85rem", cursor: "pointer" }}
+                                    >
+                                        {[...new Set([...YEAR_OPTS, ...Object.keys(form.seguimiento_observaciones ?? {}).filter(k => /^\d{4}$/.test(k))])].sort().map(y => {
+                                            const hasMeses = Object.values(form.seguimiento_observaciones?.[y] ?? {}).some(Boolean);
+                                            return <option key={y} value={y}>{y}{hasMeses ? " ✓" : ""}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 14 }}>
                                     {[
                                         ["ene", "Enero"],   ["feb", "Febrero"],  ["mar", "Marzo"],
                                         ["abr", "Abril"],   ["may", "Mayo"],     ["jun", "Junio"],
@@ -1216,13 +1239,16 @@ function Modal({
                                             <textarea
                                                 rows={3}
                                                 disabled={readOnly}
-                                                value={form.seguimiento_observaciones?.[key] ?? ""}
+                                                value={form.seguimiento_observaciones?.[obsYear]?.[key] ?? ""}
                                                 onChange={(e) =>
                                                     setForm((f) => ({
                                                         ...f,
                                                         seguimiento_observaciones: {
                                                             ...(f.seguimiento_observaciones || {}),
-                                                            [key]: e.target.value,
+                                                            [obsYear]: {
+                                                                ...(f.seguimiento_observaciones?.[obsYear] || {}),
+                                                                [key]: e.target.value,
+                                                            },
                                                         },
                                                     }))
                                                 }
