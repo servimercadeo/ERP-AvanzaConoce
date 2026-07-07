@@ -3,28 +3,30 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch } from '../components/Icons';
 
-const PROYECTOS   = ['TIGO EXPRESS', 'DIRECTV CO', 'Administrativo'];
-const CATEGORIAS  = ['Polo', 'Jean', 'Chaqueta', 'Tenis', 'Camisa', 'Zapatos', 'Gorra', 'Chaleco', 'Otro'];
+const PROYECTOS   = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
+const CATEGORIAS  = ['Blusa', 'Botas', 'Camisa', 'Carnet', 'Chaqueta', 'Conjunto', 'Gorra', 'Jean', 'Pantalon', 'Polo', 'Reata', 'Tenis', 'Zapatos', 'Chaleco', 'Otro'];
 const GENEROS     = ['Masculino', 'Femenino', 'Unisex'];
-const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-const TALLAS_JEAN = ['26', '28', '30', '32', '34', '36', '38', '40'];
-const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
-const ALL_TALLAS_ORDER = [...TALLAS_ROPA, ...TALLAS_JEAN, ...TALLAS_TENIS.filter(t => !TALLAS_JEAN.includes(t))];
+const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
+const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
+const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
+const TALLAS_UNICA = ['Única'];
+const ALL_TALLAS_ORDER = [...TALLAS_UNICA, ...TALLAS_ROPA, ...TALLAS_JEAN, ...TALLAS_TENIS.filter(t => !TALLAS_JEAN.includes(t))];
 
 function tallasForCategoria(cat) {
-    if (cat === 'Jean') return TALLAS_JEAN;
-    if (cat === 'Tenis' || cat === 'Zapatos') return TALLAS_TENIS;
+    if (cat === 'Jean' || cat === 'Pantalon') return TALLAS_JEAN;
+    if (cat === 'Tenis' || cat === 'Zapatos' || cat === 'Botas') return TALLAS_TENIS;
+    if (cat === 'Carnet' || cat === 'Gorra' || cat === 'Reata') return TALLAS_UNICA;
     return TALLAS_ROPA;
 }
 
-const EMPTY_ITEM = { proyecto: 'TIGO EXPRESS', categoria: 'Polo', subcategoria: '', genero: 'Masculino', talla: 'M', cantidad: 0, stock_minimo: 0 };
+const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', categoria: 'Polo', subcategoria: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
 const EMPTY_BULK_ROW = () => ({ ...EMPTY_ITEM });
 
 // ─── Modal agregar / editar un item ──────────────────────────────────────────
 function ItemModal({ item, onClose, onSaved }) {
     const isEdit = !!item?.id;
     const [form, setForm] = useState(isEdit
-        ? { cantidad: item.cantidad, stock_minimo: item.stock_minimo }
+        ? { cantidad: item.cantidad, stock_minimo: item.stock_minimo, precio: item.precio ?? 0 }
         : { ...EMPTY_ITEM });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -40,12 +42,14 @@ function ItemModal({ item, onClose, onSaved }) {
                 const { data } = await api.put(`/inventario-dotacion/${item.id}`, {
                     cantidad: Number(form.cantidad),
                     stock_minimo: Number(form.stock_minimo),
+                    precio: Number(form.precio),
                 });
                 onSaved(data, true);
             } else {
                 if (!form.subcategoria.trim()) return setError('Ingresa una descripción/subcategoría.') || setSaving(false);
                 const { data } = await api.post('/inventario-dotacion', {
                     ...form,
+                    precio: Number(form.precio),
                     cantidad: Number(form.cantidad),
                     stock_minimo: Number(form.stock_minimo),
                 });
@@ -81,6 +85,10 @@ function ItemModal({ item, onClose, onSaved }) {
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Stock mínimo</label>
                                     <input type="number" min={0} style={S.input} value={form.stock_minimo} onChange={set('stock_minimo')} />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Precio</label>
+                                    <input type="number" min={0} style={S.input} value={form.precio} onChange={set('precio')} />
                                 </div>
                             </div>
                         </>
@@ -121,9 +129,13 @@ function ItemModal({ item, onClose, onSaved }) {
                                     <label style={S.label}>Cantidad</label>
                                     <input type="number" min={0} style={S.input} value={form.cantidad} onChange={set('cantidad')} />
                                 </div>
-                                <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
+                                <div style={S.formGroup}>
                                     <label style={S.label}>Stock mínimo</label>
                                     <input type="number" min={0} style={S.input} value={form.stock_minimo} onChange={set('stock_minimo')} />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Precio</label>
+                                    <input type="number" min={0} style={S.input} value={form.precio} onChange={set('precio')} />
                                 </div>
                             </div>
                         </>
@@ -157,7 +169,7 @@ function BulkModal({ onClose, onSaved }) {
         setSaving(true); setError('');
         try {
             const { data } = await api.post('/inventario-dotacion/bulk', {
-                items: rows.map(r => ({ ...r, cantidad: Number(r.cantidad), stock_minimo: Number(r.stock_minimo) }))
+                items: rows.map(r => ({ ...r, precio: Number(r.precio), cantidad: Number(r.cantidad), stock_minimo: Number(r.stock_minimo) }))
             });
             onSaved(data.saved);
         } catch (e) {
@@ -178,7 +190,7 @@ function BulkModal({ onClose, onSaved }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                         <thead>
                             <tr style={{ background: 'var(--bg)' }}>
-                                {['Proyecto', 'Categoría', 'Descripción', 'Género', 'Talla', 'Cantidad', 'Stock mín.', ''].map(h => (
+                                {['Proyecto', 'Categoría', 'Descripción', 'Género', 'Talla', 'Precio', 'Cantidad', 'Stock mín.', ''].map(h => (
                                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', border: '1px solid var(--border)' }}>{h}</th>
                                 ))}
                             </tr>
@@ -209,6 +221,9 @@ function BulkModal({ onClose, onSaved }) {
                                         <select style={S.cellInput} value={row.talla} onChange={e => setRow(idx, 'talla', e.target.value)}>
                                             {tallasForCategoria(row.categoria).map(t => <option key={t}>{t}</option>)}
                                         </select>
+                                    </td>
+                                    <td style={S.tdCell}>
+                                        <input type="number" min={0} style={{ ...S.cellInput, width: 80 }} value={row.precio} onChange={e => setRow(idx, 'precio', e.target.value)} />
                                     </td>
                                     <td style={S.tdCell}>
                                         <input type="number" min={0} style={{ ...S.cellInput, width: 70 }} value={row.cantidad} onChange={e => setRow(idx, 'cantidad', e.target.value)} />
@@ -276,14 +291,15 @@ function DeleteModal({ item, onClose, onDeleted }) {
 
 // ─── Componente principal ────────────────────────────────────────────────────
 const PROYECTO_COLORS = {
-    'TIGO EXPRESS': { bg: '#e8f8f5', color: '#0d6e5a', border: '#0d6e5a' },
-    'DIRECTV CO':   { bg: '#e8f0ff', color: '#1a4fa8', border: '#1a4fa8' },
-    'Administrativo': { bg: '#fef3c7', color: '#92400e', border: '#b45309' },
+    'SYM TIGO EXPRESS':   { bg: '#e8f8f5', color: '#0d6e5a', border: '#0d6e5a' },
+    'SYM TIGO HOME':      { bg: '#f3e8ff', color: '#6b21a8', border: '#7e22ce' },
+    'SYM ADMINISTRATIVO': { bg: '#fef3c7', color: '#92400e', border: '#b45309' },
+    'DIRECTV':            { bg: '#e8f0ff', color: '#1a4fa8', border: '#1a4fa8' },
 };
 
 export default function ProductosDotacion() {
     const qc = useQueryClient();
-    const [proyectoTab, setProyectoTab]   = useState('TIGO EXPRESS');
+    const [proyectoTab, setProyectoTab]   = useState('SYM TIGO EXPRESS');
     const [categoriaFiltro, setCategoriaFiltro] = useState('Todos');
     const [generoFiltro, setGeneroFiltro] = useState('Todos');
     const [tallaFiltro, setTallaFiltro]   = useState('Todos');
@@ -374,7 +390,7 @@ export default function ProductosDotacion() {
         return { bg: '#e0f7f4', color: '#0d6e5a', label: 'OK' };
     };
 
-    const pc = PROYECTO_COLORS[proyectoTab] ?? PROYECTO_COLORS['TIGO EXPRESS'];
+    const pc = PROYECTO_COLORS[proyectoTab] ?? PROYECTO_COLORS['SYM TIGO EXPRESS'];
 
     return (
         <div style={{ width: '100%' }}>
@@ -510,6 +526,7 @@ export default function ProductosDotacion() {
                                 <th>Descripción</th>
                                 <th>Género</th>
                                 <th style={{ textAlign: 'center' }}>Talla</th>
+                                <th style={{ textAlign: 'right' }}>Precio</th>
                                 <th style={{ textAlign: 'center' }}>Cantidad</th>
                                 <th style={{ textAlign: 'center' }}>Stock mín.</th>
                                 <th style={{ textAlign: 'center' }}>Estado</th>
@@ -529,6 +546,7 @@ export default function ProductosDotacion() {
                                             </span>
                                         </td>
                                         <td style={{ textAlign: 'center', fontWeight: 700 }}>{item.talla}</td>
+                                        <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{Number(item.precio ?? 0).toLocaleString('es-CO')}</td>
                                         <td style={{ textAlign: 'center', fontWeight: 800, fontSize: '0.96rem' }}>{item.cantidad}</td>
                                         <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{item.stock_minimo}</td>
                                         <td style={{ textAlign: 'center' }}>

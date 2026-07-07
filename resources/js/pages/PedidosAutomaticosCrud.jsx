@@ -47,6 +47,21 @@ const ESTADO_LABEL = {
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+// El proyecto del contrato (tabla `proyectos`, ej. "TIGO EXPRESS", "DIRECTV CO")
+// no coincide en texto con el proyecto del inventario de dotación (tabla
+// `inventario_dotacion`, ej. "SYM TIGO EXPRESS", "DIRECTV"), así que hay que
+// mapear explícitamente entre los dos catálogos en vez de comparar por igualdad.
+const PROYECTO_A_INVENTARIO = {
+    "TIGO EXPRESS": "SYM TIGO EXPRESS",
+    "TIGO HOME": "SYM TIGO HOME",
+    "DIRECTV CO": "DIRECTV",
+    "DIRECTV ECU": "DIRECTV",
+};
+const proyectoInventarioDe = (nombreProyecto) =>
+    nombreProyecto
+        ? (PROYECTO_A_INVENTARIO[nombreProyecto] ?? "SYM ADMINISTRATIVO")
+        : null;
+
 const EMPTY_FORM = {
     empleado_id: "",
     contrato_id: "",
@@ -578,6 +593,7 @@ function Modal({
     );
 
     const proyectoEmpleado = contratosFiltrados[0]?.cliente_proyecto ?? null;
+    const proyectoInventarioEmpleado = proyectoInventarioDe(proyectoEmpleado);
 
     const generoEmpleado = useMemo(() => {
         const emp = empleados.find(
@@ -1099,7 +1115,7 @@ function Modal({
                         <>
                             {proyectoEmpleado && !readOnly && (() => {
                                 const hayStock = inventarioAjustado.some(
-                                    (i) => i.proyecto === proyectoEmpleado && i.cantidad > 0
+                                    (i) => i.proyecto === proyectoInventarioEmpleado && i.cantidad > 0
                                 );
                                 return !hayStock ? (
                                     <div style={{
@@ -1236,7 +1252,7 @@ function Modal({
                                                     tallasEmpleado={
                                                         tallasEmpleado
                                                     }
-                                                    proyecto={proyectoEmpleado}
+                                                    proyecto={proyectoInventarioEmpleado}
                                                 />
                                             )}
                                             <div

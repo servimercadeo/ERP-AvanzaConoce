@@ -17,11 +17,13 @@ class InventarioDotacion extends Model
         'subcategoria',
         'genero',
         'talla',
+        'precio',
         'cantidad',
         'stock_minimo',
     ];
 
     protected $casts = [
+        'precio' => 'integer',
         'cantidad' => 'integer',
         'stock_minimo' => 'integer',
     ];
