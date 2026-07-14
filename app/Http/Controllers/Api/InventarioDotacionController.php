@@ -117,6 +117,53 @@ class InventarioDotacionController extends Controller
         return response()->json(['saved' => $saved]);
     }
 
+    public function import(Request $request)
+    {
+        $request->validate([
+            'items'                => 'required|array|min:1',
+            'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'items.*.categoria'    => 'required|string|max:60',
+            'items.*.subcategoria' => 'required|string|max:80',
+            'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
+            'items.*.talla'        => 'required|string|max:10',
+            'items.*.precio'       => 'nullable|integer|min:0',
+            'items.*.cantidad'     => 'required|integer|min:0',
+            'items.*.stock_minimo' => 'nullable|integer|min:0',
+        ]);
+
+        $creados = 0;
+        $actualizados = 0;
+
+        foreach ($request->items as $item) {
+            $existente = InventarioDotacion::where([
+                'proyecto'     => $item['proyecto'],
+                'categoria'    => $item['categoria'],
+                'subcategoria' => $item['subcategoria'],
+                'genero'       => $item['genero'],
+                'talla'        => $item['talla'],
+            ])->first();
+
+            if ($existente) {
+                $existente->increment('cantidad', $item['cantidad']);
+                $actualizados++;
+            } else {
+                InventarioDotacion::create([
+                    'proyecto'     => $item['proyecto'],
+                    'categoria'    => $item['categoria'],
+                    'subcategoria' => $item['subcategoria'],
+                    'genero'       => $item['genero'],
+                    'talla'        => $item['talla'],
+                    'precio'       => $item['precio'] ?? 0,
+                    'cantidad'     => $item['cantidad'],
+                    'stock_minimo' => $item['stock_minimo'] ?? 0,
+                ]);
+                $creados++;
+            }
+        }
+
+        return response()->json(['creados' => $creados, 'actualizados' => $actualizados]);
+    }
+
     public function update(Request $request, InventarioDotacion $inventarioDotacion)
     {
         $data = $request->validate([

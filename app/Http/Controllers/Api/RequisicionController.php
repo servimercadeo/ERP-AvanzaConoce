@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Empresa;
+use App\Models\Proyecto;
 use App\Models\Requisicion;
+use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class RequisicionController extends Controller
 {
@@ -52,6 +56,8 @@ class RequisicionController extends Controller
             'observaciones'           => 'nullable|string',
         ]);
 
+        $this->validarEmpresaProyecto($data['empresa_id'] ?? null, $data['proyecto_id'] ?? null);
+
         $max = Requisicion::pluck('nro_identificacion_proceso')
             ->map(fn($n) => (int) preg_replace('/\D/', '', $n))
             ->filter()
@@ -91,23 +97,28 @@ class RequisicionController extends Controller
             'observaciones'           => 'nullable|string',
         ]);
 
+        $empresaIdFinal  = array_key_exists('empresa_id', $data) ? $data['empresa_id'] : $requisicion->empresa_id;
+        $proyectoIdFinal = array_key_exists('proyecto_id', $data) ? $data['proyecto_id'] : $requisicion->proyecto_id;
+        $this->validarEmpresaProyecto($empresaIdFinal, $proyectoIdFinal);
+
         $requisicion->update($data);
 
-        // Propagar cliente_proyecto a los contratos de los candidatos vinculados
-        // Se ejecuta siempre que proyecto_id venga en el request (para mantener consistencia)
-        if (array_key_exists('proyecto_id', $data)) {
-            $nuevoProyectoId = $data['proyecto_id'];
-            $nuevoNombre = $nuevoProyectoId
-                ? \App\Models\Proyecto::find($nuevoProyectoId)?->nombre
-                : null;
-
+        // Propagar proyecto/empresa a los contratos de los candidatos vinculados.
+        // Se ejecuta siempre que proyecto_id o empresa_id vengan en el request (para mantener consistencia).
+        if (array_key_exists('proyecto_id', $data) || array_key_exists('empresa_id', $data)) {
             $cedulas = $requisicion->candidatos()->pluck('identificacion')->filter()->unique();
 
             if ($cedulas->isNotEmpty()) {
                 $empleadoIds = \App\Models\User::whereIn('cedula', $cedulas)->pluck('id');
                 if ($empleadoIds->isNotEmpty()) {
-                    \App\Models\Contrato::whereIn('empleado_id', $empleadoIds)
-                        ->update(['cliente_proyecto' => $nuevoNombre]);
+                    $camposContrato = [];
+                    if (array_key_exists('proyecto_id', $data)) {
+                        $camposContrato['cliente_proyecto'] = $data['proyecto_id'] ? Proyecto::find($data['proyecto_id'])?->nombre : null;
+                    }
+                    if (array_key_exists('empresa_id', $data)) {
+                        $camposContrato['empresa'] = $data['empresa_id'] ? Empresa::find($data['empresa_id'])?->nombre : null;
+                    }
+                    \App\Models\Contrato::whereIn('empleado_id', $empleadoIds)->update($camposContrato);
                 }
             }
         }
@@ -119,5 +130,15 @@ class RequisicionController extends Controller
     {
         $requisicion->delete();
         return response()->json(null, 204);
+    }
+
+    private function validarEmpresaProyecto(?int $empresaId, ?int $proyectoId): void
+    {
+        $empresaNombre  = $empresaId ? Empresa::find($empresaId)?->nombre : null;
+        $proyectoNombre = $proyectoId ? Proyecto::find($proyectoId)?->nombre : null;
+
+        if ($msg = EmpresaProyectoRules::validar($empresaNombre, $proyectoNombre)) {
+            throw ValidationException::withMessages(['proyecto_id' => $msg]);
+        }
     }
 }

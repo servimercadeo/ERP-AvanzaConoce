@@ -141,9 +141,11 @@ class PedidoAutomaticoController extends Controller
 
     public function ultimoPorEmpleado(int $empleadoId)
     {
+        // Sirve solo como referencia de historial para pre-cargar un pedido nuevo
+        // (no se vincula ni se modifica el pedido encontrado), así que no importa
+        // en qué estado esté: se toma siempre el más reciente del empleado.
         $pedido = PedidoAutomatico::with(['items.inventario'])
             ->where('empleado_id', $empleadoId)
-            ->where('estado', 'Completado')
             ->orderBy('id', 'desc')
             ->first();
 

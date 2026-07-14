@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import api from '../api/axios';
-import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch } from '../components/Icons';
+import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 
 const PROYECTOS   = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
 const CATEGORIAS  = ['Blusa', 'Botas', 'Camisa', 'Carnet', 'Chaqueta', 'Conjunto', 'Gorra', 'Jean', 'Pantalon', 'Polo', 'Reata', 'Tenis', 'Zapatos', 'Chaleco', 'Otro'];
@@ -258,6 +259,148 @@ function BulkModal({ onClose, onSaved }) {
     );
 }
 
+// ─── Modal importar Excel ─────────────────────────────────────────────────────
+const IMPORT_HEADER_MAP = {
+    proyecto: 'proyecto',
+    prenda: 'categoria',
+    categoria: 'categoria',
+    descripcion: 'subcategoria',
+    subcategoria: 'subcategoria',
+    genero: 'genero',
+    talla: 'talla',
+    precio: 'precio',
+    cantidad: 'cantidad',
+    'stock minimo': 'stock_minimo',
+    'stock min.': 'stock_minimo',
+};
+
+const normalizeHeader = (s) => (s ?? '').toString().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
+
+function ImportModal({ onClose, onImported }) {
+    const [fileName, setFileName] = useState('');
+    const [validRows, setValidRows] = useState([]);
+    const [invalidRows, setInvalidRows] = useState([]);
+    const [importing, setImporting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError(''); setValidRows([]); setInvalidRows([]); setFileName(file.name);
+
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+            if (raw.length === 0) { setError('El archivo no tiene filas de datos.'); return; }
+
+            const valid = [];
+            const invalid = [];
+
+            raw.forEach((row, idx) => {
+                const mapped = {};
+                Object.entries(row).forEach(([k, v]) => {
+                    const key = IMPORT_HEADER_MAP[normalizeHeader(k)];
+                    if (key) mapped[key] = typeof v === 'string' ? v.trim() : v;
+                });
+
+                const motivos = [];
+                if (!PROYECTOS.includes(mapped.proyecto)) motivos.push('proyecto inválido');
+                if (!CATEGORIAS.includes(mapped.categoria)) motivos.push('prenda inválida');
+                if (!mapped.subcategoria) motivos.push('descripción vacía');
+                if (!GENEROS.includes(mapped.genero)) motivos.push('género inválido');
+                if (!mapped.talla && mapped.talla !== 0) motivos.push('talla vacía');
+                const cantidad = Number(mapped.cantidad);
+                if (!Number.isFinite(cantidad) || cantidad < 0) motivos.push('cantidad inválida');
+
+                if (motivos.length) {
+                    invalid.push({ fila: idx + 2, motivos: motivos.join(', ') });
+                } else {
+                    valid.push({
+                        proyecto: mapped.proyecto,
+                        categoria: mapped.categoria,
+                        subcategoria: mapped.subcategoria,
+                        genero: mapped.genero,
+                        talla: String(mapped.talla),
+                        precio: Number(mapped.precio) || 0,
+                        cantidad,
+                        stock_minimo: Number(mapped.stock_minimo) || 0,
+                    });
+                }
+            });
+
+            setValidRows(valid);
+            setInvalidRows(invalid);
+        } catch {
+            setError('No se pudo leer el archivo. Verifica que sea un Excel válido (.xlsx).');
+        }
+    };
+
+    const handleImport = async () => {
+        if (validRows.length === 0) return;
+        setImporting(true); setError('');
+        try {
+            const { data } = await api.post('/inventario-dotacion/import', { items: validRows });
+            onImported(data);
+        } catch (e) {
+            setError(e?.response?.data?.message ?? 'Error al importar.');
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 640 }}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800, fontSize: '1rem' }}>Importar Excel</span>
+                    <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
+                </div>
+                <div style={S.modalBody}>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: 0 }}>
+                        Usa el mismo formato del botón "Exportar Excel": columnas <strong>Proyecto, Prenda, Descripción, Género, Talla, Precio, Cantidad, Stock mínimo</strong>.
+                        Si una combinación proyecto + prenda + talla + género ya existe, la cantidad se <strong>suma</strong> al stock actual; si no existe, se crea un item nuevo.
+                    </p>
+                    <label htmlFor="import-excel-file" style={S.fileDrop}>
+                        <input id="import-excel-file" type="file" accept=".xlsx,.xls" onChange={handleFile} style={{ display: 'none' }} />
+                        <IconFile size={22} />
+                        <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.88rem' }}>
+                            {fileName ? 'Cambiar archivo' : 'Seleccionar archivo Excel'}
+                        </span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {fileName || '.xlsx o .xls'}
+                        </span>
+                    </label>
+                    {validRows.length > 0 && (
+                        <div style={{ background: '#e0f7f4', color: '#0d6e5a', borderRadius: 6, padding: '8px 12px', fontSize: '0.84rem', fontWeight: 600, marginBottom: 10 }}>
+                            {validRows.length} fila{validRows.length !== 1 ? 's' : ''} lista{validRows.length !== 1 ? 's' : ''} para importar.
+                        </div>
+                    )}
+                    {invalidRows.length > 0 && (
+                        <div style={{ ...S.errorMsg, marginBottom: 10 }}>
+                            <p style={{ margin: '0 0 6px', fontWeight: 700 }}>
+                                {invalidRows.length} fila{invalidRows.length !== 1 ? 's' : ''} omitida{invalidRows.length !== 1 ? 's' : ''} por datos inválidos:
+                            </p>
+                            <ul style={{ margin: 0, paddingLeft: 18, maxHeight: 140, overflowY: 'auto' }}>
+                                {invalidRows.map((r, i) => <li key={i}>Fila {r.fila}: {r.motivos}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                    {error && <div style={S.errorMsg}>{error}</div>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={importing}>Cancelar</button>
+                    <button style={S.btnPrimary} onClick={handleImport} disabled={importing || validRows.length === 0}>
+                        {importing ? 'Importando…' : `Importar ${validRows.length} item${validRows.length !== 1 ? 's' : ''}`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Modal confirmar eliminación ─────────────────────────────────────────────
 function DeleteModal({ item, onClose, onDeleted }) {
     const [deleting, setDeleting] = useState(false);
@@ -308,6 +451,7 @@ export default function ProductosDotacion() {
     const [deleteItem, setDeleteItem]     = useState(null);
     const [addOpen, setAddOpen]           = useState(false);
     const [bulkOpen, setBulkOpen]         = useState(false);
+    const [importOpen, setImportOpen]     = useState(false);
     const [toast, setToast]               = useState(null);
 
     const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
@@ -377,6 +521,12 @@ export default function ProductosDotacion() {
         showToast(`${count} item${count !== 1 ? 's' : ''} guardados.`);
     };
 
+    const handleImported = (result) => {
+        invalidate();
+        setImportOpen(false);
+        showToast(`Importación completa: ${result.creados} creado${result.creados !== 1 ? 's' : ''}, ${result.actualizados} sumado${result.actualizados !== 1 ? 's' : ''} al stock existente.`);
+    };
+
     const handleDeleted = (id) => {
         qc.setQueryData(['inventario-dotacion-flat'], prev => (prev ?? []).filter(i => i.id !== id));
         setDeleteItem(null);
@@ -388,6 +538,38 @@ export default function ProductosDotacion() {
         if (cantidad <= minimo * 0.5) return { bg: '#fce8e8', color: '#c0392b', label: 'Crítico' };
         if (cantidad <= minimo) return { bg: '#fff7e0', color: '#b7780c', label: 'Bajo' };
         return { bg: '#e0f7f4', color: '#0d6e5a', label: 'OK' };
+    };
+
+    const handleExport = () => {
+        const rows = filtrados.map(i => ({
+            Proyecto: i.proyecto,
+            Prenda: i.categoria,
+            Descripción: i.subcategoria,
+            Género: i.genero,
+            Talla: i.talla,
+            Precio: Number(i.precio ?? 0),
+            Cantidad: i.cantidad,
+            'Stock mínimo': i.stock_minimo,
+            Estado: badgeStock(i.cantidad, i.stock_minimo).label,
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 20 }, { wch: 14 }, { wch: 32 }, { wch: 12 },
+            { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+
+        const partes = [proyectoTab];
+        if (categoriaFiltro !== 'Todos') partes.push(categoriaFiltro);
+        if (generoFiltro !== 'Todos') partes.push(generoFiltro);
+        if (tallaFiltro !== 'Todos') partes.push(`Talla-${tallaFiltro}`);
+        const fecha = new Date().toISOString().slice(0, 10);
+        const nombre = `Inventario_Dotacion_${partes.join('_')}_${fecha}.xlsx`.replace(/\s+/g, '_');
+
+        XLSX.writeFile(wb, nombre);
+        showToast(`Excel exportado (${rows.length} item${rows.length !== 1 ? 's' : ''}).`);
     };
 
     const pc = PROYECTO_COLORS[proyectoTab] ?? PROYECTO_COLORS['SYM TIGO EXPRESS'];
@@ -503,6 +685,10 @@ export default function ProductosDotacion() {
                     </div>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+                    <button style={S.btnSecondary} onClick={handleExport} disabled={filtrados.length === 0}>
+                        Exportar Excel
+                    </button>
+                    <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>Importar Excel</button>
                     <button style={S.btnSecondary} onClick={() => setBulkOpen(true)}>Carga masiva</button>
                     <button style={S.btnPrimary} onClick={() => setAddOpen(true)}>+ Nuevo item</button>
                 </div>
@@ -577,6 +763,7 @@ export default function ProductosDotacion() {
             {addOpen  && <ItemModal onClose={() => setAddOpen(false)} onSaved={handleSaved} />}
             {editItem && <ItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={handleSaved} />}
             {bulkOpen && <BulkModal onClose={() => setBulkOpen(false)} onSaved={handleBulkSaved} />}
+            {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={handleImported} />}
             {deleteItem && <DeleteModal item={deleteItem} onClose={() => setDeleteItem(null)} onDeleted={handleDeleted} />}
         </div>
     );
@@ -609,6 +796,11 @@ const S = {
     btnSecondary: { padding: '9px 18px', background: 'var(--white)', color: 'var(--text)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', fontFamily: 'Nunito,sans-serif' },
     btnIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', borderRadius: 6 },
     errorMsg: { background: '#fce8e8', color: '#c0392b', borderRadius: 6, padding: '8px 12px', fontSize: '0.84rem', fontWeight: 600, marginTop: 10 },
+    fileDrop: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+        padding: '22px 16px', border: '1.5px dashed var(--primary)', borderRadius: 'var(--radius-sm)',
+        background: 'var(--bg)', color: 'var(--primary)', cursor: 'pointer', marginBottom: 10, textAlign: 'center',
+    },
     tdCell: { padding: '6px 8px', border: '1px solid var(--border)', verticalAlign: 'middle' },
     cellInput: { padding: '6px 8px', border: '1.5px solid var(--border)', borderRadius: 6, fontSize: '0.82rem', fontFamily: 'Nunito,sans-serif', background: 'var(--white)', color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' },
     toast: { position: 'fixed', bottom: 28, right: 28, background: 'var(--primary)', color: '#fff', borderRadius: 'var(--radius-sm)', padding: '13px 22px', fontWeight: 700, fontSize: '0.92rem', zIndex: 99999, boxShadow: '0 8px 28px rgba(26,155,140,0.35)' },

@@ -158,7 +158,7 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                             <div
                                 style={{ fontWeight: 800, fontSize: "0.95rem" }}
                             >
-                                {pedido.empleado?.nombres}{" "}
+                                {pedido.empleado?.nombres}
                                 {pedido.empleado?.apellidos}
                             </div>
                             <div
