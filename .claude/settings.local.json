@@ -6,7 +6,9 @@
       "Bash(npm run *)",
       "Bash(find app/Http/Resources -name \"Requisicion*\")",
       "Bash(find app *)",
-      "Bash(findstr /n \"estudio_seguridad\" \"c:\\\\Users\\\\Servimercadeo\\\\Desktop\\\\ERP_AvanzaConoce\\\\resources\\\\js\\\\pages\\\\CandidatosCrud.jsx\")"
+      "Bash(findstr /n \"estudio_seguridad\" \"c:\\\\Users\\\\Servimercadeo\\\\Desktop\\\\ERP_AvanzaConoce\\\\resources\\\\js\\\\pages\\\\CandidatosCrud.jsx\")",
+      "Bash(npx vite *)",
+      "Bash(php _tmp_test_reglas.php)"
     ]
   }
 }

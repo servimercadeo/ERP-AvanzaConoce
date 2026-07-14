@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventarioDotacion;
 use Illuminate\Http\Request;
 
-const PROYECTOS_DOTACION = ['TIGO EXPRESS', 'DIRECTV CO', 'Administrativo'];
+const PROYECTOS_DOTACION = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
 const GENEROS_DOTACION   = ['Masculino', 'Femenino', 'Unisex'];
 
 class InventarioDotacionController extends Controller
@@ -53,11 +53,12 @@ class InventarioDotacionController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'proyecto'     => 'required|in:TIGO EXPRESS,DIRECTV CO,Administrativo',
+            'proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
             'categoria'    => 'required|string|max:60',
             'subcategoria' => 'required|string|max:80',
             'genero'       => 'required|in:Masculino,Femenino,Unisex',
             'talla'        => 'required|string|max:10',
+            'precio'       => 'nullable|integer|min:0',
             'cantidad'     => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
         ]);
@@ -71,6 +72,7 @@ class InventarioDotacionController extends Controller
                 'talla'        => $data['talla'],
             ],
             [
+                'precio'       => $data['precio'] ?? 0,
                 'cantidad'     => $data['cantidad'],
                 'stock_minimo' => $data['stock_minimo'] ?? 0,
             ]
@@ -83,11 +85,12 @@ class InventarioDotacionController extends Controller
     {
         $request->validate([
             'items'                => 'required|array|min:1',
-            'items.*.proyecto'     => 'required|in:TIGO EXPRESS,DIRECTV CO,Administrativo',
+            'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
             'items.*.categoria'    => 'required|string|max:60',
             'items.*.subcategoria' => 'required|string|max:80',
             'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
             'items.*.talla'        => 'required|string|max:10',
+            'items.*.precio'       => 'nullable|integer|min:0',
             'items.*.cantidad'     => 'required|integer|min:0',
             'items.*.stock_minimo' => 'nullable|integer|min:0',
         ]);
@@ -103,6 +106,7 @@ class InventarioDotacionController extends Controller
                     'talla'        => $item['talla'],
                 ],
                 [
+                    'precio'       => $item['precio'] ?? 0,
                     'cantidad'     => $item['cantidad'],
                     'stock_minimo' => $item['stock_minimo'] ?? 0,
                 ]
@@ -113,16 +117,65 @@ class InventarioDotacionController extends Controller
         return response()->json(['saved' => $saved]);
     }
 
+    public function import(Request $request)
+    {
+        $request->validate([
+            'items'                => 'required|array|min:1',
+            'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'items.*.categoria'    => 'required|string|max:60',
+            'items.*.subcategoria' => 'required|string|max:80',
+            'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
+            'items.*.talla'        => 'required|string|max:10',
+            'items.*.precio'       => 'nullable|integer|min:0',
+            'items.*.cantidad'     => 'required|integer|min:0',
+            'items.*.stock_minimo' => 'nullable|integer|min:0',
+        ]);
+
+        $creados = 0;
+        $actualizados = 0;
+
+        foreach ($request->items as $item) {
+            $existente = InventarioDotacion::where([
+                'proyecto'     => $item['proyecto'],
+                'categoria'    => $item['categoria'],
+                'subcategoria' => $item['subcategoria'],
+                'genero'       => $item['genero'],
+                'talla'        => $item['talla'],
+            ])->first();
+
+            if ($existente) {
+                $existente->increment('cantidad', $item['cantidad']);
+                $actualizados++;
+            } else {
+                InventarioDotacion::create([
+                    'proyecto'     => $item['proyecto'],
+                    'categoria'    => $item['categoria'],
+                    'subcategoria' => $item['subcategoria'],
+                    'genero'       => $item['genero'],
+                    'talla'        => $item['talla'],
+                    'precio'       => $item['precio'] ?? 0,
+                    'cantidad'     => $item['cantidad'],
+                    'stock_minimo' => $item['stock_minimo'] ?? 0,
+                ]);
+                $creados++;
+            }
+        }
+
+        return response()->json(['creados' => $creados, 'actualizados' => $actualizados]);
+    }
+
     public function update(Request $request, InventarioDotacion $inventarioDotacion)
     {
         $data = $request->validate([
             'cantidad'     => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
+            'precio'       => 'nullable|integer|min:0',
         ]);
 
         $inventarioDotacion->update([
             'cantidad'     => $data['cantidad'],
             'stock_minimo' => $data['stock_minimo'] ?? $inventarioDotacion->stock_minimo,
+            'precio'       => $data['precio'] ?? $inventarioDotacion->precio,
         ]);
 
         return response()->json($inventarioDotacion);

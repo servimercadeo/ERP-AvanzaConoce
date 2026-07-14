@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect as FilterSelect,
@@ -1918,6 +1918,7 @@ function Modal({
 }
 
 export default function ContratosCrud() {
+    const qc = useQueryClient();
     const [contratos, setContratos] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -2046,6 +2047,7 @@ export default function ContratosCrud() {
                     c.estado_contrato === filtroEstado;
                 const matchS = filtroSede === "Todas" || c.sede === filtroSede;
                 const matchTC =
+            
                     filtroTipoContrato === "Todos" ||
                     c.tipo_contrato === filtroTipoContrato;
                 const matchV =
@@ -2068,8 +2070,8 @@ export default function ContratosCrud() {
                     matchTC &&
                     matchV &&
                     matchC &&
-                    matchArl &&
                     matchCaja &&
+                    matchArl &&
                     matchEmp &&
                     matchFP
                 );
@@ -2122,11 +2124,19 @@ export default function ContratosCrud() {
                 setContratos((prev) =>
                     prev.map((c) => (c.id === editTarget.id ? data : c)),
                 );
+                qc.invalidateQueries({ queryKey: ["contratos"] });
+                qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
                 showToast("Contrato actualizado.");
             } else {
                 const { data } = await api.post("/contratos", form);
                 setContratos((prev) => [data, ...prev]);
-                showToast("Contrato creado.");
+                qc.invalidateQueries({ queryKey: ["contratos"] });
+                qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+                showToast(
+                    data.pedido_automatico
+                        ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado (${data.pedido_automatico.estado}).`
+                        : "Contrato creado. No se generó pedido automático (proyecto/cargo sin regla de dotación).",
+                );
             }
             setModalOpen(false);
         } catch (err) {

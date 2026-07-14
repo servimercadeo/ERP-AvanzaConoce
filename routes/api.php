@@ -224,6 +224,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
     Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
+    Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import']);
     Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store']);
     Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update']);
     Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy']);

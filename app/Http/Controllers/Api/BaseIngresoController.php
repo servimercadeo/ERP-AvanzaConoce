@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BaseIngreso;
+use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class BaseIngresoController extends Controller
 {
@@ -84,6 +86,10 @@ class BaseIngresoController extends Controller
             'estado'                     => 'nullable|string|max:40',
         ]);
 
+        if ($msg = EmpresaProyectoRules::validar($data['empresa'] ?? null, $data['proyecto'] ?? null)) {
+            throw ValidationException::withMessages(['proyecto' => $msg]);
+        }
+
         $ingreso = BaseIngreso::create($data);
         $ingreso->load([
             'candidato.requisicion.cargo',
@@ -144,6 +150,12 @@ class BaseIngresoController extends Controller
             'auxilio_alimentacion'       => 'nullable|numeric|min:0',
             'estado'                     => 'nullable|string|max:40',
         ]);
+
+        $empresaFinal  = array_key_exists('empresa', $data) ? $data['empresa'] : $baseIngreso->empresa;
+        $proyectoFinal = array_key_exists('proyecto', $data) ? $data['proyecto'] : $baseIngreso->proyecto;
+        if ($msg = EmpresaProyectoRules::validar($empresaFinal, $proyectoFinal)) {
+            throw ValidationException::withMessages(['proyecto' => $msg]);
+        }
 
         $baseIngreso->update($data);
         $baseIngreso->load([
