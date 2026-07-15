@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class PedidoAutomatico extends Model
 {
@@ -50,5 +51,26 @@ class PedidoAutomatico extends Model
             ->value('max_c') ?? 0;
 
         return str_pad((int)$max + 1, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function asignarItems(array $items): void
+    {
+        foreach ($items as $item) {
+            $inv = InventarioDotacion::lockForUpdate()->findOrFail($item['inventario_dotacion_id']);
+
+            if ($inv->cantidad < $item['cantidad']) {
+                throw new InvalidArgumentException(
+                    "Stock insuficiente para {$inv->categoria} {$inv->subcategoria} {$inv->genero} T:{$inv->talla}. " .
+                    "Disponible: {$inv->cantidad}, solicitado: {$item['cantidad']}."
+                );
+            }
+
+            $this->items()->create([
+                'inventario_dotacion_id' => $item['inventario_dotacion_id'],
+                'cantidad'               => $item['cantidad'],
+            ]);
+
+            $inv->decrement('cantidad', $item['cantidad']);
+        }
     }
 }

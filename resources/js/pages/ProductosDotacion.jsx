@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
 import api from '../api/axios';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 
@@ -289,6 +288,7 @@ function ImportModal({ onClose, onImported }) {
         setError(''); setValidRows([]); setInvalidRows([]); setFileName(file.name);
 
         try {
+            const XLSX = await import('xlsx');
             const buf = await file.arrayBuffer();
             const wb = XLSX.read(buf, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
@@ -540,7 +540,8 @@ export default function ProductosDotacion() {
         return { bg: '#e0f7f4', color: '#0d6e5a', label: 'OK' };
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        const XLSX = await import('xlsx');
         const rows = filtrados.map(i => ({
             Proyecto: i.proyecto,
             Prenda: i.categoria,

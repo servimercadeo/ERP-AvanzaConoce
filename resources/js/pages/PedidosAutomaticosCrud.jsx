@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import {
@@ -1505,6 +1504,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
         setFileName(file.name);
 
         try {
+            const XLSX = await import("xlsx");
             const buf = await file.arrayBuffer();
             const wb = XLSX.read(buf, { type: "array" });
             const ws = wb.Sheets[wb.SheetNames[0]];
@@ -1523,8 +1523,9 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 return mapped;
             });
 
-            // Agrupar filas en pedidos por cédula + fecha + estado (así una misma
-            // exportación, con varias líneas de prenda por pedido, se reconstruye igual).
+            // Agrupar filas en pedidos por código (si viene en el archivo) o, si no,
+            // por cédula + fecha + estado. Usar el código evita que dos pedidos
+            // distintos del mismo empleado se fusionen al reimportar un export.
             const gruposMap = new Map();
             const orden = [];
             filas.forEach((fila, idx) => {
@@ -1534,11 +1535,15 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 const fechaPedido = fila.fecha_pedido
                     ? dateOnly(fila.fecha_pedido)
                     : new Date().toISOString().split("T")[0];
-                const key = `${cedula}|${fechaPedido}|${estado}`;
+                const codigo = String(fila.codigo ?? "").trim();
+                const key = codigo
+                    ? `codigo:${codigo}`
+                    : `${cedula}|${fechaPedido}|${estado}`;
 
                 if (!gruposMap.has(key)) {
                     gruposMap.set(key, {
                         cedula,
+                        codigo: codigo || null,
                         empleado: empleados.find((e) => e.cedula === cedula) ?? null,
                         estado,
                         fecha_pedido: fechaPedido,
@@ -1605,6 +1610,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                     estado: g.estado,
                     fecha_pedido: g.fecha_pedido,
                     notas: g.notas,
+                    codigo: g.codigo || undefined,
                     items: g.items.map(({ inventario_dotacion_id, cantidad }) => ({
                         inventario_dotacion_id,
                         cantidad,
@@ -1869,7 +1875,8 @@ export default function PedidosAutomaticosCrud() {
     );
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        const XLSX = await import("xlsx");
         const rows = [];
         filtered.forEach((p) => {
             const base = {
