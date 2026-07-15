@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventarioDotacion;
 use App\Models\PedidoAutomatico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,13 +41,14 @@ class PedidoAutomaticoController extends Controller
             'estado'       => 'nullable|string',
             'fecha_pedido' => 'nullable|date',
             'notas'        => 'nullable|string',
+            'codigo'       => 'nullable|string|max:10|unique:pedidos_automaticos,codigo',
             'items'        => 'nullable|array',
             'items.*.inventario_dotacion_id' => 'required|exists:inventario_dotacion,id',
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
 
         return DB::transaction(function () use ($data) {
-            $data['codigo']       = PedidoAutomatico::generarCodigo();
+            $data['codigo']       = $data['codigo'] ?? PedidoAutomatico::generarCodigo();
             $data['estado']       = $data['estado'] ?? 'Activo';
             $data['fecha_pedido'] = $data['fecha_pedido'] ?? now()->toDateString();
 
@@ -56,7 +56,7 @@ class PedidoAutomaticoController extends Controller
 
             if (!empty($data['items'])) {
                 if ($data['estado'] === 'Activo') {
-                    $this->asignarItems($pedido, $data['items']);
+                    $pedido->asignarItems($data['items']);
                 } else {
                     $this->guardarItemsSinDescontar($pedido, $data['items']);
                 }
@@ -103,14 +103,14 @@ class PedidoAutomaticoController extends Controller
                 $this->restaurarInventario($pedidoAutomatico);
                 $pedidoAutomatico->items()->delete();
                 if (!empty($data['items'])) {
-                    $this->asignarItems($pedidoAutomatico, $data['items']);
+                    $pedidoAutomatico->asignarItems($data['items']);
                 }
 
             } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Activo') {
                 // Primera activación: descontar items del payload
                 $pedidoAutomatico->items()->delete();
                 if (!empty($data['items'])) {
-                    $this->asignarItems($pedidoAutomatico, $data['items']);
+                    $pedidoAutomatico->asignarItems($data['items']);
                 }
 
             } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Pendiente') {
@@ -192,6 +192,34 @@ class PedidoAutomaticoController extends Controller
         });
     }
 
+    public function bulkEstado(Request $request)
+    {
+        $data = $request->validate([
+            'ids'          => 'required|array|min:1',
+            'ids.*'        => 'integer|exists:pedidos_automaticos,id',
+            'estado'       => 'required|string|in:Activo,Para ventas,Devolución,Devolución usada',
+        ]);
+
+        return DB::transaction(function () use ($data) {
+            $pedidos = PedidoAutomatico::whereIn('id', $data['ids'])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($pedidos as $pedido) {
+                if ($data['estado'] === 'Devolución' && $pedido->estado !== 'Devolución') {
+                    $this->restaurarInventario($pedido);
+                }
+                $pedido->update(['estado' => $data['estado']]);
+            }
+
+            return response()->json(
+                PedidoAutomatico::whereIn('id', $data['ids'])
+                    ->with(['empleado', 'contrato', 'items.inventario'])
+                    ->get()
+            );
+        });
+    }
+
     public function destroy(PedidoAutomatico $pedidoAutomatico)
     {
         return DB::transaction(function () use ($pedidoAutomatico) {
@@ -204,27 +232,6 @@ class PedidoAutomaticoController extends Controller
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private function asignarItems(PedidoAutomatico $pedido, array $items): void
-    {
-        foreach ($items as $item) {
-            $inv = InventarioDotacion::lockForUpdate()->findOrFail($item['inventario_dotacion_id']);
-
-            if ($inv->cantidad < $item['cantidad']) {
-                throw new \InvalidArgumentException(
-                    "Stock insuficiente para {$inv->categoria} {$inv->subcategoria} {$inv->genero} T:{$inv->talla}. " .
-                    "Disponible: {$inv->cantidad}, solicitado: {$item['cantidad']}."
-                );
-            }
-
-            $pedido->items()->create([
-                'inventario_dotacion_id' => $item['inventario_dotacion_id'],
-                'cantidad'               => $item['cantidad'],
-            ]);
-
-            $inv->decrement('cantidad', $item['cantidad']);
-        }
-    }
 
     private function guardarItemsSinDescontar(PedidoAutomatico $pedido, array $items): void
     {

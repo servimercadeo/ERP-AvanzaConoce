@@ -7,6 +7,7 @@ use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class PedidoGlobalController extends Controller
 {
@@ -116,6 +117,83 @@ class PedidoGlobalController extends Controller
                 'global' => $global,
                 'total'  => $pedidos->count(),
             ], 201);
+        });
+    }
+
+    public function import(Request $request)
+    {
+        $data = $request->validate([
+            'fecha'                                      => 'nullable|date',
+            'notas'                                       => 'nullable|string',
+            'proyecto'                                    => 'required|string',
+            'regional_id'                                 => 'required|exists:regionales,id',
+            'pedidos'                                      => 'required|array|min:1',
+            'pedidos.*.codigo'                             => 'nullable|string|max:10',
+            'pedidos.*.empleado_id'                        => 'required|exists:users,id',
+            'pedidos.*.contrato_id'                        => 'nullable|exists:contratos,id',
+            'pedidos.*.fecha_pedido'                       => 'nullable|date',
+            'pedidos.*.notas'                              => 'nullable|string',
+            'pedidos.*.items'                              => 'required|array|min:1',
+            'pedidos.*.items.*.inventario_dotacion_id'     => 'required|exists:inventario_dotacion,id',
+            'pedidos.*.items.*.cantidad'                   => 'required|integer|min:1',
+        ]);
+
+        return DB::transaction(function () use ($data) {
+            $global = PedidoGlobal::create([
+                'codigo'           => PedidoGlobal::generarCodigo(),
+                'fecha'            => $data['fecha'] ?? now()->toDateString(),
+                'cliente_proyecto' => $data['proyecto'],
+                'regional_id'      => $data['regional_id'],
+                'notas'            => $data['notas'] ?? null,
+                'total_pedidos'    => count($data['pedidos']),
+            ]);
+
+            foreach ($data['pedidos'] as $p) {
+                $existente = !empty($p['codigo'])
+                    ? PedidoAutomatico::where('codigo', $p['codigo'])->lockForUpdate()->first()
+                    : null;
+
+                if ($existente) {
+                    if ($existente->pedido_global_id) {
+                        throw new InvalidArgumentException(
+                            "El pedido #{$existente->codigo} ya pertenece a otro pedido global."
+                        );
+                    }
+                    if ($existente->estado !== 'Activo') {
+                        throw new InvalidArgumentException(
+                            "El pedido #{$existente->codigo} está en estado \"{$existente->estado}\" y no se puede incluir en un pedido global."
+                        );
+                    }
+                    // Ya existe y su inventario ya fue descontado al crearlo: solo se vincula al global.
+                    $existente->update([
+                        'pedido_global_id' => $global->id,
+                        'estado'           => 'Completado',
+                    ]);
+                    continue;
+                }
+
+                $pedido = PedidoAutomatico::create([
+                    'codigo'           => $p['codigo'] ?: PedidoAutomatico::generarCodigo(),
+                    'empleado_id'      => $p['empleado_id'],
+                    'contrato_id'      => $p['contrato_id'] ?? null,
+                    'estado'           => 'Completado',
+                    'fecha_pedido'     => $p['fecha_pedido'] ?? now()->toDateString(),
+                    'notas'            => $p['notas'] ?? null,
+                    'pedido_global_id' => $global->id,
+                ]);
+
+                $pedido->asignarItems($p['items']);
+            }
+
+            $fresh = collect([$global->fresh()->load([
+                'regional',
+                'pedidosAutomaticos.empleado',
+                'pedidosAutomaticos.contrato',
+                'pedidosAutomaticos.items.inventario',
+            ])]);
+            $this->resolverFotografias($fresh);
+
+            return response()->json($fresh->first(), 201);
         });
     }
 

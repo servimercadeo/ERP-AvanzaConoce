@@ -232,12 +232,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Pedidos automáticos de dotación
     Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
     Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver']);
+    Route::put('pedidos-automaticos/bulk-estado', [PedidoAutomaticoController::class, 'bulkEstado']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
         ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
 
     // Pedidos globales de dotación
     Route::get('pedidos-globales', [PedidoGlobalController::class, 'index']);
     Route::post('pedidos-globales', [PedidoGlobalController::class, 'store']);
+    Route::post('pedidos-globales/import', [PedidoGlobalController::class, 'import']);
     Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update']);
     Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy']);
 

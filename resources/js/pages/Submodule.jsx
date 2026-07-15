@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { ERP_MODULES } from '../data/erpModules';
-import { MODULE_ICONS, IconFolder, IconUnderConstruction } from '../components/Icons';
+import { MODULE_ICONS, IconFolder, IconUnderConstruction, IconLoading } from '../components/Icons';
 
-// ── Importa aquí los CRUD de cada archivo ───────────────────────────────
-import EmpleadosCrud from './EmpleadosCrud';
-import ContratosCrud from './ContratosCrud';
-import SeleccionCrud from './SeleccionCrud';
-import CandidatosCrud from './CandidatosCrud';
-import BaseIngresoCrud from './BaseIngresoCrud';
-import AvalesContratacionCrud from './AvalesContratacionCrud';
-import RespuestasFormularioCrud from './RespuestasFormularioCrud';
-import SeguimientoMedicoCrud from './SeguimientoMedicoCrud';
-import ProductosDotacion from './ProductosDotacion';
-import PedidosAutomaticosCrud from './PedidosAutomaticosCrud';
-import PedidosGlobalesCrud from './PedidosGlobalesCrud';
-import CronogramaDotacion from './CronogramaDotacion';
+// ── Importa aquí los CRUD de cada archivo (carga diferida: cada uno se
+// descarga solo cuando el usuario abre esa pestaña, no todos de una vez) ──
+const EmpleadosCrud = lazy(() => import('./EmpleadosCrud'));
+const ContratosCrud = lazy(() => import('./ContratosCrud'));
+const SeleccionCrud = lazy(() => import('./SeleccionCrud'));
+const CandidatosCrud = lazy(() => import('./CandidatosCrud'));
+const BaseIngresoCrud = lazy(() => import('./BaseIngresoCrud'));
+const AvalesContratacionCrud = lazy(() => import('./AvalesContratacionCrud'));
+const RespuestasFormularioCrud = lazy(() => import('./RespuestasFormularioCrud'));
+const SeguimientoMedicoCrud = lazy(() => import('./SeguimientoMedicoCrud'));
+const ProductosDotacion = lazy(() => import('./ProductosDotacion'));
+const PedidosAutomaticosCrud = lazy(() => import('./PedidosAutomaticosCrud'));
+const PedidosGlobalesCrud = lazy(() => import('./PedidosGlobalesCrud'));
+const CronogramaDotacion = lazy(() => import('./CronogramaDotacion'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -344,7 +345,9 @@ export default function Submodule() {
                   {mod.label} › {sub.label} · Gestión completa de {archivoActual?.label?.toLowerCase()}
                 </p>
               </div>
-              <CrudComponent />
+              <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
+                <CrudComponent />
+              </Suspense>
             </>
           ) : (
             /* ── Sin CRUD aún: placeholder ── */
@@ -420,6 +423,13 @@ const S = {
     padding: '36px 40px',
     boxShadow: 'var(--shadow)',
     minHeight: 300,
+  },
+  crudLoader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px 20px',
+    color: 'var(--primary)',
   },
   placeholder: {
     display: 'flex',
