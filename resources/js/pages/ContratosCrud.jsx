@@ -41,6 +41,18 @@ const MONTH_KEYS_SET = new Set([
     "jul", "ago", "sep", "oct", "nov", "dic",
 ]);
 
+const FLOW_URL_MED = "https://251096727969e82c98eb7eaa0a0fc8.e6.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/45ba95de50b94b638a5d230cc6012d1b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FcS4oaDM7z3PO6nTdfFh4SVXY9674xlKr2PyxUtYWkQ";
+const toBase64Med = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+const DOCS_MEDICOS = [
+    { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
+    { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
+    { id: "examen_periodico", label: "Examen Periódico",      tipo: "EXAMEN_PERIODICO" },
+    { id: "examen_retiro",    label: "Examen de Retiro",      tipo: "EXAMEN_DE_RETIRO" },
+    { id: "incapacidad",      label: "Incapacidad",           tipo: "INCAPACIDAD" },
+    { id: "otro_medico",      label: "Otro Documento Médico", tipo: "DOCUMENTO_MEDICO" },
+];
+const DOCS_MED_INIT = () => Object.fromEntries(DOCS_MEDICOS.map(d => [d.id, { file: null, status: "idle", name: null, error: null }]));
+
 const EMPTY_FORM = {
     empleado_id: "",
     tipo_contrato: "",
@@ -612,8 +624,12 @@ function Modal({
     const [activeTab, setActive] = useState("principal");
     const [eventosMedicos, setEventosMedicos] = useState([]);
     const [eventosCollapsed, setEventosCollapsed] = useState([]);
-    const [saving, setSaving] = useState(false);
-    const [obsYear, setObsYear] = useState(String(CUR_YEAR));
+    const [evObsYears, setEvObsYears]             = useState([]);
+    const [evCierreCollapsed, setEvCierre]        = useState([]);
+    const [saving, setSaving]                     = useState(false);
+    const [docsMed, setDocsMed]                   = useState(DOCS_MED_INIT);
+    const [uploadingMed, setUploadingMed]         = useState(false);
+    const [docsSubidos, setDocsSubidos]           = useState({});
     const isCreate = !initial?.id && !readOnly;
     const regionalOpts = (catalogs.regionales || []).map((r) => ({
         value: r.id,
@@ -645,20 +661,32 @@ function Modal({
                         : raw;
                 })(),
             });
-            setObsYear(String(CUR_YEAR));
             setErrors({});
             setActive("principal");
             setSaving(false);
             const _evs = (initial.eventos_medicos || []).map((ev) => ({
                 ...ev,
-                fecha_ingreso_seguimiento: dateOnly(
-                    ev.fecha_ingreso_seguimiento,
-                ),
+                fecha_ingreso_seguimiento: dateOnly(ev.fecha_ingreso_seguimiento),
                 vigencia_desde: dateOnly(ev.vigencia_desde),
                 vigencia_hasta: dateOnly(ev.vigencia_hasta),
+                fecha_cierre:   dateOnly(ev.fecha_cierre),
+                observaciones:  ev.observaciones ?? {},
             }));
             setEventosMedicos(_evs);
             setEventosCollapsed(_evs.map((_, __, arr) => arr.length > 1));
+            setEvObsYears(_evs.map(() => String(CUR_YEAR)));
+            setEvCierre(_evs.map(() => true));
+            setDocsMed(DOCS_MED_INIT());
+            setUploadingMed(false);
+            setDocsSubidos({});
+            const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
+            const ced = _emp?.cedula ?? initial?.documento ?? "";
+            if (ced) {
+                fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}`)
+                    .then(r => r.ok ? r.json() : {})
+                    .then(data => setDocsSubidos(data ?? {}))
+                    .catch(() => {});
+            }
         }
     }, [initial, open]);
 
@@ -762,12 +790,16 @@ function Modal({
         estado: "",
     };
     const addEvento = () => {
-        setEventosMedicos((ev) => [...ev, { ...EVENTO_VACIO }]);
+        setEventosMedicos((ev) => [...ev, { ...EVENTO_VACIO, fecha_cierre: "", observaciones: {} }]);
         setEventosCollapsed((c) => [...c, false]);
+        setEvObsYears((c) => [...c, String(CUR_YEAR)]);
+        setEvCierre((c) => [...c, true]);
     };
     const removeEvento = (idx) => {
         setEventosMedicos((ev) => ev.filter((_, i) => i !== idx));
         setEventosCollapsed((c) => c.filter((_, i) => i !== idx));
+        setEvObsYears((c) => c.filter((_, i) => i !== idx));
+        setEvCierre((c) => c.filter((_, i) => i !== idx));
     };
     const updateEvento = (idx, k, v) =>
         setEventosMedicos((ev) =>
@@ -775,6 +807,55 @@ function Modal({
         );
     const toggleEvento = (idx) =>
         setEventosCollapsed((c) => c.map((v, i) => (i === idx ? !v : v)));
+    const toggleCierre = (idx) =>
+        setEvCierre((c) => c.map((v, i) => (i === idx ? !v : v)));
+
+    const empForMed  = empleados.find(e => String(e.id) === String(form?.empleado_id));
+    const cedulaMed  = empForMed?.cedula ?? form?.documento ?? "";
+
+    const handleUploadDocs = async () => {
+        const toUpload = DOCS_MEDICOS.filter(d => docsMed[d.id]?.file);
+        if (!toUpload.length || uploadingMed || !cedulaMed) return;
+        setUploadingMed(true);
+        setDocsMed(prev => {
+            const next = { ...prev };
+            toUpload.forEach(d => { next[d.id] = { ...next[d.id], status: "uploading" }; });
+            return next;
+        });
+        const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
+        const successFiles = [];
+        for (const doc of toUpload) {
+            const file = docsMed[doc.id].file;
+            const ext  = file.name.split(".").pop().toLowerCase();
+            const filename = `${cedulaMed}_${doc.tipo}.${ext}`;
+            try {
+                const fd = new FormData();
+                fd.append("documento", cedulaMed);
+                fd.append("tipo", doc.id);
+                fd.append("archivo", file);
+                const res = await fetch("/api/documentos-contratacion/upload", {
+                    method: "POST", headers: { "X-CSRF-TOKEN": csrf }, body: fd,
+                });
+                if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? `Error ${res.status}`); }
+                setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
+                successFiles.push({ filename, file });
+            } catch (err) {
+                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: err.message } }));
+            }
+        }
+        if (successFiles.length > 0) {
+            fetch(FLOW_URL_MED, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    documento: cedulaMed,
+                    nombres:   empForMed?.nombres   ?? "",
+                    apellidos: empForMed?.apellidos ?? "",
+                }),
+            }).catch(() => {});
+        }
+        setUploadingMed(false);
+    };
 
     const validate = () => {
         const e = {};
@@ -861,10 +942,11 @@ function Modal({
 
                 <div className="tab-bar" style={S.tabBar}>
                     {[
-                        ["principal", "Información Principal"],
-                        ["seguridad", "Seguridad Social"],
-                        ["costos", "Costos y Anexos"],
-                        ["Seguimiento_medico", "Seguimiento medico"],
+                        ["principal",         "Información Principal"],
+                        ["seguridad",         "Seguridad Social"],
+                        ["costos",            "Costos y Anexos"],
+                        ["Seguimiento_medico","Seguimiento Médico"],
+                        ["doc_medicos",       "Documentos Médicos"],
                     ].map(([key, lbl]) => (
                         <button
                             key={key}
@@ -1218,7 +1300,7 @@ function Modal({
                                                 vigencia_hasta,
                                             } = ev;
                                             const cierre =
-                                                form.seguimiento_fecha_cierre;
+                                                ev.fecha_cierre;
                                             if (cierre && TODAY > cierre)
                                                 return {
                                                     label: "Vencida",
@@ -1493,6 +1575,70 @@ function Modal({
                                                                 {...evFp}
                                                             />
                                                         </div>
+
+                                                        {/* ── Cierre y Observaciones del evento ── */}
+                                                        <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleCierre(i)}
+                                                                style={{ width: "100%", textAlign: "left", padding: "8px 14px", background: evCierreCollapsed[i] ? "var(--bg)" : "var(--primary)", color: evCierreCollapsed[i] ? "var(--text)" : "#fff", border: "none", cursor: "pointer", fontWeight: 800, fontSize: "0.78rem", letterSpacing: "0.05em", fontFamily: "'Poppins',sans-serif", display: "flex", alignItems: "center", gap: 8 }}
+                                                            >
+                                                                {evCierreCollapsed[i] ? "▶" : "▼"} CIERRE Y OBSERVACIONES DEL EVENTO
+                                                            </button>
+                                                            {!evCierreCollapsed[i] && (
+                                                                <>
+                                                                    <div style={{ padding: "14px 14px 0", background: "var(--white)" }}>
+                                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                                                                            <div style={S.formGroup}>
+                                                                                <label style={S.label}>Fecha de Cierre</label>
+                                                                                <input
+                                                                                    type="date"
+                                                                                    style={{ ...S.input, ...(readOnly ? { background: "var(--bg)", color: "var(--text-muted)" } : {}) }}
+                                                                                    value={ev.fecha_cierre ?? ""}
+                                                                                    onChange={e => updateEvento(i, "fecha_cierre", e.target.value)}
+                                                                                    disabled={readOnly}
+                                                                                />
+                                                                            </div>
+                                                                            <div style={S.formGroup}>
+                                                                                <label style={S.label}>Año</label>
+                                                                                <select
+                                                                                    value={evObsYears[i] ?? String(CUR_YEAR)}
+                                                                                    onChange={e => setEvObsYears(y => y.map((v, j) => j === i ? e.target.value : v))}
+                                                                                    style={{ ...S.input, cursor: "pointer" }}
+                                                                                >
+                                                                                    {[...new Set([...YEAR_OPTS, ...Object.keys(ev.observaciones ?? {}).filter(k => /^\d{4}$/.test(k))])].sort().map(y => (
+                                                                                        <option key={y} value={y}>{y}{Object.values(ev.observaciones?.[y] ?? {}).some(Boolean) ? " ✓" : ""}</option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, paddingBottom: 14 }}>
+                                                                            {MESES.map(([key, label]) => (
+                                                                                <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                                                                    <label style={{ ...S.label, color: "var(--primary)", fontWeight: 800, fontSize: "0.72rem", letterSpacing: "0.05em" }}>
+                                                                                        {label.toUpperCase()}
+                                                                                    </label>
+                                                                                    <textarea
+                                                                                        rows={2}
+                                                                                        disabled={readOnly}
+                                                                                        value={ev.observaciones?.[evObsYears[i] ?? String(CUR_YEAR)]?.[key] ?? ""}
+                                                                                        onChange={e => {
+                                                                                            const yr = evObsYears[i] ?? String(CUR_YEAR);
+                                                                                            updateEvento(i, "observaciones", {
+                                                                                                ...(ev.observaciones ?? {}),
+                                                                                                [yr]: { ...(ev.observaciones?.[yr] ?? {}), [key]: e.target.value }
+                                                                                            });
+                                                                                        }}
+                                                                                        placeholder={`${label}…`}
+                                                                                        style={{ ...S.input, minHeight: 52, resize: readOnly ? "none" : "vertical", fontSize: "0.78rem", ...(readOnly ? { background: "var(--bg)", color: "var(--text-muted)" } : {}) }}
+                                                                                    />
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </>
                                                 )}
                                             </div>
@@ -1513,178 +1659,87 @@ function Modal({
                                         </button>
                                     )}
 
-                                    {/* ── División 3: Fecha de cierre + observaciones mensuales ── */}
-                                    <div
-                                        style={{
-                                            ...S.sectionHeader,
-                                            marginTop: 32,
-                                        }}
-                                    >
-                                        FECHA DE CIERRE Y OBSERVACIONES
-                                        MENSUALES
-                                    </div>
-                                    <div style={{ ...S.grid3, marginTop: 16 }}>
-                                        <Field
-                                            label="Fecha de Cierre"
-                                            k="seguimiento_fecha_cierre"
-                                            type="date"
-                                            form={form}
-                                            errors={errors}
-                                            onChange={onChange}
-                                            disabled={readOnly}
-                                        />
-                                    </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 10,
-                                            marginTop: 20,
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                fontSize: "0.82rem",
-                                                fontWeight: 700,
-                                                color: "var(--text-muted)",
-                                            }}
-                                        >
-                                            Año:
-                                        </span>
-                                        <select
-                                            value={obsYear}
-                                            onChange={(e) =>
-                                                setObsYear(e.target.value)
-                                            }
-                                            style={{
-                                                ...S.input,
-                                                width: "auto",
-                                                padding: "4px 12px",
-                                                fontSize: "0.85rem",
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            {[
-                                                ...new Set([
-                                                    ...YEAR_OPTS,
-                                                    ...Object.keys(
-                                                        form.seguimiento_observaciones ??
-                                                            {},
-                                                    ).filter((k) =>
-                                                        /^\d{4}$/.test(k),
-                                                    ),
-                                                ]),
-                                            ]
-                                                .sort()
-                                                .map((y) => {
-                                                    const hasMeses =
-                                                        Object.values(
-                                                            form
-                                                                .seguimiento_observaciones?.[
-                                                                y
-                                                            ] ?? {},
-                                                        ).some(Boolean);
-                                                    return (
-                                                        <option
-                                                            key={y}
-                                                            value={y}
-                                                        >
-                                                            {y}
-                                                            {hasMeses
-                                                                ? " ✓"
-                                                                : ""}
-                                                        </option>
-                                                    );
-                                                })}
-                                        </select>
-                                    </div>
-                                    <div
-                                        style={{
-                                            display: "grid",
-                                            gridTemplateColumns:
-                                                "repeat(3, 1fr)",
-                                            gap: 14,
-                                            marginTop: 14,
-                                        }}
-                                    >
-                                        {[
-                                            ["ene", "Enero"],
-                                            ["feb", "Febrero"],
-                                            ["mar", "Marzo"],
-                                            ["abr", "Abril"],
-                                            ["may", "Mayo"],
-                                            ["jun", "Junio"],
-                                            ["jul", "Julio"],
-                                            ["ago", "Agosto"],
-                                            ["sep", "Septiembre"],
-                                            ["oct", "Octubre"],
-                                            ["nov", "Noviembre"],
-                                            ["dic", "Diciembre"],
-                                        ].map(([key, label]) => (
-                                            <div
-                                                key={key}
-                                                style={{
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    gap: 6,
-                                                }}
-                                            >
-                                                <label
-                                                    style={{
-                                                        ...S.label,
-                                                        color: "var(--primary)",
-                                                        fontWeight: 800,
-                                                        fontSize: "0.72rem",
-                                                        letterSpacing: "0.05em",
-                                                    }}
-                                                >
-                                                    {label.toUpperCase()}
-                                                </label>
-                                                <textarea
-                                                    rows={3}
-                                                    disabled={readOnly}
-                                                    value={
-                                                        form
-                                                            .seguimiento_observaciones?.[
-                                                            obsYear
-                                                        ]?.[key] ?? ""
-                                                    }
-                                                    onChange={(e) =>
-                                                        setForm((f) => ({
-                                                            ...f,
-                                                            seguimiento_observaciones:
-                                                                {
-                                                                    ...(f.seguimiento_observaciones ||
-                                                                        {}),
-                                                                    [obsYear]: {
-                                                                        ...(f
-                                                                            .seguimiento_observaciones?.[
-                                                                            obsYear
-                                                                        ] ||
-                                                                            {}),
-                                                                        [key]: e
-                                                                            .target
-                                                                            .value,
-                                                                    },
-                                                                },
-                                                        }))
-                                                    }
-                                                    placeholder={`Observaciones ${label}…`}
-                                                    style={{
-                                                        ...S.input,
-                                                        minHeight: 72,
-                                                        resize: readOnly
-                                                            ? "none"
-                                                            : "vertical",
-                                                        fontSize: "0.82rem",
-                                                    }}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
                                 </>
                             );
                         })()}
+
+                    {/* ── Tab Documentos Médicos ── */}
+                    {activeTab === "doc_medicos" && (
+                        <div>
+                            {!cedulaMed ? (
+                                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                    Sin empleado asociado. Selecciona un empleado en la pestaña Principal.
+                                </div>
+                            ) : (
+                                <>
+                                    <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
+                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 10, marginBottom: 18 }}>
+                                        Carpeta SharePoint del empleado <strong>CC {cedulaMed}</strong>. Máx. 10 MB por archivo.
+                                    </p>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                        {DOCS_MEDICOS.map(doc => {
+                                            const st      = docsMed[doc.id] ?? { file: null, status: "idle", name: null, error: null };
+                                            const subido  = docsSubidos[doc.id];
+                                            const isUp    = st.status === "uploading";
+                                            const isDone  = st.status === "done";
+                                            const isErr   = st.status === "error";
+                                            const isSel   = !!st.file;
+                                            const yaSubido = !!subido && !isDone;
+                                            const bg      = isDone || yaSubido ? "#f0fdf4" : isErr ? "#fdf5f5" : "var(--bg)";
+                                            const border  = isDone || yaSubido ? "#27ae60" : isErr ? "#e74c3c" : "var(--border)";
+                                            return (
+                                                <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: bg, borderRadius: "var(--radius-sm)", border: `1.5px solid ${border}` }}>
+                                                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text)", flex: 1 }}>{doc.label}</span>
+                                                    {isDone  && <span style={{ color: "#27ae60", fontSize: "0.78rem", fontWeight: 700 }}>✓ {st.name}</span>}
+                                                    {yaSubido && <span style={{ color: "#27ae60", fontSize: "0.78rem" }}>✓ Subido el {subido.uploaded_at?.split(" ")[0] ?? ""}</span>}
+                                                    {isErr   && <span style={{ color: "#e74c3c", fontSize: "0.78rem" }}>{st.error}</span>}
+                                                    {isUp    && <span style={{ color: "var(--primary)", fontSize: "0.78rem" }}>Subiendo…</span>}
+                                                    {isSel && !isUp && !isDone && <span style={{ color: "var(--primary)", fontSize: "0.78rem", fontWeight: 600 }}>{st.file.name}</span>}
+                                                    {!readOnly && (
+                                                        <label style={{ cursor: uploadingMed ? "default" : "pointer", background: "var(--primary)", color: "#fff", borderRadius: 4, padding: "5px 12px", fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap", opacity: uploadingMed ? 0.5 : 1 }}>
+                                                            {isDone || yaSubido ? "Reemplazar" : "Seleccionar"}
+                                                            <input type="file" style={{ display: "none" }} disabled={uploadingMed}
+                                                                onChange={e => {
+                                                                    const file = e.target.files[0];
+                                                                    if (!file) return;
+                                                                    setDocsMed(prev => ({ ...prev, [doc.id]: { file, status: "selected", name: file.name, error: null } }));
+                                                                    e.target.value = "";
+                                                                }}
+                                                            />
+                                                        </label>
+                                                    )}
+                                                    {(yaSubido || isDone) && !readOnly && (
+                                                        <button onClick={async () => {
+                                                            if (!confirm("¿Eliminar este documento?")) return;
+                                                            const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
+                                                            await fetch("/api/documentos-contratacion/docs-medicos", {
+                                                                method: "DELETE",
+                                                                headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
+                                                                body: JSON.stringify({ cedula: cedulaMed, tipo: doc.id }),
+                                                            });
+                                                            setDocsSubidos(prev => ({ ...prev, [doc.id]: null }));
+                                                            setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "idle", name: null, error: null } }));
+                                                        }} style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                                                            Borrar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {!readOnly && (
+                                        <button
+                                            onClick={handleUploadDocs}
+                                            disabled={uploadingMed || !DOCS_MEDICOS.some(d => docsMed[d.id]?.file)}
+                                            style={{ marginTop: 20, padding: "9px 24px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", opacity: (uploadingMed || !DOCS_MEDICOS.some(d => docsMed[d.id]?.file)) ? 0.5 : 1 }}
+                                        >
+                                            {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {activeTab === "costos" && (
                         <>

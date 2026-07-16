@@ -267,6 +267,49 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);
 
+    // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
+    Route::get('documentos-contratacion/employee-info', function (Request $request) {
+        $cedula  = $request->query('cedula', '');
+        $ingreso = BaseIngreso::where('documento_identificacion', $cedula)->latest()->first();
+        return response()->json([
+            'nombre' => $ingreso?->nombre_completo ?? '',
+            'correo' => $ingreso?->correo          ?? '',
+        ]);
+    });
+
+    // Devuelve los documentos médicos ya subidos para una cédula
+    Route::get('documentos-contratacion/docs-medicos', function (Request $request) {
+        $cedula   = $request->query('cedula', '');
+        $metaPath = storage_path('app/documentos_contratacion.json');
+        $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+        $archivos = $meta[$cedula]['archivos'] ?? [];
+        $tiposMed = ['examen_ingreso','concepto_medico','examen_periodico','examen_retiro','incapacidad','otro_medico'];
+        $result   = [];
+        foreach ($tiposMed as $tipo) {
+            $result[$tipo] = isset($archivos[$tipo]) ? [
+                'uploaded_at'     => $archivos[$tipo]['uploaded_at'] ?? null,
+                'nombre_original' => $archivos[$tipo]['nombre_original'] ?? null,
+            ] : null;
+        }
+        return response()->json($result);
+    });
+
+    // Elimina un documento médico específico de una cédula
+    Route::delete('documentos-contratacion/docs-medicos', function (Request $request) {
+        $cedula   = $request->input('cedula', '');
+        $tipo     = $request->input('tipo', '');
+        if (!$cedula || !$tipo) return response()->json(['error' => 'Faltan parámetros'], 422);
+        $metaPath = storage_path('app/documentos_contratacion.json');
+        $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+        if (isset($meta[$cedula]['archivos'][$tipo])) {
+            $ruta = $meta[$cedula]['archivos'][$tipo]['ruta'] ?? null;
+            if ($ruta) \Illuminate\Support\Facades\Storage::disk('local')->delete($ruta);
+            unset($meta[$cedula]['archivos'][$tipo]);
+            file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+        return response()->json(null, 204);
+    });
+
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
         ->parameters(['requisiciones' => 'requisicion']);
