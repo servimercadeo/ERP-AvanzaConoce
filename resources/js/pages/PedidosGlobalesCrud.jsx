@@ -13,23 +13,16 @@ import api from "../api/axios";
 const POR_PAGINA = 8;
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
-// ─── Excel: mismo formato que "Pedidos automáticos" ───────────────────────────
+// ─── Excel: mismo espíritu de simplificación que "Pedidos automáticos", con
+// Regional como columna adicional porque cada combinación Proyecto+Regional
+// del archivo termina siendo un pedido global independiente. ─────────────────
 const PEDIDO_HEADER_MAP = {
-    codigo: "codigo",
     cedula: "cedula",
-    empleado: "empleado",
-    estado: "estado",
-    "fecha pedido": "fecha_pedido",
-    fechapedido: "fecha_pedido",
+    regional: "regional",
     proyecto: "proyecto",
-    prenda: "categoria",
-    categoria: "categoria",
-    descripcion: "subcategoria",
-    subcategoria: "subcategoria",
-    genero: "genero",
+    prenda: "prenda",
     talla: "talla",
     cantidad: "cantidad",
-    notas: "notas",
 };
 
 const normalizeHeaderPA = (s) =>
@@ -39,6 +32,8 @@ const normalizeHeaderPA = (s) =>
         .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
         .toLowerCase()
         .trim();
+
+const normalizeTextPA = normalizeHeaderPA;
 
 function parseDateLocal(str) {
     return new Date(String(str).split("T")[0] + "T00:00:00");
@@ -267,8 +262,7 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                                         }}
                                     >
                                         <span>
-                                            {it.inventario?.categoria}{" "}
-                                            {it.inventario?.subcategoria} T:
+                                            {it.inventario?.prenda} T:
                                             {it.inventario?.talla}
                                         </span>
                                         <span
@@ -781,13 +775,13 @@ function ImportPedidosGlobalesModal({
     empleados,
     contratos,
     inventarioFlat,
+    regionales,
 }) {
     const [fileName, setFileName] = useState("");
     const [grupos, setGrupos] = useState([]);
     const [error, setError] = useState("");
     const [importing, setImporting] = useState(false);
     const [resultado, setResultado] = useState(null);
-    const [proyectoInfo, setProyectoInfo] = useState(null);
 
     const handleFile = async (e) => {
         const file = e.target.files?.[0];
@@ -795,7 +789,6 @@ function ImportPedidosGlobalesModal({
         setError("");
         setGrupos([]);
         setResultado(null);
-        setProyectoInfo(null);
         setFileName(file.name);
 
         try {
@@ -818,59 +811,59 @@ function ImportPedidosGlobalesModal({
                 return mapped;
             });
 
+            // Un pedido nuevo por cada combinación cédula + proyecto + regional:
+            // todas sus filas (prendas) se agrupan en ese único pedido. Cada
+            // combinación proyecto + regional distinta que aparezca en el
+            // archivo termina en su propio pedido global.
+            const hoy = new Date().toISOString().split("T")[0];
             const gruposMap = new Map();
             const orden = [];
             filas.forEach((fila, idx) => {
                 const cedula = String(fila.cedula ?? "").trim();
+                const proyecto = String(fila.proyecto ?? "").trim();
+                const regionalTexto = String(fila.regional ?? "").trim();
                 if (!cedula) return;
-                const fechaPedido = fila.fecha_pedido
-                    ? dateOnly(fila.fecha_pedido)
-                    : new Date().toISOString().split("T")[0];
-                const codigo = String(fila.codigo ?? "").trim();
-                const key = codigo
-                    ? `codigo:${codigo}`
-                    : `${cedula}|${fechaPedido}`;
+                const key = `${cedula}|${proyecto}|${normalizeTextPA(regionalTexto)}`;
 
                 if (!gruposMap.has(key)) {
                     gruposMap.set(key, {
                         cedula,
-                        codigo: codigo || null,
+                        proyecto,
+                        regionalTexto,
                         empleado:
                             empleados.find((e) => e.cedula === cedula) ??
                             null,
-                        fecha_pedido: fechaPedido,
-                        notas: fila.notas || "",
+                        fecha_pedido: hoy,
+                        notas: "",
                         items: [],
                         erroresItems: [],
                     });
                     orden.push(key);
                 }
                 const grupo = gruposMap.get(key);
-                if (!fila.categoria && !fila.proyecto) return;
+                if (!fila.prenda) return;
 
+                const generoEmpleado = grupo.empleado?.genero ?? "";
                 const cantidad = Number(fila.cantidad) || 0;
                 const inv = inventarioFlat.find(
                     (i) =>
-                        i.proyecto === fila.proyecto &&
-                        i.categoria === fila.categoria &&
-                        (fila.subcategoria
-                            ? i.subcategoria === fila.subcategoria
-                            : true) &&
-                        i.genero === fila.genero &&
+                        i.proyecto === proyecto &&
+                        i.prenda === fila.prenda &&
+                        (i.genero === generoEmpleado || i.genero === "Unisex") &&
                         String(i.talla).toLowerCase() ===
                             String(fila.talla ?? "").toLowerCase(),
                 );
 
                 if (!inv || cantidad <= 0) {
                     grupo.erroresItems.push(
-                        `Fila ${idx + 2}: no se encontró "${fila.categoria ?? ""} ${fila.subcategoria ?? ""}" (${fila.proyecto ?? ""}, ${fila.genero ?? ""}, talla ${fila.talla ?? ""}) o la cantidad no es válida.`,
+                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${proyecto}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
                     );
                     return;
                 }
                 grupo.items.push({
                     inventario_dotacion_id: inv.id,
                     cantidad,
-                    descripcion: `${inv.categoria} · ${inv.subcategoria} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
+                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
                 });
             });
 
@@ -879,51 +872,34 @@ function ImportPedidosGlobalesModal({
                 const contrato = g.empleado
                     ? contratos.find((c) => c.empleado_id === g.empleado.id)
                     : null;
+                const regional = regionales.find(
+                    (r) =>
+                        normalizeTextPA(r.nombre) ===
+                        normalizeTextPA(g.regionalTexto),
+                );
                 const errores = [...g.erroresItems];
                 if (!g.empleado)
                     errores.unshift(
                         `No se encontró un empleado con cédula "${g.cedula}".`,
                     );
-                else if (!contrato)
+                else if (!g.empleado.genero)
                     errores.unshift(
-                        `El empleado ${g.cedula} no tiene un contrato asociado.`,
+                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
                     );
-                else if (!contrato.cliente_proyecto || !contrato.regional_id)
+                if (!g.proyecto)
+                    errores.unshift(`Falta el proyecto para la cédula ${g.cedula}.`);
+                if (!regional)
                     errores.unshift(
-                        `El contrato del empleado ${g.cedula} no tiene proyecto o regional definidos.`,
+                        `Regional "${g.regionalTexto}" no reconocida para la cédula ${g.cedula}.`,
                     );
-                return { ...g, contrato, errores };
+                return {
+                    ...g,
+                    contrato_id: contrato?.id ?? null,
+                    regional_id: regional?.id ?? null,
+                    regionalNombre: regional?.nombre ?? g.regionalTexto,
+                    errores,
+                };
             });
-
-            const combos = new Set(
-                gruposFinal
-                    .filter(
-                        (g) =>
-                            g.contrato?.cliente_proyecto &&
-                            g.contrato?.regional_id,
-                    )
-                    .map(
-                        (g) =>
-                            `${g.contrato.cliente_proyecto}|${g.contrato.regional_id}`,
-                    ),
-            );
-
-            if (combos.size > 1) {
-                setError(
-                    "Los pedidos del archivo pertenecen a distintos proyectos o regionales. Para crear un pedido global, exporta o filtra un archivo que incluya solo pedidos de un mismo proyecto y una misma regional.",
-                );
-            } else if (combos.size === 1) {
-                const [proyecto] = [...combos][0].split("|");
-                const conContrato = gruposFinal.find(
-                    (g) => g.contrato?.cliente_proyecto === proyecto,
-                );
-                setProyectoInfo({
-                    proyecto,
-                    regional_id: conContrato.contrato.regional_id,
-                    regionalNombre:
-                        conContrato.contrato.regional?.nombre ?? "—",
-                });
-            }
 
             setGrupos(gruposFinal);
         } catch {
@@ -937,36 +913,101 @@ function ImportPedidosGlobalesModal({
         (g) => g.errores.length === 0 && g.items.length > 0,
     );
 
+    const combosValidos = [];
+    const combosIndex = new Map();
+    gruposValidos.forEach((g) => {
+        const comboKey = `${g.proyecto}|${g.regional_id}`;
+        if (!combosIndex.has(comboKey)) {
+            const combo = {
+                proyecto: g.proyecto,
+                regional_id: g.regional_id,
+                regionalNombre: g.regionalNombre,
+                pedidos: [],
+            };
+            combosIndex.set(comboKey, combo);
+            combosValidos.push(combo);
+        }
+        combosIndex.get(comboKey).pedidos.push(g);
+    });
+
+    const handleDescargarPlantilla = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [
+            {
+                Cédula: "1234567890",
+                Regional: "EJE CAFETERO",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Polo Gris Manga Corta",
+                Talla: "M",
+                Cantidad: 1,
+            },
+            {
+                Cédula: "1234567890",
+                Regional: "EJE CAFETERO",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Pantalon Administrativo",
+                Talla: "34",
+                Cantidad: 1,
+            },
+        ];
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 18 },
+            { wch: 26 },
+            { wch: 8 },
+            { wch: 10 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+        XLSX.writeFile(wb, "Plantilla_Pedidos_Globales.xlsx");
+    };
+
     const handleImport = async () => {
-        if (gruposValidos.length === 0 || !proyectoInfo) return;
+        if (combosValidos.length === 0) return;
         setImporting(true);
         setError("");
-        try {
-            const { data } = await api.post("/pedidos-globales/import", {
-                proyecto: proyectoInfo.proyecto,
-                regional_id: proyectoInfo.regional_id,
-                pedidos: gruposValidos.map((g) => ({
-                    codigo: g.codigo,
-                    empleado_id: g.empleado.id,
-                    contrato_id: g.contrato?.id ?? null,
-                    fecha_pedido: g.fecha_pedido,
-                    notas: g.notas,
-                    items: g.items.map(({ inventario_dotacion_id, cantidad }) => ({
-                        inventario_dotacion_id,
-                        cantidad,
+        const creados = [];
+        const fallidos = [];
+        for (const combo of combosValidos) {
+            try {
+                const { data } = await api.post("/pedidos-globales/import", {
+                    proyecto: combo.proyecto,
+                    regional_id: combo.regional_id,
+                    pedidos: combo.pedidos.map((g) => ({
+                        codigo: null,
+                        empleado_id: g.empleado.id,
+                        contrato_id: g.contrato_id,
+                        fecha_pedido: g.fecha_pedido,
+                        notas: g.notas,
+                        items: g.items.map(
+                            ({ inventario_dotacion_id, cantidad }) => ({
+                                inventario_dotacion_id,
+                                cantidad,
+                            }),
+                        ),
                     })),
-                })),
-            });
-            setResultado({ global: data, total: gruposValidos.length });
-            onImported();
-        } catch (e) {
-            setError(
-                e?.response?.data?.message ??
-                    "Error al crear el pedido global.",
-            );
-        } finally {
-            setImporting(false);
+                });
+                creados.push({
+                    global: data,
+                    total: combo.pedidos.length,
+                    proyecto: combo.proyecto,
+                    regionalNombre: combo.regionalNombre,
+                });
+            } catch (e) {
+                fallidos.push({
+                    proyecto: combo.proyecto,
+                    regionalNombre: combo.regionalNombre,
+                    motivo:
+                        e?.response?.data?.message ??
+                        "Error al crear el pedido global.",
+                });
+            }
         }
+        setImporting(false);
+        setResultado({ creados, fallidos });
+        if (creados.length > 0) onImported();
     };
 
     return (
@@ -988,17 +1029,35 @@ function ImportPedidosGlobalesModal({
                             marginTop: 0,
                         }}
                     >
-                        Usa el mismo formato del botón "Exportar Excel"
-                        (aquí o en Pedidos automáticos): columnas{" "}
+                        Columnas del archivo:{" "}
                         <strong>
-                            Código, Cédula, Empleado, Estado, Fecha Pedido,
-                            Proyecto, Prenda, Descripción, Género, Talla,
-                            Cantidad, Notas
+                            Cédula, Regional, Proyecto, Prenda, Talla, Cantidad
                         </strong>
-                        . Todos los pedidos del archivo deben pertenecer al
-                        mismo proyecto y a la misma regional: se creará un
-                        pedido global nuevo que los agrupa.
+                        . El código y el estado se generan automáticamente, el
+                        género se toma del empleado, la fecha es la de hoy y
+                        las notas se agregan luego desde la interfaz. Las
+                        filas con la misma cédula, proyecto y regional se
+                        agrupan en un solo pedido; cada combinación distinta
+                        de <strong>Proyecto + Regional</strong> del archivo
+                        crea su propio pedido global.
                     </p>
+                    <button
+                        type="button"
+                        onClick={handleDescargarPlantilla}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            marginBottom: 10,
+                            color: "var(--primary)",
+                            fontWeight: 700,
+                            fontSize: "0.82rem",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                    >
+                        Descargar plantilla de ejemplo
+                    </button>
                     <label
                         htmlFor="import-pedidos-globales-file"
                         style={S.fileDrop}
@@ -1031,7 +1090,7 @@ function ImportPedidosGlobalesModal({
                         </span>
                     </label>
 
-                    {proyectoInfo && !resultado && (
+                    {combosValidos.length > 0 && !resultado && (
                         <div
                             style={{
                                 ...S.errorMsg,
@@ -1040,9 +1099,15 @@ function ImportPedidosGlobalesModal({
                                 marginTop: 10,
                             }}
                         >
-                            Proyecto <strong>{proyectoInfo.proyecto}</strong>{" "}
-                            · Regional{" "}
-                            <strong>{proyectoInfo.regionalNombre}</strong>
+                            Se crearán {combosValidos.length} pedido
+                            {combosValidos.length !== 1 ? "s" : ""} global
+                            {combosValidos.length !== 1 ? "es" : ""}:{" "}
+                            {combosValidos
+                                .map(
+                                    (c) =>
+                                        `${c.proyecto} · ${c.regionalNombre} (${c.pedidos.length})`,
+                                )
+                                .join(" — ")}
                         </div>
                     )}
 
@@ -1083,7 +1148,9 @@ function ImportPedidosGlobalesModal({
                                             ? `· ${g.empleado.nombres} ${g.empleado.apellidos}`
                                             : ""}
                                         {" · "}
-                                        {g.fecha_pedido}
+                                        {g.proyecto || "—"}
+                                        {" · "}
+                                        {g.regionalNombre || "—"}
                                         {" · "}
                                         {g.items.length} prenda
                                         {g.items.length !== 1 ? "s" : ""}
@@ -1118,18 +1185,33 @@ function ImportPedidosGlobalesModal({
                     )}
 
                     {resultado && (
-                        <div
-                            style={{
-                                ...S.errorMsg,
-                                background: "#e0f7f4",
-                                color: "#0d6e5a",
-                                marginTop: 10,
-                            }}
-                        >
-                            Pedido global{" "}
-                            <strong>#{resultado.global.codigo}</strong>{" "}
-                            creado con {resultado.total} pedido
-                            {resultado.total !== 1 ? "s" : ""}.
+                        <div style={{ marginTop: 10 }}>
+                            {resultado.creados.map((r, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        ...S.errorMsg,
+                                        background: "#e0f7f4",
+                                        color: "#0d6e5a",
+                                        marginBottom: 6,
+                                    }}
+                                >
+                                    Pedido global{" "}
+                                    <strong>#{r.global.codigo}</strong> (
+                                    {r.proyecto} · {r.regionalNombre}) creado
+                                    con {r.total} pedido
+                                    {r.total !== 1 ? "s" : ""}.
+                                </div>
+                            ))}
+                            {resultado.fallidos.map((f, i) => (
+                                <div
+                                    key={i}
+                                    style={{ ...S.errorMsg, marginBottom: 6 }}
+                                >
+                                    {f.proyecto} · {f.regionalNombre}:{" "}
+                                    {f.motivo}
+                                </div>
+                            ))}
                         </div>
                     )}
                     {error && (
@@ -1151,22 +1233,16 @@ function ImportPedidosGlobalesModal({
                             style={{
                                 ...S.btnPrimary,
                                 opacity:
-                                    importing ||
-                                    gruposValidos.length === 0 ||
-                                    !proyectoInfo
+                                    importing || combosValidos.length === 0
                                         ? 0.6
                                         : 1,
                             }}
                             onClick={handleImport}
-                            disabled={
-                                importing ||
-                                gruposValidos.length === 0 ||
-                                !proyectoInfo
-                            }
+                            disabled={importing || combosValidos.length === 0}
                         >
                             {importing
                                 ? "Creando…"
-                                : `Crear pedido global (${gruposValidos.length})`}
+                                : `Crear ${combosValidos.length} pedido${combosValidos.length !== 1 ? "s" : ""} global${combosValidos.length !== 1 ? "es" : ""}`}
                         </button>
                     )}
                 </div>
@@ -1216,6 +1292,11 @@ export default function PedidosGlobalesCrud() {
         queryFn: () =>
             api.get("/inventario-dotacion?flat=1").then((r) => r.data),
     });
+    const { data: catalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+    });
+    const regionales = catalogos?.regionales ?? [];
 
     const stats = useMemo(
         () => ({
@@ -1289,8 +1370,7 @@ export default function PedidosGlobalesCrud() {
                 const itemRow = (inv, cantidad) => ({
                     ...base,
                     Proyecto: inv?.proyecto ?? g.cliente_proyecto ?? "",
-                    Prenda: inv?.categoria ?? "",
-                    Descripción: inv?.subcategoria ?? "",
+                    Prenda: inv?.prenda ?? "",
                     Género: inv?.genero ?? "",
                     Talla: inv?.talla ?? "",
                     Cantidad: cantidad ?? "",
@@ -1314,7 +1394,6 @@ export default function PedidosGlobalesCrud() {
             { wch: 12 },
             { wch: 12 },
             { wch: 18 },
-            { wch: 14 },
             { wch: 28 },
             { wch: 12 },
             { wch: 8 },
@@ -2411,12 +2490,7 @@ export default function PedidosGlobalesCrud() {
                                                                                                     {
                                                                                                         it
                                                                                                             .inventario
-                                                                                                            ?.categoria
-                                                                                                    }{" "}
-                                                                                                    {
-                                                                                                        it
-                                                                                                            .inventario
-                                                                                                            ?.subcategoria
+                                                                                                            ?.prenda
                                                                                                     }{" "}
                                                                                                     T:
                                                                                                     {
@@ -2650,6 +2724,7 @@ export default function PedidosGlobalesCrud() {
                     empleados={empleados}
                     contratos={contratos}
                     inventarioFlat={inventarioFlat}
+                    regionales={regionales}
                 />
             )}
         </div>

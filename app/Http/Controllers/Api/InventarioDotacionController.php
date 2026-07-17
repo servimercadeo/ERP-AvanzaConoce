@@ -14,8 +14,7 @@ class InventarioDotacionController extends Controller
     public function index(Request $request)
     {
         $query = InventarioDotacion::orderBy('proyecto')
-            ->orderBy('categoria')
-            ->orderBy('subcategoria')
+            ->orderBy('prenda')
             ->orderBy('genero')
             ->orderBy('talla');
 
@@ -30,14 +29,13 @@ class InventarioDotacionController extends Controller
         }
 
         $items = $rows
-            ->groupBy(fn ($r) => $r->proyecto . '|' . $r->categoria . '|' . $r->subcategoria . '|' . $r->genero)
+            ->groupBy(fn ($r) => $r->proyecto . '|' . $r->prenda . '|' . $r->genero)
             ->map(function ($group) {
                 $first = $group->first();
                 return [
                     'id'           => $first->id,
                     'proyecto'     => $first->proyecto,
-                    'categoria'    => $first->categoria,
-                    'subcategoria' => $first->subcategoria,
+                    'prenda'       => $first->prenda,
                     'genero'       => $first->genero,
                     'tallas'       => $group->mapWithKeys(fn ($r) => [$r->talla => ['id' => $r->id, 'cantidad' => $r->cantidad]]),
                     'stock_total'  => $group->sum('cantidad'),
@@ -54,8 +52,7 @@ class InventarioDotacionController extends Controller
     {
         $data = $request->validate([
             'proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
-            'categoria'    => 'required|string|max:60',
-            'subcategoria' => 'required|string|max:80',
+            'prenda'       => 'required|string|max:150',
             'genero'       => 'required|in:Masculino,Femenino,Unisex',
             'talla'        => 'required|string|max:10',
             'precio'       => 'nullable|integer|min:0',
@@ -65,11 +62,10 @@ class InventarioDotacionController extends Controller
 
         $item = InventarioDotacion::updateOrCreate(
             [
-                'proyecto'     => $data['proyecto'],
-                'categoria'    => $data['categoria'],
-                'subcategoria' => $data['subcategoria'],
-                'genero'       => $data['genero'],
-                'talla'        => $data['talla'],
+                'proyecto' => $data['proyecto'],
+                'prenda'   => $data['prenda'],
+                'genero'   => $data['genero'],
+                'talla'    => $data['talla'],
             ],
             [
                 'precio'       => $data['precio'] ?? 0,
@@ -86,8 +82,7 @@ class InventarioDotacionController extends Controller
         $request->validate([
             'items'                => 'required|array|min:1',
             'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
-            'items.*.categoria'    => 'required|string|max:60',
-            'items.*.subcategoria' => 'required|string|max:80',
+            'items.*.prenda'       => 'required|string|max:150',
             'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
             'items.*.talla'        => 'required|string|max:10',
             'items.*.precio'       => 'nullable|integer|min:0',
@@ -99,11 +94,10 @@ class InventarioDotacionController extends Controller
         foreach ($request->items as $item) {
             InventarioDotacion::updateOrCreate(
                 [
-                    'proyecto'     => $item['proyecto'],
-                    'categoria'    => $item['categoria'],
-                    'subcategoria' => $item['subcategoria'],
-                    'genero'       => $item['genero'],
-                    'talla'        => $item['talla'],
+                    'proyecto' => $item['proyecto'],
+                    'prenda'   => $item['prenda'],
+                    'genero'   => $item['genero'],
+                    'talla'    => $item['talla'],
                 ],
                 [
                     'precio'       => $item['precio'] ?? 0,
@@ -122,8 +116,7 @@ class InventarioDotacionController extends Controller
         $request->validate([
             'items'                => 'required|array|min:1',
             'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
-            'items.*.categoria'    => 'required|string|max:60',
-            'items.*.subcategoria' => 'required|string|max:80',
+            'items.*.prenda'       => 'required|string|max:150',
             'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
             'items.*.talla'        => 'required|string|max:10',
             'items.*.precio'       => 'nullable|integer|min:0',
@@ -136,11 +129,10 @@ class InventarioDotacionController extends Controller
 
         foreach ($request->items as $item) {
             $existente = InventarioDotacion::where([
-                'proyecto'     => $item['proyecto'],
-                'categoria'    => $item['categoria'],
-                'subcategoria' => $item['subcategoria'],
-                'genero'       => $item['genero'],
-                'talla'        => $item['talla'],
+                'proyecto' => $item['proyecto'],
+                'prenda'   => $item['prenda'],
+                'genero'   => $item['genero'],
+                'talla'    => $item['talla'],
             ])->first();
 
             if ($existente) {
@@ -149,13 +141,12 @@ class InventarioDotacionController extends Controller
             } else {
                 InventarioDotacion::create([
                     'proyecto'     => $item['proyecto'],
-                    'categoria'    => $item['categoria'],
-                    'subcategoria' => $item['subcategoria'],
+                    'prenda'       => $item['prenda'],
                     'genero'       => $item['genero'],
                     'talla'        => $item['talla'],
                     'precio'       => $item['precio'] ?? 0,
                     'cantidad'     => $item['cantidad'],
-                    'stock_minimo' => $item['stock_minimo'] ?? 0,
+                    'stock_minimo' => $item['stock_minimo'] ?? 10,
                 ]);
                 $creados++;
             }

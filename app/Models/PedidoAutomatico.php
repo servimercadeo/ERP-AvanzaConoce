@@ -60,7 +60,7 @@ class PedidoAutomatico extends Model
 
             if ($inv->cantidad < $item['cantidad']) {
                 throw new InvalidArgumentException(
-                    "Stock insuficiente para {$inv->categoria} {$inv->subcategoria} {$inv->genero} T:{$inv->talla}. " .
+                    "Stock insuficiente para {$inv->prenda} {$inv->genero} T:{$inv->talla}. " .
                     "Disponible: {$inv->cantidad}, solicitado: {$item['cantidad']}."
                 );
             }

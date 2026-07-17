@@ -10,32 +10,21 @@ class InventarioDotacionSeeder extends Seeder
     private const CANTIDAD_INICIAL = 20;
     private const STOCK_MINIMO_INICIAL = 0;
 
-    private const CATEGORIA_POR_PRIMERA_PALABRA = [
-        'BLUSA' => 'Blusa',
-        'BOTAS' => 'Botas',
-        'BRAZALETE' => 'Carnet',
-        'CAMISA' => 'Camisa',
+    // Accesorios de carnet: el nombre de origen trae variaciones/typos ("PORTA
+    // CANET"), así que se normalizan a un nombre de prenda fijo en vez de usar
+    // el texto tal cual viene. Siempre quedan en Unisex/N/A.
+    private const PRENDA_CARNET_POR_PRIMERA_PALABRA = [
         'CARNET' => 'Carnet',
-        'CHAQUETA' => 'Chaqueta',
-        'CONJUNTO' => 'Conjunto',
-        'GORRA' => 'Gorra',
-        'JEAN' => 'Jean',
-        'JEANS' => 'Jean',
-        'PANTALON' => 'Pantalon',
-        'POLO' => 'Polo',
-        'PORTA' => 'Carnet',
-        'PVC' => 'Carnet',
-        'REATA' => 'Reata',
-        'TENIS' => 'Tenis',
-        'YOYO' => 'Carnet',
+        'BRAZALETE' => 'Carnet Brazalete',
+        'PORTA' => 'Carnet Porta Carnet',
+        'PVC' => 'Carnet PVC',
+        'YOYO' => 'Carnet Yoyo',
     ];
 
-    private const SUBCATEGORIA_CARNET_POR_PALABRA = [
-        'CARNET' => 'Carnet',
-        'BRAZALETE' => 'Brazalete',
-        'PORTA' => 'Porta Carnet',
-        'PVC' => 'PVC',
-        'YOYO' => 'Yoyo',
+    // Variantes de la primera palabra que deben normalizarse a una forma
+    // canónica (ej. "JEANS" y "JEAN" son la misma prenda).
+    private const PRIMERA_PALABRA_NORMALIZADA = [
+        'JEANS' => 'JEAN',
     ];
 
     /**
@@ -68,9 +57,9 @@ class InventarioDotacionSeeder extends Seeder
             $precio = (int) $data['precio'];
 
             $proyecto = $this->resolverProyecto($empresa, $nombre);
-            [$categoria, $subcategoria, $genero, $talla] = $this->parseItem($nombre);
+            [$prenda, $genero, $talla] = $this->parseItem($nombre);
 
-            $key = implode('|', [$proyecto, $categoria, $subcategoria, $genero, $talla]);
+            $key = implode('|', [$proyecto, $prenda, $genero, $talla]);
             if (isset($seen[$key])) {
                 continue;
             }
@@ -78,8 +67,7 @@ class InventarioDotacionSeeder extends Seeder
 
             $records[] = [
                 'proyecto' => $proyecto,
-                'categoria' => $categoria,
-                'subcategoria' => $subcategoria,
+                'prenda' => $prenda,
                 'genero' => $genero,
                 'talla' => $talla,
                 'precio' => $precio,
@@ -117,7 +105,7 @@ class InventarioDotacionSeeder extends Seeder
     private const TALLA_TRAS_TEXTO = '/\b(\d{1,2}|XS|S|M|L|XL|2XL|3XL|4XL|XXL|XXXL)(\s*\([^)]*\))?$/i';
 
     /**
-     * @return array{0:string,1:string,2:string,3:string} [categoria, subcategoria, genero, talla]
+     * @return array{0:string,1:string,2:string} [prenda, genero, talla]
      */
     private function parseItem(string $nombreOriginal): array
     {
@@ -143,7 +131,7 @@ class InventarioDotacionSeeder extends Seeder
             }
         }
 
-        $talla = 'Única';
+        $talla = 'N/A';
         if (preg_match(self::TALLA_TRAS_TEXTO, $nombre, $m)) {
             $talla = strtoupper(trim($m[0]));
             $nombre = trim(substr($nombre, 0, -strlen($m[0])));
@@ -151,18 +139,20 @@ class InventarioDotacionSeeder extends Seeder
 
         $palabras = explode(' ', $nombre);
         $primera = strtoupper($palabras[0] ?? '');
-        $categoria = self::CATEGORIA_POR_PRIMERA_PALABRA[$primera] ?? 'Otro';
 
-        if ($categoria === 'Carnet') {
-            $subcategoria = self::SUBCATEGORIA_CARNET_POR_PALABRA[$primera] ?? 'Carnet';
+        if (isset(self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera])) {
             $genero = 'Unisex';
-            $talla = 'Única';
+            $talla = 'N/A';
+            $prenda = self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera];
         } else {
-            $resto = trim(implode(' ', array_slice($palabras, 1)));
-            $subcategoria = $this->tituloCase($resto !== '' ? $resto : $primera);
+            if (isset(self::PRIMERA_PALABRA_NORMALIZADA[$primera])) {
+                $palabras[0] = self::PRIMERA_PALABRA_NORMALIZADA[$primera];
+                $nombre = implode(' ', $palabras);
+            }
+            $prenda = $this->tituloCase($nombre);
         }
 
-        return [$categoria, $subcategoria, $genero, $talla];
+        return [$prenda, $genero, $talla];
     }
 
     private function tituloCase(string $texto): string
