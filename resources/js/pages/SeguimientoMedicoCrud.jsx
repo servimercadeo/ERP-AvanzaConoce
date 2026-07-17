@@ -86,6 +86,11 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     const [docsMed, setDocsMed]                   = useState(DOCS_MED_INIT);
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
+    const [eventoDocIdx, setEventoDocIdx]         = useState(0);
+
+    const eventoIdx = Math.max(0, Math.min(eventoDocIdx, eventos.length - 1));
+    const eventoSel = eventos[eventoIdx] ?? null;
+    const eventoFecha = eventoSel?.fecha_ingreso_seguimiento ?? "";
 
     useEffect(() => {
         if (open && contrato) {
@@ -115,15 +120,20 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             setDocsMed(DOCS_MED_INIT());
             setUploadingMed(false);
             setDocsSubidos({});
-            const ced = (contrato.empleado?.cedula ?? "");
-            if (ced) {
-                fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}`)
-                    .then(r => r.ok ? r.json() : {})
-                    .then(data => setDocsSubidos(data ?? {}))
-                    .catch(() => {});
-            }
+            setEventoDocIdx(0);
         }
     }, [open, contrato]);
+
+    useEffect(() => {
+        if (!open || !contrato) return;
+        const ced = contrato.empleado?.cedula ?? "";
+        setDocsMed(DOCS_MED_INIT());
+        if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
+        fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}&evento=${encodeURIComponent(eventoFecha)}`)
+            .then(r => r.ok ? r.json() : {})
+            .then(data => setDocsSubidos(data ?? {}))
+            .catch(() => {});
+    }, [open, contrato, eventoFecha]);
 
     if (!open || !contrato) return null;
 
@@ -144,7 +154,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
 
     const handleUploadDocs = async () => {
         const toUpload = DOCS_MEDICOS.filter(d => docsMed[d.id]?.file);
-        if (!toUpload.length || uploadingMed || !cedula) return;
+        if (!toUpload.length || uploadingMed || !cedula || !eventoFecha) return;
         setUploadingMed(true);
         setDocsMed(prev => {
             const next = { ...prev };
@@ -162,12 +172,13 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 fd.append("documento", cedula);
                 fd.append("tipo", doc.id);
                 fd.append("archivo", file);
+                fd.append("evento", eventoFecha);
                 const res = await fetch("/api/documentos-contratacion/upload", {
                     method: "POST", headers: { "X-CSRF-TOKEN": csrf }, body: fd,
                 });
                 if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? `Error ${res.status}`); }
                 setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
-                successFiles.push({ filename, file });
+                successFiles.push(filename);
             } catch (err) {
                 setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: err.message } }));
             }
@@ -177,9 +188,11 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    documento: cedula,
-                    nombres:   emp?.nombres   ?? "",
-                    apellidos: emp?.apellidos ?? "",
+                    documento:        cedula,
+                    nombres:          emp?.nombres   ?? "",
+                    apellidos:        emp?.apellidos ?? "",
+                    fechaSeguimiento: eventoFecha,
+                    archivos:         successFiles,
                 }),
             }).catch(() => {});
         }
@@ -423,11 +436,35 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                 <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
                                     Sin empleado asociado. Guarda primero el registro con un empleado.
                                 </div>
+                            ) : eventos.length === 0 ? (
+                                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                    Registra primero un evento en la pestaña "Eventos Médicos". Los documentos se asocian a un evento.
+                                </div>
                             ) : (
                                 <>
                                     <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 10, marginBottom: 18 }}>
-                                        Carpeta SharePoint del empleado <strong>CC {cedula}</strong>. Máx. 10 MB por archivo.
+                                    <div style={{ ...S.formGroup, marginTop: 14, maxWidth: 360 }}>
+                                        <label style={S.label}>Evento médico</label>
+                                        <select
+                                            style={{ ...S.input, cursor: "pointer" }}
+                                            value={eventoIdx}
+                                            onChange={e => setEventoDocIdx(Number(e.target.value))}
+                                        >
+                                            {eventos.map((ev, i) => (
+                                                <option key={i} value={i}>
+                                                    {(ev.fecha_ingreso_seguimiento || "Sin fecha") + (ev.tipo_evento ? ` · ${ev.tipo_evento}` : "")}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {!eventoFecha ? (
+                                        <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                            Este evento no tiene "Fecha Ingreso a Seguimiento". Complétala en la pestaña "Eventos Médicos" y guarda antes de subir documentos.
+                                        </div>
+                                    ) : (
+                                    <>
+                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 14, marginBottom: 18 }}>
+                                        Carpeta SharePoint del empleado <strong>CC {cedula}</strong>, evento <strong>{eventoFecha}</strong>. Máx. 10 MB por archivo.
                                     </p>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                         {DOCS_MEDICOS.map(doc => {
@@ -468,7 +505,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                             await fetch("/api/documentos-contratacion/docs-medicos", {
                                                                 method: "DELETE",
                                                                 headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
-                                                                body: JSON.stringify({ cedula, tipo: doc.id }),
+                                                                body: JSON.stringify({ cedula, tipo: doc.id, evento: eventoFecha }),
                                                             });
                                                             setDocsSubidos(prev => ({ ...prev, [doc.id]: null }));
                                                             setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "idle", name: null, error: null } }));
@@ -488,6 +525,8 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                         >
                                             {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
                                         </button>
+                                    )}
+                                    </>
                                     )}
                                 </>
                             )}

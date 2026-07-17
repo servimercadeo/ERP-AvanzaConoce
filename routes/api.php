@@ -277,12 +277,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    // Devuelve los documentos médicos ya subidos para una cédula
+    // Devuelve los documentos médicos ya subidos para una cédula, ligados a un evento (fecha de seguimiento)
     Route::get('documentos-contratacion/docs-medicos', function (Request $request) {
         $cedula   = $request->query('cedula', '');
+        $evento   = $request->query('evento', '');
         $metaPath = storage_path('app/documentos_contratacion.json');
         $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
-        $archivos = $meta[$cedula]['archivos'] ?? [];
+        $archivos = $evento
+            ? ($meta[$cedula]['archivos_eventos'][$evento] ?? [])
+            : ($meta[$cedula]['archivos'] ?? []);
         $tiposMed = ['examen_ingreso','concepto_medico','examen_periodico','examen_retiro','incapacidad','otro_medico'];
         $result   = [];
         foreach ($tiposMed as $tipo) {
@@ -294,17 +297,23 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($result);
     });
 
-    // Elimina un documento médico específico de una cédula
+    // Elimina un documento médico específico de una cédula, dentro de un evento (fecha de seguimiento)
     Route::delete('documentos-contratacion/docs-medicos', function (Request $request) {
         $cedula   = $request->input('cedula', '');
         $tipo     = $request->input('tipo', '');
+        $evento   = $request->input('evento', '');
         if (!$cedula || !$tipo) return response()->json(['error' => 'Faltan parámetros'], 422);
         $metaPath = storage_path('app/documentos_contratacion.json');
         $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
-        if (isset($meta[$cedula]['archivos'][$tipo])) {
-            $ruta = $meta[$cedula]['archivos'][$tipo]['ruta'] ?? null;
+        $ref      = $evento ? ($meta[$cedula]['archivos_eventos'][$evento] ?? null) : ($meta[$cedula]['archivos'] ?? null);
+        if (isset($ref[$tipo])) {
+            $ruta = $ref[$tipo]['ruta'] ?? null;
             if ($ruta) \Illuminate\Support\Facades\Storage::disk('local')->delete($ruta);
-            unset($meta[$cedula]['archivos'][$tipo]);
+            if ($evento) {
+                unset($meta[$cedula]['archivos_eventos'][$evento][$tipo]);
+            } else {
+                unset($meta[$cedula]['archivos'][$tipo]);
+            }
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
         return response()->json(null, 204);
@@ -479,15 +488,20 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
         'documento' => 'required|string|max:40',
         'tipo'      => 'required|string|max:120',
         'archivo'   => 'required|file|max:10240',
+        'evento'    => 'nullable|string|max:20',
     ]);
 
     $documento = $request->input('documento');
     $tipo      = $request->input('tipo');
+    $evento    = $request->input('evento');
     $file      = $request->file('archivo');
     $ext       = $file->getClientOriginalExtension() ?: 'pdf';
     $dirSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $documento);
     $tipSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $tipo);
-    $path      = $file->storeAs("documentos_contratacion/{$dirSafe}", "{$tipSafe}.{$ext}", 'local');
+    $dir       = $evento
+        ? "documentos_contratacion/{$dirSafe}/eventos/" . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $evento)
+        : "documentos_contratacion/{$dirSafe}";
+    $path      = $file->storeAs($dir, "{$tipSafe}.{$ext}", 'local');
 
     $metaPath = storage_path('app/documentos_contratacion.json');
     $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
@@ -495,11 +509,16 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
     if (!isset($meta[$documento])) {
         $meta[$documento] = ['documento' => $documento, 'archivos' => [], 'created_at' => now()->toDateTimeString()];
     }
-    $meta[$documento]['archivos'][$tipo] = [
+    $archivo = [
         'ruta'            => $path,
         'nombre_original' => $file->getClientOriginalName(),
         'uploaded_at'     => now()->toDateTimeString(),
     ];
+    if ($evento) {
+        $meta[$documento]['archivos_eventos'][$evento][$tipo] = $archivo;
+    } else {
+        $meta[$documento]['archivos'][$tipo] = $archivo;
+    }
     $meta[$documento]['updated_at'] = now()->toDateTimeString();
 
     file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
