@@ -229,10 +229,10 @@ function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
 }
 
 // ── Selector de item de inventario ─────────────────────────────────────────
-// Mapea categoría/subcategoría del ítem a la talla correspondiente del empleado
-function tallaPorCategoria(categoria, subcategoria, tallasEmpleado) {
+// Mapea la prenda del ítem a la talla correspondiente del empleado
+function tallaPorPrenda(prenda, tallasEmpleado) {
     if (!tallasEmpleado) return null;
-    const txt = `${categoria} ${subcategoria}`.toLowerCase();
+    const txt = (prenda ?? "").toLowerCase();
     if (/polo|camisa|camiseta|chaqueta|blusa|buzo|sudadera|chaleco/.test(txt))
         return tallasEmpleado.talla_camisa || null;
     if (/pantalon|jean|short|bermuda|licra/.test(txt))
@@ -243,24 +243,19 @@ function tallaPorCategoria(categoria, subcategoria, tallasEmpleado) {
 }
 
 // Vuelve a resolver una prenda de un pedido anterior contra el inventario ACTUAL:
-// mismo proyecto/prenda/descripción/género, pero con la talla VIGENTE del empleado
+// mismo proyecto/prenda/género, pero con la talla VIGENTE del empleado
 // (no la que tenía congelada el pedido viejo, por si cambió de talla) y apuntando a
 // un id de inventario_dotacion que exista hoy. Devuelve null si ya no hay coincidencia
 // (ítem descontinuado, por ejemplo).
 function resolverItemRenovacion(invOriginal, tallasEmpleado, inventarioFlat) {
     if (!invOriginal) return null;
     const tallaActual =
-        tallaPorCategoria(
-            invOriginal.categoria,
-            invOriginal.subcategoria,
-            tallasEmpleado,
-        ) || invOriginal.talla;
+        tallaPorPrenda(invOriginal.prenda, tallasEmpleado) || invOriginal.talla;
     return (
         inventarioFlat.find(
             (i) =>
                 i.proyecto === invOriginal.proyecto &&
-                i.categoria === invOriginal.categoria &&
-                i.subcategoria === invOriginal.subcategoria &&
+                i.prenda === invOriginal.prenda &&
                 i.genero === invOriginal.genero &&
                 i.talla === tallaActual,
         ) ?? null
@@ -290,14 +285,10 @@ function InventarioItemSelect({
 
         if (proyecto) base = base.filter((i) => i.proyecto === proyecto);
 
-        // Filtro talla: para cada ítem, buscar la talla que le corresponde según categoría
+        // Filtro talla: para cada ítem, buscar la talla que le corresponde según la prenda
         if (tallasEmpleado) {
             base = base.filter((i) => {
-                const tallaEsperada = tallaPorCategoria(
-                    i.categoria,
-                    i.subcategoria,
-                    tallasEmpleado,
-                );
+                const tallaEsperada = tallaPorPrenda(i.prenda, tallasEmpleado);
                 if (!tallaEsperada) return true; // sin mapeo conocido → mostrar siempre
                 return i.talla?.toLowerCase() === tallaEsperada.toLowerCase();
             });
@@ -306,8 +297,7 @@ function InventarioItemSelect({
         if (!words.length) return base.slice(0, 80);
         return base
             .filter((i) => {
-                const txt =
-                    `${i.categoria} ${i.subcategoria} ${i.genero} ${i.talla}`.toLowerCase();
+                const txt = `${i.prenda} ${i.genero} ${i.talla}`.toLowerCase();
                 return words.every((w) => txt.includes(w));
             })
             .slice(0, 80);
@@ -333,7 +323,7 @@ function InventarioItemSelect({
     };
 
     const label = selected
-        ? `${selected.categoria} · ${selected.subcategoria} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
+        ? `${selected.prenda} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
         : "";
 
     const dropdown =
@@ -389,7 +379,7 @@ function InventarioItemSelect({
                             }
                         >
                             <span style={{ fontWeight: 700 }}>
-                                {i.categoria} · {i.subcategoria}
+                                {i.prenda}
                             </span>
                             <span
                                 style={{
@@ -1266,11 +1256,7 @@ function Modal({
                                         (it.inventario
                                             ? {
                                                   id: it.inventario.id,
-                                                  categoria:
-                                                      it.inventario.categoria,
-                                                  subcategoria:
-                                                      it.inventario
-                                                          .subcategoria,
+                                                  prenda: it.inventario.prenda,
                                                   genero: it.inventario.genero,
                                                   talla: it.inventario.talla,
                                                   cantidad:
@@ -1302,7 +1288,7 @@ function Modal({
                                                     }}
                                                 >
                                                     {displayInv
-                                                        ? `${displayInv.categoria} · ${displayInv.subcategoria} · ${displayInv.genero} · T:${displayInv.talla}`
+                                                        ? `${displayInv.prenda} · ${displayInv.genero} · T:${displayInv.talla}`
                                                         : `Item #${it.inventario_dotacion_id}`}
                                                 </div>
                                             ) : (
@@ -1462,22 +1448,16 @@ function Modal({
 }
 
 // ─── Importar Excel ───────────────────────────────────────────────────────────
+// Plantilla simplificada para pedidos nuevos: solo se pide cédula + prendas.
+// El código se genera automático, el estado siempre queda "En proceso", la
+// fecha es la del día de la importación, el género se toma del empleado, y
+// las notas se agregan luego desde la interfaz (no van en el archivo).
 const PEDIDO_HEADER_MAP = {
-    codigo: "codigo",
     cedula: "cedula",
-    empleado: "empleado",
-    estado: "estado",
-    "fecha pedido": "fecha_pedido",
-    fechapedido: "fecha_pedido",
     proyecto: "proyecto",
-    prenda: "categoria",
-    categoria: "categoria",
-    descripcion: "subcategoria",
-    subcategoria: "subcategoria",
-    genero: "genero",
+    prenda: "prenda",
     talla: "talla",
     cantidad: "cantidad",
-    notas: "notas",
 };
 
 const normalizeHeaderPA = (s) =>
@@ -1523,59 +1503,51 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 return mapped;
             });
 
-            // Agrupar filas en pedidos por código (si viene en el archivo) o, si no,
-            // por cédula + fecha + estado. Usar el código evita que dos pedidos
-            // distintos del mismo empleado se fusionen al reimportar un export.
+            // Un pedido nuevo por cada cédula distinta en el archivo: todas sus
+            // filas (prendas) se agrupan en ese único pedido.
+            const hoy = new Date().toISOString().split("T")[0];
             const gruposMap = new Map();
             const orden = [];
             filas.forEach((fila, idx) => {
                 const cedula = String(fila.cedula ?? "").trim();
                 if (!cedula) return;
-                const estado = ESTADOS.includes(fila.estado) ? fila.estado : "Pendiente";
-                const fechaPedido = fila.fecha_pedido
-                    ? dateOnly(fila.fecha_pedido)
-                    : new Date().toISOString().split("T")[0];
-                const codigo = String(fila.codigo ?? "").trim();
-                const key = codigo
-                    ? `codigo:${codigo}`
-                    : `${cedula}|${fechaPedido}|${estado}`;
+                const key = cedula;
 
                 if (!gruposMap.has(key)) {
                     gruposMap.set(key, {
                         cedula,
-                        codigo: codigo || null,
                         empleado: empleados.find((e) => e.cedula === cedula) ?? null,
-                        estado,
-                        fecha_pedido: fechaPedido,
-                        notas: fila.notas || "",
+                        estado: "Activo",
+                        fecha_pedido: hoy,
+                        notas: "",
                         items: [],
                         erroresItems: [],
                     });
                     orden.push(key);
                 }
                 const grupo = gruposMap.get(key);
-                if (!fila.categoria && !fila.proyecto) return;
+                if (!fila.prenda && !fila.proyecto) return;
 
+                const generoEmpleado = grupo.empleado?.genero ?? "";
                 const cantidad = Number(fila.cantidad) || 0;
                 const inv = inventarioFlat.find(
                     (i) =>
                         i.proyecto === fila.proyecto &&
-                        i.categoria === fila.categoria &&
-                        (fila.subcategoria ? i.subcategoria === fila.subcategoria : true) &&
-                        i.genero === fila.genero &&
+                        i.prenda === fila.prenda &&
+                        (i.genero === generoEmpleado || i.genero === "Unisex") &&
                         String(i.talla).toLowerCase() === String(fila.talla ?? "").toLowerCase(),
                 );
 
                 if (!inv || cantidad <= 0) {
                     grupo.erroresItems.push(
-                        `Fila ${idx + 2}: no se encontró "${fila.categoria ?? ""} ${fila.subcategoria ?? ""}" (${fila.proyecto ?? ""}, ${fila.genero ?? ""}, talla ${fila.talla ?? ""}) o la cantidad no es válida.`,
+                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${fila.proyecto ?? ""}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
                     );
                     return;
                 }
                 grupo.items.push({
                     inventario_dotacion_id: inv.id,
                     cantidad,
-                    descripcion: `${inv.categoria} · ${inv.subcategoria} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
+                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
                 });
             });
 
@@ -1586,6 +1558,10 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                     : null;
                 const errores = [...g.erroresItems];
                 if (!g.empleado) errores.unshift(`No se encontró un empleado con cédula "${g.cedula}".`);
+                else if (!g.empleado.genero)
+                    errores.unshift(
+                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
+                    );
                 return { ...g, contrato_id: contrato?.id ?? null, errores };
             });
 
@@ -1595,7 +1571,40 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
         }
     };
 
-    const gruposValidos = grupos.filter((g) => g.empleado && g.items.length > 0);
+    const gruposValidos = grupos.filter(
+        (g) => g.errores.length === 0 && g.items.length > 0,
+    );
+
+    const handleDescargarPlantilla = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [
+            {
+                Cédula: "1234567890",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Polo Gris Manga Corta",
+                Talla: "M",
+                Cantidad: 1,
+            },
+            {
+                Cédula: "1234567890",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Pantalon Administrativo",
+                Talla: "34",
+                Cantidad: 1,
+            },
+        ];
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 14 },
+            { wch: 18 },
+            { wch: 26 },
+            { wch: 8 },
+            { wch: 10 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+        XLSX.writeFile(wb, "Plantilla_Pedidos_Automaticos.xlsx");
+    };
 
     const handleImport = async () => {
         if (gruposValidos.length === 0) return;
@@ -1610,7 +1619,6 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                     estado: g.estado,
                     fecha_pedido: g.fecha_pedido,
                     notas: g.notas,
-                    codigo: g.codigo || undefined,
                     items: g.items.map(({ inventario_dotacion_id, cantidad }) => ({
                         inventario_dotacion_id,
                         cantidad,
@@ -1640,13 +1648,30 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: 0 }}>
-                        Usa el mismo formato del botón "Exportar Excel": columnas{" "}
-                        <strong>Código, Cédula, Empleado, Estado, Fecha Pedido, Proyecto, Prenda,
-                        Descripción, Género, Talla, Cantidad, Notas</strong>. Las filas con la misma
-                        cédula + fecha + estado se agrupan en un solo pedido con varias prendas.
-                        Cada grupo válido crea un pedido <strong>nuevo</strong> (no actualiza pedidos existentes,
-                        aunque tengan el mismo código).
+                        Columnas del archivo: <strong>Cédula, Proyecto, Prenda,
+                        Talla, Cantidad</strong>. El código se genera automático, el
+                        estado queda <strong>En proceso</strong>, la fecha es la de hoy,
+                        el género se toma del empleado y las notas se agregan luego
+                        desde la interfaz. Las filas con la misma cédula se agrupan en
+                        un solo pedido nuevo con varias prendas.
                     </p>
+                    <button
+                        type="button"
+                        onClick={handleDescargarPlantilla}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            marginBottom: 10,
+                            color: "var(--primary)",
+                            fontWeight: 700,
+                            fontSize: "0.82rem",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                    >
+                        Descargar plantilla de ejemplo
+                    </button>
                     <label htmlFor="import-pedidos-file" style={S.fileDrop}>
                         <input
                             id="import-pedidos-file"
@@ -1672,7 +1697,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                                     style={{
                                         padding: "10px 14px",
                                         borderBottom: i < grupos.length - 1 ? "1px solid var(--border)" : "none",
-                                        background: g.empleado && g.items.length > 0 ? "transparent" : "#fce8e8",
+                                        background: g.errores.length === 0 && g.items.length > 0 ? "transparent" : "#fce8e8",
                                     }}
                                 >
                                     <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>
@@ -1889,8 +1914,7 @@ export default function PedidosAutomaticosCrud() {
             const itemRow = (inv, cantidad) => ({
                 ...base,
                 Proyecto: inv?.proyecto ?? "",
-                Prenda: inv?.categoria ?? "",
-                Descripción: inv?.subcategoria ?? "",
+                Prenda: inv?.prenda ?? "",
                 Género: inv?.genero ?? "",
                 Talla: inv?.talla ?? "",
                 Cantidad: cantidad ?? "",
@@ -1906,7 +1930,7 @@ export default function PedidosAutomaticosCrud() {
         const ws = XLSX.utils.json_to_sheet(rows);
         ws["!cols"] = [
             { wch: 10 }, { wch: 14 }, { wch: 26 }, { wch: 12 }, { wch: 12 },
-            { wch: 18 }, { wch: 14 }, { wch: 28 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 30 },
+            { wch: 18 }, { wch: 28 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 30 },
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
@@ -1938,8 +1962,21 @@ export default function PedidosAutomaticosCrud() {
         [pedidos],
     );
 
-    const filtrosGlobalListos =
-        filtroProyecto !== "Todos" && filtroRegional !== "Todos";
+    // Los pedidos automáticos son mayormente de personal nuevo: siempre
+    // salen de esta regional, así que si no se filtra una regional específica
+    // se asume esta por defecto para generar el pedido global.
+    const REGIONAL_GLOBAL = "EJE CAFETERO";
+
+    const filtrosGlobalListos = filtroProyecto !== "Todos";
+
+    // Regional efectiva para el pedido global: la que el usuario haya
+    // filtrado explícitamente, o EJE CAFETERO por defecto (personal nuevo).
+    const regionalGlobalNombre =
+        filtroRegional !== "Todos"
+            ? (regionalesUsados.find(
+                  (r) => String(r.id) === String(filtroRegional),
+              )?.nombre ?? "")
+            : REGIONAL_GLOBAL;
 
     const pedidosParaGlobal = useMemo(() => {
         if (!filtrosGlobalListos) return [];
@@ -1948,13 +1985,15 @@ export default function PedidosAutomaticosCrud() {
             const proyectoPedido = p.contrato_id
                 ? (contratoProyectoMap[String(p.contrato_id)] ?? "")
                 : "";
-            const regionalPedidoId = p.contrato_id
-                ? (contratoRegionalMap[String(p.contrato_id)]?.id ?? "")
-                : "";
-            return (
-                proyectoPedido === filtroProyecto &&
-                String(regionalPedidoId) === String(filtroRegional)
-            );
+            const regionalPedido = p.contrato_id
+                ? contratoRegionalMap[String(p.contrato_id)]
+                : null;
+            const matchRegional =
+                filtroRegional !== "Todos"
+                    ? String(regionalPedido?.id ?? "") ===
+                      String(filtroRegional)
+                    : regionalPedido?.nombre === REGIONAL_GLOBAL;
+            return proyectoPedido === filtroProyecto && matchRegional;
         });
     }, [
         pedidos,
@@ -1965,16 +2004,14 @@ export default function PedidosAutomaticosCrud() {
         contratoRegionalMap,
     ]);
 
-    const regionalSeleccionada = regionalesUsados.find(
-        (r) => String(r.id) === String(filtroRegional),
-    );
-
     const handleCrearGlobal = async () => {
         setGlobalSaving(true);
         try {
             const { data } = await api.post("/pedidos-globales", {
                 proyecto: filtroProyecto,
-                regional_id: filtroRegional,
+                ...(filtroRegional !== "Todos"
+                    ? { regional_id: filtroRegional }
+                    : {}),
             });
             const idsGlobal = new Set(pedidosParaGlobal.map((p) => p.id));
             queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
@@ -2227,9 +2264,9 @@ export default function PedidosAutomaticosCrud() {
                         }
                         title={
                             !filtrosGlobalListos
-                                ? "Selecciona un proyecto y una regional específicos para generar el pedido global"
+                                ? "Selecciona un proyecto específico para generar el pedido global"
                                 : pedidosParaGlobal.length === 0
-                                  ? "No hay pedidos en proceso para ese proyecto y regional"
+                                  ? `No hay pedidos en proceso para ese proyecto en ${regionalGlobalNombre || "la regional seleccionada"}`
                                   : ""
                         }
                     >
@@ -2616,9 +2653,7 @@ export default function PedidosAutomaticosCrud() {
                                     >
                                         Proyecto <strong>{filtroProyecto}</strong>{" "}
                                         · Regional{" "}
-                                        <strong>
-                                            {regionalSeleccionada?.nombre ?? ""}
-                                        </strong>
+                                        <strong>{regionalGlobalNombre}</strong>
                                     </div>
                                     <div
                                         style={{

@@ -5,12 +5,29 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
+use App\Models\Regional;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class PedidoGlobalController extends Controller
 {
+    // Los pedidos automáticos son mayormente de personal nuevo, que siempre
+    // sale de esta regional: al generar un pedido global desde ellos ya no
+    // se pide seleccionar regional, se asume esta por defecto.
+    private const REGIONAL_PEDIDOS_AUTOMATICOS = 'EJE CAFETERO';
+
+    private function regionalPedidosAutomaticosId(): int
+    {
+        $id = Regional::where('nombre', self::REGIONAL_PEDIDOS_AUTOMATICOS)->value('id');
+
+        if (!$id) {
+            abort(422, 'No se encontró la regional "' . self::REGIONAL_PEDIDOS_AUTOMATICOS . '".');
+        }
+
+        return $id;
+    }
+
     public function index()
     {
         $globales = PedidoGlobal::with([
@@ -78,23 +95,26 @@ class PedidoGlobalController extends Controller
         $data = $request->validate([
             'notas'       => 'nullable|string',
             'proyecto'    => 'required|string',
-            'regional_id' => 'required|exists:regionales,id',
+            'regional_id' => 'nullable|exists:regionales,id',
         ]);
 
-        return DB::transaction(function () use ($data) {
+        $regionalId = $data['regional_id'] ?? $this->regionalPedidosAutomaticosId();
+        $regionalNombre = Regional::find($regionalId)->nombre;
+
+        return DB::transaction(function () use ($data, $regionalId, $regionalNombre) {
             $pedidos = PedidoAutomatico::where('estado', 'Activo')
                 ->whereNull('pedido_global_id')
                 ->whereNotNull('codigo')
-                ->whereHas('contrato', function ($q) use ($data) {
+                ->whereHas('contrato', function ($q) use ($data, $regionalId) {
                     $q->where('cliente_proyecto', $data['proyecto'])
-                      ->where('regional_id', $data['regional_id']);
+                      ->where('regional_id', $regionalId);
                 })
                 ->lockForUpdate()
                 ->get();
 
             if ($pedidos->isEmpty()) {
                 return response()->json([
-                    'message' => 'No hay pedidos en proceso para el proyecto y la regional seleccionados.',
+                    'message' => 'No hay pedidos en proceso para el proyecto seleccionado en la regional ' . $regionalNombre . '.',
                 ], 422);
             }
 
@@ -104,7 +124,7 @@ class PedidoGlobalController extends Controller
                 'total_pedidos'    => $pedidos->count(),
                 'notas'            => $data['notas'] ?? null,
                 'cliente_proyecto' => $data['proyecto'],
-                'regional_id'      => $data['regional_id'],
+                'regional_id'      => $regionalId,
             ]);
 
             PedidoAutomatico::whereIn('id', $pedidos->pluck('id'))

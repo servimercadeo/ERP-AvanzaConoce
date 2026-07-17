@@ -13,8 +13,7 @@ class InventarioDotacion extends Model
 
     protected $fillable = [
         'proyecto',
-        'categoria',
-        'subcategoria',
+        'prenda',
         'genero',
         'talla',
         'precio',

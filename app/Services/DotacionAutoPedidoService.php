@@ -70,8 +70,8 @@ class DotacionAutoPedidoService
                 'notas'        => 'Generado automáticamente al crear el contrato.',
             ]);
 
-            foreach ($reglas as [$proyecto, $categoria, $subcategoria, $genero, $talla, $cantidad]) {
-                $inv = $this->buscarItemConStock($proyecto, $categoria, $subcategoria, $genero, $talla, $cantidad);
+            foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
+                $inv = $this->buscarItemConStock($proyecto, $prenda, $genero, $talla, $cantidad);
                 if (!$inv) {
                     continue;
                 }
@@ -111,9 +111,9 @@ class DotacionAutoPedidoService
      * del empleado no está registrada, o si no hay stock suficiente, devuelve null y
      * deja constancia en el log (esa línea simplemente se omite del pedido).
      */
-    private function buscarItemConStock(string $proyecto, string $categoria, ?string $subcategoria, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
+    private function buscarItemConStock(string $proyecto, string $prenda, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
     {
-        $descripcion = trim("{$categoria} " . ($subcategoria ?? '') . " ({$proyecto}, {$genero})");
+        $descripcion = "{$prenda} ({$proyecto}, {$genero})";
 
         if (!$talla) {
             Log::info("DotacionAutoPedidoService: talla no registrada para el empleado, no se asigna {$descripcion}.");
@@ -121,15 +121,11 @@ class DotacionAutoPedidoService
         }
 
         $query = InventarioDotacion::where('proyecto', $proyecto)
-            ->where('categoria', $categoria)
+            ->where('prenda', $prenda)
             ->where('talla', $talla)
             ->where(function ($q) use ($genero) {
                 $q->where('genero', $genero)->orWhere('genero', 'Unisex');
             });
-
-        if ($subcategoria !== null) {
-            $query->where('subcategoria', $subcategoria);
-        }
 
         $inv = $query->lockForUpdate()->first();
 
@@ -150,7 +146,7 @@ class DotacionAutoPedidoService
      * Devuelve la lista de reglas (líneas de dotación) para el proyecto+cargo dados, o un
      * array vacío si el proyecto no es SYM/DIRECTV o el cargo no coincide con ninguna de
      * las reglas definidas (en cuyo caso no se genera ningún pedido automático).
-     * Cada regla: ['proyecto','categoria','subcategoria'|null,'genero','talla'|null,'cantidad'].
+     * Cada regla: ['proyecto','prenda','genero','talla'|null,'cantidad'].
      */
     private function resolverReglas(string $proyecto, string $cargo, string $genero, User $empleado): array
     {
@@ -164,17 +160,17 @@ class DotacionAutoPedidoService
 
         } elseif (in_array($proyecto, ['SYM TIGO EXPRESS', 'SYM TIGO HOME'], true)) {
             if ($esSupervisorComercial) {
-                $reglas[] = ['SYM TIGO EXPRESS', 'Polo', 'Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Polo', 'Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Unisex', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO EXPRESS') {
-                $reglas[] = ['SYM TIGO EXPRESS', 'Polo', 'Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Polo', 'Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
+                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Unisex', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO HOME') {
-                $reglas[] = ['SYM TIGO HOME', 'Polo', 'Ml Azul Home', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['SYM TIGO HOME', 'Gorra', null, 'Unisex', 'Única', 1];
-                $reglas[] = ['SYM TIGO HOME', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['SYM TIGO HOME', 'Polo Ml Azul Home', $genero, $empleado->talla_camisa, 2];
+                $reglas[] = ['SYM TIGO HOME', 'Gorra', 'Unisex', 'N/A', 1];
+                $reglas[] = ['SYM TIGO HOME', 'Carnet', 'Unisex', 'N/A', 1];
             } else {
                 // Cargo no comercial (ej. Analista, Coordinador) en un proyecto Tigo: recibe el
                 // mismo kit que "personal administrativo" (proyecto Solo Ausentismos).
@@ -183,22 +179,22 @@ class DotacionAutoPedidoService
 
         } elseif ($proyecto === 'DIRECTV') {
             if (in_array($cargo, self::DIRECTV_TECNICOS_INSTALADORES, true)) {
-                $reglas[] = ['DIRECTV', 'Polo', 'Instalador Azul Oscuro M/C', 'Unisex', $empleado->talla_camisa, 1];
-                $reglas[] = ['DIRECTV', 'Polo', 'Instalador Azul Oscuro M/L', 'Unisex', $empleado->talla_camisa, 1];
-                $reglas[] = ['DIRECTV', 'Pantalon', 'De Dril Tecnicos', 'Unisex', $empleado->talla_pantalon, 2];
-                $reglas[] = ['DIRECTV', 'Botas', 'Instalador', 'Unisex', $empleado->talla_zapatos, 1];
-                $reglas[] = ['DIRECTV', 'Reata', 'Azul Oscuro', 'Unisex', 'Única', 1];
-                $reglas[] = ['DIRECTV', 'Gorra', 'Gorra', 'Unisex', 'Única', 1];
-                $reglas[] = ['DIRECTV', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['DIRECTV', 'Polo Instalador Azul Oscuro M/C', 'Unisex', $empleado->talla_camisa, 1];
+                $reglas[] = ['DIRECTV', 'Polo Instalador Azul Oscuro M/L', 'Unisex', $empleado->talla_camisa, 1];
+                $reglas[] = ['DIRECTV', 'Pantalon De Dril Tecnicos', 'Unisex', $empleado->talla_pantalon, 2];
+                $reglas[] = ['DIRECTV', 'Botas Instalador', 'Unisex', $empleado->talla_zapatos, 1];
+                $reglas[] = ['DIRECTV', 'Reata Azul Oscuro', 'Unisex', 'N/A', 1];
+                $reglas[] = ['DIRECTV', 'Gorra', 'Unisex', 'N/A', 1];
+                $reglas[] = ['DIRECTV', 'Carnet', 'Unisex', 'N/A', 1];
             } elseif (str_contains($cargo, 'LOGISTICA')) {
-                $reglas[] = ['DIRECTV', 'Polo', 'Gris Administrativa', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['DIRECTV', 'Pantalon', 'Comercial', $genero, $empleado->talla_pantalon, 1];
-                $reglas[] = ['DIRECTV', 'Botas', 'Instalador', 'Unisex', $empleado->talla_zapatos, 1];
-                $reglas[] = ['DIRECTV', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['DIRECTV', 'Polo Gris Administrativa', $genero, $empleado->talla_camisa, 2];
+                $reglas[] = ['DIRECTV', 'Pantalon Comercial', $genero, $empleado->talla_pantalon, 1];
+                $reglas[] = ['DIRECTV', 'Botas Instalador', 'Unisex', $empleado->talla_zapatos, 1];
+                $reglas[] = ['DIRECTV', 'Carnet', 'Unisex', 'N/A', 1];
             } elseif (str_contains($cargo, 'ADMINISTRATIVO') || str_contains($cargo, 'COMERCIAL')) {
-                $reglas[] = ['DIRECTV', 'Polo', 'Gris Administrativa', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['DIRECTV', 'Pantalon', 'Comercial', $genero, $empleado->talla_pantalon, 1];
-                $reglas[] = ['DIRECTV', 'Carnet', 'Carnet', 'Unisex', 'Única', 1];
+                $reglas[] = ['DIRECTV', 'Polo Gris Administrativa', $genero, $empleado->talla_camisa, 2];
+                $reglas[] = ['DIRECTV', 'Pantalon Comercial', $genero, $empleado->talla_pantalon, 1];
+                $reglas[] = ['DIRECTV', 'Carnet', 'Unisex', 'N/A', 1];
             } else {
                 Log::info("DotacionAutoPedidoService: cargo \"{$cargo}\" (proyecto DIRECTV) no coincide con Administrativo, Comercial, Logística ni Técnico instalador; no se genera pedido automático.");
             }
@@ -219,9 +215,9 @@ class DotacionAutoPedidoService
     private function kitAdministrativoSym(string $genero, User $empleado): array
     {
         return [
-            ['SYM ADMINISTRATIVO', 'Polo', 'Gris Manga Corta', $genero, $empleado->talla_camisa, 2],
-            ['SYM ADMINISTRATIVO', 'Pantalon', null, $genero, $empleado->talla_pantalon, 1],
-            ['SYM ADMINISTRATIVO', 'Carnet', 'Carnet', 'Unisex', 'Única', 1],
+            ['SYM ADMINISTRATIVO', 'Polo Gris Manga Corta', $genero, $empleado->talla_camisa, 2],
+            ['SYM ADMINISTRATIVO', 'Pantalon Administrativo', $genero, $empleado->talla_pantalon, 1],
+            ['SYM ADMINISTRATIVO', 'Carnet', 'Unisex', 'N/A', 1],
         ];
     }
 

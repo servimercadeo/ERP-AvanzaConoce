@@ -4,22 +4,14 @@ import api from '../api/axios';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 
 const PROYECTOS   = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
-const CATEGORIAS  = ['Blusa', 'Botas', 'Camisa', 'Carnet', 'Chaqueta', 'Conjunto', 'Gorra', 'Jean', 'Pantalon', 'Polo', 'Reata', 'Tenis', 'Zapatos', 'Chaleco', 'Otro'];
 const GENEROS     = ['Masculino', 'Femenino', 'Unisex'];
 const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
 const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
 const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
-const TALLAS_UNICA = ['Única'];
+const TALLAS_UNICA = ['N/A'];
 const ALL_TALLAS_ORDER = [...TALLAS_UNICA, ...TALLAS_ROPA, ...TALLAS_JEAN, ...TALLAS_TENIS.filter(t => !TALLAS_JEAN.includes(t))];
 
-function tallasForCategoria(cat) {
-    if (cat === 'Jean' || cat === 'Pantalon') return TALLAS_JEAN;
-    if (cat === 'Tenis' || cat === 'Zapatos' || cat === 'Botas') return TALLAS_TENIS;
-    if (cat === 'Carnet' || cat === 'Gorra' || cat === 'Reata') return TALLAS_UNICA;
-    return TALLAS_ROPA;
-}
-
-const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', categoria: 'Polo', subcategoria: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
+const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', prenda: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
 const EMPTY_BULK_ROW = () => ({ ...EMPTY_ITEM });
 
 // ─── Modal agregar / editar un item ──────────────────────────────────────────
@@ -33,8 +25,6 @@ function ItemModal({ item, onClose, onSaved }) {
 
     const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-    const tallasOpts = isEdit ? [] : tallasForCategoria(form.categoria);
-
     const handleSave = async () => {
         setSaving(true); setError('');
         try {
@@ -46,7 +36,7 @@ function ItemModal({ item, onClose, onSaved }) {
                 });
                 onSaved(data, true);
             } else {
-                if (!form.subcategoria.trim()) return setError('Ingresa una descripción/subcategoría.') || setSaving(false);
+                if (!form.prenda.trim()) return setError('Ingresa el nombre de la prenda.') || setSaving(false);
                 const { data } = await api.post('/inventario-dotacion', {
                     ...form,
                     precio: Number(form.precio),
@@ -74,7 +64,7 @@ function ItemModal({ item, onClose, onSaved }) {
                         <>
                             <div style={S.readonlyGroup}>
                                 <span style={S.roLabel}>Proyecto</span><span style={S.roVal}>{item.proyecto}</span>
-                                <span style={S.roLabel}>Prenda</span><span style={S.roVal}>{item.categoria} · {item.subcategoria}</span>
+                                <span style={S.roLabel}>Prenda</span><span style={S.roVal}>{item.prenda}</span>
                                 <span style={S.roLabel}>Género / Talla</span><span style={S.roVal}>{item.genero} / {item.talla}</span>
                             </div>
                             <div style={S.grid2}>
@@ -101,12 +91,10 @@ function ItemModal({ item, onClose, onSaved }) {
                                         {PROYECTOS.map(p => <option key={p}>{p}</option>)}
                                     </select>
                                 </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Categoría (prenda) *</label>
-                                    <select style={S.input} value={form.categoria}
-                                        onChange={e => setForm(f => ({ ...f, categoria: e.target.value, talla: tallasForCategoria(e.target.value)[0] }))}>
-                                        {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
-                                    </select>
+                                <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
+                                    <label style={S.label}>Prenda *</label>
+                                    <input type="text" style={S.input} placeholder="Ej: Polo Gris Manga Corta, Jean Azul…"
+                                        value={form.prenda} onChange={set('prenda')} />
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Género *</label>
@@ -114,15 +102,10 @@ function ItemModal({ item, onClose, onSaved }) {
                                         {GENEROS.map(g => <option key={g}>{g}</option>)}
                                     </select>
                                 </div>
-                                <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
-                                    <label style={S.label}>Descripción / Subcategoría *</label>
-                                    <input type="text" style={S.input} placeholder="Ej: Polo manga corta, Jean slim fit…"
-                                        value={form.subcategoria} onChange={set('subcategoria')} />
-                                </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Talla *</label>
                                     <select style={S.input} value={form.talla} onChange={set('talla')}>
-                                        {tallasOpts.map(t => <option key={t}>{t}</option>)}
+                                        {ALL_TALLAS_ORDER.map(t => <option key={t}>{t}</option>)}
                                     </select>
                                 </div>
                                 <div style={S.formGroup}>
@@ -164,8 +147,8 @@ function BulkModal({ onClose, onSaved }) {
     const removeRow = (idx) => setRows(rs => rs.filter((_, i) => i !== idx));
 
     const handleSave = async () => {
-        const incomplete = rows.some(r => !r.subcategoria.trim());
-        if (incomplete) return setError('Todos los items necesitan descripción/subcategoría.');
+        const incomplete = rows.some(r => !r.prenda.trim());
+        if (incomplete) return setError('Todos los items necesitan el nombre de la prenda.');
         setSaving(true); setError('');
         try {
             const { data } = await api.post('/inventario-dotacion/bulk', {
@@ -190,7 +173,7 @@ function BulkModal({ onClose, onSaved }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                         <thead>
                             <tr style={{ background: 'var(--bg)' }}>
-                                {['Proyecto', 'Categoría', 'Descripción', 'Género', 'Talla', 'Precio', 'Cantidad', 'Stock mín.', ''].map(h => (
+                                {['Proyecto', 'Prenda', 'Género', 'Talla', 'Precio', 'Cantidad', 'Stock mín.', ''].map(h => (
                                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', border: '1px solid var(--border)' }}>{h}</th>
                                 ))}
                             </tr>
@@ -204,13 +187,7 @@ function BulkModal({ onClose, onSaved }) {
                                         </select>
                                     </td>
                                     <td style={S.tdCell}>
-                                        <select style={S.cellInput} value={row.categoria}
-                                            onChange={e => { setRow(idx, 'categoria', e.target.value); setRow(idx, 'talla', tallasForCategoria(e.target.value)[0]); }}>
-                                            {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
-                                        </select>
-                                    </td>
-                                    <td style={S.tdCell}>
-                                        <input style={S.cellInput} placeholder="Ej: Polo manga corta" value={row.subcategoria} onChange={e => setRow(idx, 'subcategoria', e.target.value)} />
+                                        <input style={S.cellInput} placeholder="Ej: Polo Gris Manga Corta" value={row.prenda} onChange={e => setRow(idx, 'prenda', e.target.value)} />
                                     </td>
                                     <td style={S.tdCell}>
                                         <select style={S.cellInput} value={row.genero} onChange={e => setRow(idx, 'genero', e.target.value)}>
@@ -219,7 +196,7 @@ function BulkModal({ onClose, onSaved }) {
                                     </td>
                                     <td style={S.tdCell}>
                                         <select style={S.cellInput} value={row.talla} onChange={e => setRow(idx, 'talla', e.target.value)}>
-                                            {tallasForCategoria(row.categoria).map(t => <option key={t}>{t}</option>)}
+                                            {ALL_TALLAS_ORDER.map(t => <option key={t}>{t}</option>)}
                                         </select>
                                     </td>
                                     <td style={S.tdCell}>
@@ -259,18 +236,15 @@ function BulkModal({ onClose, onSaved }) {
 }
 
 // ─── Modal importar Excel ─────────────────────────────────────────────────────
+const STOCK_MINIMO_IMPORT_DEFAULT = 10;
+
 const IMPORT_HEADER_MAP = {
     proyecto: 'proyecto',
-    prenda: 'categoria',
-    categoria: 'categoria',
-    descripcion: 'subcategoria',
-    subcategoria: 'subcategoria',
+    prenda: 'prenda',
     genero: 'genero',
     talla: 'talla',
     precio: 'precio',
     cantidad: 'cantidad',
-    'stock minimo': 'stock_minimo',
-    'stock min.': 'stock_minimo',
 };
 
 const normalizeHeader = (s) => (s ?? '').toString().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
@@ -308,8 +282,7 @@ function ImportModal({ onClose, onImported }) {
 
                 const motivos = [];
                 if (!PROYECTOS.includes(mapped.proyecto)) motivos.push('proyecto inválido');
-                if (!CATEGORIAS.includes(mapped.categoria)) motivos.push('prenda inválida');
-                if (!mapped.subcategoria) motivos.push('descripción vacía');
+                if (!mapped.prenda) motivos.push('prenda vacía');
                 if (!GENEROS.includes(mapped.genero)) motivos.push('género inválido');
                 if (!mapped.talla && mapped.talla !== 0) motivos.push('talla vacía');
                 const cantidad = Number(mapped.cantidad);
@@ -320,13 +293,12 @@ function ImportModal({ onClose, onImported }) {
                 } else {
                     valid.push({
                         proyecto: mapped.proyecto,
-                        categoria: mapped.categoria,
-                        subcategoria: mapped.subcategoria,
+                        prenda: mapped.prenda,
                         genero: mapped.genero,
                         talla: String(mapped.talla),
                         precio: Number(mapped.precio) || 0,
                         cantidad,
-                        stock_minimo: Number(mapped.stock_minimo) || 0,
+                        stock_minimo: STOCK_MINIMO_IMPORT_DEFAULT,
                     });
                 }
             });
@@ -360,7 +332,8 @@ function ImportModal({ onClose, onImported }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: 0 }}>
-                        Usa el mismo formato del botón "Exportar Excel": columnas <strong>Proyecto, Prenda, Descripción, Género, Talla, Precio, Cantidad, Stock mínimo</strong>.
+                        Columnas del archivo: <strong>Proyecto, Prenda, Género, Talla, Precio, Cantidad</strong>. No es necesario poner Estado ni Stock mínimo:
+                        el estado se calcula solo según cantidad vs. stock mínimo, y los items nuevos quedan con stock mínimo <strong>{STOCK_MINIMO_IMPORT_DEFAULT}</strong> por defecto.
                         Si una combinación proyecto + prenda + talla + género ya existe, la cantidad se <strong>suma</strong> al stock actual; si no existe, se crea un item nuevo.
                     </p>
                     <label htmlFor="import-excel-file" style={S.fileDrop}>
@@ -419,7 +392,7 @@ function DeleteModal({ item, onClose, onDeleted }) {
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
                 </div>
                 <div style={S.modalBody}>
-                    <p>¿Eliminar <strong>{item.categoria} {item.subcategoria}</strong> talla <strong>{item.talla}</strong> ({item.genero}) de <strong>{item.proyecto}</strong>?</p>
+                    <p>¿Eliminar <strong>{item.prenda}</strong> talla <strong>{item.talla}</strong> ({item.genero}) de <strong>{item.proyecto}</strong>?</p>
                 </div>
                 <div style={S.modalFooter}>
                     <button style={S.btnSecondary} onClick={onClose} disabled={deleting}>Cancelar</button>
@@ -443,7 +416,7 @@ const PROYECTO_COLORS = {
 export default function ProductosDotacion() {
     const qc = useQueryClient();
     const [proyectoTab, setProyectoTab]   = useState('SYM TIGO EXPRESS');
-    const [categoriaFiltro, setCategoriaFiltro] = useState('Todos');
+    const [prendaFiltro, setPrendaFiltro] = useState('Todos');
     const [generoFiltro, setGeneroFiltro] = useState('Todos');
     const [tallaFiltro, setTallaFiltro]   = useState('Todos');
     const [search, setSearch]             = useState('');
@@ -473,39 +446,38 @@ export default function ProductosDotacion() {
         return { total, bajoStock, porProyecto };
     }, [inventario]);
 
-    // Filtrado por tab, categoría, género, talla y búsqueda
+    // Filtrado por tab, prenda, género, talla y búsqueda
     const filtrados = useMemo(() => {
         let items = inventario.filter(i => i.proyecto === proyectoTab);
-        if (categoriaFiltro !== 'Todos') items = items.filter(i => i.categoria === categoriaFiltro);
+        if (prendaFiltro !== 'Todos') items = items.filter(i => i.prenda === prendaFiltro);
         if (generoFiltro !== 'Todos') items = items.filter(i => i.genero === generoFiltro);
         if (tallaFiltro !== 'Todos') items = items.filter(i => i.talla === tallaFiltro);
         if (search.trim()) {
             const q = search.toLowerCase();
             items = items.filter(i =>
-                i.categoria.toLowerCase().includes(q) ||
-                i.subcategoria.toLowerCase().includes(q) ||
+                i.prenda.toLowerCase().includes(q) ||
                 i.genero.toLowerCase().includes(q) ||
                 i.talla.toLowerCase().includes(q)
             );
         }
         return items;
-    }, [inventario, proyectoTab, categoriaFiltro, generoFiltro, tallaFiltro, search]);
+    }, [inventario, proyectoTab, prendaFiltro, generoFiltro, tallaFiltro, search]);
 
-    // Categorías disponibles en el tab actual
-    const categoriasDisponibles = useMemo(() => {
+    // Prendas disponibles en el tab actual
+    const prendasDisponibles = useMemo(() => {
         const enTab = inventario.filter(i => i.proyecto === proyectoTab);
-        const presentes = new Set(enTab.map(i => i.categoria));
-        return ['Todos', ...CATEGORIAS.filter(c => presentes.has(c))];
+        const presentes = [...new Set(enTab.map(i => i.prenda))].sort((a, b) => a.localeCompare(b));
+        return ['Todos', ...presentes];
     }, [inventario, proyectoTab]);
 
-    // Tallas disponibles según proyecto + categoría + género activos
+    // Tallas disponibles según proyecto + prenda + género activos
     const tallasDisponibles = useMemo(() => {
         let items = inventario.filter(i => i.proyecto === proyectoTab);
-        if (categoriaFiltro !== 'Todos') items = items.filter(i => i.categoria === categoriaFiltro);
+        if (prendaFiltro !== 'Todos') items = items.filter(i => i.prenda === prendaFiltro);
         if (generoFiltro !== 'Todos') items = items.filter(i => i.genero === generoFiltro);
         const presentes = new Set(items.map(i => i.talla));
         return ['Todos', ...ALL_TALLAS_ORDER.filter(t => presentes.has(t))];
-    }, [inventario, proyectoTab, categoriaFiltro, generoFiltro]);
+    }, [inventario, proyectoTab, prendaFiltro, generoFiltro]);
 
     const invalidate = () => qc.invalidateQueries({ queryKey: ['inventario-dotacion-flat'] });
 
@@ -544,8 +516,7 @@ export default function ProductosDotacion() {
         const XLSX = await import('xlsx');
         const rows = filtrados.map(i => ({
             Proyecto: i.proyecto,
-            Prenda: i.categoria,
-            Descripción: i.subcategoria,
+            Prenda: i.prenda,
             Género: i.genero,
             Talla: i.talla,
             Precio: Number(i.precio ?? 0),
@@ -556,14 +527,14 @@ export default function ProductosDotacion() {
 
         const ws = XLSX.utils.json_to_sheet(rows);
         ws['!cols'] = [
-            { wch: 20 }, { wch: 14 }, { wch: 32 }, { wch: 12 },
+            { wch: 20 }, { wch: 32 }, { wch: 12 },
             { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
 
         const partes = [proyectoTab];
-        if (categoriaFiltro !== 'Todos') partes.push(categoriaFiltro);
+        if (prendaFiltro !== 'Todos') partes.push(prendaFiltro);
         if (generoFiltro !== 'Todos') partes.push(generoFiltro);
         if (tallaFiltro !== 'Todos') partes.push(`Talla-${tallaFiltro}`);
         const fecha = new Date().toISOString().slice(0, 10);
@@ -588,7 +559,7 @@ export default function ProductosDotacion() {
                 {PROYECTOS.map(p => {
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setCategoriaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }}>
+                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }}>
                             <div className="stat-num" style={{ color: c.color }}>{stats.porProyecto[p] ?? 0}</div>
                             <div className="stat-label">{p}</div>
                         </div>
@@ -606,7 +577,7 @@ export default function ProductosDotacion() {
                     const active = proyectoTab === p;
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <button key={p} onClick={() => { setProyectoTab(p); setCategoriaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }} style={{
+                        <button key={p} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }} style={{
                             padding: '10px 22px', border: 'none', borderBottom: active ? `2.5px solid ${c.border}` : '2.5px solid transparent',
                             marginBottom: -2, background: 'transparent', fontWeight: active ? 800 : 600,
                             fontSize: '0.9rem', fontFamily: 'Nunito,sans-serif', color: active ? c.color : 'var(--text-muted)',
@@ -621,13 +592,13 @@ export default function ProductosDotacion() {
                 })}
             </div>
 
-            {/* Filtros por categoría y género */}
+            {/* Filtros por prenda y género */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {categoriasDisponibles.map(cat => {
-                        const active = categoriaFiltro === cat;
+                    {prendasDisponibles.map(cat => {
+                        const active = prendaFiltro === cat;
                         return (
-                            <button key={cat} onClick={() => { setCategoriaFiltro(cat); setTallaFiltro('Todos'); }} style={{
+                            <button key={cat} onClick={() => { setPrendaFiltro(cat); setTallaFiltro('Todos'); }} style={{
                                 padding: '5px 14px', border: `1.5px solid ${active ? pc.border : 'var(--border)'}`,
                                 borderRadius: 20, background: active ? pc.bg : 'var(--white)',
                                 color: active ? pc.color : 'var(--text-muted)', fontWeight: active ? 800 : 600,
@@ -709,8 +680,7 @@ export default function ProductosDotacion() {
                     <table className="data-table" style={{ fontSize: '0.83rem' }}>
                         <thead>
                             <tr>
-                                <th>Categoría</th>
-                                <th>Descripción</th>
+                                <th>Prenda</th>
                                 <th>Género</th>
                                 <th style={{ textAlign: 'center' }}>Talla</th>
                                 <th style={{ textAlign: 'right' }}>Precio</th>
@@ -725,8 +695,7 @@ export default function ProductosDotacion() {
                                 const bs = badgeStock(item.cantidad, item.stock_minimo);
                                 return (
                                     <tr key={item.id}>
-                                        <td style={{ fontWeight: 700 }}>{item.categoria}</td>
-                                        <td style={{ color: 'var(--text-muted)' }}>{item.subcategoria || '—'}</td>
+                                        <td style={{ fontWeight: 700 }}>{item.prenda}</td>
                                         <td>
                                             <span style={{ ...S.badge(item.genero === 'Masculino' ? '#e8f0ff' : item.genero === 'Femenino' ? '#fce8f5' : '#f1f5f9', item.genero === 'Masculino' ? '#1a4fa8' : item.genero === 'Femenino' ? '#8b267a' : '#475569') }}>
                                                 {item.genero}
