@@ -200,7 +200,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                         <path d="M9 12h6m-3-3v6M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"/>
                                     </svg>
                                     <p style={{ margin: 0, fontSize: "0.9rem" }}>Sin eventos registrados.</p>
-                                    {!readOnly && <p style={{ margin: 0, fontSize: "0.82rem" }}>Usa el botón de abajo para agregar el primer evento.</p>}
+                                    {!readOnly && <p style={{ margin: 0, fontSize: "0.82rem" }}>Usa el boton de abajo para agregar el primer evento.</p>}
                                 </div>
                             )}
                             {eventos.map((ev, i) => {
