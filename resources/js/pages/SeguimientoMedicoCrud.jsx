@@ -129,9 +129,8 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
         const ced = contrato.empleado?.cedula ?? "";
         setDocsMed(DOCS_MED_INIT());
         if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
-        fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}&evento=${encodeURIComponent(eventoFecha)}`)
-            .then(r => r.ok ? r.json() : {})
-            .then(data => setDocsSubidos(data ?? {}))
+        api.get("/documentos-contratacion/docs-medicos", { params: { cedula: ced, evento: eventoFecha } })
+            .then(r => setDocsSubidos(r.data ?? {}))
             .catch(() => {});
     }, [open, contrato, eventoFecha]);
 
@@ -161,7 +160,6 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             toUpload.forEach(d => { next[d.id] = { ...next[d.id], status: "uploading" }; });
             return next;
         });
-        const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
         const successFiles = [];
         for (const doc of toUpload) {
             const file = docsMed[doc.id].file;
@@ -173,14 +171,12 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 fd.append("tipo", doc.id);
                 fd.append("archivo", file);
                 fd.append("evento", eventoFecha);
-                const res = await fetch("/api/documentos-contratacion/upload", {
-                    method: "POST", headers: { "X-CSRF-TOKEN": csrf }, body: fd,
-                });
-                if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? `Error ${res.status}`); }
+                await api.post("/documentos-contratacion/upload", fd);
                 setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
                 successFiles.push(filename);
             } catch (err) {
-                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: err.message } }));
+                const msg = err?.response?.data?.message ?? err.message;
+                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: msg } }));
             }
         }
         if (successFiles.length > 0) {
@@ -501,11 +497,8 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                     {(yaSubido || isDone) && !readOnly && (
                                                         <button onClick={async () => {
                                                             if (!confirm("¿Eliminar este documento?")) return;
-                                                            const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
-                                                            await fetch("/api/documentos-contratacion/docs-medicos", {
-                                                                method: "DELETE",
-                                                                headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
-                                                                body: JSON.stringify({ cedula, tipo: doc.id, evento: eventoFecha }),
+                                                            await api.delete("/documentos-contratacion/docs-medicos", {
+                                                                data: { cedula, tipo: doc.id, evento: eventoFecha },
                                                             });
                                                             setDocsSubidos(prev => ({ ...prev, [doc.id]: null }));
                                                             setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "idle", name: null, error: null } }));
