@@ -13,15 +13,16 @@ class InventarioDotacion extends Model
 
     protected $fillable = [
         'proyecto',
-        'categoria',
-        'subcategoria',
+        'prenda',
         'genero',
         'talla',
+        'precio',
         'cantidad',
         'stock_minimo',
     ];
 
     protected $casts = [
+        'precio' => 'integer',
         'cantidad' => 'integer',
         'stock_minimo' => 'integer',
     ];

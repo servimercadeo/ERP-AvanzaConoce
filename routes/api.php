@@ -224,6 +224,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
     Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
+    Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import']);
     Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store']);
     Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update']);
     Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy']);
@@ -231,12 +232,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Pedidos automáticos de dotación
     Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
     Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver']);
+    Route::put('pedidos-automaticos/bulk-estado', [PedidoAutomaticoController::class, 'bulkEstado']);
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
         ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
 
     // Pedidos globales de dotación
     Route::get('pedidos-globales', [PedidoGlobalController::class, 'index']);
     Route::post('pedidos-globales', [PedidoGlobalController::class, 'store']);
+    Route::post('pedidos-globales/import', [PedidoGlobalController::class, 'import']);
     Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update']);
     Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy']);
 

@@ -14,6 +14,7 @@ import {
     IconLayers,
     IconCalendar,
     IconWarning,
+    IconFile,
 } from "../components/Icons";
 
 const POR_PAGINA = 8;
@@ -46,6 +47,21 @@ const ESTADO_LABEL = {
 };
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
+
+// El proyecto del contrato (tabla `proyectos`, ej. "TIGO EXPRESS", "DIRECTV CO")
+// no coincide en texto con el proyecto del inventario de dotación (tabla
+// `inventario_dotacion`, ej. "SYM TIGO EXPRESS", "DIRECTV"), así que hay que
+// mapear explícitamente entre los dos catálogos en vez de comparar por igualdad.
+const PROYECTO_A_INVENTARIO = {
+    "TIGO EXPRESS": "SYM TIGO EXPRESS",
+    "TIGO HOME": "SYM TIGO HOME",
+    "DIRECTV CO": "DIRECTV",
+    "DIRECTV ECU": "DIRECTV",
+};
+const proyectoInventarioDe = (nombreProyecto) =>
+    nombreProyecto
+        ? (PROYECTO_A_INVENTARIO[nombreProyecto] ?? "SYM ADMINISTRATIVO")
+        : null;
 
 const EMPTY_FORM = {
     empleado_id: "",
@@ -213,10 +229,10 @@ function EmpleadoSearchSelect({ empleados, value, onChange, disabled, error }) {
 }
 
 // ── Selector de item de inventario ─────────────────────────────────────────
-// Mapea categoría/subcategoría del ítem a la talla correspondiente del empleado
-function tallaPorCategoria(categoria, subcategoria, tallasEmpleado) {
+// Mapea la prenda del ítem a la talla correspondiente del empleado
+function tallaPorPrenda(prenda, tallasEmpleado) {
     if (!tallasEmpleado) return null;
-    const txt = `${categoria} ${subcategoria}`.toLowerCase();
+    const txt = (prenda ?? "").toLowerCase();
     if (/polo|camisa|camiseta|chaqueta|blusa|buzo|sudadera|chaleco/.test(txt))
         return tallasEmpleado.talla_camisa || null;
     if (/pantalon|jean|short|bermuda|licra/.test(txt))
@@ -224,6 +240,26 @@ function tallaPorCategoria(categoria, subcategoria, tallasEmpleado) {
     if (/zapato|tenis|bota|calzado|zapatilla/.test(txt))
         return tallasEmpleado.talla_zapatos || null;
     return null;
+}
+
+// Vuelve a resolver una prenda de un pedido anterior contra el inventario ACTUAL:
+// mismo proyecto/prenda/género, pero con la talla VIGENTE del empleado
+// (no la que tenía congelada el pedido viejo, por si cambió de talla) y apuntando a
+// un id de inventario_dotacion que exista hoy. Devuelve null si ya no hay coincidencia
+// (ítem descontinuado, por ejemplo).
+function resolverItemRenovacion(invOriginal, tallasEmpleado, inventarioFlat) {
+    if (!invOriginal) return null;
+    const tallaActual =
+        tallaPorPrenda(invOriginal.prenda, tallasEmpleado) || invOriginal.talla;
+    return (
+        inventarioFlat.find(
+            (i) =>
+                i.proyecto === invOriginal.proyecto &&
+                i.prenda === invOriginal.prenda &&
+                i.genero === invOriginal.genero &&
+                i.talla === tallaActual,
+        ) ?? null
+    );
 }
 
 function InventarioItemSelect({
@@ -249,14 +285,10 @@ function InventarioItemSelect({
 
         if (proyecto) base = base.filter((i) => i.proyecto === proyecto);
 
-        // Filtro talla: para cada ítem, buscar la talla que le corresponde según categoría
+        // Filtro talla: para cada ítem, buscar la talla que le corresponde según la prenda
         if (tallasEmpleado) {
             base = base.filter((i) => {
-                const tallaEsperada = tallaPorCategoria(
-                    i.categoria,
-                    i.subcategoria,
-                    tallasEmpleado,
-                );
+                const tallaEsperada = tallaPorPrenda(i.prenda, tallasEmpleado);
                 if (!tallaEsperada) return true; // sin mapeo conocido → mostrar siempre
                 return i.talla?.toLowerCase() === tallaEsperada.toLowerCase();
             });
@@ -265,8 +297,7 @@ function InventarioItemSelect({
         if (!words.length) return base.slice(0, 80);
         return base
             .filter((i) => {
-                const txt =
-                    `${i.categoria} ${i.subcategoria} ${i.genero} ${i.talla}`.toLowerCase();
+                const txt = `${i.prenda} ${i.genero} ${i.talla}`.toLowerCase();
                 return words.every((w) => txt.includes(w));
             })
             .slice(0, 80);
@@ -292,7 +323,7 @@ function InventarioItemSelect({
     };
 
     const label = selected
-        ? `${selected.categoria} · ${selected.subcategoria} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
+        ? `${selected.prenda} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
         : "";
 
     const dropdown =
@@ -348,7 +379,7 @@ function InventarioItemSelect({
                             }
                         >
                             <span style={{ fontWeight: 700 }}>
-                                {i.categoria} · {i.subcategoria}
+                                {i.prenda}
                             </span>
                             <span
                                 style={{
@@ -578,6 +609,7 @@ function Modal({
     );
 
     const proyectoEmpleado = contratosFiltrados[0]?.cliente_proyecto ?? null;
+    const proyectoInventarioEmpleado = proyectoInventarioDe(proyectoEmpleado);
 
     const generoEmpleado = useMemo(() => {
         const emp = empleados.find(
@@ -709,26 +741,53 @@ function Modal({
                                                         data.items &&
                                                         data.items.length > 0
                                                     ) {
+                                                        // Cada prenda se vuelve a resolver contra el inventario
+                                                        // actual (mismo proyecto/prenda/descripción/género) usando
+                                                        // la talla VIGENTE del empleado, no la del pedido viejo —
+                                                        // son prendas nuevas para renovar la dotación, no las mismas.
                                                         const itemsPreCargados =
-                                                            data.items.map(
-                                                                (it) => ({
-                                                                    inventario_dotacion_id:
-                                                                        it.inventario_dotacion_id,
-                                                                    cantidad:
-                                                                        it.cantidad,
-                                                                    _inv:
-                                                                        it.inventario ??
-                                                                        null,
-                                                                    inventario:
-                                                                        it.inventario ??
-                                                                        null,
-                                                                }),
-                                                            );
-                                                        setForm((f) => ({
-                                                            ...f,
-                                                            items: itemsPreCargados,
-                                                        }));
-                                                        setPedidoPrevio(data);
+                                                            data.items
+                                                                .map((it) => {
+                                                                    const invActual =
+                                                                        resolverItemRenovacion(
+                                                                            it.inventario,
+                                                                            t,
+                                                                            inventarioFlat,
+                                                                        );
+                                                                    if (
+                                                                        !invActual
+                                                                    )
+                                                                        return null;
+                                                                    return {
+                                                                        inventario_dotacion_id:
+                                                                            invActual.id,
+                                                                        cantidad:
+                                                                            it.cantidad,
+                                                                        _inv: invActual,
+                                                                        inventario:
+                                                                            invActual,
+                                                                    };
+                                                                })
+                                                                .filter(
+                                                                    Boolean,
+                                                                );
+                                                        if (
+                                                            itemsPreCargados.length >
+                                                            0
+                                                        ) {
+                                                            setForm((f) => ({
+                                                                ...f,
+                                                                items: itemsPreCargados,
+                                                            }));
+                                                        }
+                                                        setPedidoPrevio({
+                                                            ...data,
+                                                            itemsCargados:
+                                                                itemsPreCargados.length,
+                                                            itemsOriginales:
+                                                                data.items
+                                                                    .length,
+                                                        });
                                                     }
                                                 } catch {
                                                     // silencioso — si falla, el usuario agrega items manualmente
@@ -967,13 +1026,31 @@ function Modal({
                                         Este empleado ya recibió dotación. Se
                                         pre-cargaron{" "}
                                         <strong>
-                                            {pedidoPrevio.items.length} prenda
-                                            {pedidoPrevio.items.length !== 1
+                                            {pedidoPrevio.itemsCargados} prenda
+                                            {pedidoPrevio.itemsCargados !== 1
                                                 ? "s"
                                                 : ""}
                                         </strong>{" "}
+                                        (talla actual, inventario vigente)
                                         desde el pedido{" "}
-                                        <strong>#{pedidoPrevio.codigo}</strong>.
+                                        <strong>#{pedidoPrevio.codigo}</strong>
+                                        {pedidoPrevio.itemsCargados <
+                                            pedidoPrevio.itemsOriginales && (
+                                            <>
+                                                {" "}
+                                                — {pedidoPrevio.itemsOriginales -
+                                                    pedidoPrevio.itemsCargados}{" "}
+                                                prenda
+                                                {pedidoPrevio.itemsOriginales -
+                                                    pedidoPrevio.itemsCargados !==
+                                                1
+                                                    ? "s"
+                                                    : ""}{" "}
+                                                de ese pedido ya no está
+                                                disponible en inventario
+                                            </>
+                                        )}
+                                        .
                                     </span>
                                 </div>
                             )}
@@ -1099,7 +1176,7 @@ function Modal({
                         <>
                             {proyectoEmpleado && !readOnly && (() => {
                                 const hayStock = inventarioAjustado.some(
-                                    (i) => i.proyecto === proyectoEmpleado && i.cantidad > 0
+                                    (i) => i.proyecto === proyectoInventarioEmpleado && i.cantidad > 0
                                 );
                                 return !hayStock ? (
                                     <div style={{
@@ -1179,11 +1256,7 @@ function Modal({
                                         (it.inventario
                                             ? {
                                                   id: it.inventario.id,
-                                                  categoria:
-                                                      it.inventario.categoria,
-                                                  subcategoria:
-                                                      it.inventario
-                                                          .subcategoria,
+                                                  prenda: it.inventario.prenda,
                                                   genero: it.inventario.genero,
                                                   talla: it.inventario.talla,
                                                   cantidad:
@@ -1215,7 +1288,7 @@ function Modal({
                                                     }}
                                                 >
                                                     {displayInv
-                                                        ? `${displayInv.categoria} · ${displayInv.subcategoria} · ${displayInv.genero} · T:${displayInv.talla}`
+                                                        ? `${displayInv.prenda} · ${displayInv.genero} · T:${displayInv.talla}`
                                                         : `Item #${it.inventario_dotacion_id}`}
                                                 </div>
                                             ) : (
@@ -1236,7 +1309,7 @@ function Modal({
                                                     tallasEmpleado={
                                                         tallasEmpleado
                                                     }
-                                                    proyecto={proyectoEmpleado}
+                                                    proyecto={proyectoInventarioEmpleado}
                                                 />
                                             )}
                                             <div
@@ -1374,6 +1447,314 @@ function Modal({
     );
 }
 
+// ─── Importar Excel ───────────────────────────────────────────────────────────
+// Plantilla simplificada para pedidos nuevos: solo se pide cédula + prendas.
+// El código se genera automático, el estado siempre queda "En proceso", la
+// fecha es la del día de la importación, el género se toma del empleado, y
+// las notas se agregan luego desde la interfaz (no van en el archivo).
+const PEDIDO_HEADER_MAP = {
+    cedula: "cedula",
+    proyecto: "proyecto",
+    prenda: "prenda",
+    talla: "talla",
+    cantidad: "cantidad",
+};
+
+const normalizeHeaderPA = (s) =>
+    (s ?? "")
+        .toString()
+        .normalize("NFD")
+        .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+        .toLowerCase()
+        .trim();
+
+function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventarioFlat }) {
+    const [fileName, setFileName] = useState("");
+    const [grupos, setGrupos] = useState([]);
+    const [error, setError] = useState("");
+    const [importing, setImporting] = useState(false);
+    const [resultado, setResultado] = useState(null);
+
+    const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError("");
+        setGrupos([]);
+        setResultado(null);
+        setFileName(file.name);
+
+        try {
+            const XLSX = await import("xlsx");
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
+            if (raw.length === 0) {
+                setError("El archivo no tiene filas de datos.");
+                return;
+            }
+
+            const filas = raw.map((row) => {
+                const mapped = {};
+                Object.entries(row).forEach(([k, v]) => {
+                    const key = PEDIDO_HEADER_MAP[normalizeHeaderPA(k)];
+                    if (key) mapped[key] = typeof v === "string" ? v.trim() : v;
+                });
+                return mapped;
+            });
+
+            // Un pedido nuevo por cada cédula distinta en el archivo: todas sus
+            // filas (prendas) se agrupan en ese único pedido.
+            const hoy = new Date().toISOString().split("T")[0];
+            const gruposMap = new Map();
+            const orden = [];
+            filas.forEach((fila, idx) => {
+                const cedula = String(fila.cedula ?? "").trim();
+                if (!cedula) return;
+                const key = cedula;
+
+                if (!gruposMap.has(key)) {
+                    gruposMap.set(key, {
+                        cedula,
+                        empleado: empleados.find((e) => e.cedula === cedula) ?? null,
+                        estado: "Activo",
+                        fecha_pedido: hoy,
+                        notas: "",
+                        items: [],
+                        erroresItems: [],
+                    });
+                    orden.push(key);
+                }
+                const grupo = gruposMap.get(key);
+                if (!fila.prenda && !fila.proyecto) return;
+
+                const generoEmpleado = grupo.empleado?.genero ?? "";
+                const cantidad = Number(fila.cantidad) || 0;
+                const inv = inventarioFlat.find(
+                    (i) =>
+                        i.proyecto === fila.proyecto &&
+                        i.prenda === fila.prenda &&
+                        (i.genero === generoEmpleado || i.genero === "Unisex") &&
+                        String(i.talla).toLowerCase() === String(fila.talla ?? "").toLowerCase(),
+                );
+
+                if (!inv || cantidad <= 0) {
+                    grupo.erroresItems.push(
+                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${fila.proyecto ?? ""}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
+                    );
+                    return;
+                }
+                grupo.items.push({
+                    inventario_dotacion_id: inv.id,
+                    cantidad,
+                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
+                });
+            });
+
+            const gruposFinal = orden.map((key) => {
+                const g = gruposMap.get(key);
+                const contrato = g.empleado
+                    ? contratos.find((c) => c.empleado_id === g.empleado.id)
+                    : null;
+                const errores = [...g.erroresItems];
+                if (!g.empleado) errores.unshift(`No se encontró un empleado con cédula "${g.cedula}".`);
+                else if (!g.empleado.genero)
+                    errores.unshift(
+                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
+                    );
+                return { ...g, contrato_id: contrato?.id ?? null, errores };
+            });
+
+            setGrupos(gruposFinal);
+        } catch {
+            setError("No se pudo leer el archivo. Verifica que sea un Excel válido (.xlsx).");
+        }
+    };
+
+    const gruposValidos = grupos.filter(
+        (g) => g.errores.length === 0 && g.items.length > 0,
+    );
+
+    const handleDescargarPlantilla = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [
+            {
+                Cédula: "1234567890",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Polo Gris Manga Corta",
+                Talla: "M",
+                Cantidad: 1,
+            },
+            {
+                Cédula: "1234567890",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Pantalon Administrativo",
+                Talla: "34",
+                Cantidad: 1,
+            },
+        ];
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 14 },
+            { wch: 18 },
+            { wch: 26 },
+            { wch: 8 },
+            { wch: 10 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+        XLSX.writeFile(wb, "Plantilla_Pedidos_Automaticos.xlsx");
+    };
+
+    const handleImport = async () => {
+        if (gruposValidos.length === 0) return;
+        setImporting(true);
+        const fallidos = [];
+        let creados = 0;
+        for (const g of gruposValidos) {
+            try {
+                await api.post("/pedidos-automaticos", {
+                    empleado_id: g.empleado.id,
+                    contrato_id: g.contrato_id,
+                    estado: g.estado,
+                    fecha_pedido: g.fecha_pedido,
+                    notas: g.notas,
+                    items: g.items.map(({ inventario_dotacion_id, cantidad }) => ({
+                        inventario_dotacion_id,
+                        cantidad,
+                    })),
+                });
+                creados++;
+            } catch (e) {
+                fallidos.push({
+                    cedula: g.cedula,
+                    motivo: e?.response?.data?.message ?? "Error al crear el pedido.",
+                });
+            }
+        }
+        setImporting(false);
+        setResultado({ creados, fallidos });
+        onImported();
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 720 }}>
+                <div style={S.modalHeader}>
+                    <span style={S.modalTitle}>Importar Excel</span>
+                    <button style={S.closeBtn} onClick={onClose}>
+                        <IconClose size={14} />
+                    </button>
+                </div>
+                <div style={S.modalBody}>
+                    <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: 0 }}>
+                        Columnas del archivo: <strong>Cédula, Proyecto, Prenda,
+                        Talla, Cantidad</strong>. El código se genera automático, el
+                        estado queda <strong>En proceso</strong>, la fecha es la de hoy,
+                        el género se toma del empleado y las notas se agregan luego
+                        desde la interfaz. Las filas con la misma cédula se agrupan en
+                        un solo pedido nuevo con varias prendas.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleDescargarPlantilla}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            marginBottom: 10,
+                            color: "var(--primary)",
+                            fontWeight: 700,
+                            fontSize: "0.82rem",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                    >
+                        Descargar plantilla de ejemplo
+                    </button>
+                    <label htmlFor="import-pedidos-file" style={S.fileDrop}>
+                        <input
+                            id="import-pedidos-file"
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleFile}
+                            style={{ display: "none" }}
+                        />
+                        <IconFile size={22} />
+                        <span style={{ fontWeight: 800, color: "var(--primary)", fontSize: "0.88rem" }}>
+                            {fileName ? "Cambiar archivo" : "Seleccionar archivo Excel"}
+                        </span>
+                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                            {fileName || ".xlsx o .xls"}
+                        </span>
+                    </label>
+
+                    {grupos.length > 0 && (
+                        <div style={{ marginTop: 10, maxHeight: 260, overflowY: "auto", border: "1.5px solid var(--border)", borderRadius: 8 }}>
+                            {grupos.map((g, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        padding: "10px 14px",
+                                        borderBottom: i < grupos.length - 1 ? "1px solid var(--border)" : "none",
+                                        background: g.errores.length === 0 && g.items.length > 0 ? "transparent" : "#fce8e8",
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                                        {g.cedula} {g.empleado ? `· ${g.empleado.nombres} ${g.empleado.apellidos}` : ""}
+                                        {" · "}{ESTADO_LABEL[g.estado] ?? g.estado}{" · "}{g.fecha_pedido}
+                                        {" · "}{g.items.length} prenda{g.items.length !== 1 ? "s" : ""}
+                                    </div>
+                                    {g.items.map((it, j) => (
+                                        <div key={j} style={{ fontSize: "0.78rem", color: "var(--text-muted)", paddingLeft: 8 }}>
+                                            {it.descripcion}
+                                        </div>
+                                    ))}
+                                    {g.errores.map((e, j) => (
+                                        <div key={j} style={{ fontSize: "0.78rem", color: "#c0392b", paddingLeft: 8 }}>
+                                            {e}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {resultado && (
+                        <div style={{ ...S.alertaBanner, background: "#e0f7f4", color: "#0d6e5a", border: "1px solid #b7e4da", marginTop: 10 }}>
+                            {resultado.creados} pedido{resultado.creados !== 1 ? "s" : ""} creado{resultado.creados !== 1 ? "s" : ""}.
+                            {resultado.fallidos.length > 0 && (
+                                <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                                    {resultado.fallidos.map((f, i) => (
+                                        <li key={i}>{f.cedula}: {f.motivo}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                    {error && <div style={S.alertaBanner}>{error}</div>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={importing}>
+                        {resultado ? "Cerrar" : "Cancelar"}
+                    </button>
+                    {!resultado && (
+                        <button
+                            style={{ ...S.btnPrimary, opacity: importing || gruposValidos.length === 0 ? 0.6 : 1 }}
+                            onClick={handleImport}
+                            disabled={importing || gruposValidos.length === 0}
+                        >
+                            {importing
+                                ? "Importando…"
+                                : `Importar ${gruposValidos.length} pedido${gruposValidos.length !== 1 ? "s" : ""}`}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PedidosAutomaticosCrud() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
@@ -1390,6 +1771,7 @@ export default function PedidosAutomaticosCrud() {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [globalModal, setGlobalModal] = useState(false);
     const [globalSaving, setGlobalSaving] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
 
     const { data: pedidos = [], isLoading } = useQuery({
         queryKey: ["pedidos-automaticos"],
@@ -1419,14 +1801,14 @@ export default function PedidosAutomaticosCrud() {
     }, [debouncedSearch, filtroEstado, filtroProyecto, filtroRegional]);
 
     useEffect(() => {
-        const anyOpen = modalOpen || viewOpen || !!confirmDelete || globalModal;
+        const anyOpen = modalOpen || viewOpen || !!confirmDelete || globalModal || importOpen;
         document.documentElement.style.overflowY = anyOpen ? "hidden" : "";
         document.body.style.overflowY = anyOpen ? "hidden" : "";
         return () => {
             document.documentElement.style.overflowY = "";
             document.body.style.overflowY = "";
         };
-    }, [modalOpen, viewOpen, confirmDelete, globalModal]);
+    }, [modalOpen, viewOpen, confirmDelete, globalModal, importOpen]);
 
     const showToast = (msg, error = false) => {
         setToast({ msg, error });
@@ -1518,6 +1900,46 @@ export default function PedidosAutomaticosCrud() {
     );
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
 
+    const handleExport = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [];
+        filtered.forEach((p) => {
+            const base = {
+                Código: p.codigo ?? "",
+                Cédula: p.empleado?.cedula ?? "",
+                Empleado: `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.trim(),
+                Estado: p.estado ?? "",
+                "Fecha Pedido": dateOnly(p.fecha_pedido),
+            };
+            const itemRow = (inv, cantidad) => ({
+                ...base,
+                Proyecto: inv?.proyecto ?? "",
+                Prenda: inv?.prenda ?? "",
+                Género: inv?.genero ?? "",
+                Talla: inv?.talla ?? "",
+                Cantidad: cantidad ?? "",
+                Notas: p.notas ?? "",
+            });
+            if (!p.items || p.items.length === 0) {
+                rows.push(itemRow(null, ""));
+            } else {
+                p.items.forEach((it) => rows.push(itemRow(it.inventario, it.cantidad)));
+            }
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 10 }, { wch: 14 }, { wch: 26 }, { wch: 12 }, { wch: 12 },
+            { wch: 18 }, { wch: 28 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 30 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+        const fecha = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `Pedidos_Automaticos_${fecha}.xlsx`);
+        showToast(`Excel exportado (${rows.length} línea${rows.length !== 1 ? "s" : ""}).`);
+    };
+
     const empleadosConContrato = useMemo(() => {
         const ids = new Set(contratos.map((c) => String(c.empleado_id)));
         return empleados.filter((e) => ids.has(String(e.id)));
@@ -1540,8 +1962,21 @@ export default function PedidosAutomaticosCrud() {
         [pedidos],
     );
 
-    const filtrosGlobalListos =
-        filtroProyecto !== "Todos" && filtroRegional !== "Todos";
+    // Los pedidos automáticos son mayormente de personal nuevo: siempre
+    // salen de esta regional, así que si no se filtra una regional específica
+    // se asume esta por defecto para generar el pedido global.
+    const REGIONAL_GLOBAL = "EJE CAFETERO";
+
+    const filtrosGlobalListos = filtroProyecto !== "Todos";
+
+    // Regional efectiva para el pedido global: la que el usuario haya
+    // filtrado explícitamente, o EJE CAFETERO por defecto (personal nuevo).
+    const regionalGlobalNombre =
+        filtroRegional !== "Todos"
+            ? (regionalesUsados.find(
+                  (r) => String(r.id) === String(filtroRegional),
+              )?.nombre ?? "")
+            : REGIONAL_GLOBAL;
 
     const pedidosParaGlobal = useMemo(() => {
         if (!filtrosGlobalListos) return [];
@@ -1550,13 +1985,15 @@ export default function PedidosAutomaticosCrud() {
             const proyectoPedido = p.contrato_id
                 ? (contratoProyectoMap[String(p.contrato_id)] ?? "")
                 : "";
-            const regionalPedidoId = p.contrato_id
-                ? (contratoRegionalMap[String(p.contrato_id)]?.id ?? "")
-                : "";
-            return (
-                proyectoPedido === filtroProyecto &&
-                String(regionalPedidoId) === String(filtroRegional)
-            );
+            const regionalPedido = p.contrato_id
+                ? contratoRegionalMap[String(p.contrato_id)]
+                : null;
+            const matchRegional =
+                filtroRegional !== "Todos"
+                    ? String(regionalPedido?.id ?? "") ===
+                      String(filtroRegional)
+                    : regionalPedido?.nombre === REGIONAL_GLOBAL;
+            return proyectoPedido === filtroProyecto && matchRegional;
         });
     }, [
         pedidos,
@@ -1567,16 +2004,14 @@ export default function PedidosAutomaticosCrud() {
         contratoRegionalMap,
     ]);
 
-    const regionalSeleccionada = regionalesUsados.find(
-        (r) => String(r.id) === String(filtroRegional),
-    );
-
     const handleCrearGlobal = async () => {
         setGlobalSaving(true);
         try {
             const { data } = await api.post("/pedidos-globales", {
                 proyecto: filtroProyecto,
-                regional_id: filtroRegional,
+                ...(filtroRegional !== "Todos"
+                    ? { regional_id: filtroRegional }
+                    : {}),
             });
             const idsGlobal = new Set(pedidosParaGlobal.map((p) => p.id));
             queryClient.setQueryData(["pedidos-automaticos"], (prev = []) =>
@@ -1829,9 +2264,9 @@ export default function PedidosAutomaticosCrud() {
                         }
                         title={
                             !filtrosGlobalListos
-                                ? "Selecciona un proyecto y una regional específicos para generar el pedido global"
+                                ? "Selecciona un proyecto específico para generar el pedido global"
                                 : pedidosParaGlobal.length === 0
-                                  ? "No hay pedidos en proceso para ese proyecto y regional"
+                                  ? `No hay pedidos en proceso para ese proyecto en ${regionalGlobalNombre || "la regional seleccionada"}`
                                   : ""
                         }
                     >
@@ -1849,6 +2284,12 @@ export default function PedidosAutomaticosCrud() {
                                 {pedidosParaGlobal.length}
                             </span>
                         )}
+                    </button>
+                    <button style={S.btnSecondary} onClick={handleExport} disabled={filtered.length === 0}>
+                        Exportar Excel
+                    </button>
+                    <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>
+                        Importar Excel
                     </button>
                     <button
                         className="btn-primary"
@@ -2121,6 +2562,19 @@ export default function PedidosAutomaticosCrud() {
                 </div>
             )}
 
+            {importOpen && (
+                <ImportPedidosModal
+                    onClose={() => setImportOpen(false)}
+                    onImported={() => {
+                        queryClient.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+                        queryClient.invalidateQueries({ queryKey: ["inventario-dotacion-flat"] });
+                    }}
+                    empleados={empleados}
+                    contratos={contratos}
+                    inventarioFlat={inventarioFlat}
+                />
+            )}
+
             {globalModal && (
                 <div
                     style={S.overlay}
@@ -2199,9 +2653,7 @@ export default function PedidosAutomaticosCrud() {
                                     >
                                         Proyecto <strong>{filtroProyecto}</strong>{" "}
                                         · Regional{" "}
-                                        <strong>
-                                            {regionalSeleccionada?.nombre ?? ""}
-                                        </strong>
+                                        <strong>{regionalGlobalNombre}</strong>
                                     </div>
                                     <div
                                         style={{
@@ -2680,6 +3132,21 @@ const S = {
         padding: "10px 14px",
         fontSize: "0.85rem",
         marginBottom: 12,
+    },
+    fileDrop: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        padding: "22px 16px",
+        border: "1.5px dashed var(--primary)",
+        borderRadius: "var(--radius-sm)",
+        background: "var(--bg)",
+        color: "var(--primary)",
+        cursor: "pointer",
+        marginTop: 4,
+        textAlign: "center",
     },
     dropdown: {
         position: "absolute",

@@ -7,47 +7,156 @@ use Illuminate\Support\Facades\DB;
 
 class InventarioDotacionSeeder extends Seeder
 {
+    private const CANTIDAD_INICIAL = 20;
+    private const STOCK_MINIMO_INICIAL = 0;
+
+    // Accesorios de carnet: el nombre de origen trae variaciones/typos ("PORTA
+    // CANET"), así que se normalizan a un nombre de prenda fijo en vez de usar
+    // el texto tal cual viene. Siempre quedan en Unisex/N/A.
+    private const PRENDA_CARNET_POR_PRIMERA_PALABRA = [
+        'CARNET' => 'Carnet',
+        'BRAZALETE' => 'Carnet Brazalete',
+        'PORTA' => 'Carnet Porta Carnet',
+        'PVC' => 'Carnet PVC',
+        'YOYO' => 'Carnet Yoyo',
+    ];
+
+    // Variantes de la primera palabra que deben normalizarse a una forma
+    // canónica (ej. "JEANS" y "JEAN" son la misma prenda).
+    private const PRIMERA_PALABRA_NORMALIZADA = [
+        'JEANS' => 'JEAN',
+    ];
+
+    /**
+     * Import real desde el Excel de items del cliente (database/seeders/data/inventario_dotacion_import.csv).
+     * Reemplaza los datos de prueba anteriores. Divide el inventario por proyecto según empresa + palabras
+     * clave del nombre del item: SERVIMERCADEO -> DIRECTV; SYM con "EXPRESS"/"HOME" en el nombre -> el
+     * proyecto SYM correspondiente; el resto de items SYM (sin marca de proyecto en el nombre) -> SYM Administrativo.
+     */
     public function run(): void
     {
-        DB::table('inventario_dotacion')->truncate();
+        $path = __DIR__ . '/data/inventario_dotacion_import.csv';
+        $lines = array_map('str_getcsv', file($path));
+        $header = array_map(fn ($h) => strtolower(trim($h)), array_shift($lines));
 
         $now = now();
+        $records = [];
+        $seen = [];
 
-        $grupos = [
-            ['Polo', 'Manga Corta', 'Masculino', 20, ['XS' => 5, 'S' => 12, 'M' => 28, 'L' => 35, 'XL' => 20, 'XXL' => 8, 'XXXL' => 3]],
-            ['Polo', 'Manga Corta', 'Femenino', 15, ['XS' => 8, 'S' => 18, 'M' => 30, 'L' => 22, 'XL' => 14, 'XXL' => 4, 'XXXL' => 1]],
-            ['Polo', 'Manga Larga', 'Masculino', 10, ['XS' => 2, 'S' => 6, 'M' => 15, 'L' => 20, 'XL' => 12, 'XXL' => 5, 'XXXL' => 2]],
-            ['Polo', 'Manga Larga', 'Femenino', 10, ['XS' => 4, 'S' => 10, 'M' => 18, 'L' => 14, 'XL' => 8, 'XXL' => 3, 'XXXL' => 1]],
-            ['Jean', 'Clásico', 'Masculino', 25, ['26' => 2, '28' => 8, '30' => 20, '32' => 35, '34' => 28, '36' => 15, '38' => 6, '40' => 3]],
-            ['Jean', 'Clásico', 'Femenino', 20, ['26' => 5, '28' => 15, '30' => 25, '32' => 20, '34' => 12, '36' => 6, '38' => 2, '40' => 1]],
-            ['Chaqueta', 'Impermeable', 'Masculino', 15, ['XS' => 3, 'S' => 10, 'M' => 22, 'L' => 30, 'XL' => 18, 'XXL' => 8, 'XXXL' => 2]],
-            ['Chaqueta', 'Impermeable', 'Femenino', 12, ['XS' => 6, 'S' => 14, 'M' => 24, 'L' => 18, 'XL' => 10, 'XXL' => 4, 'XXXL' => 1]],
-            ['Chaqueta', 'Reflectiva', 'Masculino', 10, ['XS' => 2, 'S' => 8, 'M' => 16, 'L' => 22, 'XL' => 14, 'XXL' => 6, 'XXXL' => 2]],
-            ['Chaqueta', 'Reflectiva', 'Femenino', 8, ['XS' => 4, 'S' => 10, 'M' => 18, 'L' => 14, 'XL' => 8, 'XXL' => 3, 'XXXL' => 1]],
-            ['Tenis', 'Seguridad', 'Masculino', 30, ['34' => 2, '35' => 4, '36' => 8, '37' => 12, '38' => 20, '39' => 28, '40' => 30, '41' => 22, '42' => 14, '43' => 8, '44' => 4, '45' => 2]],
-            ['Tenis', 'Seguridad', 'Femenino', 20, ['34' => 4, '35' => 8, '36' => 16, '37' => 22, '38' => 28, '39' => 20, '40' => 12, '41' => 6, '42' => 3, '43' => 1, '44' => 0, '45' => 0]],
-            ['Tenis', 'Casual', 'Masculino', 25, ['34' => 3, '35' => 6, '36' => 12, '37' => 18, '38' => 25, '39' => 30, '40' => 28, '41' => 20, '42' => 12, '43' => 6, '44' => 3, '45' => 1]],
-            ['Tenis', 'Casual', 'Femenino', 20, ['34' => 6, '35' => 12, '36' => 22, '37' => 28, '38' => 30, '39' => 22, '40' => 14, '41' => 8, '42' => 4, '43' => 2, '44' => 0, '45' => 0]],
+        foreach ($lines as $row) {
+            if (count($row) < count($header)) {
+                continue;
+            }
+            $data = array_combine($header, $row);
+            if (trim($data['estado'] ?? '') !== 'Activo') {
+                continue;
+            }
+
+            $empresa = trim($data['empresa']);
+            $nombre = trim($data['item']);
+            $precio = (int) $data['precio'];
+
+            $proyecto = $this->resolverProyecto($empresa, $nombre);
+            [$prenda, $genero, $talla] = $this->parseItem($nombre);
+
+            $key = implode('|', [$proyecto, $prenda, $genero, $talla]);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $records[] = [
+                'proyecto' => $proyecto,
+                'prenda' => $prenda,
+                'genero' => $genero,
+                'talla' => $talla,
+                'precio' => $precio,
+                'cantidad' => self::CANTIDAD_INICIAL,
+                'stock_minimo' => self::STOCK_MINIMO_INICIAL,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        DB::table('inventario_dotacion')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        DB::table('inventario_dotacion')->insert($records);
+
+        $this->command->info('✓ ' . count($records) . ' items de inventario de dotación importados desde el Excel.');
+    }
+
+    private function resolverProyecto(string $empresa, string $nombre): string
+    {
+        if ($empresa === 'SERVIMERCADEO') {
+            return 'DIRECTV';
+        }
+
+        if (str_contains($nombre, 'EXPRESS')) {
+            return 'SYM TIGO EXPRESS';
+        }
+        if (str_contains($nombre, 'HOME')) {
+            return 'SYM TIGO HOME';
+        }
+
+        return 'SYM ADMINISTRATIVO';
+    }
+
+    private const TALLA_TRAS_TEXTO = '/\b(\d{1,2}|XS|S|M|L|XL|2XL|3XL|4XL|XXL|XXXL)(\s*\([^)]*\))?$/i';
+
+    /**
+     * @return array{0:string,1:string,2:string} [prenda, genero, talla]
+     */
+    private function parseItem(string $nombreOriginal): array
+    {
+        $nombre = preg_replace('/\s+/', ' ', trim($nombreOriginal));
+        $nombre = preg_replace('/^SYM\s+/', '', $nombre);
+        $nombre = str_replace('M/CXXXL', 'M/C XXXL', $nombre); // typo en el Excel origen (falta espacio)
+
+        $generoPatrones = [
+            'Femenino' => '/\b(FEMENINO|FEMENINA|MUJER|DAMA)\b/',
+            'Masculino' => '/\b(MASCULINO|MASCULINA|HOMBRE|CABALLERO)\b/',
         ];
 
-        $records = [];
-        foreach ($grupos as [$categoria, $subcategoria, $genero, $stockMinimo, $tallas]) {
-            foreach ($tallas as $talla => $cantidad) {
-                $records[] = [
-                    'categoria' => $categoria,
-                    'subcategoria' => $subcategoria,
-                    'genero' => $genero,
-                    'talla' => (string) $talla,
-                    'cantidad' => $cantidad,
-                    'stock_minimo' => $stockMinimo,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
+        $genero = 'Unisex';
+        foreach ($generoPatrones as $g => $patron) {
+            if (preg_match($patron, $nombre, $m, PREG_OFFSET_CAPTURE)) {
+                $genero = $g;
+                $pos = $m[0][1];
+                $largo = strlen($m[0][0]);
+                $antes = rtrim(substr($nombre, 0, $pos));
+                $despues = ltrim(substr($nombre, $pos + $largo));
+                $nombre = trim($antes . ' ' . $despues);
+                break;
             }
         }
 
-        DB::table('inventario_dotacion')->insert($records);
+        $talla = 'N/A';
+        if (preg_match(self::TALLA_TRAS_TEXTO, $nombre, $m)) {
+            $talla = strtoupper(trim($m[0]));
+            $nombre = trim(substr($nombre, 0, -strlen($m[0])));
+        }
 
-        $this->command->info('✓ ' . count($records) . ' registros de inventario de dotación insertados.');
+        $palabras = explode(' ', $nombre);
+        $primera = strtoupper($palabras[0] ?? '');
+
+        if (isset(self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera])) {
+            $genero = 'Unisex';
+            $talla = 'N/A';
+            $prenda = self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera];
+        } else {
+            if (isset(self::PRIMERA_PALABRA_NORMALIZADA[$primera])) {
+                $palabras[0] = self::PRIMERA_PALABRA_NORMALIZADA[$primera];
+                $nombre = implode(' ', $palabras);
+            }
+            $prenda = $this->tituloCase($nombre);
+        }
+
+        return [$prenda, $genero, $talla];
+    }
+
+    private function tituloCase(string $texto): string
+    {
+        return mb_convert_case(mb_strtolower($texto), MB_CASE_TITLE, 'UTF-8');
     }
 }

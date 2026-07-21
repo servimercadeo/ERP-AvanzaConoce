@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\Contrato;
 use App\Models\RespuestaIngreso;
+use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ContratoController extends Controller
 {
@@ -209,6 +211,10 @@ class ContratoController extends Controller
             'seguimiento_observaciones'    => 'nullable|array',
         ]);
 
+        if ($msg = EmpresaProyectoRules::validar($data['empresa'] ?? null, $data['cliente_proyecto'] ?? null)) {
+            throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
+        }
+
         $contrato = DB::transaction(function() use ($data) {
             $data['completado'] = true;
 
@@ -254,7 +260,21 @@ class ContratoController extends Controller
             ]);
         }
 
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']), 201);
+        $pedidoAutomatico = null;
+        try {
+            $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
+        } catch (\Throwable $e) {
+            Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional'])->toArray();
+        $contratoData['pedido_automatico'] = $pedidoAutomatico
+            ? ['id' => $pedidoAutomatico->id, 'codigo' => $pedidoAutomatico->codigo, 'estado' => $pedidoAutomatico->estado]
+            : null;
+
+        return response()->json($contratoData, 201);
     }
 
     public function show(Contrato $contrato)
@@ -296,6 +316,12 @@ class ContratoController extends Controller
             'seguimiento_fecha_cierre'     => 'nullable|date',
             'seguimiento_observaciones'    => 'nullable|array',
         ]);
+
+        $empresaFinal = array_key_exists('empresa', $data) ? $data['empresa'] : $contrato->empresa;
+        $proyectoFinal = array_key_exists('cliente_proyecto', $data) ? $data['cliente_proyecto'] : $contrato->cliente_proyecto;
+        if ($msg = EmpresaProyectoRules::validar($empresaFinal, $proyectoFinal)) {
+            throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
+        }
 
         $result = DB::transaction(function() use ($contrato, $data) {
             $data['completado'] = true;

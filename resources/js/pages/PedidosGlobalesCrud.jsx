@@ -13,6 +13,28 @@ import api from "../api/axios";
 const POR_PAGINA = 8;
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+// ─── Excel: mismo espíritu de simplificación que "Pedidos automáticos", con
+// Regional como columna adicional porque cada combinación Proyecto+Regional
+// del archivo termina siendo un pedido global independiente. ─────────────────
+const PEDIDO_HEADER_MAP = {
+    cedula: "cedula",
+    regional: "regional",
+    proyecto: "proyecto",
+    prenda: "prenda",
+    talla: "talla",
+    cantidad: "cantidad",
+};
+
+const normalizeHeaderPA = (s) =>
+    (s ?? "")
+        .toString()
+        .normalize("NFD")
+        .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+        .toLowerCase()
+        .trim();
+
+const normalizeTextPA = normalizeHeaderPA;
+
 function parseDateLocal(str) {
     return new Date(String(str).split("T")[0] + "T00:00:00");
 }
@@ -75,6 +97,14 @@ function proximoCorte(cronInfo) {
 function estadoDisplay(pedido, g) {
     if (pedido.estado === "Devolución")
         return { label: "Devolución", bg: "#fce8e8", color: "#c0392b" };
+    if (pedido.estado === "Devolución usada")
+        return {
+            label: "Devolución usada",
+            bg: "#e5e7eb",
+            color: "#4b5563",
+        };
+    if (pedido.estado === "Para ventas")
+        return { label: "Para ventas", bg: "#fef3c7", color: "#92400e" };
     if (g.entrega_confirmada)
         return { label: "Completado", bg: "#dcfce7", color: "#0d6e5a" };
     if (g.confirmado)
@@ -158,7 +188,7 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                             <div
                                 style={{ fontWeight: 800, fontSize: "0.95rem" }}
                             >
-                                {pedido.empleado?.nombres}{" "}
+                                {pedido.empleado?.nombres}
                                 {pedido.empleado?.apellidos}
                             </div>
                             <div
@@ -232,8 +262,7 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                                         }}
                                     >
                                         <span>
-                                            {it.inventario?.categoria}{" "}
-                                            {it.inventario?.subcategoria} T:
+                                            {it.inventario?.prenda} T:
                                             {it.inventario?.talla}
                                         </span>
                                         <span
@@ -739,6 +768,489 @@ function DeleteModal({ global: g, onClose, onDeleted }) {
         </div>
     );
 }
+
+function ImportPedidosGlobalesModal({
+    onClose,
+    onImported,
+    empleados,
+    contratos,
+    inventarioFlat,
+    regionales,
+}) {
+    const [fileName, setFileName] = useState("");
+    const [grupos, setGrupos] = useState([]);
+    const [error, setError] = useState("");
+    const [importing, setImporting] = useState(false);
+    const [resultado, setResultado] = useState(null);
+
+    const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError("");
+        setGrupos([]);
+        setResultado(null);
+        setFileName(file.name);
+
+        try {
+            const XLSX = await import("xlsx");
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
+            if (raw.length === 0) {
+                setError("El archivo no tiene filas de datos.");
+                return;
+            }
+
+            const filas = raw.map((row) => {
+                const mapped = {};
+                Object.entries(row).forEach(([k, v]) => {
+                    const key = PEDIDO_HEADER_MAP[normalizeHeaderPA(k)];
+                    if (key) mapped[key] = typeof v === "string" ? v.trim() : v;
+                });
+                return mapped;
+            });
+
+            // Un pedido nuevo por cada combinación cédula + proyecto + regional:
+            // todas sus filas (prendas) se agrupan en ese único pedido. Cada
+            // combinación proyecto + regional distinta que aparezca en el
+            // archivo termina en su propio pedido global.
+            const hoy = new Date().toISOString().split("T")[0];
+            const gruposMap = new Map();
+            const orden = [];
+            filas.forEach((fila, idx) => {
+                const cedula = String(fila.cedula ?? "").trim();
+                const proyecto = String(fila.proyecto ?? "").trim();
+                const regionalTexto = String(fila.regional ?? "").trim();
+                if (!cedula) return;
+                const key = `${cedula}|${proyecto}|${normalizeTextPA(regionalTexto)}`;
+
+                if (!gruposMap.has(key)) {
+                    gruposMap.set(key, {
+                        cedula,
+                        proyecto,
+                        regionalTexto,
+                        empleado:
+                            empleados.find((e) => e.cedula === cedula) ??
+                            null,
+                        fecha_pedido: hoy,
+                        notas: "",
+                        items: [],
+                        erroresItems: [],
+                    });
+                    orden.push(key);
+                }
+                const grupo = gruposMap.get(key);
+                if (!fila.prenda) return;
+
+                const generoEmpleado = grupo.empleado?.genero ?? "";
+                const cantidad = Number(fila.cantidad) || 0;
+                const inv = inventarioFlat.find(
+                    (i) =>
+                        i.proyecto === proyecto &&
+                        i.prenda === fila.prenda &&
+                        (i.genero === generoEmpleado || i.genero === "Unisex") &&
+                        String(i.talla).toLowerCase() ===
+                            String(fila.talla ?? "").toLowerCase(),
+                );
+
+                if (!inv || cantidad <= 0) {
+                    grupo.erroresItems.push(
+                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${proyecto}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
+                    );
+                    return;
+                }
+                grupo.items.push({
+                    inventario_dotacion_id: inv.id,
+                    cantidad,
+                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
+                });
+            });
+
+            const gruposFinal = orden.map((key) => {
+                const g = gruposMap.get(key);
+                const contrato = g.empleado
+                    ? contratos.find((c) => c.empleado_id === g.empleado.id)
+                    : null;
+                const regional = regionales.find(
+                    (r) =>
+                        normalizeTextPA(r.nombre) ===
+                        normalizeTextPA(g.regionalTexto),
+                );
+                const errores = [...g.erroresItems];
+                if (!g.empleado)
+                    errores.unshift(
+                        `No se encontró un empleado con cédula "${g.cedula}".`,
+                    );
+                else if (!g.empleado.genero)
+                    errores.unshift(
+                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
+                    );
+                if (!g.proyecto)
+                    errores.unshift(`Falta el proyecto para la cédula ${g.cedula}.`);
+                if (!regional)
+                    errores.unshift(
+                        `Regional "${g.regionalTexto}" no reconocida para la cédula ${g.cedula}.`,
+                    );
+                return {
+                    ...g,
+                    contrato_id: contrato?.id ?? null,
+                    regional_id: regional?.id ?? null,
+                    regionalNombre: regional?.nombre ?? g.regionalTexto,
+                    errores,
+                };
+            });
+
+            setGrupos(gruposFinal);
+        } catch {
+            setError(
+                "No se pudo leer el archivo. Verifica que sea un Excel válido (.xlsx).",
+            );
+        }
+    };
+
+    const gruposValidos = grupos.filter(
+        (g) => g.errores.length === 0 && g.items.length > 0,
+    );
+
+    const combosValidos = [];
+    const combosIndex = new Map();
+    gruposValidos.forEach((g) => {
+        const comboKey = `${g.proyecto}|${g.regional_id}`;
+        if (!combosIndex.has(comboKey)) {
+            const combo = {
+                proyecto: g.proyecto,
+                regional_id: g.regional_id,
+                regionalNombre: g.regionalNombre,
+                pedidos: [],
+            };
+            combosIndex.set(comboKey, combo);
+            combosValidos.push(combo);
+        }
+        combosIndex.get(comboKey).pedidos.push(g);
+    });
+
+    const handleDescargarPlantilla = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [
+            {
+                Cédula: "1234567890",
+                Regional: "EJE CAFETERO",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Polo Gris Manga Corta",
+                Talla: "M",
+                Cantidad: 1,
+            },
+            {
+                Cédula: "1234567890",
+                Regional: "EJE CAFETERO",
+                Proyecto: "SYM TIGO EXPRESS",
+                Prenda: "Pantalon Administrativo",
+                Talla: "34",
+                Cantidad: 1,
+            },
+        ];
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 18 },
+            { wch: 26 },
+            { wch: 8 },
+            { wch: 10 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+        XLSX.writeFile(wb, "Plantilla_Pedidos_Globales.xlsx");
+    };
+
+    const handleImport = async () => {
+        if (combosValidos.length === 0) return;
+        setImporting(true);
+        setError("");
+        const creados = [];
+        const fallidos = [];
+        for (const combo of combosValidos) {
+            try {
+                const { data } = await api.post("/pedidos-globales/import", {
+                    proyecto: combo.proyecto,
+                    regional_id: combo.regional_id,
+                    pedidos: combo.pedidos.map((g) => ({
+                        codigo: null,
+                        empleado_id: g.empleado.id,
+                        contrato_id: g.contrato_id,
+                        fecha_pedido: g.fecha_pedido,
+                        notas: g.notas,
+                        items: g.items.map(
+                            ({ inventario_dotacion_id, cantidad }) => ({
+                                inventario_dotacion_id,
+                                cantidad,
+                            }),
+                        ),
+                    })),
+                });
+                creados.push({
+                    global: data,
+                    total: combo.pedidos.length,
+                    proyecto: combo.proyecto,
+                    regionalNombre: combo.regionalNombre,
+                });
+            } catch (e) {
+                fallidos.push({
+                    proyecto: combo.proyecto,
+                    regionalNombre: combo.regionalNombre,
+                    motivo:
+                        e?.response?.data?.message ??
+                        "Error al crear el pedido global.",
+                });
+            }
+        }
+        setImporting(false);
+        setResultado({ creados, fallidos });
+        if (creados.length > 0) onImported();
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 720 }}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800, fontSize: "1rem" }}>
+                        Importar Pedido Global desde Excel
+                    </span>
+                    <button style={S.btnIcon} onClick={onClose}>
+                        <IconClose size={16} />
+                    </button>
+                </div>
+                <div style={S.modalBody}>
+                    <p
+                        style={{
+                            fontSize: "0.84rem",
+                            color: "var(--text-muted)",
+                            marginTop: 0,
+                        }}
+                    >
+                        Columnas del archivo:{" "}
+                        <strong>
+                            Cédula, Regional, Proyecto, Prenda, Talla, Cantidad
+                        </strong>
+                        . El código y el estado se generan automáticamente, el
+                        género se toma del empleado, la fecha es la de hoy y
+                        las notas se agregan luego desde la interfaz. Las
+                        filas con la misma cédula, proyecto y regional se
+                        agrupan en un solo pedido; cada combinación distinta
+                        de <strong>Proyecto + Regional</strong> del archivo
+                        crea su propio pedido global.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleDescargarPlantilla}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            marginBottom: 10,
+                            color: "var(--primary)",
+                            fontWeight: 700,
+                            fontSize: "0.82rem",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                        }}
+                    >
+                        Descargar plantilla de ejemplo
+                    </button>
+                    <label
+                        htmlFor="import-pedidos-globales-file"
+                        style={S.fileDrop}
+                    >
+                        <input
+                            id="import-pedidos-globales-file"
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleFile}
+                            style={{ display: "none" }}
+                        />
+                        <span
+                            style={{
+                                fontWeight: 800,
+                                color: "var(--primary)",
+                                fontSize: "0.88rem",
+                            }}
+                        >
+                            {fileName
+                                ? "Cambiar archivo"
+                                : "Seleccionar archivo Excel"}
+                        </span>
+                        <span
+                            style={{
+                                fontSize: "0.78rem",
+                                color: "var(--text-muted)",
+                            }}
+                        >
+                            {fileName || ".xlsx o .xls"}
+                        </span>
+                    </label>
+
+                    {combosValidos.length > 0 && !resultado && (
+                        <div
+                            style={{
+                                ...S.errorMsg,
+                                background: "#e0f7f4",
+                                color: "#0d6e5a",
+                                marginTop: 10,
+                            }}
+                        >
+                            Se crearán {combosValidos.length} pedido
+                            {combosValidos.length !== 1 ? "s" : ""} global
+                            {combosValidos.length !== 1 ? "es" : ""}:{" "}
+                            {combosValidos
+                                .map(
+                                    (c) =>
+                                        `${c.proyecto} · ${c.regionalNombre} (${c.pedidos.length})`,
+                                )
+                                .join(" — ")}
+                        </div>
+                    )}
+
+                    {grupos.length > 0 && (
+                        <div
+                            style={{
+                                marginTop: 10,
+                                maxHeight: 260,
+                                overflowY: "auto",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 8,
+                            }}
+                        >
+                            {grupos.map((g, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        padding: "10px 14px",
+                                        borderBottom:
+                                            i < grupos.length - 1
+                                                ? "1px solid var(--border)"
+                                                : "none",
+                                        background:
+                                            g.errores.length === 0 &&
+                                            g.items.length > 0
+                                                ? "transparent"
+                                                : "#fce8e8",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontWeight: 700,
+                                            fontSize: "0.85rem",
+                                        }}
+                                    >
+                                        {g.cedula}{" "}
+                                        {g.empleado
+                                            ? `· ${g.empleado.nombres} ${g.empleado.apellidos}`
+                                            : ""}
+                                        {" · "}
+                                        {g.proyecto || "—"}
+                                        {" · "}
+                                        {g.regionalNombre || "—"}
+                                        {" · "}
+                                        {g.items.length} prenda
+                                        {g.items.length !== 1 ? "s" : ""}
+                                    </div>
+                                    {g.items.map((it, j) => (
+                                        <div
+                                            key={j}
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                                paddingLeft: 8,
+                                            }}
+                                        >
+                                            {it.descripcion}
+                                        </div>
+                                    ))}
+                                    {g.errores.map((e, j) => (
+                                        <div
+                                            key={j}
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "#c0392b",
+                                                paddingLeft: 8,
+                                            }}
+                                        >
+                                            {e}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {resultado && (
+                        <div style={{ marginTop: 10 }}>
+                            {resultado.creados.map((r, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        ...S.errorMsg,
+                                        background: "#e0f7f4",
+                                        color: "#0d6e5a",
+                                        marginBottom: 6,
+                                    }}
+                                >
+                                    Pedido global{" "}
+                                    <strong>#{r.global.codigo}</strong> (
+                                    {r.proyecto} · {r.regionalNombre}) creado
+                                    con {r.total} pedido
+                                    {r.total !== 1 ? "s" : ""}.
+                                </div>
+                            ))}
+                            {resultado.fallidos.map((f, i) => (
+                                <div
+                                    key={i}
+                                    style={{ ...S.errorMsg, marginBottom: 6 }}
+                                >
+                                    {f.proyecto} · {f.regionalNombre}:{" "}
+                                    {f.motivo}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {error && (
+                        <div style={{ ...S.errorMsg, marginTop: 10 }}>
+                            {error}
+                        </div>
+                    )}
+                </div>
+                <div style={S.modalFooter}>
+                    <button
+                        style={S.btnSecondary}
+                        onClick={onClose}
+                        disabled={importing}
+                    >
+                        {resultado ? "Cerrar" : "Cancelar"}
+                    </button>
+                    {!resultado && (
+                        <button
+                            style={{
+                                ...S.btnPrimary,
+                                opacity:
+                                    importing || combosValidos.length === 0
+                                        ? 0.6
+                                        : 1,
+                            }}
+                            onClick={handleImport}
+                            disabled={importing || combosValidos.length === 0}
+                        >
+                            {importing
+                                ? "Creando…"
+                                : `Crear ${combosValidos.length} pedido${combosValidos.length !== 1 ? "s" : ""} global${combosValidos.length !== 1 ? "es" : ""}`}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PedidosGlobalesCrud() {
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
@@ -751,6 +1263,11 @@ export default function PedidosGlobalesCrud() {
     const [confirmTarget, setConfirmTarget] = useState(null);
     const [entregaTarget, setEntregaTarget] = useState(null);
     const [editPedido, setEditPedido] = useState(null); // { pedido, global }
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [bulkEstado, setBulkEstado] = useState("Activo");
+    const [bulkSaving, setBulkSaving] = useState(false);
+    const [bulkError, setBulkError] = useState("");
+    const [importOpen, setImportOpen] = useState(false);
 
     const { data: globales = [], isLoading } = useQuery({
         queryKey: ["pedidos-globales"],
@@ -761,6 +1278,25 @@ export default function PedidosGlobalesCrud() {
         queryKey: ["cronograma-dotacion"],
         queryFn: () => api.get("/cronograma-dotacion").then((r) => r.data),
     });
+
+    const { data: empleados = [] } = useQuery({
+        queryKey: ["empleados"],
+        queryFn: () => api.get("/empleados").then((r) => r.data),
+    });
+    const { data: contratos = [] } = useQuery({
+        queryKey: ["contratos"],
+        queryFn: () => api.get("/contratos").then((r) => r.data),
+    });
+    const { data: inventarioFlat = [] } = useQuery({
+        queryKey: ["inventario-dotacion-flat"],
+        queryFn: () =>
+            api.get("/inventario-dotacion?flat=1").then((r) => r.data),
+    });
+    const { data: catalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+    });
+    const regionales = catalogos?.regionales ?? [];
 
     const stats = useMemo(
         () => ({
@@ -816,6 +1352,61 @@ export default function PedidosGlobalesCrud() {
     );
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
 
+    const handleExport = async () => {
+        const XLSX = await import("xlsx");
+        const rows = [];
+        filtered.forEach((g) => {
+            const pedidos = (g.pedidos_automaticos ?? []).filter(
+                (p) => p.codigo,
+            );
+            pedidos.forEach((p) => {
+                const base = {
+                    Código: p.codigo ?? "",
+                    Cédula: p.empleado?.cedula ?? "",
+                    Empleado: `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.trim(),
+                    Estado: p.estado ?? "",
+                    "Fecha Pedido": dateOnly(p.fecha_pedido),
+                };
+                const itemRow = (inv, cantidad) => ({
+                    ...base,
+                    Proyecto: inv?.proyecto ?? g.cliente_proyecto ?? "",
+                    Prenda: inv?.prenda ?? "",
+                    Género: inv?.genero ?? "",
+                    Talla: inv?.talla ?? "",
+                    Cantidad: cantidad ?? "",
+                    Notas: p.notas ?? "",
+                });
+                if (!p.items || p.items.length === 0) {
+                    rows.push(itemRow(null, ""));
+                } else {
+                    p.items.forEach((it) =>
+                        rows.push(itemRow(it.inventario, it.cantidad)),
+                    );
+                }
+            });
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws["!cols"] = [
+            { wch: 10 },
+            { wch: 14 },
+            { wch: 26 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 18 },
+            { wch: 28 },
+            { wch: 12 },
+            { wch: 8 },
+            { wch: 10 },
+            { wch: 30 },
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+        const fecha = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `Pedidos_Globales_${fecha}.xlsx`);
+    };
+
     const toggle = (id) => {
         setExpanded((prev) => (prev === id ? null : id));
         setSubSearch("");
@@ -864,6 +1455,59 @@ export default function PedidosGlobalesCrud() {
             old.map((g) => (g.id === updated.id ? updated : g)),
         );
         setEntregaTarget(null);
+    };
+
+    const togglePedido = (id, checked) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (checked) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    };
+
+    const toggleGlobal = (pedidoIds, checked) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            pedidoIds.forEach((id) =>
+                checked ? next.add(id) : next.delete(id),
+            );
+            return next;
+        });
+    };
+
+    const handleBulkApply = async () => {
+        if (selectedIds.size === 0) return;
+        setBulkSaving(true);
+        setBulkError("");
+        try {
+            const { data } = await api.put("/pedidos-automaticos/bulk-estado", {
+                ids: Array.from(selectedIds),
+                estado: bulkEstado,
+            });
+            qc.setQueryData(["pedidos-globales"], (old = []) =>
+                old.map((g) => ({
+                    ...g,
+                    pedidos_automaticos: (g.pedidos_automaticos ?? []).map(
+                        (p) => data.find((d) => d.id === p.id) ?? p,
+                    ),
+                })),
+            );
+            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+            if (bulkEstado === "Devolución") {
+                qc.invalidateQueries({
+                    queryKey: ["inventario-dotacion-flat"],
+                });
+                qc.invalidateQueries({ queryKey: ["inventario_dotacion"] });
+            }
+            setSelectedIds(new Set());
+        } catch (e) {
+            setBulkError(
+                e?.response?.data?.message ?? "Error al actualizar el estado.",
+            );
+        } finally {
+            setBulkSaving(false);
+        }
     };
 
     return (
@@ -917,7 +1561,71 @@ export default function PedidosGlobalesCrud() {
                     <option value="Pedido confirmado">Pedido confirmado</option>
                     <option value="Completado">Completado</option>
                 </select>
+                <button
+                    style={S.btnSecondary}
+                    onClick={handleExport}
+                    disabled={filtered.length === 0}
+                >
+                    Exportar Excel
+                </button>
+                <button
+                    style={S.btnSecondary}
+                    onClick={() => setImportOpen(true)}
+                >
+                    Importar Excel
+                </button>
             </div>
+
+            {selectedIds.size > 0 && (
+                <div style={S.bulkBar}>
+                    <span style={{ fontWeight: 700, fontSize: "0.86rem" }}>
+                        {selectedIds.size} pedido
+                        {selectedIds.size !== 1 ? "s" : ""} seleccionado
+                        {selectedIds.size !== 1 ? "s" : ""}
+                    </span>
+                    <select
+                        style={S.selectFilter}
+                        value={bulkEstado}
+                        onChange={(e) => setBulkEstado(e.target.value)}
+                        disabled={bulkSaving}
+                    >
+                        <option value="Activo">En proceso</option>
+                        <option value="Para ventas">Para ventas</option>
+                        <option value="Devolución">Devolución</option>
+                        <option value="Devolución usada">
+                            Devolución usada
+                        </option>
+                    </select>
+                    <button
+                        style={{
+                            ...S.btnPrimary,
+                            opacity: bulkSaving ? 0.6 : 1,
+                        }}
+                        onClick={handleBulkApply}
+                        disabled={bulkSaving}
+                    >
+                        {bulkSaving ? "Aplicando…" : "Aplicar"}
+                    </button>
+                    <button
+                        style={S.btnSecondary}
+                        onClick={() => setSelectedIds(new Set())}
+                        disabled={bulkSaving}
+                    >
+                        Cancelar selección
+                    </button>
+                    {bulkError && (
+                        <span
+                            style={{
+                                color: "#c0392b",
+                                fontWeight: 600,
+                                fontSize: "0.82rem",
+                            }}
+                        >
+                            {bulkError}
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Tabla */}
             <div style={S.tableWrap}>
@@ -935,6 +1643,7 @@ export default function PedidosGlobalesCrud() {
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th style={{ width: 32 }}></th>
                                 <th style={{ width: 32 }}></th>
                                 <th>Código</th>
                                 <th>Regional</th>
@@ -986,6 +1695,17 @@ export default function PedidosGlobalesCrud() {
                                     pedidos,
                                     cronogramas,
                                 );
+                                const pedidoIds = pedidos.map((p) => p.id);
+                                const allSelected =
+                                    pedidoIds.length > 0 &&
+                                    pedidoIds.every((id) =>
+                                        selectedIds.has(id),
+                                    );
+                                const someSelected =
+                                    !allSelected &&
+                                    pedidoIds.some((id) =>
+                                        selectedIds.has(id),
+                                    );
 
                                 return (
                                     <React.Fragment key={g.id}>
@@ -1004,6 +1724,31 @@ export default function PedidosGlobalesCrud() {
                                                 toggle(g.id)
                                             }
                                         >
+                                            <td
+                                                style={{ textAlign: "center" }}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                            >
+                                                {pedidoIds.length > 0 && (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={allSelected}
+                                                        ref={(el) => {
+                                                            if (el)
+                                                                el.indeterminate =
+                                                                    someSelected;
+                                                        }}
+                                                        onChange={(e) =>
+                                                            toggleGlobal(
+                                                                pedidoIds,
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                            </td>
                                             <td
                                                 style={{
                                                     textAlign: "center",
@@ -1355,7 +2100,7 @@ export default function PedidosGlobalesCrud() {
                                         {isOpen && (
                                             <tr>
                                                 <td
-                                                    colSpan={11}
+                                                    colSpan={12}
                                                     style={{
                                                         padding: 0,
                                                         background: "#f8fffe",
@@ -1475,6 +2220,12 @@ export default function PedidosGlobalesCrud() {
                                                                     }}
                                                                 >
                                                                     <th
+                                                                        style={{
+                                                                            ...S.thInner,
+                                                                            width: 30,
+                                                                        }}
+                                                                    ></th>
+                                                                    <th
                                                                         style={
                                                                             S.thInner
                                                                         }
@@ -1534,7 +2285,7 @@ export default function PedidosGlobalesCrud() {
                                                                     <tr>
                                                                         <td
                                                                             colSpan={
-                                                                                7
+                                                                                8
                                                                             }
                                                                             style={{
                                                                                 ...S.tdInner,
@@ -1573,6 +2324,28 @@ export default function PedidosGlobalesCrud() {
                                                                                         "1px solid var(--border)",
                                                                                 }}
                                                                             >
+                                                                                <td
+                                                                                    style={
+                                                                                        S.tdInner
+                                                                                    }
+                                                                                >
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={selectedIds.has(
+                                                                                            p.id,
+                                                                                        )}
+                                                                                        onChange={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            togglePedido(
+                                                                                                p.id,
+                                                                                                e
+                                                                                                    .target
+                                                                                                    .checked,
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </td>
                                                                                 <td
                                                                                     style={
                                                                                         S.tdInner
@@ -1717,12 +2490,7 @@ export default function PedidosGlobalesCrud() {
                                                                                                     {
                                                                                                         it
                                                                                                             .inventario
-                                                                                                            ?.categoria
-                                                                                                    }{" "}
-                                                                                                    {
-                                                                                                        it
-                                                                                                            .inventario
-                                                                                                            ?.subcategoria
+                                                                                                            ?.prenda
                                                                                                     }{" "}
                                                                                                     T:
                                                                                                     {
@@ -1936,6 +2704,29 @@ export default function PedidosGlobalesCrud() {
                     onDevuelto={handleDevuelto}
                 />
             )}
+            {importOpen && (
+                <ImportPedidosGlobalesModal
+                    onClose={() => setImportOpen(false)}
+                    onImported={() => {
+                        qc.invalidateQueries({
+                            queryKey: ["pedidos-globales"],
+                        });
+                        qc.invalidateQueries({
+                            queryKey: ["pedidos-automaticos"],
+                        });
+                        qc.invalidateQueries({
+                            queryKey: ["inventario-dotacion-flat"],
+                        });
+                        qc.invalidateQueries({
+                            queryKey: ["inventario_dotacion"],
+                        });
+                    }}
+                    empleados={empleados}
+                    contratos={contratos}
+                    inventarioFlat={inventarioFlat}
+                    regionales={regionales}
+                />
+            )}
         </div>
     );
 }
@@ -1957,6 +2748,17 @@ const S = {
         color: "var(--text)",
         cursor: "pointer",
         outline: "none",
+    },
+    bulkBar: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 14px",
+        marginBottom: 16,
+        background: "#f0f9f7",
+        border: "1.5px solid var(--primary)",
+        borderRadius: "var(--radius-sm)",
+        flexWrap: "wrap",
     },
     searchWrap: { position: "relative", flex: 1, maxWidth: 360 },
     searchIcon: {
@@ -2173,5 +2975,20 @@ const S = {
         padding: "8px 12px",
         fontSize: "0.84rem",
         fontWeight: 600,
+    },
+    fileDrop: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        padding: "22px 16px",
+        border: "1.5px dashed var(--primary)",
+        borderRadius: "var(--radius-sm)",
+        background: "var(--bg)",
+        color: "var(--primary)",
+        cursor: "pointer",
+        marginTop: 4,
+        textAlign: "center",
     },
 };
