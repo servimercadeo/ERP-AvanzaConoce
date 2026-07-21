@@ -8,6 +8,7 @@ use App\Mail\DocumentosCompletadosMail;
 use App\Models\BaseIngreso;
 use App\Models\RespuestaIngreso;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
@@ -319,6 +320,29 @@ Route::middleware('auth:sanctum')->group(function () {
             }
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
+        return response()->json(null, 204);
+    });
+
+    // Notifica al flujo de Power Automate que hay documentos médicos nuevos (llamada server-to-server para evitar CORS)
+    Route::post('documentos-contratacion/notificar-seguimiento-medico', function (Request $request) {
+        $data = $request->validate([
+            'documento'        => 'required|string|max:40',
+            'nombres'          => 'nullable|string|max:150',
+            'apellidos'        => 'nullable|string|max:150',
+            'fechaSeguimiento' => 'nullable|date',
+            'archivos'         => 'nullable|array',
+            'archivos.*'       => 'string',
+        ]);
+
+        $flowUrl = config('services.sharepoint.medico_flow_url');
+        if (!$flowUrl) return response()->json(null, 204);
+
+        try {
+            Http::timeout(15)->asJson()->post($flowUrl, $data);
+        } catch (\Exception $e) {
+            Log::warning('No se pudo notificar el flujo de seguimiento médico para documento ' . $data['documento'] . ': ' . $e->getMessage());
+        }
+
         return response()->json(null, 204);
     });
 

@@ -27,8 +27,6 @@ const CUR_YEAR = new Date().getFullYear();
 const YEAR_OPTS = Array.from({ length: CUR_YEAR - 2021 }, (_, i) => String(2022 + i)).concat([String(CUR_YEAR + 1)]);
 const MONTH_KEYS_SET = new Set(["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]);
 
-const FLOW_URL_MED = "https://251096727969e82c98eb7eaa0a0fc8.e6.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/45ba95de50b94b638a5d230cc6012d1b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FcS4oaDM7z3PO6nTdfFh4SVXY9674xlKr2PyxUtYWkQ";
-const toBase64Med = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
     { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
@@ -180,16 +178,12 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             }
         }
         if (successFiles.length > 0) {
-            fetch(FLOW_URL_MED, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    documento:        cedula,
-                    nombres:          emp?.nombres   ?? "",
-                    apellidos:        emp?.apellidos ?? "",
-                    fechaSeguimiento: eventoFecha,
-                    archivos:         successFiles,
-                }),
+            api.post("/documentos-contratacion/notificar-seguimiento-medico", {
+                documento:        cedula,
+                nombres:          emp?.nombres   ?? "",
+                apellidos:        emp?.apellidos ?? "",
+                fechaSeguimiento: eventoFecha,
+                archivos:         [],
             }).catch(() => {});
         }
         setUploadingMed(false);
