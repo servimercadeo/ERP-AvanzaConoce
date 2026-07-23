@@ -158,7 +158,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             toUpload.forEach(d => { next[d.id] = { ...next[d.id], status: "uploading" }; });
             return next;
         });
-        const successFiles = [];
+        const successTipos = [];
         for (const doc of toUpload) {
             const file = docsMed[doc.id].file;
             const ext  = file.name.split(".").pop().toLowerCase();
@@ -171,19 +171,20 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 fd.append("evento", eventoFecha);
                 await api.post("/documentos-contratacion/upload", fd);
                 setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
-                successFiles.push(filename);
+                successTipos.push(doc.id);
             } catch (err) {
                 const msg = err?.response?.data?.message ?? err.message;
                 setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: msg } }));
             }
         }
-        if (successFiles.length > 0) {
+        if (successTipos.length > 0) {
             api.post("/documentos-contratacion/notificar-seguimiento-medico", {
                 documento:        cedula,
                 nombres:          emp?.nombres   ?? "",
                 apellidos:        emp?.apellidos ?? "",
                 fechaSeguimiento: eventoFecha,
-                archivos:         [],
+                evento:           eventoFecha,
+                tipos:            successTipos,
             }).catch(() => {});
         }
         setUploadingMed(false);
