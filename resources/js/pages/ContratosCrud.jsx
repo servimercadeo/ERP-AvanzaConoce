@@ -617,6 +617,7 @@ function Modal({
     catalogs,
     candidatosContrato = [],
     proyectoOpts = [],
+    centrosCostoCatalogo = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
@@ -635,6 +636,14 @@ function Modal({
         value: r.id,
         label: r.nombre,
     }));
+    const empresasCentroCosto = useMemo(
+        () => [...new Set(centrosCostoCatalogo.map((c) => c.empresa))].sort(),
+        [centrosCostoCatalogo],
+    );
+    const totalPorcentajeCC = (form.centros_costos || []).reduce(
+        (s, cc) => s + (parseFloat(cc.porcentaje) || 0),
+        0,
+    );
 
     useEffect(() => {
         if (open) {
@@ -743,7 +752,7 @@ function Modal({
             ...f,
             centros_costos: [
                 ...f.centros_costos,
-                { centro_costos: "", porcentaje: 0 },
+                { empresa: "", codigo: "", centro_costos: "", porcentaje: 0 },
             ],
         }));
     const removeCentroCosto = (idx) =>
@@ -754,9 +763,19 @@ function Modal({
     const updateCentroCosto = (idx, k, v) =>
         setForm((f) => ({
             ...f,
-            centros_costos: f.centros_costos.map((cc, i) =>
-                i === idx ? { ...cc, [k]: v } : cc,
-            ),
+            centros_costos: f.centros_costos.map((cc, i) => {
+                if (i !== idx) return cc;
+                if (k === "empresa") {
+                    return { ...cc, empresa: v, codigo: "", centro_costos: "" };
+                }
+                if (k === "codigo") {
+                    const found = centrosCostoCatalogo.find(
+                        (c) => c.empresa === cc.empresa && c.codigo === v,
+                    );
+                    return { ...cc, codigo: v, centro_costos: found?.nombre ?? "" };
+                }
+                return { ...cc, [k]: v };
+            }),
         }));
 
     const addAnexo = () =>
@@ -864,6 +883,17 @@ function Modal({
         if (!form.cargo) e.cargo = "Requerido";
         if (!form.sede) e.sede = "Requerido";
         if (!form.fecha_ingreso) e.fecha_ingreso = "Requerido";
+
+        const ccList = form.centros_costos || [];
+        const filaIncompleta = ccList.some(
+            (cc) => (cc.empresa || cc.codigo || cc.porcentaje) && (!cc.empresa || !cc.codigo || !(parseFloat(cc.porcentaje) > 0)),
+        );
+        if (filaIncompleta) {
+            e.centros_costos = "Cada centro de costo necesita empresa, código y un porcentaje mayor a 0%.";
+        } else if (Math.round(totalPorcentajeCC * 100) / 100 > 100) {
+            e.centros_costos = `La suma de porcentajes es ${totalPorcentajeCC}% y no puede superar 100%.`;
+        }
+
         return e;
     };
 
@@ -871,7 +901,7 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            setActive("principal");
+            setActive(e.centros_costos && !e.empleado_id && !e.tipo_contrato && !e.cargo && !e.sede && !e.fecha_ingreso ? "costos" : "principal");
             return;
         }
         setSaving(true);
@@ -1745,76 +1775,93 @@ function Modal({
                         <>
                             <div style={S.sectionHeader}>CENTROS DE COSTO</div>
                             <div style={{ marginTop: 12 }}>
-                                {form.centros_costos.map((cc, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            ...S.grid2,
-                                            marginBottom: 10,
-                                            alignItems: "end",
-                                        }}
-                                    >
-                                        <Field
-                                            label="Centro de Costos"
-                                            k={`cc_${i}_name`}
-                                            form={{
-                                                [`cc_${i}_name`]:
-                                                    cc.centro_costos,
-                                            }}
-                                            onChange={() => (e) =>
-                                                updateCentroCosto(
-                                                    i,
-                                                    "centro_costos",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            errors={{}}
-                                            disabled={readOnly}
-                                        />
+                                {form.centros_costos.map((cc, i) => {
+                                    const codigoOpts = centrosCostoCatalogo
+                                        .filter((c) => c.empresa === cc.empresa)
+                                        .map((c) => ({
+                                            value: c.codigo,
+                                            label: `${c.codigo} · ${c.nombre}${c.ciudad ? ` (${c.ciudad})` : ""}${c.proyecto ? ` — ${c.proyecto}` : ""}`,
+                                        }));
+                                    return (
                                         <div
+                                            key={i}
                                             style={{
-                                                display: "flex",
-                                                gap: 10,
+                                                ...S.grid3,
+                                                marginBottom: 10,
                                                 alignItems: "end",
                                             }}
                                         >
                                             <Field
-                                                label="Porcentaje %"
-                                                k={`cc_${i}_pct`}
-                                                type="number"
-                                                form={{
-                                                    [`cc_${i}_pct`]:
-                                                        cc.porcentaje,
-                                                }}
+                                                label="Empresa"
+                                                k={`cc_${i}_empresa`}
+                                                opts={empresasCentroCosto}
+                                                form={{ [`cc_${i}_empresa`]: cc.empresa }}
                                                 onChange={() => (e) =>
-                                                    updateCentroCosto(
-                                                        i,
-                                                        "porcentaje",
-                                                        e.target.value,
-                                                    )
+                                                    updateCentroCosto(i, "empresa", e.target.value)
                                                 }
                                                 errors={{}}
                                                 disabled={readOnly}
                                             />
-                                            {!readOnly && (
-                                                <button
-                                                    style={{
-                                                        ...S.actionBtn(
-                                                            "#fce8e8",
-                                                            "#a33",
-                                                        ),
-                                                        height: 38,
-                                                    }}
-                                                    onClick={() =>
-                                                        removeCentroCosto(i)
+                                            <div style={S.formGroup}>
+                                                <label style={S.label}>
+                                                    Centro de Costos
+                                                </label>
+                                                <FilterSelect
+                                                    value={cc.codigo}
+                                                    onChange={(v) =>
+                                                        updateCentroCosto(i, "codigo", v)
                                                     }
-                                                >
-                                                    <IconTrash size={14} />
-                                                </button>
-                                            )}
+                                                    options={codigoOpts}
+                                                    minSearch={0}
+                                                    maxResults={200}
+                                                    disabled={readOnly || !cc.empresa}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    gap: 10,
+                                                    alignItems: "end",
+                                                }}
+                                            >
+                                                <Field
+                                                    label="Porcentaje %"
+                                                    k={`cc_${i}_pct`}
+                                                    type="number"
+                                                    form={{
+                                                        [`cc_${i}_pct`]:
+                                                            cc.porcentaje,
+                                                    }}
+                                                    onChange={() => (e) =>
+                                                        updateCentroCosto(
+                                                            i,
+                                                            "porcentaje",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    errors={{}}
+                                                    disabled={readOnly}
+                                                />
+                                                {!readOnly && (
+                                                    <button
+                                                        style={{
+                                                            ...S.actionBtn(
+                                                                "#fce8e8",
+                                                                "#a33",
+                                                            ),
+                                                            height: 38,
+                                                        }}
+                                                        onClick={() =>
+                                                            removeCentroCosto(i)
+                                                        }
+                                                    >
+                                                        <IconTrash size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {!readOnly && (
                                     <button
                                         style={{
@@ -1824,9 +1871,27 @@ function Modal({
                                             fontSize: "0.8rem",
                                         }}
                                         onClick={addCentroCosto}
+                                        disabled={totalPorcentajeCC >= 100}
                                     >
                                         + Agregar Centro de Costo
                                     </button>
+                                )}
+                                {form.centros_costos.length > 0 && (
+                                    <div
+                                        style={{
+                                            marginTop: 10,
+                                            fontSize: "0.85rem",
+                                            fontWeight: 700,
+                                            color: totalPorcentajeCC > 100 ? "#a33" : "var(--text-muted)",
+                                        }}
+                                    >
+                                        Total asignado: {totalPorcentajeCC}%
+                                    </div>
+                                )}
+                                {errors.centros_costos && (
+                                    <div style={{ ...S.err, marginTop: 6 }}>
+                                        {errors.centros_costos}
+                                    </div>
                                 )}
                             </div>
 
@@ -2028,9 +2093,15 @@ export default function ContratosCrud() {
         queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
         staleTime: 10 * 60 * 1000,
     });
+    const { data: _qCentrosCosto } = useQuery({
+        queryKey: ["centros-costo-catalogo"],
+        queryFn: () => api.get("/centros-costo-catalogo").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
     const [candidatosContrato, setCandidatosContrato] = useState([]);
     const [proyectoOpts, setProyectoOpts] = useState([]);
+    const [centrosCostoCatalogo, setCentrosCostoCatalogo] = useState([]);
 
     useEffect(() => {
         if (_qContratos) {
@@ -2051,6 +2122,9 @@ export default function ContratosCrud() {
         if (_qSeleccionCatalogos?.proyectos)
             setProyectoOpts(_qSeleccionCatalogos.proyectos.map((p) => p.label));
     }, [_qSeleccionCatalogos]);
+    useEffect(() => {
+        if (_qCentrosCosto) setCentrosCostoCatalogo(_qCentrosCosto);
+    }, [_qCentrosCosto]);
 
     useEffect(() => {
         setPagina(1);
@@ -2756,6 +2830,7 @@ export default function ContratosCrud() {
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
                 proyectoOpts={proyectoOpts}
+                centrosCostoCatalogo={centrosCostoCatalogo}
             />
 
             <Modal
@@ -2766,6 +2841,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 proyectoOpts={proyectoOpts}
+                centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
             />
         </div>

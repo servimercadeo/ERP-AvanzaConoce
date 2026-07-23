@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Candidato;
+use App\Models\CentroCostoCatalogo;
 use App\Models\Contrato;
 use App\Models\RespuestaIngreso;
 use App\Services\EmpresaProyectoRules;
@@ -71,6 +72,70 @@ class ContratoController extends Controller
         } catch (\Exception $e) {
             Log::warning('No se pudo enviar el contrato a SharePoint para cédula ' . $cedula . ': ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Valida cada centro de costo contra el catálogo (empresa+código deben existir), rechaza
+     * códigos repetidos dentro del mismo contrato, y exige que la suma de porcentajes no supere
+     * 100%. Devuelve los items resueltos (con el nombre oficial del catálogo) listos para crear.
+     */
+    private function validarYResolverCentrosCosto(array $items): array
+    {
+        if (empty($items)) {
+            return [];
+        }
+
+        $vistos    = [];
+        $resueltos = [];
+        $suma      = 0;
+
+        foreach ($items as $item) {
+            $empresa    = trim((string) ($item['empresa'] ?? ''));
+            $codigo     = trim((string) ($item['codigo'] ?? ''));
+            $porcentaje = round((float) ($item['porcentaje'] ?? 0), 2);
+
+            $clave = mb_strtoupper($empresa, 'UTF-8') . '|' . mb_strtoupper($codigo, 'UTF-8');
+            if (isset($vistos[$clave])) {
+                throw ValidationException::withMessages([
+                    'centros_costos' => "El centro de costo \"{$codigo}\" de \"{$empresa}\" está repetido en el contrato. Usa una sola fila y ajusta el porcentaje.",
+                ]);
+            }
+            $vistos[$clave] = true;
+
+            $catalogo = CentroCostoCatalogo::where('empresa', $empresa)
+                ->where('codigo', $codigo)
+                ->where('activo', true)
+                ->first();
+
+            if (!$catalogo) {
+                throw ValidationException::withMessages([
+                    'centros_costos' => "El centro de costo \"{$codigo}\" no existe para la empresa \"{$empresa}\".",
+                ]);
+            }
+
+            if ($porcentaje <= 0) {
+                throw ValidationException::withMessages([
+                    'centros_costos' => "El porcentaje del centro de costo \"{$codigo}\" debe ser mayor a 0%.",
+                ]);
+            }
+
+            $suma += $porcentaje;
+
+            $resueltos[] = [
+                'empresa'       => $catalogo->empresa,
+                'codigo'        => $catalogo->codigo,
+                'centro_costos' => $catalogo->nombre,
+                'porcentaje'    => $porcentaje,
+            ];
+        }
+
+        if (round($suma, 2) > 100) {
+            throw ValidationException::withMessages([
+                'centros_costos' => "La suma de porcentajes de los centros de costo es {$suma}% y no puede superar 100%. Reduce el porcentaje de un centro de costo existente antes de agregar otro.",
+            ]);
+        }
+
+        return $resueltos;
     }
 
     public function index(Request $request)
@@ -205,6 +270,9 @@ class ContratoController extends Controller
             'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
             'centros_costos'               => 'nullable|array',
+            'centros_costos.*.empresa'     => 'required_with:centros_costos|string|max:150',
+            'centros_costos.*.codigo'      => 'required_with:centros_costos|string|max:30',
+            'centros_costos.*.porcentaje'  => 'required_with:centros_costos|numeric|min:0.01|max:100',
             'anexos'                       => 'nullable|array',
             'eventos_medicos'              => 'nullable|array',
             'seguimiento_fecha_cierre'     => 'nullable|date',
@@ -214,6 +282,8 @@ class ContratoController extends Controller
         if ($msg = EmpresaProyectoRules::validar($data['empresa'] ?? null, $data['cliente_proyecto'] ?? null)) {
             throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
         }
+
+        $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
 
         $contrato = DB::transaction(function() use ($data) {
             $data['completado'] = true;
@@ -311,6 +381,9 @@ class ContratoController extends Controller
             'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
             'centros_costos'               => 'nullable|array',
+            'centros_costos.*.empresa'     => 'required_with:centros_costos|string|max:150',
+            'centros_costos.*.codigo'      => 'required_with:centros_costos|string|max:30',
+            'centros_costos.*.porcentaje'  => 'required_with:centros_costos|numeric|min:0.01|max:100',
             'anexos'                       => 'nullable|array',
             'eventos_medicos'              => 'nullable|array',
             'seguimiento_fecha_cierre'     => 'nullable|date',
@@ -322,6 +395,8 @@ class ContratoController extends Controller
         if ($msg = EmpresaProyectoRules::validar($empresaFinal, $proyectoFinal)) {
             throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
         }
+
+        $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
 
         $result = DB::transaction(function() use ($contrato, $data) {
             $data['completado'] = true;
