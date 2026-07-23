@@ -223,8 +223,39 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json(
             \App\Models\CentroCostoCatalogo::where('activo', true)
                 ->orderBy('empresa')->orderBy('ciudad')->orderBy('codigo')
-                ->get(['empresa', 'codigo', 'nombre', 'ciudad', 'proyecto'])
+                ->get(['id', 'empresa', 'codigo', 'nombre', 'ciudad', 'proyecto'])
         );
+    });
+
+    // Crea un centro de costo nuevo en el catálogo
+    Route::post('centros-costo-catalogo', function (Request $request) {
+        $data = $request->validate([
+            'empresa'  => 'required|string|max:150',
+            'codigo'   => 'required|string|max:30',
+            'nombre'   => 'required|string|max:200',
+            'ciudad'   => 'nullable|string|max:100',
+            'proyecto' => 'nullable|string|max:100',
+        ]);
+
+        $existe = \App\Models\CentroCostoCatalogo::where('empresa', $data['empresa'])
+            ->where('codigo', $data['codigo'])
+            ->exists();
+        if ($existe) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'codigo' => "Ya existe el centro de costo \"{$data['codigo']}\" para la empresa \"{$data['empresa']}\".",
+            ]);
+        }
+
+        $data['activo'] = true;
+        $centro = \App\Models\CentroCostoCatalogo::create($data);
+
+        return response()->json($centro, 201);
+    });
+
+    // Elimina un centro de costo del catálogo
+    Route::delete('centros-costo-catalogo/{centroCosto}', function (\App\Models\CentroCostoCatalogo $centroCosto) {
+        $centroCosto->delete();
+        return response()->json(null, 204);
     });
 
     // Opciones y CRUD de sedes

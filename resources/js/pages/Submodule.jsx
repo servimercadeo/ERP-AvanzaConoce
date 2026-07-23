@@ -14,6 +14,7 @@ const BaseIngresoCrud = lazy(() => import('./BaseIngresoCrud'));
 const AvalesContratacionCrud = lazy(() => import('./AvalesContratacionCrud'));
 const RespuestasFormularioCrud = lazy(() => import('./RespuestasFormularioCrud'));
 const SeguimientoMedicoCrud = lazy(() => import('./SeguimientoMedicoCrud'));
+const CentrosCostosCrud = lazy(() => import('./CentrosCostosCrud'));
 const ProductosDotacion = lazy(() => import('./ProductosDotacion'));
 const PedidosAutomaticosCrud = lazy(() => import('./PedidosAutomaticosCrud'));
 const PedidosGlobalesCrud = lazy(() => import('./PedidosGlobalesCrud'));
@@ -53,6 +54,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'avales_contratacion': return AvalesContratacionCrud;
             case 'respuestas_formulario': return RespuestasFormularioCrud;
             case 'Seguros_medicos': return SeguimientoMedicoCrud;
+            case 'centros_costos_catalogo': return CentrosCostosCrud;
             default: return null;
           }
         default: return null;

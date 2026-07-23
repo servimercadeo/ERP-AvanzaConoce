@@ -1,6 +1,6 @@
 {
-  "_Layout-zmURme6A.js": {
-    "file": "assets/Layout-zmURme6A.js",
+  "_Layout-DyjMdTuB.js": {
+    "file": "assets/Layout-DyjMdTuB.js",
     "name": "Layout",
     "imports": [
       "_vendor-query-qy_ppomC.js",
@@ -53,7 +53,7 @@
     ]
   },
   "resources/js/app.jsx": {
-    "file": "assets/app-DoQx_sl6.js",
+    "file": "assets/app-B2fjggxL.js",
     "name": "app",
     "src": "resources/js/app.jsx",
     "isEntry": true,
@@ -105,7 +105,7 @@
     ]
   },
   "resources/js/pages/AvalesContratacionCrud.jsx": {
-    "file": "assets/AvalesContratacionCrud-DI5eCD7e.js",
+    "file": "assets/AvalesContratacionCrud-b_YAjmo5.js",
     "name": "AvalesContratacionCrud",
     "src": "resources/js/pages/AvalesContratacionCrud.jsx",
     "isDynamicEntry": true,
@@ -114,7 +114,7 @@
       "_useDebounce-B89BvJx0.js",
       "resources/js/app.jsx",
       "_SearchableSelect-0BjvoiIm.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -122,7 +122,7 @@
     ]
   },
   "resources/js/pages/BaseIngresoCrud.jsx": {
-    "file": "assets/BaseIngresoCrud-CFianbHb.js",
+    "file": "assets/BaseIngresoCrud-DdUP5v6M.js",
     "name": "BaseIngresoCrud",
     "src": "resources/js/pages/BaseIngresoCrud.jsx",
     "isDynamicEntry": true,
@@ -131,7 +131,7 @@
       "_useDebounce-B89BvJx0.js",
       "resources/js/app.jsx",
       "_SearchableSelect-0BjvoiIm.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -139,7 +139,7 @@
     ]
   },
   "resources/js/pages/CandidatosCrud.jsx": {
-    "file": "assets/CandidatosCrud-YqoKVfH3.js",
+    "file": "assets/CandidatosCrud-BCGtvfzM.js",
     "name": "CandidatosCrud",
     "src": "resources/js/pages/CandidatosCrud.jsx",
     "isDynamicEntry": true,
@@ -147,7 +147,7 @@
       "_vendor-query-qy_ppomC.js",
       "_useDebounce-B89BvJx0.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_SearchableSelect-0BjvoiIm.js",
       "_vendor-router-CDelyX25.js"
     ],
@@ -155,8 +155,24 @@
       "assets/app-DZNngVDw.css"
     ]
   },
+  "resources/js/pages/CentrosCostosCrud.jsx": {
+    "file": "assets/CentrosCostosCrud-AfY4GKgh.js",
+    "name": "CentrosCostosCrud",
+    "src": "resources/js/pages/CentrosCostosCrud.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-query-qy_ppomC.js",
+      "_useDebounce-B89BvJx0.js",
+      "resources/js/app.jsx",
+      "_Layout-DyjMdTuB.js",
+      "_vendor-router-CDelyX25.js"
+    ],
+    "css": [
+      "assets/app-DZNngVDw.css"
+    ]
+  },
   "resources/js/pages/ContratosCrud.jsx": {
-    "file": "assets/ContratosCrud-CFM0bLJC.js",
+    "file": "assets/ContratosCrud-DODJwMXj.js",
     "name": "ContratosCrud",
     "src": "resources/js/pages/ContratosCrud.jsx",
     "isDynamicEntry": true,
@@ -165,7 +181,7 @@
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -173,14 +189,14 @@
     ]
   },
   "resources/js/pages/CronogramaDotacion.jsx": {
-    "file": "assets/CronogramaDotacion-0Veqeq1U.js",
+    "file": "assets/CronogramaDotacion-D3A5RxUp.js",
     "name": "CronogramaDotacion",
     "src": "resources/js/pages/CronogramaDotacion.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -188,13 +204,13 @@
     ]
   },
   "resources/js/pages/Dashboard.jsx": {
-    "file": "assets/Dashboard-XATuruiC.js",
+    "file": "assets/Dashboard-ChcanI4P.js",
     "name": "Dashboard",
     "src": "resources/js/pages/Dashboard.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js",
       "resources/js/app.jsx"
     ],
@@ -203,7 +219,7 @@
     ]
   },
   "resources/js/pages/EmpleadosCrud.jsx": {
-    "file": "assets/EmpleadosCrud-DEicY0nl.js",
+    "file": "assets/EmpleadosCrud-CI_3_DCX.js",
     "name": "EmpleadosCrud",
     "src": "resources/js/pages/EmpleadosCrud.jsx",
     "isDynamicEntry": true,
@@ -212,7 +228,7 @@
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -220,7 +236,7 @@
     ]
   },
   "resources/js/pages/Login.jsx": {
-    "file": "assets/Login-Ep9dmBbe.js",
+    "file": "assets/Login-B5xDvuJ8.js",
     "name": "Login",
     "src": "resources/js/pages/Login.jsx",
     "isDynamicEntry": true,
@@ -234,13 +250,13 @@
     ]
   },
   "resources/js/pages/Module.jsx": {
-    "file": "assets/Module-3j_MT3uz.js",
+    "file": "assets/Module-CoqlrIqb.js",
     "name": "Module",
     "src": "resources/js/pages/Module.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "resources/js/pages/EmpleadosCrud.jsx",
       "_useDebounce-B89BvJx0.js",
       "_SearchableSelect-0BjvoiIm.js",
@@ -252,7 +268,7 @@
     ]
   },
   "resources/js/pages/PedidosAutomaticosCrud.jsx": {
-    "file": "assets/PedidosAutomaticosCrud-CHWxWqxI.js",
+    "file": "assets/PedidosAutomaticosCrud-CDzrCXKK.js",
     "name": "PedidosAutomaticosCrud",
     "src": "resources/js/pages/PedidosAutomaticosCrud.jsx",
     "isDynamicEntry": true,
@@ -261,7 +277,7 @@
       "_vendor-query-qy_ppomC.js",
       "_vendor-router-CDelyX25.js",
       "_useDebounce-B89BvJx0.js",
-      "_Layout-zmURme6A.js"
+      "_Layout-DyjMdTuB.js"
     ],
     "dynamicImports": [
       "node_modules/xlsx/xlsx.mjs",
@@ -273,14 +289,14 @@
     ]
   },
   "resources/js/pages/PedidosGlobalesCrud.jsx": {
-    "file": "assets/PedidosGlobalesCrud-q8nc2kVi.js",
+    "file": "assets/PedidosGlobalesCrud-gF4VRl9E.js",
     "name": "PedidosGlobalesCrud",
     "src": "resources/js/pages/PedidosGlobalesCrud.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
       "_vendor-query-qy_ppomC.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "dynamicImports": [
@@ -293,14 +309,14 @@
     ]
   },
   "resources/js/pages/ProductosDotacion.jsx": {
-    "file": "assets/ProductosDotacion-DLO-8gGO.js",
+    "file": "assets/ProductosDotacion-3QdWrsaC.js",
     "name": "ProductosDotacion",
     "src": "resources/js/pages/ProductosDotacion.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
       "_vendor-query-qy_ppomC.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "dynamicImports": [
@@ -312,14 +328,14 @@
     ]
   },
   "resources/js/pages/RespuestasFormularioCrud.jsx": {
-    "file": "assets/RespuestasFormularioCrud-FVsziCWH.js",
+    "file": "assets/RespuestasFormularioCrud-CK5ve-uZ.js",
     "name": "RespuestasFormularioCrud",
     "src": "resources/js/pages/RespuestasFormularioCrud.jsx",
     "isDynamicEntry": true,
     "imports": [
       "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -327,7 +343,7 @@
     ]
   },
   "resources/js/pages/SeguimientoMedicoCrud.jsx": {
-    "file": "assets/SeguimientoMedicoCrud-Defj0chE.js",
+    "file": "assets/SeguimientoMedicoCrud-CF7zNEvH.js",
     "name": "SeguimientoMedicoCrud",
     "src": "resources/js/pages/SeguimientoMedicoCrud.jsx",
     "isDynamicEntry": true,
@@ -335,7 +351,7 @@
       "_vendor-query-qy_ppomC.js",
       "_useDebounce-B89BvJx0.js",
       "resources/js/app.jsx",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -343,7 +359,7 @@
     ]
   },
   "resources/js/pages/SeleccionCrud.jsx": {
-    "file": "assets/SeleccionCrud-CBu9SzvE.js",
+    "file": "assets/SeleccionCrud-sierRxCa.js",
     "name": "SeleccionCrud",
     "src": "resources/js/pages/SeleccionCrud.jsx",
     "isDynamicEntry": true,
@@ -351,7 +367,7 @@
       "_vendor-query-qy_ppomC.js",
       "resources/js/app.jsx",
       "_SearchableSelect-0BjvoiIm.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "css": [
@@ -359,14 +375,14 @@
     ]
   },
   "resources/js/pages/Submodule.jsx": {
-    "file": "assets/Submodule-D4tKbEo5.js",
+    "file": "assets/Submodule-BY-TTjqt.js",
     "name": "Submodule",
     "src": "resources/js/pages/Submodule.jsx",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.jsx",
       "_vendor-query-qy_ppomC.js",
-      "_Layout-zmURme6A.js",
+      "_Layout-DyjMdTuB.js",
       "_vendor-router-CDelyX25.js"
     ],
     "dynamicImports": [
@@ -378,6 +394,7 @@
       "resources/js/pages/AvalesContratacionCrud.jsx",
       "resources/js/pages/RespuestasFormularioCrud.jsx",
       "resources/js/pages/SeguimientoMedicoCrud.jsx",
+      "resources/js/pages/CentrosCostosCrud.jsx",
       "resources/js/pages/ProductosDotacion.jsx",
       "resources/js/pages/PedidosAutomaticosCrud.jsx",
       "resources/js/pages/PedidosGlobalesCrud.jsx",
