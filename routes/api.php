@@ -223,6 +223,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
     // Inventario de prendas de dotación
+    Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
+    Route::get('inventario-dotacion/resumen', [InventarioDotacionController::class, 'resumen']);
+    Route::get('inventario-dotacion/filtros', [InventarioDotacionController::class, 'filtros']);
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
     Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
     Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import']);

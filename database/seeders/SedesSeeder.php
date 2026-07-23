@@ -7,79 +7,97 @@ use Illuminate\Support\Facades\DB;
 
 class SedesSeeder extends Seeder
 {
+    /**
+     * Nombre de proyecto tal como viene en sedes_activas.csv => nombre exacto en la tabla
+     * `proyectos`. "ADMINISTRACION" y "DIRECTV COL" son los alias de negocio para "SOLO
+     * AUSENTISMOS" y "DIRECTV CO" respectivamente (ver App\Services\EmpresaProyectoRules).
+     */
+    private const CSV_PROYECTO_A_PROYECTOS = [
+        'ADMINISTRACION' => 'SOLO AUSENTISMOS',
+        'DIRECTV COL'    => 'DIRECTV CO',
+        'TIGO EXPRESS'   => 'TIGO EXPRESS',
+        'TIGO HOME'      => 'TIGO HOME',
+        'HUGHES COL'     => 'HUGHES COL',
+        'S&M ASESORES'   => 'S&M ASESORES',
+    ];
+
     public function run(): void
     {
-        $csvPath = database_path('seeders/data/Sedes.csv');
+        $csvPath = database_path('seeders/data/sedes_activas.csv');
 
         if (!file_exists($csvPath)) {
             $this->command->error("CSV no encontrado en: {$csvPath}");
-            $this->command->line('Coloca el archivo Aliados.csv en database/seeders/data/');
             return;
         }
+
+        $proyectoIds = DB::table('proyectos')->pluck('id', 'nombre');
 
         $handle = fopen($csvPath, 'r');
         fgetcsv($handle); // saltar cabecera
 
-        $nullOrVal = fn($v) => ($v === '' || strtoupper((string) $v) === 'NULL' || $v === '-') ? null : $v;
-        $intOrZero = fn($v) => is_numeric($v) ? (int) $v : 0;
-
-        $updateCols = [
-            'nombre', 'id_ciudad', 'direccion', 'telefono', 'estado',
-            'id_consultor_mac', 'id_almacenista_mac', 'id_secretaria_mac',
-            'id_jefe_mac', 'id_user_mac', 'id_torre_mac',
-            'codigo_distribuidor', 'codigo_instalador',
-            'numero_contrato_inicial', 'numero_contrato_final',
-            'meta_prepago', 'meta_postpago', 'tipo_sede', 'id_sede_padre',
-            'sub_canal', 'updated_at',
-        ];
-
-        $batch = [];
-        $count = 0;
+        $sedeIdPorNombre = [];
+        $relaciones = [];
 
         while (($row = fgetcsv($handle)) !== false) {
-            if (!isset($row[0]) || !is_numeric($row[0])) continue;
-
-            $batch[] = [
-                'id'                      => (int) $row[0],
-                'nombre'                  => trim($row[1] ?? ''),
-                'id_ciudad'               => is_numeric($row[2] ?? '') ? (int) $row[2] : null,
-                'direccion'               => $nullOrVal($row[3] ?? null),
-                'telefono'                => $nullOrVal($row[4] ?? null),
-                'estado'                  => $row[5] ?? 'Activa',
-                'id_consultor_mac'        => $intOrZero($row[6] ?? 0),
-                'id_almacenista_mac'      => $intOrZero($row[7] ?? 0),
-                'id_secretaria_mac'       => $intOrZero($row[8] ?? 0),
-                'id_jefe_mac'             => $intOrZero($row[9] ?? 0),
-                'id_user_mac'             => $intOrZero($row[10] ?? 0),
-                'id_torre_mac'            => $intOrZero($row[11] ?? 0),
-                'codigo_distribuidor'     => $nullOrVal($row[12] ?? null),
-                'codigo_instalador'       => $nullOrVal($row[13] ?? null),
-                'numero_contrato_inicial' => $nullOrVal($row[14] ?? null),
-                'numero_contrato_final'   => $nullOrVal($row[15] ?? null),
-                'meta_prepago'            => $intOrZero($row[16] ?? 0),
-                'meta_postpago'           => $intOrZero($row[17] ?? 0),
-                'tipo_sede'               => $row[18] ?? 'Principal',
-                'id_sede_padre'           => $intOrZero($row[19] ?? 0),
-                'sub_canal'               => $nullOrVal($row[20] ?? null),
-                'created_at'              => now(),
-                'updated_at'              => now(),
-            ];
-
-            $count++;
-
-            // Upsert en lotes de 50: inserta nuevas y actualiza existentes por id
-            if (count($batch) >= 50) {
-                DB::table('sedes')->upsert($batch, ['id'], $updateCols);
-                $batch = [];
+            $proyectoCsv = trim($row[1] ?? '');
+            $nombreSede  = trim($row[2] ?? '');
+            if ($nombreSede === '') {
+                continue;
             }
-        }
 
-        if (!empty($batch)) {
-            DB::table('sedes')->upsert($batch, ['id'], $updateCols);
+            $clave = mb_strtoupper($nombreSede, 'UTF-8');
+            if (!isset($sedeIdPorNombre[$clave])) {
+                $sedeIdPorNombre[$clave] = ['nombre' => $nombreSede];
+            }
+
+            $nombreProyecto = self::CSV_PROYECTO_A_PROYECTOS[$proyectoCsv] ?? null;
+            if ($nombreProyecto === null) {
+                $this->command->warn("Proyecto \"{$proyectoCsv}\" no tiene mapeo definido, se omite para la sede \"{$nombreSede}\".");
+                continue;
+            }
+
+            $proyectoId = $proyectoIds[$nombreProyecto] ?? null;
+            if ($proyectoId === null) {
+                $this->command->warn("Proyecto \"{$nombreProyecto}\" no existe en la tabla proyectos, se omite para la sede \"{$nombreSede}\".");
+                continue;
+            }
+
+            $relaciones[] = ['sede_clave' => $clave, 'proyecto_id' => $proyectoId];
         }
 
         fclose($handle);
 
-        $this->command->info("✓ {$count} sedes importadas desde Aliados.csv");
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        DB::table('proyecto_sede')->truncate();
+        DB::table('sedes')->truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+        $now = now();
+        foreach (array_keys($sedeIdPorNombre) as $clave) {
+            $id = DB::table('sedes')->insertGetId([
+                'nombre'     => $sedeIdPorNombre[$clave]['nombre'],
+                'estado'     => 'Activa',
+                'tipo_sede'  => 'Principal',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            $sedeIdPorNombre[$clave]['id'] = $id;
+        }
+
+        $pivote = collect($relaciones)
+            ->map(fn ($r) => [
+                'sede_id'     => $sedeIdPorNombre[$r['sede_clave']]['id'],
+                'proyecto_id' => $r['proyecto_id'],
+            ])
+            ->unique(fn ($r) => $r['sede_id'] . '-' . $r['proyecto_id'])
+            ->map(fn ($r) => $r + ['created_at' => $now, 'updated_at' => $now])
+            ->values()
+            ->all();
+
+        foreach (array_chunk($pivote, 200) as $chunk) {
+            DB::table('proyecto_sede')->insert($chunk);
+        }
+
+        $this->command->info('✓ ' . count($sedeIdPorNombre) . ' sedes importadas desde sedes_activas.csv (' . count($pivote) . ' relaciones proyecto-sede).');
     }
 }

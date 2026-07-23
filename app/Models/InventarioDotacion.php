@@ -11,8 +11,21 @@ class InventarioDotacion extends Model
 
     protected $table = 'inventario_dotacion';
 
+    /**
+     * Proyecto de dotación => nombre exacto en la tabla `proyectos`. Fuente única de verdad
+     * para resolver qué sedes aplican a cada proyecto de dotación vía el pivote proyecto_sede
+     * (usado por InventarioDotacionController y por InventarioDotacionSeeder).
+     */
+    public const PROYECTO_DOTACION_A_PROYECTO = [
+        'SYM TIGO EXPRESS'   => 'TIGO EXPRESS',
+        'SYM TIGO HOME'      => 'TIGO HOME',
+        'SYM ADMINISTRATIVO' => 'SOLO AUSENTISMOS',
+        'DIRECTV'            => 'DIRECTV CO',
+    ];
+
     protected $fillable = [
         'proyecto',
+        'sede_id',
         'prenda',
         'genero',
         'talla',
@@ -26,4 +39,9 @@ class InventarioDotacion extends Model
         'cantidad' => 'integer',
         'stock_minimo' => 'integer',
     ];
+
+    public function sede()
+    {
+        return $this->belongsTo(Sede::class);
+    }
 }
