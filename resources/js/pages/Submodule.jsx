@@ -17,6 +17,7 @@ const SeguimientoMedicoCrud = lazy(() => import('./SeguimientoMedicoCrud'));
 const ProductosDotacion = lazy(() => import('./ProductosDotacion'));
 const PedidosAutomaticosCrud = lazy(() => import('./PedidosAutomaticosCrud'));
 const PedidosGlobalesCrud = lazy(() => import('./PedidosGlobalesCrud'));
+const TrazabilidadPedidos = lazy(() => import('./TrazabilidadPedidos'));
 const CronogramaDotacion = lazy(() => import('./CronogramaDotacion'));
 
 // import SubagentesCrud      from './SubagentesCrud';
@@ -92,6 +93,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'productos_dotacion': return ProductosDotacion;
             case 'pedidos_dotacion':   return PedidosAutomaticosCrud;
             case 'pedidos_globales':   return PedidosGlobalesCrud;
+            case 'trazabilidad_pedidos': return TrazabilidadPedidos;
             case 'cronograma':         return CronogramaDotacion;
             default: return null;
           }

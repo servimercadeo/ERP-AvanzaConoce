@@ -61,6 +61,14 @@ class PedidoGlobalController extends Controller
             }
         }
 
+        if (array_key_exists('confirmado', $data) && $data['confirmado'] !== $pedidoGlobal->confirmado) {
+            $data['confirmado_at'] = $data['confirmado'] ? now() : null;
+        }
+
+        if (array_key_exists('entrega_confirmada', $data) && $data['entrega_confirmada'] !== $pedidoGlobal->entrega_confirmada) {
+            $data['entrega_confirmada_at'] = $data['entrega_confirmada'] ? now() : null;
+        }
+
         $pedidoGlobal->update($data);
 
         $fresh = collect([$pedidoGlobal->fresh()->load([
