@@ -13,6 +13,8 @@ class ContratoCentroCostos extends Model
 
     protected $fillable = [
         'contrato_id',
+        'empresa',
+        'codigo',
         'centro_costos',
         'porcentaje',
     ];

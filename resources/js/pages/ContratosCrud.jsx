@@ -41,8 +41,6 @@ const MONTH_KEYS_SET = new Set([
     "jul", "ago", "sep", "oct", "nov", "dic",
 ]);
 
-const FLOW_URL_MED = "https://251096727969e82c98eb7eaa0a0fc8.e6.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/45ba95de50b94b638a5d230cc6012d1b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FcS4oaDM7z3PO6nTdfFh4SVXY9674xlKr2PyxUtYWkQ";
-const toBase64Med = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
     { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
@@ -617,6 +615,7 @@ function Modal({
     catalogs,
     candidatosContrato = [],
     proyectoOpts = [],
+    centrosCostoCatalogo = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
@@ -630,11 +629,23 @@ function Modal({
     const [docsMed, setDocsMed]                   = useState(DOCS_MED_INIT);
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
+    const [eventoDocIdx, setEventoDocIdx]         = useState(0);
     const isCreate = !initial?.id && !readOnly;
+    const eventoIdx = Math.max(0, Math.min(eventoDocIdx, eventosMedicos.length - 1));
+    const eventoSel = eventosMedicos[eventoIdx] ?? null;
+    const eventoFecha = eventoSel?.fecha_ingreso_seguimiento ?? "";
     const regionalOpts = (catalogs.regionales || []).map((r) => ({
         value: r.id,
         label: r.nombre,
     }));
+    const empresasCentroCosto = useMemo(
+        () => [...new Set(centrosCostoCatalogo.map((c) => c.empresa))].sort(),
+        [centrosCostoCatalogo],
+    );
+    const totalPorcentajeCC = (form.centros_costos || []).reduce(
+        (s, cc) => s + (parseFloat(cc.porcentaje) || 0),
+        0,
+    );
 
     useEffect(() => {
         if (open) {
@@ -679,16 +690,20 @@ function Modal({
             setDocsMed(DOCS_MED_INIT());
             setUploadingMed(false);
             setDocsSubidos({});
-            const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
-            const ced = _emp?.cedula ?? initial?.documento ?? "";
-            if (ced) {
-                fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}`)
-                    .then(r => r.ok ? r.json() : {})
-                    .then(data => setDocsSubidos(data ?? {}))
-                    .catch(() => {});
-            }
+            setEventoDocIdx(0);
         }
     }, [initial, open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
+        const ced = _emp?.cedula ?? initial?.documento ?? "";
+        setDocsMed(DOCS_MED_INIT());
+        if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
+        api.get("/documentos-contratacion/docs-medicos", { params: { cedula: ced, evento: eventoFecha } })
+            .then(r => setDocsSubidos(r.data ?? {}))
+            .catch(() => {});
+    }, [open, initial, eventoFecha]);
 
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -743,7 +758,7 @@ function Modal({
             ...f,
             centros_costos: [
                 ...f.centros_costos,
-                { centro_costos: "", porcentaje: 0 },
+                { empresa: "", codigo: "", centro_costos: "", porcentaje: 0 },
             ],
         }));
     const removeCentroCosto = (idx) =>
@@ -754,9 +769,19 @@ function Modal({
     const updateCentroCosto = (idx, k, v) =>
         setForm((f) => ({
             ...f,
-            centros_costos: f.centros_costos.map((cc, i) =>
-                i === idx ? { ...cc, [k]: v } : cc,
-            ),
+            centros_costos: f.centros_costos.map((cc, i) => {
+                if (i !== idx) return cc;
+                if (k === "empresa") {
+                    return { ...cc, empresa: v, codigo: "", centro_costos: "" };
+                }
+                if (k === "codigo") {
+                    const found = centrosCostoCatalogo.find(
+                        (c) => c.empresa === cc.empresa && c.codigo === v,
+                    );
+                    return { ...cc, codigo: v, centro_costos: found?.nombre ?? "" };
+                }
+                return { ...cc, [k]: v };
+            }),
         }));
 
     const addAnexo = () =>
@@ -815,14 +840,13 @@ function Modal({
 
     const handleUploadDocs = async () => {
         const toUpload = DOCS_MEDICOS.filter(d => docsMed[d.id]?.file);
-        if (!toUpload.length || uploadingMed || !cedulaMed) return;
+        if (!toUpload.length || uploadingMed || !cedulaMed || !eventoFecha) return;
         setUploadingMed(true);
         setDocsMed(prev => {
             const next = { ...prev };
             toUpload.forEach(d => { next[d.id] = { ...next[d.id], status: "uploading" }; });
             return next;
         });
-        const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
         const successFiles = [];
         for (const doc of toUpload) {
             const file = docsMed[doc.id].file;
@@ -833,25 +857,22 @@ function Modal({
                 fd.append("documento", cedulaMed);
                 fd.append("tipo", doc.id);
                 fd.append("archivo", file);
-                const res = await fetch("/api/documentos-contratacion/upload", {
-                    method: "POST", headers: { "X-CSRF-TOKEN": csrf }, body: fd,
-                });
-                if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? `Error ${res.status}`); }
+                fd.append("evento", eventoFecha);
+                await api.post("/documentos-contratacion/upload", fd);
                 setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
-                successFiles.push({ filename, file });
+                successFiles.push(filename);
             } catch (err) {
-                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: err.message } }));
+                const msg = err?.response?.data?.message ?? err.message;
+                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: msg } }));
             }
         }
         if (successFiles.length > 0) {
-            fetch(FLOW_URL_MED, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    documento: cedulaMed,
-                    nombres:   empForMed?.nombres   ?? "",
-                    apellidos: empForMed?.apellidos ?? "",
-                }),
+            api.post("/documentos-contratacion/notificar-seguimiento-medico", {
+                documento:        cedulaMed,
+                nombres:          empForMed?.nombres   ?? "",
+                apellidos:        empForMed?.apellidos ?? "",
+                fechaSeguimiento: eventoFecha,
+                archivos:         [],
             }).catch(() => {});
         }
         setUploadingMed(false);
@@ -864,6 +885,17 @@ function Modal({
         if (!form.cargo) e.cargo = "Requerido";
         if (!form.sede) e.sede = "Requerido";
         if (!form.fecha_ingreso) e.fecha_ingreso = "Requerido";
+
+        const ccList = form.centros_costos || [];
+        const filaIncompleta = ccList.some(
+            (cc) => (cc.empresa || cc.codigo || cc.porcentaje) && (!cc.empresa || !cc.codigo || !(parseFloat(cc.porcentaje) > 0)),
+        );
+        if (filaIncompleta) {
+            e.centros_costos = "Cada centro de costo necesita empresa, código y un porcentaje mayor a 0%.";
+        } else if (Math.round(totalPorcentajeCC * 100) / 100 > 100) {
+            e.centros_costos = `La suma de porcentajes es ${totalPorcentajeCC}% y no puede superar 100%.`;
+        }
+
         return e;
     };
 
@@ -871,7 +903,7 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            setActive("principal");
+            setActive(e.centros_costos && !e.empleado_id && !e.tipo_contrato && !e.cargo && !e.sede && !e.fecha_ingreso ? "costos" : "principal");
             return;
         }
         setSaving(true);
@@ -1670,11 +1702,35 @@ function Modal({
                                 <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
                                     Sin empleado asociado. Selecciona un empleado en la pestaña Principal.
                                 </div>
+                            ) : eventosMedicos.length === 0 ? (
+                                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                    Registra primero un evento en la pestaña "Seguimiento Médico". Los documentos se asocian a un evento.
+                                </div>
                             ) : (
                                 <>
                                     <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 10, marginBottom: 18 }}>
-                                        Carpeta SharePoint del empleado <strong>CC {cedulaMed}</strong>. Máx. 10 MB por archivo.
+                                    <div style={{ ...S.formGroup, marginTop: 14, maxWidth: 360 }}>
+                                        <label style={S.label}>Evento médico</label>
+                                        <select
+                                            style={{ ...S.input, cursor: "pointer" }}
+                                            value={eventoIdx}
+                                            onChange={e => setEventoDocIdx(Number(e.target.value))}
+                                        >
+                                            {eventosMedicos.map((ev, i) => (
+                                                <option key={i} value={i}>
+                                                    {(ev.fecha_ingreso_seguimiento || "Sin fecha") + (ev.tipo_evento ? ` · ${ev.tipo_evento}` : "")}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {!eventoFecha ? (
+                                        <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                            Este evento no tiene "Fecha Ingreso a Seguimiento". Complétala en la pestaña "Seguimiento Médico" y guarda antes de subir documentos.
+                                        </div>
+                                    ) : (
+                                    <>
+                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 14, marginBottom: 18 }}>
+                                        Carpeta SharePoint del empleado <strong>CC {cedulaMed}</strong>, evento <strong>{eventoFecha}</strong>. Máx. 10 MB por archivo.
                                     </p>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                         {DOCS_MEDICOS.map(doc => {
@@ -1711,11 +1767,8 @@ function Modal({
                                                     {(yaSubido || isDone) && !readOnly && (
                                                         <button onClick={async () => {
                                                             if (!confirm("¿Eliminar este documento?")) return;
-                                                            const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
-                                                            await fetch("/api/documentos-contratacion/docs-medicos", {
-                                                                method: "DELETE",
-                                                                headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
-                                                                body: JSON.stringify({ cedula: cedulaMed, tipo: doc.id }),
+                                                            await api.delete("/documentos-contratacion/docs-medicos", {
+                                                                data: { cedula: cedulaMed, tipo: doc.id, evento: eventoFecha },
                                                             });
                                                             setDocsSubidos(prev => ({ ...prev, [doc.id]: null }));
                                                             setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "idle", name: null, error: null } }));
@@ -1736,6 +1789,8 @@ function Modal({
                                             {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
                                         </button>
                                     )}
+                                    </>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -1745,76 +1800,93 @@ function Modal({
                         <>
                             <div style={S.sectionHeader}>CENTROS DE COSTO</div>
                             <div style={{ marginTop: 12 }}>
-                                {form.centros_costos.map((cc, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            ...S.grid2,
-                                            marginBottom: 10,
-                                            alignItems: "end",
-                                        }}
-                                    >
-                                        <Field
-                                            label="Centro de Costos"
-                                            k={`cc_${i}_name`}
-                                            form={{
-                                                [`cc_${i}_name`]:
-                                                    cc.centro_costos,
-                                            }}
-                                            onChange={() => (e) =>
-                                                updateCentroCosto(
-                                                    i,
-                                                    "centro_costos",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            errors={{}}
-                                            disabled={readOnly}
-                                        />
+                                {form.centros_costos.map((cc, i) => {
+                                    const codigoOpts = centrosCostoCatalogo
+                                        .filter((c) => c.empresa === cc.empresa)
+                                        .map((c) => ({
+                                            value: c.codigo,
+                                            label: `${c.codigo} · ${c.nombre}${c.ciudad ? ` (${c.ciudad})` : ""}${c.proyecto ? ` — ${c.proyecto}` : ""}`,
+                                        }));
+                                    return (
                                         <div
+                                            key={i}
                                             style={{
-                                                display: "flex",
-                                                gap: 10,
+                                                ...S.grid3,
+                                                marginBottom: 10,
                                                 alignItems: "end",
                                             }}
                                         >
                                             <Field
-                                                label="Porcentaje %"
-                                                k={`cc_${i}_pct`}
-                                                type="number"
-                                                form={{
-                                                    [`cc_${i}_pct`]:
-                                                        cc.porcentaje,
-                                                }}
+                                                label="Empresa"
+                                                k={`cc_${i}_empresa`}
+                                                opts={empresasCentroCosto}
+                                                form={{ [`cc_${i}_empresa`]: cc.empresa }}
                                                 onChange={() => (e) =>
-                                                    updateCentroCosto(
-                                                        i,
-                                                        "porcentaje",
-                                                        e.target.value,
-                                                    )
+                                                    updateCentroCosto(i, "empresa", e.target.value)
                                                 }
                                                 errors={{}}
                                                 disabled={readOnly}
                                             />
-                                            {!readOnly && (
-                                                <button
-                                                    style={{
-                                                        ...S.actionBtn(
-                                                            "#fce8e8",
-                                                            "#a33",
-                                                        ),
-                                                        height: 38,
-                                                    }}
-                                                    onClick={() =>
-                                                        removeCentroCosto(i)
+                                            <div style={S.formGroup}>
+                                                <label style={S.label}>
+                                                    Centro de Costos
+                                                </label>
+                                                <FilterSelect
+                                                    value={cc.codigo}
+                                                    onChange={(v) =>
+                                                        updateCentroCosto(i, "codigo", v)
                                                     }
-                                                >
-                                                    <IconTrash size={14} />
-                                                </button>
-                                            )}
+                                                    options={codigoOpts}
+                                                    minSearch={0}
+                                                    maxResults={200}
+                                                    disabled={readOnly || !cc.empresa}
+                                                />
+                                            </div>
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    gap: 10,
+                                                    alignItems: "end",
+                                                }}
+                                            >
+                                                <Field
+                                                    label="Porcentaje %"
+                                                    k={`cc_${i}_pct`}
+                                                    type="number"
+                                                    form={{
+                                                        [`cc_${i}_pct`]:
+                                                            cc.porcentaje,
+                                                    }}
+                                                    onChange={() => (e) =>
+                                                        updateCentroCosto(
+                                                            i,
+                                                            "porcentaje",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    errors={{}}
+                                                    disabled={readOnly}
+                                                />
+                                                {!readOnly && (
+                                                    <button
+                                                        style={{
+                                                            ...S.actionBtn(
+                                                                "#fce8e8",
+                                                                "#a33",
+                                                            ),
+                                                            height: 38,
+                                                        }}
+                                                        onClick={() =>
+                                                            removeCentroCosto(i)
+                                                        }
+                                                    >
+                                                        <IconTrash size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {!readOnly && (
                                     <button
                                         style={{
@@ -1824,9 +1896,27 @@ function Modal({
                                             fontSize: "0.8rem",
                                         }}
                                         onClick={addCentroCosto}
+                                        disabled={totalPorcentajeCC >= 100}
                                     >
                                         + Agregar Centro de Costo
                                     </button>
+                                )}
+                                {form.centros_costos.length > 0 && (
+                                    <div
+                                        style={{
+                                            marginTop: 10,
+                                            fontSize: "0.85rem",
+                                            fontWeight: 700,
+                                            color: totalPorcentajeCC > 100 ? "#a33" : "var(--text-muted)",
+                                        }}
+                                    >
+                                        Total asignado: {totalPorcentajeCC}%
+                                    </div>
+                                )}
+                                {errors.centros_costos && (
+                                    <div style={{ ...S.err, marginTop: 6 }}>
+                                        {errors.centros_costos}
+                                    </div>
                                 )}
                             </div>
 
@@ -2028,9 +2118,15 @@ export default function ContratosCrud() {
         queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
         staleTime: 10 * 60 * 1000,
     });
+    const { data: _qCentrosCosto } = useQuery({
+        queryKey: ["centros-costo-catalogo"],
+        queryFn: () => api.get("/centros-costo-catalogo").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
     const [candidatosContrato, setCandidatosContrato] = useState([]);
     const [proyectoOpts, setProyectoOpts] = useState([]);
+    const [centrosCostoCatalogo, setCentrosCostoCatalogo] = useState([]);
 
     useEffect(() => {
         if (_qContratos) {
@@ -2051,6 +2147,9 @@ export default function ContratosCrud() {
         if (_qSeleccionCatalogos?.proyectos)
             setProyectoOpts(_qSeleccionCatalogos.proyectos.map((p) => p.label));
     }, [_qSeleccionCatalogos]);
+    useEffect(() => {
+        if (_qCentrosCosto) setCentrosCostoCatalogo(_qCentrosCosto);
+    }, [_qCentrosCosto]);
 
     useEffect(() => {
         setPagina(1);
@@ -2756,6 +2855,7 @@ export default function ContratosCrud() {
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
                 proyectoOpts={proyectoOpts}
+                centrosCostoCatalogo={centrosCostoCatalogo}
             />
 
             <Modal
@@ -2766,6 +2866,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 proyectoOpts={proyectoOpts}
+                centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
             />
         </div>

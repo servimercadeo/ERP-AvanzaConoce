@@ -28,5 +28,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RequisicionesSeeder::class);
         $this->call(InventarioDotacionSeeder::class);
 
+        // Catálogo de centros de costo (empresa + código)
+        $this->call(CentrosCostoCatalogoSeeder::class);
     }
 }

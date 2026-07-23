@@ -218,6 +218,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de contratos
     Route::apiResource('contratos', ContratoController::class);
 
+    // Catálogo de centros de costo (empresa + código), usado para asignar centros de costo a un contrato
+    Route::get('centros-costo-catalogo', function () {
+        return response()->json(
+            \App\Models\CentroCostoCatalogo::where('activo', true)
+                ->orderBy('empresa')->orderBy('ciudad')->orderBy('codigo')
+                ->get(['empresa', 'codigo', 'nombre', 'ciudad', 'proyecto'])
+        );
+    });
+
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
