@@ -41,8 +41,6 @@ const MONTH_KEYS_SET = new Set([
     "jul", "ago", "sep", "oct", "nov", "dic",
 ]);
 
-const FLOW_URL_MED = "https://251096727969e82c98eb7eaa0a0fc8.e6.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/45ba95de50b94b638a5d230cc6012d1b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FcS4oaDM7z3PO6nTdfFh4SVXY9674xlKr2PyxUtYWkQ";
-const toBase64Med = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
     { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
@@ -631,7 +629,11 @@ function Modal({
     const [docsMed, setDocsMed]                   = useState(DOCS_MED_INIT);
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
+    const [eventoDocIdx, setEventoDocIdx]         = useState(0);
     const isCreate = !initial?.id && !readOnly;
+    const eventoIdx = Math.max(0, Math.min(eventoDocIdx, eventosMedicos.length - 1));
+    const eventoSel = eventosMedicos[eventoIdx] ?? null;
+    const eventoFecha = eventoSel?.fecha_ingreso_seguimiento ?? "";
     const regionalOpts = (catalogs.regionales || []).map((r) => ({
         value: r.id,
         label: r.nombre,
@@ -688,16 +690,20 @@ function Modal({
             setDocsMed(DOCS_MED_INIT());
             setUploadingMed(false);
             setDocsSubidos({});
-            const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
-            const ced = _emp?.cedula ?? initial?.documento ?? "";
-            if (ced) {
-                fetch(`/api/documentos-contratacion/docs-medicos?cedula=${encodeURIComponent(ced)}`)
-                    .then(r => r.ok ? r.json() : {})
-                    .then(data => setDocsSubidos(data ?? {}))
-                    .catch(() => {});
-            }
+            setEventoDocIdx(0);
         }
     }, [initial, open]);
+
+    useEffect(() => {
+        if (!open) return;
+        const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
+        const ced = _emp?.cedula ?? initial?.documento ?? "";
+        setDocsMed(DOCS_MED_INIT());
+        if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
+        api.get("/documentos-contratacion/docs-medicos", { params: { cedula: ced, evento: eventoFecha } })
+            .then(r => setDocsSubidos(r.data ?? {}))
+            .catch(() => {});
+    }, [open, initial, eventoFecha]);
 
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -834,14 +840,13 @@ function Modal({
 
     const handleUploadDocs = async () => {
         const toUpload = DOCS_MEDICOS.filter(d => docsMed[d.id]?.file);
-        if (!toUpload.length || uploadingMed || !cedulaMed) return;
+        if (!toUpload.length || uploadingMed || !cedulaMed || !eventoFecha) return;
         setUploadingMed(true);
         setDocsMed(prev => {
             const next = { ...prev };
             toUpload.forEach(d => { next[d.id] = { ...next[d.id], status: "uploading" }; });
             return next;
         });
-        const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
         const successFiles = [];
         for (const doc of toUpload) {
             const file = docsMed[doc.id].file;
@@ -852,25 +857,22 @@ function Modal({
                 fd.append("documento", cedulaMed);
                 fd.append("tipo", doc.id);
                 fd.append("archivo", file);
-                const res = await fetch("/api/documentos-contratacion/upload", {
-                    method: "POST", headers: { "X-CSRF-TOKEN": csrf }, body: fd,
-                });
-                if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? `Error ${res.status}`); }
+                fd.append("evento", eventoFecha);
+                await api.post("/documentos-contratacion/upload", fd);
                 setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "done", name: filename, error: null } }));
-                successFiles.push({ filename, file });
+                successFiles.push(filename);
             } catch (err) {
-                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: err.message } }));
+                const msg = err?.response?.data?.message ?? err.message;
+                setDocsMed(prev => ({ ...prev, [doc.id]: { ...prev[doc.id], status: "error", error: msg } }));
             }
         }
         if (successFiles.length > 0) {
-            fetch(FLOW_URL_MED, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    documento: cedulaMed,
-                    nombres:   empForMed?.nombres   ?? "",
-                    apellidos: empForMed?.apellidos ?? "",
-                }),
+            api.post("/documentos-contratacion/notificar-seguimiento-medico", {
+                documento:        cedulaMed,
+                nombres:          empForMed?.nombres   ?? "",
+                apellidos:        empForMed?.apellidos ?? "",
+                fechaSeguimiento: eventoFecha,
+                archivos:         [],
             }).catch(() => {});
         }
         setUploadingMed(false);
@@ -1700,11 +1702,35 @@ function Modal({
                                 <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
                                     Sin empleado asociado. Selecciona un empleado en la pestaña Principal.
                                 </div>
+                            ) : eventosMedicos.length === 0 ? (
+                                <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                    Registra primero un evento en la pestaña "Seguimiento Médico". Los documentos se asocian a un evento.
+                                </div>
                             ) : (
                                 <>
                                     <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 10, marginBottom: 18 }}>
-                                        Carpeta SharePoint del empleado <strong>CC {cedulaMed}</strong>. Máx. 10 MB por archivo.
+                                    <div style={{ ...S.formGroup, marginTop: 14, maxWidth: 360 }}>
+                                        <label style={S.label}>Evento médico</label>
+                                        <select
+                                            style={{ ...S.input, cursor: "pointer" }}
+                                            value={eventoIdx}
+                                            onChange={e => setEventoDocIdx(Number(e.target.value))}
+                                        >
+                                            {eventosMedicos.map((ev, i) => (
+                                                <option key={i} value={i}>
+                                                    {(ev.fecha_ingreso_seguimiento || "Sin fecha") + (ev.tipo_evento ? ` · ${ev.tipo_evento}` : "")}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {!eventoFecha ? (
+                                        <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                            Este evento no tiene "Fecha Ingreso a Seguimiento". Complétala en la pestaña "Seguimiento Médico" y guarda antes de subir documentos.
+                                        </div>
+                                    ) : (
+                                    <>
+                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 14, marginBottom: 18 }}>
+                                        Carpeta SharePoint del empleado <strong>CC {cedulaMed}</strong>, evento <strong>{eventoFecha}</strong>. Máx. 10 MB por archivo.
                                     </p>
                                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                         {DOCS_MEDICOS.map(doc => {
@@ -1741,11 +1767,8 @@ function Modal({
                                                     {(yaSubido || isDone) && !readOnly && (
                                                         <button onClick={async () => {
                                                             if (!confirm("¿Eliminar este documento?")) return;
-                                                            const csrf = document.querySelector("meta[name=\"csrf-token\"]")?.content ?? "";
-                                                            await fetch("/api/documentos-contratacion/docs-medicos", {
-                                                                method: "DELETE",
-                                                                headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf },
-                                                                body: JSON.stringify({ cedula: cedulaMed, tipo: doc.id }),
+                                                            await api.delete("/documentos-contratacion/docs-medicos", {
+                                                                data: { cedula: cedulaMed, tipo: doc.id, evento: eventoFecha },
                                                             });
                                                             setDocsSubidos(prev => ({ ...prev, [doc.id]: null }));
                                                             setDocsMed(prev => ({ ...prev, [doc.id]: { file: null, status: "idle", name: null, error: null } }));
@@ -1765,6 +1788,8 @@ function Modal({
                                         >
                                             {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
                                         </button>
+                                    )}
+                                    </>
                                     )}
                                 </>
                             )}
