@@ -363,22 +363,50 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json(null, 204);
     });
 
-    // Notifica al flujo de Power Automate que hay documentos médicos nuevos (llamada server-to-server para evitar CORS)
+    // Notifica al flujo de Power Automate con los documentos médicos recién subidos, incluyendo
+    // el contenido en base64 (llamada server-to-server para evitar CORS)
     Route::post('documentos-contratacion/notificar-seguimiento-medico', function (Request $request) {
         $data = $request->validate([
             'documento'        => 'required|string|max:40',
             'nombres'          => 'nullable|string|max:150',
             'apellidos'        => 'nullable|string|max:150',
             'fechaSeguimiento' => 'nullable|date',
-            'archivos'         => 'nullable|array',
-            'archivos.*'       => 'string',
+            'evento'           => 'nullable|string|max:20',
+            'tipos'            => 'nullable|array',
+            'tipos.*'          => 'string',
         ]);
 
         $flowUrl = config('services.sharepoint.medico_flow_url');
         if (!$flowUrl) return response()->json(null, 204);
 
+        $payload = [
+            'documento'        => $data['documento'],
+            'nombres'          => $data['nombres'] ?? '',
+            'apellidos'        => $data['apellidos'] ?? '',
+            'fechaSeguimiento' => $data['fechaSeguimiento'] ?? '',
+            'archivos'         => [],
+        ];
+
+        $evento = $data['evento'] ?? $data['fechaSeguimiento'] ?? null;
+        if ($evento && !empty($data['tipos'])) {
+            $metaPath = storage_path('app/documentos_contratacion.json');
+            $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+            $archivosEvento = $meta[$data['documento']]['archivos_eventos'][$evento] ?? [];
+
+            foreach ($data['tipos'] as $tipo) {
+                $entry = $archivosEvento[$tipo] ?? null;
+                if (!$entry || !Storage::disk('local')->exists($entry['ruta'])) continue;
+
+                $payload['archivos'][] = [
+                    'nombre'    => $entry['nombre_original'],
+                    'tipo'      => Storage::disk('local')->mimeType($entry['ruta']),
+                    'contenido' => base64_encode(Storage::disk('local')->get($entry['ruta'])),
+                ];
+            }
+        }
+
         try {
-            Http::timeout(15)->asJson()->post($flowUrl, $data);
+            Http::timeout(30)->asJson()->post($flowUrl, $payload);
         } catch (\Exception $e) {
             Log::warning('No se pudo notificar el flujo de seguimiento médico para documento ' . $data['documento'] . ': ' . $e->getMessage());
         }
