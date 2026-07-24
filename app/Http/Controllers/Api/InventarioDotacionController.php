@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\InventarioDotacion;
 use App\Models\Proyecto;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 const GENEROS_DOTACION = ['Masculino', 'Femenino', 'Unisex'];
 
@@ -106,7 +108,19 @@ class InventarioDotacionController extends Controller
     {
         $item = $r->toArray();
         $item['sede_nombre'] = $r->sede->nombre ?? null;
+        unset($item['sede'], $item['created_at'], $item['updated_at']);
         return $item;
+    }
+
+    private const CACHE_KEY_FLAT = 'inventario-dotacion:flat';
+
+    /**
+     * Invalida la caché del catálogo completo (usada por el fetch "sin filtros" de abajo).
+     * Se llama tras cualquier escritura en inventario_dotacion.
+     */
+    private function olvidarCacheFlat(): void
+    {
+        Cache::forget(self::CACHE_KEY_FLAT);
     }
 
     /**
@@ -114,9 +128,36 @@ class InventarioDotacionController extends Controller
      * completo) — así PedidosAutomaticosCrud.jsx y PedidosGlobalesCrud.jsx, que piden el
      * catálogo entero sin paginar para buscar ítems por talla/género, no se ven afectados.
      * Con `per_page` pagina server-side, que es lo que usa ProductosDotacion.jsx.
+     *
+     * El caso "sin filtros ni per_page" (el catálogo completo, ~8700 filas) se cachea unos
+     * minutos: es la misma respuesta para cualquier usuario y se pide en cada carga de
+     * PedidosAutomaticosCrud/PedidosGlobalesCrud, así que evita re-escanear y re-serializar
+     * toda la tabla en cada request. Se invalida en cuanto algo se crea/edita/borra.
      */
     public function index(Request $request)
     {
+        $sinFiltros = !$request->filled('proyecto') && !$request->filled('sede_id')
+            && !$request->filled('prenda') && !$request->filled('genero')
+            && !$request->filled('talla') && !$request->filled('search');
+
+        if ($sinFiltros && !$request->filled('per_page')) {
+            // Query plana (sin hidratar modelos Eloquent) a propósito: con ~8-9 mil filas,
+            // ->with('sede')->get()->map(fn($r) => $r->toArray()...) tarda decenas de
+            // segundos por el costo de hidratar y serializar miles de modelos; un JOIN +
+            // DB::table() hace lo mismo en un par de segundos.
+            $data = Cache::remember(self::CACHE_KEY_FLAT, 180, function () {
+                return DB::table('inventario_dotacion as i')
+                    ->leftJoin('sedes as s', 's.id', '=', 'i.sede_id')
+                    ->orderBy('i.proyecto')->orderBy('i.prenda')->orderBy('i.genero')->orderBy('i.talla')
+                    ->get([
+                        'i.id', 'i.proyecto', 'i.sede_id', 'i.prenda', 'i.genero', 'i.talla',
+                        'i.precio', 'i.cantidad', 'i.stock_minimo', 's.nombre as sede_nombre',
+                    ])
+                    ->all();
+            });
+            return response()->json($data);
+        }
+
         $query = $this->filtrarInventario($request);
 
         if ($request->filled('per_page')) {
@@ -193,6 +234,7 @@ class InventarioDotacionController extends Controller
             ]
         );
 
+        $this->olvidarCacheFlat();
         return response()->json($item, 201);
     }
 
@@ -235,6 +277,7 @@ class InventarioDotacionController extends Controller
             $saved++;
         }
 
+        $this->olvidarCacheFlat();
         return response()->json(['saved' => $saved]);
     }
 
@@ -288,6 +331,7 @@ class InventarioDotacionController extends Controller
             }
         }
 
+        $this->olvidarCacheFlat();
         return response()->json(['creados' => $creados, 'actualizados' => $actualizados]);
     }
 
@@ -311,12 +355,14 @@ class InventarioDotacionController extends Controller
             'precio'       => $data['precio'] ?? $inventarioDotacion->precio,
         ]);
 
+        $this->olvidarCacheFlat();
         return response()->json($inventarioDotacion);
     }
 
     public function destroy(InventarioDotacion $inventarioDotacion)
     {
         $inventarioDotacion->delete();
+        $this->olvidarCacheFlat();
         return response()->json(null, 204);
     }
 }
