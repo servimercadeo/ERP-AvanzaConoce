@@ -1,22 +1,20 @@
 <?php
 
-namespace Database\Seeders;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
-use App\Models\CentroCostoCatalogo;
-use App\Models\Empresa;
-use Illuminate\Database\Seeder;
-
-class CentrosCostoCatalogoSeeder extends Seeder
+return new class extends Migration
 {
     /**
-     * NOTA: "S&M HUGHES" y "S&M TIGO" se fusionaron en una sola empresa ("S&M TIGO"), cuyos
-     * centros de costo ahora se distinguen por la columna `proyecto` (hughesnet, Tigo Express,
-     * Tigo Home, Tigo Tropas, Nacional Express, Nacional Home, HOME, Hospital). Dos códigos
-     * venían duplicados en la lista fuente con datos distintos y se resolvieron quedándose con
-     * la primera ocurrencia: 221205 (TOLU, no SUCRE) y 220804 (SAN GIL, no FLORIDABLANCA).
+     * Fuente original: database/seeders/CentrosCostoCatalogoSeeder.php (ya eliminado). Traía la
+     * empresa como primer valor de cada fila para distinguir 24 códigos que, entre SYM y
+     * Servimercadeo, coincidían exactamente en código+nombre+ciudad; esos duplicados se fusionan
+     * aquí en una sola fila (la empresa ya no se guarda en este catálogo). Dos códigos venían
+     * duplicados en la lista fuente con datos distintos y se resolvieron quedándose con la
+     * primera ocurrencia: 221205 (TOLU, no SUCRE) y 220804 (SAN GIL, no FLORIDABLANCA).
      */
     private const FILAS = [
-        // empresa, codigo, nombre, ciudad, proyecto
+        // empresa (solo para dedup), codigo, nombre, ciudad, proyecto
         ['CYC', '000001', 'ADMINISTRACION (CYC)', 'PEREIRA', null],
 
         ['S&M TIGO', '060302', 'COMERCIAL', 'APARTADO', 'hughesnet'],
@@ -195,29 +193,39 @@ class CentrosCostoCatalogoSeeder extends Seeder
         ['SERVIMERCADEO', '0602031', 'OPERACIONES', 'RIONEGRO', null],
     ];
 
-    /**
-     * Los nombres de empresa usados en FILAS ('CYC', 'S&M TIGO', 'SERVIMERCADEO') son etiquetas
-     * históricas de la fuente de datos, no empresas reales. Se resuelven contra la tabla
-     * `empresas`: CYC y S&M TIGO son ambas Servicios y Mercadeo COL (SYM); SERVIMERCADEO es
-     * Servimercadeo COL.
-     */
-    private const EMPRESA_MAP = [
-        'CYC'           => 'Servicios y Mercadeo COL',
-        'S&M TIGO'      => 'Servicios y Mercadeo COL',
-        'SERVIMERCADEO' => 'Servimercadeo COL',
-    ];
-
-    public function run(): void
+    public function up(): void
     {
-        $empresaIds = Empresa::whereIn('nombre', array_unique(self::EMPRESA_MAP))->pluck('id', 'nombre');
+        DB::table('centros_costo_catalogo')->truncate();
 
-        foreach (self::FILAS as [$empresa, $codigo, $nombre, $ciudad, $proyecto]) {
-            $empresaId = $empresaIds[self::EMPRESA_MAP[$empresa]] ?? null;
+        $vistos = [];
+        $filas  = [];
+        $ahora  = now();
 
-            CentroCostoCatalogo::updateOrCreate(
-                ['empresa_id' => $empresaId, 'codigo' => $codigo],
-                ['nombre' => $nombre, 'ciudad' => $ciudad, 'proyecto' => $proyecto, 'activo' => true]
-            );
+        foreach (self::FILAS as [, $codigo, $nombre, $ciudad, $proyecto]) {
+            $clave = mb_strtoupper($codigo . '|' . $nombre . '|' . ($ciudad ?? ''), 'UTF-8');
+            if (isset($vistos[$clave])) {
+                continue;
+            }
+            $vistos[$clave] = true;
+
+            $filas[] = [
+                'codigo'     => $codigo,
+                'nombre'     => $nombre,
+                'ciudad'     => $ciudad,
+                'proyecto'   => $proyecto,
+                'activo'     => true,
+                'created_at' => $ahora,
+                'updated_at' => $ahora,
+            ];
+        }
+
+        foreach (array_chunk($filas, 100) as $chunk) {
+            DB::table('centros_costo_catalogo')->insert($chunk);
         }
     }
-}
+
+    public function down(): void
+    {
+        DB::table('centros_costo_catalogo')->truncate();
+    }
+};

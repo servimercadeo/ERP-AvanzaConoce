@@ -7,7 +7,6 @@ import { SearchableSelect } from '../components/SearchableSelect';
 
 const POR_PAGINA = 50;
 
-const PROYECTOS   = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
 const GENEROS     = ['Masculino', 'Femenino', 'Unisex'];
 const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
 const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
@@ -18,8 +17,8 @@ const ALL_TALLAS_ORDER = [...TALLAS_UNICA, ...TALLAS_ROPA, ...TALLAS_JEAN, ...TA
 const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', sede_id: '', prenda: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
 const EMPTY_BULK_ROW = () => ({ ...EMPTY_ITEM });
 
-const fetchSedesPorProyecto = async () => {
-    const entries = await Promise.all(PROYECTOS.map(async (p) => {
+const fetchSedesPorProyecto = async (proyectos) => {
+    const entries = await Promise.all(proyectos.map(async (p) => {
         const { data } = await api.get('/inventario-dotacion/sedes', { params: { proyecto: p } });
         return [p, data];
     }));
@@ -27,7 +26,7 @@ const fetchSedesPorProyecto = async () => {
 };
 
 // ─── Modal agregar / editar un item ──────────────────────────────────────────
-function ItemModal({ item, sedesPorProyecto, onClose, onSaved }) {
+function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
     const isEdit = !!item?.id;
     const [form, setForm] = useState(isEdit
         ? { cantidad: item.cantidad, stock_minimo: item.stock_minimo, precio: item.precio ?? 0 }
@@ -104,7 +103,7 @@ function ItemModal({ item, sedesPorProyecto, onClose, onSaved }) {
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
                                     <label style={S.label}>Proyecto *</label>
                                     <select style={S.input} value={form.proyecto} onChange={set('proyecto')}>
-                                        {PROYECTOS.map(p => <option key={p}>{p}</option>)}
+                                        {proyectos.map(p => <option key={p}>{p}</option>)}
                                     </select>
                                 </div>
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
@@ -162,7 +161,7 @@ function ItemModal({ item, sedesPorProyecto, onClose, onSaved }) {
 }
 
 // ─── Modal carga masiva ──────────────────────────────────────────────────────
-function BulkModal({ sedesPorProyecto, onClose, onSaved }) {
+function BulkModal({ proyectos, sedesPorProyecto, onClose, onSaved }) {
     const [rows, setRows] = useState([EMPTY_BULK_ROW()]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -208,7 +207,7 @@ function BulkModal({ sedesPorProyecto, onClose, onSaved }) {
                                 <tr key={idx}>
                                     <td style={S.tdCell}>
                                         <select style={S.cellInput} value={row.proyecto} onChange={e => setRow(idx, 'proyecto', e.target.value)}>
-                                            {PROYECTOS.map(p => <option key={p}>{p}</option>)}
+                                            {proyectos.map(p => <option key={p}>{p}</option>)}
                                         </select>
                                     </td>
                                     <td style={S.tdCell}>
@@ -281,7 +280,7 @@ const IMPORT_HEADER_MAP = {
 
 const normalizeHeader = (s) => (s ?? '').toString().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
 
-function ImportModal({ sedesPorProyecto, onClose, onImported }) {
+function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
     const [fileName, setFileName] = useState('');
     const [validRows, setValidRows] = useState([]);
     const [invalidRows, setInvalidRows] = useState([]);
@@ -313,7 +312,7 @@ function ImportModal({ sedesPorProyecto, onClose, onImported }) {
                 });
 
                 const motivos = [];
-                if (!PROYECTOS.includes(mapped.proyecto)) motivos.push('proyecto inválido');
+                if (!proyectos.includes(mapped.proyecto)) motivos.push('proyecto inválido');
                 if (!mapped.prenda) motivos.push('prenda vacía');
                 if (!GENEROS.includes(mapped.genero)) motivos.push('género inválido');
                 if (!mapped.talla && mapped.talla !== 0) motivos.push('talla vacía');
@@ -322,7 +321,7 @@ function ImportModal({ sedesPorProyecto, onClose, onImported }) {
 
                 let sedeId = null;
                 const sedeTexto = (mapped.sede ?? '').toString().trim();
-                if (sedeTexto && PROYECTOS.includes(mapped.proyecto)) {
+                if (sedeTexto && proyectos.includes(mapped.proyecto)) {
                     const sede = (sedesPorProyecto?.[mapped.proyecto] ?? [])
                         .find(s => s.nombre.toLowerCase() === sedeTexto.toLowerCase());
                     if (sede) sedeId = sede.id;
@@ -496,9 +495,16 @@ export default function ProductosDotacion() {
 
     const filtrados = pagina?.data ?? [];
 
+    const { data: proyectos = [] } = useQuery({
+        queryKey: ['inventario-dotacion-proyectos'],
+        queryFn: () => api.get('/inventario-dotacion/proyectos').then(r => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+
     const { data: sedesPorProyecto = {} } = useQuery({
-        queryKey: ['sedes-por-proyecto-dotacion'],
-        queryFn: fetchSedesPorProyecto,
+        queryKey: ['sedes-por-proyecto-dotacion', proyectos],
+        queryFn: () => fetchSedesPorProyecto(proyectos),
+        enabled: proyectos.length > 0,
     });
 
     const sedesTab = sedesPorProyecto[proyectoTab] ?? [];
@@ -604,7 +610,7 @@ export default function ProductosDotacion() {
                     <div className="stat-num">{stats.total}</div>
                     <div className="stat-label">Total prendas</div>
                 </div>
-                {PROYECTOS.map(p => {
+                {proyectos.map(p => {
                     const c = PROYECTO_COLORS[p];
                     return (
                         <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro('Todas'); }}>
@@ -621,7 +627,7 @@ export default function ProductosDotacion() {
 
             {/* Tabs de proyecto */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', marginBottom: 20 }}>
-                {PROYECTOS.map(p => {
+                {proyectos.map(p => {
                     const active = proyectoTab === p;
                     const c = PROYECTO_COLORS[p];
                     return (
@@ -810,10 +816,10 @@ export default function ProductosDotacion() {
             )}
 
             {/* Modales */}
-            {addOpen  && <ItemModal sedesPorProyecto={sedesPorProyecto} onClose={() => setAddOpen(false)} onSaved={handleSaved} />}
-            {editItem && <ItemModal item={editItem} sedesPorProyecto={sedesPorProyecto} onClose={() => setEditItem(null)} onSaved={handleSaved} />}
-            {bulkOpen && <BulkModal sedesPorProyecto={sedesPorProyecto} onClose={() => setBulkOpen(false)} onSaved={handleBulkSaved} />}
-            {importOpen && <ImportModal sedesPorProyecto={sedesPorProyecto} onClose={() => setImportOpen(false)} onImported={handleImported} />}
+            {addOpen  && <ItemModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setAddOpen(false)} onSaved={handleSaved} />}
+            {editItem && <ItemModal item={editItem} proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setEditItem(null)} onSaved={handleSaved} />}
+            {bulkOpen && <BulkModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setBulkOpen(false)} onSaved={handleBulkSaved} />}
+            {importOpen && <ImportModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setImportOpen(false)} onImported={handleImported} />}
             {deleteItem && <DeleteModal item={deleteItem} onClose={() => setDeleteItem(null)} onDeleted={handleDeleted} />}
         </div>
     );

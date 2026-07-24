@@ -8,12 +8,12 @@ import {
 } from "../components/Icons";
 
 const POR_PAGINA = 15;
-const CAMPOS_VACIOS = { empresa: "", codigo: "", nombre: "", ciudad: "", proyecto: "" };
+const CAMPOS_VACIOS = { codigo: "", nombre: "", ciudad: "", proyecto: "" };
 
 const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /* ─── Modal de creación ────────────────────────────────────────────── */
-function CrearModal({ open, onClose, onSave, empresasExistentes }) {
+function CrearModal({ open, onClose, onSave }) {
     const [form, setForm] = useState(CAMPOS_VACIOS);
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
@@ -24,7 +24,6 @@ function CrearModal({ open, onClose, onSave, empresasExistentes }) {
 
     const validate = () => {
         const e = {};
-        if (!form.empresa.trim()) e.empresa = "Requerido";
         if (!form.codigo.trim()) e.codigo = "Requerido";
         if (!form.nombre.trim()) e.nombre = "Requerido";
         return e;
@@ -37,7 +36,6 @@ function CrearModal({ open, onClose, onSave, empresasExistentes }) {
         setErrors({});
         try {
             await onSave({
-                empresa: form.empresa.trim(),
                 codigo: form.codigo.trim(),
                 nombre: form.nombre.trim(),
                 ciudad: form.ciudad.trim() || null,
@@ -65,20 +63,6 @@ function CrearModal({ open, onClose, onSave, empresasExistentes }) {
                     </button>
                 </div>
                 <div style={S.modalBody}>
-                    <div style={S.formGroup}>
-                        <label style={S.label}>Empresa *</label>
-                        <input
-                            style={{ ...S.input, ...(errors.empresa ? { borderColor: "#e74c3c" } : {}) }}
-                            value={form.empresa}
-                            onChange={onChange("empresa")}
-                            list="empresas-centro-costo"
-                            placeholder="Ej. S&M TIGO"
-                        />
-                        <datalist id="empresas-centro-costo">
-                            {empresasExistentes.map((e) => <option key={e} value={e} />)}
-                        </datalist>
-                        {errors.empresa && <span style={S.err}>{errors.empresa}</span>}
-                    </div>
                     <div style={S.grid2}>
                         <div style={S.formGroup}>
                             <label style={S.label}>Código *</label>
@@ -135,16 +119,11 @@ export default function CentrosCostosCrud() {
         queryFn: () => api.get("/centros-costo-catalogo").then((r) => r.data),
     });
 
-    const empresasExistentes = useMemo(
-        () => [...new Set(centros.map((c) => c.empresa))].sort(),
-        [centros],
-    );
-
     const filtered = useMemo(() => {
         const q = norm(debSearch);
         if (!q) return centros;
         return centros.filter((c) =>
-            [c.empresa, c.codigo, c.nombre, c.ciudad, c.proyecto].some((v) => norm(v ?? "").includes(q)),
+            [c.codigo, c.nombre, c.ciudad, c.proyecto].some((v) => norm(v ?? "").includes(q)),
         );
     }, [centros, debSearch]);
 
@@ -158,7 +137,7 @@ export default function CentrosCostosCrud() {
     };
 
     const handleDelete = async (centro) => {
-        if (!confirm(`¿Eliminar el centro de costo "${centro.codigo} · ${centro.nombre}" de ${centro.empresa}?`)) return;
+        if (!confirm(`¿Eliminar el centro de costo "${centro.codigo} · ${centro.nombre}"?`)) return;
         try {
             await api.delete(`/centros-costo-catalogo/${centro.id}`);
             qc.invalidateQueries({ queryKey: ["centros-costo-catalogo"] });
@@ -177,10 +156,6 @@ export default function CentrosCostosCrud() {
                     <div className="stat-num">{centros.length}</div>
                     <div className="stat-label">Total centros de costo</div>
                 </div>
-                <div className="stat-card">
-                    <div className="stat-num" style={{ color: "#27ae60" }}>{empresasExistentes.length}</div>
-                    <div className="stat-label">Empresas</div>
-                </div>
             </div>
 
             <div style={S.toolbar}>
@@ -188,7 +163,7 @@ export default function CentrosCostosCrud() {
                     <span style={S.searchIcon}><IconSearch size={15} /></span>
                     <input
                         style={S.searchInput}
-                        placeholder="Buscar por empresa, código, nombre, ciudad, proyecto…"
+                        placeholder="Buscar por código, nombre, ciudad, proyecto…"
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setPagina(1); }}
                     />
@@ -207,7 +182,6 @@ export default function CentrosCostosCrud() {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Empresa</th>
                                 <th>Código</th>
                                 <th>Nombre</th>
                                 <th>Ciudad</th>
@@ -218,7 +192,6 @@ export default function CentrosCostosCrud() {
                         <tbody>
                             {paginated.map((c) => (
                                 <tr key={c.id}>
-                                    <td>{c.empresa}</td>
                                     <td>{c.codigo}</td>
                                     <td>{c.nombre}</td>
                                     <td>{c.ciudad || "—"}</td>
@@ -264,7 +237,6 @@ export default function CentrosCostosCrud() {
                 open={crearOpen}
                 onClose={() => setCrearOpen(false)}
                 onSave={handleCreate}
-                empresasExistentes={empresasExistentes}
             />
         </div>
     );

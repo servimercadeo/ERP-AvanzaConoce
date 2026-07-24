@@ -19,7 +19,6 @@ import {
 const POR_PAGINA = 5;
 
 const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Translado"];
-const TIPOS_VINCULACION = ["Directa", "Indirecta"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -615,6 +614,7 @@ function Modal({
     catalogs,
     candidatosContrato = [],
     proyectoOpts = [],
+    empleadorOpts = [],
     centrosCostoCatalogo = [],
     readOnly = false,
 }) {
@@ -638,10 +638,6 @@ function Modal({
         value: r.id,
         label: r.nombre,
     }));
-    const empresasCentroCosto = useMemo(
-        () => [...new Set(centrosCostoCatalogo.map((c) => c.empresa))].sort(),
-        [centrosCostoCatalogo],
-    );
     const totalPorcentajeCC = (form.centros_costos || []).reduce(
         (s, cc) => s + (parseFloat(cc.porcentaje) || 0),
         0,
@@ -758,7 +754,7 @@ function Modal({
             ...f,
             centros_costos: [
                 ...f.centros_costos,
-                { empresa: "", codigo: "", centro_costos: "", porcentaje: 0 },
+                { centro_costo_catalogo_id: "", codigo: "", centro_costos: "", porcentaje: 0 },
             ],
         }));
     const removeCentroCosto = (idx) =>
@@ -771,14 +767,16 @@ function Modal({
             ...f,
             centros_costos: f.centros_costos.map((cc, i) => {
                 if (i !== idx) return cc;
-                if (k === "empresa") {
-                    return { ...cc, empresa: v, codigo: "", centro_costos: "" };
-                }
-                if (k === "codigo") {
+                if (k === "centro_costo_catalogo_id") {
                     const found = centrosCostoCatalogo.find(
-                        (c) => c.empresa === cc.empresa && c.codigo === v,
+                        (c) => String(c.id) === String(v),
                     );
-                    return { ...cc, codigo: v, centro_costos: found?.nombre ?? "" };
+                    return {
+                        ...cc,
+                        centro_costo_catalogo_id: v,
+                        codigo: found?.codigo ?? "",
+                        centro_costos: found?.nombre ?? "",
+                    };
                 }
                 return { ...cc, [k]: v };
             }),
@@ -889,7 +887,7 @@ function Modal({
 
         const ccList = form.centros_costos || [];
         const filaIncompleta = ccList.some(
-            (cc) => (cc.empresa || cc.codigo || cc.porcentaje) && (!cc.empresa || !cc.codigo || !(parseFloat(cc.porcentaje) > 0)),
+            (cc) => (cc.centro_costo_catalogo_id || cc.porcentaje) && (!cc.centro_costo_catalogo_id || !(parseFloat(cc.porcentaje) > 0)),
         );
         if (filaIncompleta) {
             e.centros_costos = "Cada centro de costo necesita empresa, código y un porcentaje mayor a 0%.";
@@ -1068,7 +1066,7 @@ function Modal({
                                 <Field
                                     label="Tipo Vinculación"
                                     k="tipo_vinculacion"
-                                    opts={TIPOS_VINCULACION}
+                                    opts={catalogs.tipos_vinculacion}
                                     {...fp}
                                 />
                                 <Field
@@ -1117,6 +1115,7 @@ function Modal({
                                 <Field
                                     label="Empleador"
                                     k="empleador"
+                                    opts={empleadorOpts}
                                     {...fp}
                                 />
                                 <Field label="Empresa" k="empresa" {...fp} />
@@ -1241,6 +1240,7 @@ function Modal({
                                         <Field
                                             label="Empleador"
                                             k="empleador"
+                                            opts={empleadorOpts}
                                             {...fp}
                                         />
                                     </div>
@@ -1802,45 +1802,32 @@ function Modal({
                             <div style={S.sectionHeader}>CENTROS DE COSTO</div>
                             <div style={{ marginTop: 12 }}>
                                 {form.centros_costos.map((cc, i) => {
-                                    const codigoOpts = centrosCostoCatalogo
-                                        .filter((c) => c.empresa === cc.empresa)
-                                        .map((c) => ({
-                                            value: c.codigo,
-                                            label: `${c.codigo} · ${c.nombre}${c.ciudad ? ` (${c.ciudad})` : ""}${c.proyecto ? ` — ${c.proyecto}` : ""}`,
-                                        }));
+                                    const codigoOpts = centrosCostoCatalogo.map((c) => ({
+                                        value: c.id,
+                                        label: `${c.codigo} · ${c.nombre}${c.ciudad ? ` (${c.ciudad})` : ""}${c.proyecto ? ` — ${c.proyecto}` : ""}`,
+                                    }));
                                     return (
                                         <div
                                             key={i}
                                             style={{
-                                                ...S.grid3,
+                                                ...S.grid2,
                                                 marginBottom: 10,
                                                 alignItems: "end",
                                             }}
                                         >
-                                            <Field
-                                                label="Empresa"
-                                                k={`cc_${i}_empresa`}
-                                                opts={empresasCentroCosto}
-                                                form={{ [`cc_${i}_empresa`]: cc.empresa }}
-                                                onChange={() => (e) =>
-                                                    updateCentroCosto(i, "empresa", e.target.value)
-                                                }
-                                                errors={{}}
-                                                disabled={readOnly}
-                                            />
                                             <div style={S.formGroup}>
                                                 <label style={S.label}>
                                                     Centro de Costos
                                                 </label>
                                                 <FilterSelect
-                                                    value={cc.codigo}
+                                                    value={cc.centro_costo_catalogo_id}
                                                     onChange={(v) =>
-                                                        updateCentroCosto(i, "codigo", v)
+                                                        updateCentroCosto(i, "centro_costo_catalogo_id", v)
                                                     }
                                                     options={codigoOpts}
                                                     minSearch={0}
                                                     maxResults={200}
-                                                    disabled={readOnly || !cc.empresa}
+                                                    disabled={readOnly}
                                                 />
                                             </div>
                                             <div
@@ -2086,6 +2073,7 @@ export default function ContratosCrud() {
         arls: [],
         cajas: [],
         bancos: [],
+        pensiones: [],
         tipos_vinculacion: [],
         regionales: [],
     });
@@ -2124,9 +2112,16 @@ export default function ContratosCrud() {
         queryFn: () => api.get("/centros-costo-catalogo").then((r) => r.data),
         staleTime: 10 * 60 * 1000,
     });
+    const { data: _qEmpresas } = useQuery({
+        queryKey: ["empresas"],
+        queryFn: () => api.get("/empresas").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
     const [candidatosContrato, setCandidatosContrato] = useState([]);
     const [proyectoOpts, setProyectoOpts] = useState([]);
+    const [empleadorOpts, setEmpleadorOpts] = useState([]);
+    const [empresasOpts, setEmpresasOpts] = useState([]);
     const [centrosCostoCatalogo, setCentrosCostoCatalogo] = useState([]);
 
     useEffect(() => {
@@ -2147,10 +2142,15 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qSeleccionCatalogos?.proyectos)
             setProyectoOpts(_qSeleccionCatalogos.proyectos.map((p) => p.label));
+        if (_qSeleccionCatalogos?.empleadores)
+            setEmpleadorOpts(_qSeleccionCatalogos.empleadores.map((e) => e.nombre));
     }, [_qSeleccionCatalogos]);
     useEffect(() => {
         if (_qCentrosCosto) setCentrosCostoCatalogo(_qCentrosCosto);
     }, [_qCentrosCosto]);
+    useEffect(() => {
+        if (_qEmpresas) setEmpresasOpts(_qEmpresas.map((e) => e.nombre));
+    }, [_qEmpresas]);
 
     useEffect(() => {
         setPagina(1);
@@ -2784,13 +2784,10 @@ export default function ContratosCrud() {
                                         value={filtroEmpresa}
                                         onChange={setFiltroEmpresa}
                                         defaultValue="Todas"
-                                        options={[
-                                            ...new Set(
-                                                contratos
-                                                    .map((c) => c.empresa)
-                                                    .filter(Boolean),
-                                            ),
-                                        ].map((s) => ({ label: s, value: s }))}
+                                        options={empresasOpts.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2801,16 +2798,10 @@ export default function ContratosCrud() {
                                         value={filtroFondoPensiones}
                                         onChange={setFiltroFondoPensiones}
                                         defaultValue="Todos"
-                                        options={[
-                                            ...new Set(
-                                                contratos
-                                                    .map(
-                                                        (c) =>
-                                                            c.fondo_pensiones,
-                                                    )
-                                                    .filter(Boolean),
-                                            ),
-                                        ].map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.pensiones.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                             </div>
@@ -2856,6 +2847,7 @@ export default function ContratosCrud() {
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
                 proyectoOpts={proyectoOpts}
+                empleadorOpts={empleadorOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
             />
 
@@ -2867,6 +2859,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 proyectoOpts={proyectoOpts}
+                empleadorOpts={empleadorOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
             />

@@ -90,42 +90,39 @@ class ContratoController extends Controller
         $suma      = 0;
 
         foreach ($items as $item) {
-            $empresa    = trim((string) ($item['empresa'] ?? ''));
-            $codigo     = trim((string) ($item['codigo'] ?? ''));
+            $catalogoId = (int) ($item['centro_costo_catalogo_id'] ?? 0);
             $porcentaje = round((float) ($item['porcentaje'] ?? 0), 2);
 
-            $clave = mb_strtoupper($empresa, 'UTF-8') . '|' . mb_strtoupper($codigo, 'UTF-8');
-            if (isset($vistos[$clave])) {
+            if (isset($vistos[$catalogoId])) {
                 throw ValidationException::withMessages([
-                    'centros_costos' => "El centro de costo \"{$codigo}\" de \"{$empresa}\" está repetido en el contrato. Usa una sola fila y ajusta el porcentaje.",
+                    'centros_costos' => "Ese centro de costo está repetido en el contrato. Usa una sola fila y ajusta el porcentaje.",
                 ]);
             }
-            $vistos[$clave] = true;
+            $vistos[$catalogoId] = true;
 
-            $catalogo = CentroCostoCatalogo::where('empresa', $empresa)
-                ->where('codigo', $codigo)
+            $catalogo = CentroCostoCatalogo::where('id', $catalogoId)
                 ->where('activo', true)
                 ->first();
 
             if (!$catalogo) {
                 throw ValidationException::withMessages([
-                    'centros_costos' => "El centro de costo \"{$codigo}\" no existe para la empresa \"{$empresa}\".",
+                    'centros_costos' => "El centro de costo seleccionado no existe.",
                 ]);
             }
 
             if ($porcentaje <= 0) {
                 throw ValidationException::withMessages([
-                    'centros_costos' => "El porcentaje del centro de costo \"{$codigo}\" debe ser mayor a 0%.",
+                    'centros_costos' => "El porcentaje del centro de costo \"{$catalogo->codigo}\" debe ser mayor a 0%.",
                 ]);
             }
 
             $suma += $porcentaje;
 
             $resueltos[] = [
-                'empresa'       => $catalogo->empresa,
-                'codigo'        => $catalogo->codigo,
-                'centro_costos' => $catalogo->nombre,
-                'porcentaje'    => $porcentaje,
+                'centro_costo_catalogo_id' => $catalogo->id,
+                'codigo'                   => $catalogo->codigo,
+                'centro_costos'            => $catalogo->nombre,
+                'porcentaje'               => $porcentaje,
             ];
         }
 
@@ -269,10 +266,9 @@ class ContratoController extends Controller
             'cliente_proyecto'        => 'nullable|string',
             'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'               => 'nullable|array',
-            'centros_costos.*.empresa'     => 'required_with:centros_costos|string|max:150',
-            'centros_costos.*.codigo'      => 'required_with:centros_costos|string|max:30',
-            'centros_costos.*.porcentaje'  => 'required_with:centros_costos|numeric|min:0.01|max:100',
+            'centros_costos'                              => 'nullable|array',
+            'centros_costos.*.centro_costo_catalogo_id'   => 'required_with:centros_costos|integer|exists:centros_costo_catalogo,id',
+            'centros_costos.*.porcentaje'                 => 'required_with:centros_costos|numeric|min:0.01|max:100',
             'anexos'                       => 'nullable|array',
             'eventos_medicos'              => 'nullable|array',
             'seguimiento_fecha_cierre'     => 'nullable|date',
@@ -380,10 +376,9 @@ class ContratoController extends Controller
             'cliente_proyecto'        => 'nullable|string',
             'regional_id'             => 'nullable|exists:regionales,id',
             'origen_seguimiento'      => 'nullable|string',
-            'centros_costos'               => 'nullable|array',
-            'centros_costos.*.empresa'     => 'required_with:centros_costos|string|max:150',
-            'centros_costos.*.codigo'      => 'required_with:centros_costos|string|max:30',
-            'centros_costos.*.porcentaje'  => 'required_with:centros_costos|numeric|min:0.01|max:100',
+            'centros_costos'                              => 'nullable|array',
+            'centros_costos.*.centro_costo_catalogo_id'   => 'required_with:centros_costos|integer|exists:centros_costo_catalogo,id',
+            'centros_costos.*.porcentaje'                 => 'required_with:centros_costos|numeric|min:0.01|max:100',
             'anexos'                       => 'nullable|array',
             'eventos_medicos'              => 'nullable|array',
             'seguimiento_fecha_cierre'     => 'nullable|date',

@@ -147,22 +147,10 @@ Route::get('/catalogos', function () {
 
     return response()->json([
         'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'eps'               => $merge(
-                                    DB::table('eps')->pluck('nombre'),
-                                    $merge(
-                                        DB::table('contratos')->whereNotNull('lps_afiliado')->where('lps_afiliado', '!=', '')->pluck('lps_afiliado'),
-                                        DB::table('respuestas_ingresos')->whereNotNull('eps')->where('eps', '!=', '')->pluck('eps')
-                                    )
-                               ),
+        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'pensiones'         => $merge(
-                                    DB::table('contratos')->whereNotNull('fondo_pensiones')->where('fondo_pensiones', '!=', '')->pluck('fondo_pensiones'),
-                                    $merge(
-                                        DB::table('respuestas_ingresos')->whereNotNull('afp')->where('afp', '!=', '')->pluck('afp'),
-                                        collect(['PORVENIR', 'PROTECCIÓN', 'COLFONDOS', 'OLD MUTUAL', 'COLPENSIONES', 'OTRO'])
-                                    )
-                               ),
+        'pensiones'         => DB::table('fondos_pensiones')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
@@ -218,31 +206,31 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de contratos
     Route::apiResource('contratos', ContratoController::class);
 
-    // Catálogo de centros de costo (empresa + código), usado para asignar centros de costo a un contrato
+    // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato
     Route::get('centros-costo-catalogo', function () {
         return response()->json(
             \App\Models\CentroCostoCatalogo::where('activo', true)
-                ->orderBy('empresa')->orderBy('ciudad')->orderBy('codigo')
-                ->get(['id', 'empresa', 'codigo', 'nombre', 'ciudad', 'proyecto'])
+                ->orderBy('ciudad')->orderBy('codigo')
+                ->get(['id', 'codigo', 'nombre', 'ciudad', 'proyecto'])
         );
     });
 
     // Crea un centro de costo nuevo en el catálogo
     Route::post('centros-costo-catalogo', function (Request $request) {
         $data = $request->validate([
-            'empresa'  => 'required|string|max:150',
             'codigo'   => 'required|string|max:30',
             'nombre'   => 'required|string|max:200',
             'ciudad'   => 'nullable|string|max:100',
             'proyecto' => 'nullable|string|max:100',
         ]);
 
-        $existe = \App\Models\CentroCostoCatalogo::where('empresa', $data['empresa'])
-            ->where('codigo', $data['codigo'])
+        $existe = \App\Models\CentroCostoCatalogo::where('codigo', $data['codigo'])
+            ->where('nombre', $data['nombre'])
+            ->where('ciudad', $data['ciudad'] ?? null)
             ->exists();
         if ($existe) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'codigo' => "Ya existe el centro de costo \"{$data['codigo']}\" para la empresa \"{$data['empresa']}\".",
+                'codigo' => "Ya existe ese centro de costo.",
             ]);
         }
 
@@ -263,6 +251,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
     // Inventario de prendas de dotación
+    Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
     Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
     Route::get('inventario-dotacion/resumen', [InventarioDotacionController::class, 'resumen']);
     Route::get('inventario-dotacion/filtros', [InventarioDotacionController::class, 'filtros']);

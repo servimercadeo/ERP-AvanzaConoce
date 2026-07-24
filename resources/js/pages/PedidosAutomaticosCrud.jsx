@@ -1785,6 +1785,16 @@ export default function PedidosAutomaticosCrud() {
         queryKey: ["contratos"],
         queryFn: () => api.get("/contratos").then((r) => r.data),
     });
+    const { data: catalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+    const { data: seleccionCatalogos } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
     const { data: inventarioFlat = [] } = useQuery({
         queryKey: ["inventario-dotacion-flat"],
         queryFn: () =>
@@ -1823,16 +1833,10 @@ export default function PedidosAutomaticosCrud() {
         return m;
     }, [contratos]);
 
-    const proyectosUsados = useMemo(() => {
-        const set = new Set();
-        pedidos.forEach((p) => {
-            const cp = p.contrato_id
-                ? contratoProyectoMap[String(p.contrato_id)]
-                : "";
-            if (cp) set.add(cp);
-        });
-        return Array.from(set).sort();
-    }, [pedidos, contratoProyectoMap]);
+    const proyectosUsados = useMemo(
+        () => (seleccionCatalogos?.proyectos ?? []).map((p) => p.label),
+        [seleccionCatalogos],
+    );
 
     const contratoRegionalMap = useMemo(() => {
         const m = {};
@@ -1844,18 +1848,10 @@ export default function PedidosAutomaticosCrud() {
         return m;
     }, [contratos]);
 
-    const regionalesUsados = useMemo(() => {
-        const map = new Map();
-        pedidos.forEach((p) => {
-            const rg = p.contrato_id
-                ? contratoRegionalMap[String(p.contrato_id)]
-                : null;
-            if (rg) map.set(rg.id, rg.nombre);
-        });
-        return Array.from(map.entries())
-            .map(([id, nombre]) => ({ id, nombre }))
-            .sort((a, b) => a.nombre.localeCompare(b.nombre));
-    }, [pedidos, contratoRegionalMap]);
+    const regionalesUsados = useMemo(
+        () => catalogos?.regionales ?? [],
+        [catalogos],
+    );
 
     const filtered = useMemo(
         () =>

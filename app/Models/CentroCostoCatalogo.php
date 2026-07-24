@@ -9,7 +9,6 @@ class CentroCostoCatalogo extends Model
     protected $table = 'centros_costo_catalogo';
 
     protected $fillable = [
-        'empresa',
         'codigo',
         'nombre',
         'ciudad',

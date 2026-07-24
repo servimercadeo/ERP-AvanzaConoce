@@ -7,11 +7,16 @@ use App\Models\InventarioDotacion;
 use App\Models\Proyecto;
 use Illuminate\Http\Request;
 
-const PROYECTOS_DOTACION = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
-const GENEROS_DOTACION   = ['Masculino', 'Femenino', 'Unisex'];
+const GENEROS_DOTACION = ['Masculino', 'Femenino', 'Unisex'];
 
 class InventarioDotacionController extends Controller
 {
+    /** Fuente única de verdad: las claves de InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO. */
+    public static function proyectosDotacion(): array
+    {
+        return array_keys(InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO);
+    }
+
     private function sedeIdsValidasParaProyecto(string $proyectoDotacion): array
     {
         $nombreProyecto = InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$proyectoDotacion] ?? null;
@@ -30,7 +35,7 @@ class InventarioDotacionController extends Controller
     public function sedesDisponibles(Request $request)
     {
         $request->validate([
-            'proyecto' => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'proyecto' => 'required|in:' . implode(',', self::proyectosDotacion()),
         ]);
 
         $nombreProyecto = InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$request->proyecto] ?? null;
@@ -159,7 +164,7 @@ class InventarioDotacionController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'sede_id'      => 'nullable|integer|exists:sedes,id',
             'prenda'       => 'required|string|max:150',
             'genero'       => 'required|in:Masculino,Femenino,Unisex',
@@ -195,7 +200,7 @@ class InventarioDotacionController extends Controller
     {
         $request->validate([
             'items'                => 'required|array|min:1',
-            'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'items.*.proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'items.*.sede_id'      => 'nullable|integer|exists:sedes,id',
             'items.*.prenda'       => 'required|string|max:150',
             'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
@@ -237,7 +242,7 @@ class InventarioDotacionController extends Controller
     {
         $request->validate([
             'items'                => 'required|array|min:1',
-            'items.*.proyecto'     => 'required|in:' . implode(',', PROYECTOS_DOTACION),
+            'items.*.proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'items.*.sede_id'      => 'nullable|integer|exists:sedes,id',
             'items.*.prenda'       => 'required|string|max:150',
             'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
