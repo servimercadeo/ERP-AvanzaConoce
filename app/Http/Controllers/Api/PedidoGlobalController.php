@@ -3,11 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ActaEntregaDotacionMail;
 use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
 use App\Models\Regional;
+use App\Models\RespuestaIngreso;
+use App\Models\User;
+use App\Services\ActaEntregaDotacionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 
 class PedidoGlobalController extends Controller
@@ -61,17 +67,89 @@ class PedidoGlobalController extends Controller
             }
         }
 
+        $seAcabaDeConfirmar = ($data['confirmado'] ?? false) && !$pedidoGlobal->confirmado;
+
+        if (array_key_exists('confirmado', $data) && $data['confirmado'] !== $pedidoGlobal->confirmado) {
+            $data['confirmado_at'] = $data['confirmado'] ? now() : null;
+        }
+
+        if (array_key_exists('entrega_confirmada', $data) && $data['entrega_confirmada'] !== $pedidoGlobal->entrega_confirmada) {
+            $data['entrega_confirmada_at'] = $data['entrega_confirmada'] ? now() : null;
+        }
+
         $pedidoGlobal->update($data);
 
         $fresh = collect([$pedidoGlobal->fresh()->load([
             'regional',
-            'pedidosAutomaticos.empleado',
+            'pedidosAutomaticos.empleado.empresa',
             'pedidosAutomaticos.contrato',
             'pedidosAutomaticos.items.inventario',
         ])]);
         $this->resolverFotografias($fresh);
 
+        if ($seAcabaDeConfirmar) {
+            $this->enviarActasEntrega($fresh->first(), $request->user()?->name ?: 'Sistema');
+        }
+
         return response()->json($fresh->first());
+    }
+
+    /**
+     * Al confirmar un pedido global, envía por correo a cada empleado incluido su acta de
+     * entrega de dotación en PDF (una por pedido automático, con solo sus propias prendas).
+     * Un fallo puntual (correo inválido, SMTP caído) solo se loguea: no debe impedir que el
+     * pedido global quede confirmado.
+     */
+    private function enviarActasEntrega(PedidoGlobal $global, string $creadoPor): void
+    {
+        $service = app(ActaEntregaDotacionService::class);
+
+        foreach ($global->pedidosAutomaticos as $pedido) {
+            if (!$pedido->codigo || $pedido->items->isEmpty()) {
+                continue;
+            }
+
+            $empleado = $pedido->empleado;
+            $correo   = $this->resolverEmailReal($empleado);
+            if (!$empleado || !$correo) {
+                Log::warning("Acta de dotación no enviada: el empleado del pedido {$pedido->codigo} no tiene correo real registrado.");
+                continue;
+            }
+
+            try {
+                $pdf = $service->generar($pedido, $creadoPor);
+                Mail::to($correo)->send(new ActaEntregaDotacionMail(
+                    trim("{$empleado->nombres} {$empleado->apellidos}"),
+                    $pedido->codigo,
+                    $service->resolverEmpresa($pedido),
+                    $pdf,
+                ));
+            } catch (\Throwable $e) {
+                Log::error("No se pudo enviar el acta de dotación del pedido {$pedido->codigo}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * users.email suele quedar con el correo autogenerado "{cedula}@avanzaconoce.com" cuando
+     * no se registró un correo real al crear el contrato (ver ContratoController::store). En
+     * ese caso, igual que hace EmpleadoController::index() para mostrarlo en el listado, se
+     * busca el correo real en respuestas_ingresos / candidatos. Si tampoco existe ahí, se
+     * devuelve null en vez del placeholder (no es una casilla real, no tiene sentido enviarle).
+     */
+    private function resolverEmailReal(?User $empleado): ?string
+    {
+        if (!$empleado || !$empleado->email) {
+            return null;
+        }
+
+        $cedula = $empleado->cedula ?? '';
+        if (!$cedula || !str_starts_with($empleado->email, $cedula . '@')) {
+            return $empleado->email;
+        }
+
+        return RespuestaIngreso::where('documento', $cedula)->value('correo')
+            ?? DB::table('candidatos')->where('identificacion', $cedula)->value('correo');
     }
 
     public function destroy(PedidoGlobal $pedidoGlobal)

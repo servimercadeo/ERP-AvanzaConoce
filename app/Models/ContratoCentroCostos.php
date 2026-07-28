@@ -13,6 +13,8 @@ class ContratoCentroCostos extends Model
 
     protected $fillable = [
         'contrato_id',
+        'centro_costo_catalogo_id',
+        'codigo',
         'centro_costos',
         'porcentaje',
     ];
@@ -24,5 +26,10 @@ class ContratoCentroCostos extends Model
     public function contrato()
     {
         return $this->belongsTo(Contrato::class);
+    }
+
+    public function centroCostoCatalogo()
+    {
+        return $this->belongsTo(CentroCostoCatalogo::class);
     }
 }

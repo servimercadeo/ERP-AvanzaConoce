@@ -53,4 +53,9 @@ class Sede extends Model
     {
         return $this->belongsTo(User::class, 'id_jefe_mac');
     }
+
+    public function proyectos()
+    {
+        return $this->belongsToMany(Proyecto::class, 'proyecto_sede');
+    }
 }

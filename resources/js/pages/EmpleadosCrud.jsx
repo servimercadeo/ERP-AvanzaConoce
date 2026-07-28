@@ -1959,7 +1959,7 @@ export default function EmpleadosCrud() {
                                         value={filtroVinc}
                                         onChange={setFiltroVinc}
                                         defaultValue="Todos"
-                                        options={TIPOS_VINC.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_vinculacion.map((v) => ({ label: v, value: v }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>

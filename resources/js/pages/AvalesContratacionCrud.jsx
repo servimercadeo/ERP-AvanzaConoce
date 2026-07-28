@@ -5,7 +5,6 @@ import api from "../api/axios";
 import { FilterDropdown } from "../components/SearchableSelect";
 import { IconEye, IconEdit, IconClose } from "../components/Icons";
 
-const TIPOS_VINCULACION = ["Directa", "Indirecta"];
 const ESTADOS = ["activa", "en proceso", "finalizada", "cancelada"];
 
 const TIPO_FILTERS = [
@@ -94,6 +93,18 @@ export default function AvalesContratacionCrud() {
         queryKey: ["base-ingresos"],
         queryFn: () => api.get("/base-ingresos").then((r) => r.data),
     });
+    const { data: _qCatalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+    const { data: _qSeleccionCatalogos } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+    const tiposVinculacion = _qCatalogos?.tipos_vinculacion ?? [];
+    const empleadorOpts = (_qSeleccionCatalogos?.empleadores ?? []).map((e) => e.nombre);
 
     useEffect(() => {
         if (_qData) {
@@ -624,7 +635,7 @@ export default function AvalesContratacionCrud() {
                                 <Field
                                     label="Tipo de vinculación"
                                     k="tipo_vinculacion"
-                                    opts={TIPOS_VINCULACION}
+                                    opts={tiposVinculacion}
                                     form={form}
                                     onChange={set}
                                     disabled={modalMode === "view"}
@@ -670,6 +681,7 @@ export default function AvalesContratacionCrud() {
                                 <Field
                                     label="Empleador"
                                     k="empleador"
+                                    opts={empleadorOpts}
                                     form={form}
                                     onChange={set}
                                     disabled={modalMode === "view"}

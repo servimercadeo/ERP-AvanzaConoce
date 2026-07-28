@@ -28,5 +28,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RequisicionesSeeder::class);
         $this->call(InventarioDotacionSeeder::class);
 
+        // Catálogo de centros de costo: se importa por migración
+        // (database/migrations/2026_07_24_000002_import_centros_costo_catalogo.php), no por seeder.
     }
 }

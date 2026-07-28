@@ -8,6 +8,7 @@ use App\Mail\DocumentosCompletadosMail;
 use App\Models\BaseIngreso;
 use App\Models\RespuestaIngreso;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\CandidatoController;
@@ -146,22 +147,10 @@ Route::get('/catalogos', function () {
 
     return response()->json([
         'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'eps'               => $merge(
-                                    DB::table('eps')->pluck('nombre'),
-                                    $merge(
-                                        DB::table('contratos')->whereNotNull('lps_afiliado')->where('lps_afiliado', '!=', '')->pluck('lps_afiliado'),
-                                        DB::table('respuestas_ingresos')->whereNotNull('eps')->where('eps', '!=', '')->pluck('eps')
-                                    )
-                               ),
+        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'pensiones'         => $merge(
-                                    DB::table('contratos')->whereNotNull('fondo_pensiones')->where('fondo_pensiones', '!=', '')->pluck('fondo_pensiones'),
-                                    $merge(
-                                        DB::table('respuestas_ingresos')->whereNotNull('afp')->where('afp', '!=', '')->pluck('afp'),
-                                        collect(['PORVENIR', 'PROTECCIÓN', 'COLFONDOS', 'OLD MUTUAL', 'COLPENSIONES', 'OTRO'])
-                                    )
-                               ),
+        'pensiones'         => DB::table('fondos_pensiones')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
@@ -217,11 +206,55 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de contratos
     Route::apiResource('contratos', ContratoController::class);
 
+    // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato
+    Route::get('centros-costo-catalogo', function () {
+        return response()->json(
+            \App\Models\CentroCostoCatalogo::where('activo', true)
+                ->orderBy('ciudad')->orderBy('codigo')
+                ->get(['id', 'codigo', 'nombre', 'ciudad', 'proyecto'])
+        );
+    });
+
+    // Crea un centro de costo nuevo en el catálogo
+    Route::post('centros-costo-catalogo', function (Request $request) {
+        $data = $request->validate([
+            'codigo'   => 'required|string|max:30',
+            'nombre'   => 'required|string|max:200',
+            'ciudad'   => 'nullable|string|max:100',
+            'proyecto' => 'nullable|string|max:100',
+        ]);
+
+        $existe = \App\Models\CentroCostoCatalogo::where('codigo', $data['codigo'])
+            ->where('nombre', $data['nombre'])
+            ->where('ciudad', $data['ciudad'] ?? null)
+            ->exists();
+        if ($existe) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'codigo' => "Ya existe ese centro de costo.",
+            ]);
+        }
+
+        $data['activo'] = true;
+        $centro = \App\Models\CentroCostoCatalogo::create($data);
+
+        return response()->json($centro, 201);
+    });
+
+    // Elimina un centro de costo del catálogo
+    Route::delete('centros-costo-catalogo/{centroCosto}', function (\App\Models\CentroCostoCatalogo $centroCosto) {
+        $centroCosto->delete();
+        return response()->json(null, 204);
+    });
+
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
 
     // Inventario de prendas de dotación
+    Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
+    Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
+    Route::get('inventario-dotacion/resumen', [InventarioDotacionController::class, 'resumen']);
+    Route::get('inventario-dotacion/filtros', [InventarioDotacionController::class, 'filtros']);
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
     Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
     Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import']);
@@ -280,12 +313,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    // Devuelve los documentos médicos ya subidos para una cédula
+    // Devuelve los documentos médicos ya subidos para una cédula, ligados a un evento (fecha de seguimiento)
     Route::get('documentos-contratacion/docs-medicos', function (Request $request) {
         $cedula   = $request->query('cedula', '');
+        $evento   = $request->query('evento', '');
         $metaPath = storage_path('app/documentos_contratacion.json');
         $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
-        $archivos = $meta[$cedula]['archivos'] ?? [];
+        $archivos = $evento
+            ? ($meta[$cedula]['archivos_eventos'][$evento] ?? [])
+            : ($meta[$cedula]['archivos'] ?? []);
         $tiposMed = ['examen_ingreso','concepto_medico','examen_periodico','examen_retiro','incapacidad','otro_medico'];
         $result   = [];
         foreach ($tiposMed as $tipo) {
@@ -297,19 +333,76 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($result);
     });
 
-    // Elimina un documento médico específico de una cédula
+    // Elimina un documento médico específico de una cédula, dentro de un evento (fecha de seguimiento)
     Route::delete('documentos-contratacion/docs-medicos', function (Request $request) {
         $cedula   = $request->input('cedula', '');
         $tipo     = $request->input('tipo', '');
+        $evento   = $request->input('evento', '');
         if (!$cedula || !$tipo) return response()->json(['error' => 'Faltan parámetros'], 422);
         $metaPath = storage_path('app/documentos_contratacion.json');
         $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
-        if (isset($meta[$cedula]['archivos'][$tipo])) {
-            $ruta = $meta[$cedula]['archivos'][$tipo]['ruta'] ?? null;
+        $ref      = $evento ? ($meta[$cedula]['archivos_eventos'][$evento] ?? null) : ($meta[$cedula]['archivos'] ?? null);
+        if (isset($ref[$tipo])) {
+            $ruta = $ref[$tipo]['ruta'] ?? null;
             if ($ruta) \Illuminate\Support\Facades\Storage::disk('local')->delete($ruta);
-            unset($meta[$cedula]['archivos'][$tipo]);
+            if ($evento) {
+                unset($meta[$cedula]['archivos_eventos'][$evento][$tipo]);
+            } else {
+                unset($meta[$cedula]['archivos'][$tipo]);
+            }
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
+        return response()->json(null, 204);
+    });
+
+    // Notifica al flujo de Power Automate con los documentos médicos recién subidos, incluyendo
+    // el contenido en base64 (llamada server-to-server para evitar CORS)
+    Route::post('documentos-contratacion/notificar-seguimiento-medico', function (Request $request) {
+        $data = $request->validate([
+            'documento'        => 'required|string|max:40',
+            'nombres'          => 'nullable|string|max:150',
+            'apellidos'        => 'nullable|string|max:150',
+            'fechaSeguimiento' => 'nullable|date',
+            'evento'           => 'nullable|string|max:20',
+            'tipos'            => 'nullable|array',
+            'tipos.*'          => 'string',
+        ]);
+
+        $flowUrl = config('services.sharepoint.medico_flow_url');
+        if (!$flowUrl) return response()->json(null, 204);
+
+        $payload = [
+            'documento'        => $data['documento'],
+            'nombres'          => $data['nombres'] ?? '',
+            'apellidos'        => $data['apellidos'] ?? '',
+            'fechaSeguimiento' => $data['fechaSeguimiento'] ?? '',
+            'archivos'         => [],
+        ];
+
+        $evento = $data['evento'] ?? $data['fechaSeguimiento'] ?? null;
+        if ($evento && !empty($data['tipos'])) {
+            $metaPath = storage_path('app/documentos_contratacion.json');
+            $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
+            $archivosEvento = $meta[$data['documento']]['archivos_eventos'][$evento] ?? [];
+
+            foreach ($data['tipos'] as $tipo) {
+                $entry = $archivosEvento[$tipo] ?? null;
+                if (!$entry || !Storage::disk('local')->exists($entry['ruta'])) continue;
+
+                $payload['archivos'][] = [
+                    'nombre'    => $entry['nombre_original'],
+                    'tipo'      => Storage::disk('local')->mimeType($entry['ruta']),
+                    'contenido' => base64_encode(Storage::disk('local')->get($entry['ruta'])),
+                ];
+            }
+        }
+
+        try {
+            Http::timeout(30)->asJson()->post($flowUrl, $payload);
+        } catch (\Exception $e) {
+            Log::warning('No se pudo notificar el flujo de seguimiento médico para documento ' . $data['documento'] . ': ' . $e->getMessage());
+        }
+
         return response()->json(null, 204);
     });
 
@@ -482,15 +575,20 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
         'documento' => 'required|string|max:40',
         'tipo'      => 'required|string|max:120',
         'archivo'   => 'required|file|max:10240',
+        'evento'    => 'nullable|string|max:20',
     ]);
 
     $documento = $request->input('documento');
     $tipo      = $request->input('tipo');
+    $evento    = $request->input('evento');
     $file      = $request->file('archivo');
     $ext       = $file->getClientOriginalExtension() ?: 'pdf';
     $dirSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $documento);
     $tipSafe   = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $tipo);
-    $path      = $file->storeAs("documentos_contratacion/{$dirSafe}", "{$tipSafe}.{$ext}", 'local');
+    $dir       = $evento
+        ? "documentos_contratacion/{$dirSafe}/eventos/" . preg_replace('/[^a-zA-Z0-9_\-]/', '_', $evento)
+        : "documentos_contratacion/{$dirSafe}";
+    $path      = $file->storeAs($dir, "{$tipSafe}.{$ext}", 'local');
 
     $metaPath = storage_path('app/documentos_contratacion.json');
     $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
@@ -498,11 +596,16 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
     if (!isset($meta[$documento])) {
         $meta[$documento] = ['documento' => $documento, 'archivos' => [], 'created_at' => now()->toDateTimeString()];
     }
-    $meta[$documento]['archivos'][$tipo] = [
+    $archivo = [
         'ruta'            => $path,
         'nombre_original' => $file->getClientOriginalName(),
         'uploaded_at'     => now()->toDateTimeString(),
     ];
+    if ($evento) {
+        $meta[$documento]['archivos_eventos'][$evento][$tipo] = $archivo;
+    } else {
+        $meta[$documento]['archivos'][$tipo] = $archivo;
+    }
     $meta[$documento]['updated_at'] = now()->toDateTimeString();
 
     file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));

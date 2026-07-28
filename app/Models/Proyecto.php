@@ -21,4 +21,9 @@ class Proyecto extends Model
     {
         return $this->hasMany(BaseIngreso::class);
     }
+
+    public function sedes()
+    {
+        return $this->belongsToMany(Sede::class, 'proyecto_sede');
+    }
 }

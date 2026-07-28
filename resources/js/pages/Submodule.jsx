@@ -14,9 +14,11 @@ const BaseIngresoCrud = lazy(() => import('./BaseIngresoCrud'));
 const AvalesContratacionCrud = lazy(() => import('./AvalesContratacionCrud'));
 const RespuestasFormularioCrud = lazy(() => import('./RespuestasFormularioCrud'));
 const SeguimientoMedicoCrud = lazy(() => import('./SeguimientoMedicoCrud'));
+const CentrosCostosCrud = lazy(() => import('./CentrosCostosCrud'));
 const ProductosDotacion = lazy(() => import('./ProductosDotacion'));
 const PedidosAutomaticosCrud = lazy(() => import('./PedidosAutomaticosCrud'));
 const PedidosGlobalesCrud = lazy(() => import('./PedidosGlobalesCrud'));
+const TrazabilidadPedidos = lazy(() => import('./TrazabilidadPedidos'));
 const CronogramaDotacion = lazy(() => import('./CronogramaDotacion'));
 
 // import SubagentesCrud      from './SubagentesCrud';
@@ -53,6 +55,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'avales_contratacion': return AvalesContratacionCrud;
             case 'respuestas_formulario': return RespuestasFormularioCrud;
             case 'Seguros_medicos': return SeguimientoMedicoCrud;
+            case 'centros_costos_catalogo': return CentrosCostosCrud;
             default: return null;
           }
         default: return null;
@@ -92,6 +95,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'productos_dotacion': return ProductosDotacion;
             case 'pedidos_dotacion':   return PedidosAutomaticosCrud;
             case 'pedidos_globales':   return PedidosGlobalesCrud;
+            case 'trazabilidad_pedidos': return TrazabilidadPedidos;
             case 'cronograma':         return CronogramaDotacion;
             default: return null;
           }

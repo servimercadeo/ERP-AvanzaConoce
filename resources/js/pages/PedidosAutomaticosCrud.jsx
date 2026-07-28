@@ -242,6 +242,31 @@ function tallaPorPrenda(prenda, tallasEmpleado) {
     return null;
 }
 
+// Índice O(1) de inventarioFlat para no escanear las ~8-9 mil filas por cada fila de un
+// Excel importado. Clave = proyecto|prenda|talla(lower)|genero, primer ítem encontrado gana
+// (mismo criterio que un .find() en el orden en que llega inventarioFlat, agrupado por
+// proyecto/prenda/genero/talla desde el backend).
+function buildInventarioIndex(inventarioFlat) {
+    const idx = new Map();
+    for (const i of inventarioFlat) {
+        const key = `${i.proyecto}|${i.prenda}|${String(i.talla).toLowerCase()}|${i.genero}`;
+        if (!idx.has(key)) idx.set(key, i);
+    }
+    return idx;
+}
+
+// Replica exactamente `inventarioFlat.find(i => i.proyecto===p && i.prenda===pr &&
+// (i.genero===genero || i.genero==='Unisex') && i.talla.toLowerCase()===talla.toLowerCase())`
+// pero usando el índice: primero intenta el género exacto del empleado, si no hay cae a Unisex.
+function lookupInventario(idx, proyecto, prenda, talla, genero) {
+    const tallaLower = String(talla ?? "").toLowerCase();
+    return (
+        idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ??
+        idx.get(`${proyecto}|${prenda}|${tallaLower}|Unisex`) ??
+        null
+    );
+}
+
 // Vuelve a resolver una prenda de un pedido anterior contra el inventario ACTUAL:
 // mismo proyecto/prenda/género, pero con la talla VIGENTE del empleado
 // (no la que tenía congelada el pedido viejo, por si cambió de talla) y apuntando a
@@ -1508,6 +1533,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
             const hoy = new Date().toISOString().split("T")[0];
             const gruposMap = new Map();
             const orden = [];
+            const invIndex = buildInventarioIndex(inventarioFlat);
             filas.forEach((fila, idx) => {
                 const cedula = String(fila.cedula ?? "").trim();
                 if (!cedula) return;
@@ -1530,13 +1556,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
 
                 const generoEmpleado = grupo.empleado?.genero ?? "";
                 const cantidad = Number(fila.cantidad) || 0;
-                const inv = inventarioFlat.find(
-                    (i) =>
-                        i.proyecto === fila.proyecto &&
-                        i.prenda === fila.prenda &&
-                        (i.genero === generoEmpleado || i.genero === "Unisex") &&
-                        String(i.talla).toLowerCase() === String(fila.talla ?? "").toLowerCase(),
-                );
+                const inv = lookupInventario(invIndex, fila.proyecto, fila.prenda, fila.talla, generoEmpleado);
 
                 if (!inv || cantidad <= 0) {
                     grupo.erroresItems.push(
@@ -1785,6 +1805,16 @@ export default function PedidosAutomaticosCrud() {
         queryKey: ["contratos"],
         queryFn: () => api.get("/contratos").then((r) => r.data),
     });
+    const { data: catalogos } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+    const { data: seleccionCatalogos } = useQuery({
+        queryKey: ["seleccion-catalogos"],
+        queryFn: () => api.get("/seleccion/catalogos").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
     const { data: inventarioFlat = [] } = useQuery({
         queryKey: ["inventario-dotacion-flat"],
         queryFn: () =>
@@ -1823,16 +1853,10 @@ export default function PedidosAutomaticosCrud() {
         return m;
     }, [contratos]);
 
-    const proyectosUsados = useMemo(() => {
-        const set = new Set();
-        pedidos.forEach((p) => {
-            const cp = p.contrato_id
-                ? contratoProyectoMap[String(p.contrato_id)]
-                : "";
-            if (cp) set.add(cp);
-        });
-        return Array.from(set).sort();
-    }, [pedidos, contratoProyectoMap]);
+    const proyectosUsados = useMemo(
+        () => (seleccionCatalogos?.proyectos ?? []).map((p) => p.label),
+        [seleccionCatalogos],
+    );
 
     const contratoRegionalMap = useMemo(() => {
         const m = {};
@@ -1844,18 +1868,10 @@ export default function PedidosAutomaticosCrud() {
         return m;
     }, [contratos]);
 
-    const regionalesUsados = useMemo(() => {
-        const map = new Map();
-        pedidos.forEach((p) => {
-            const rg = p.contrato_id
-                ? contratoRegionalMap[String(p.contrato_id)]
-                : null;
-            if (rg) map.set(rg.id, rg.nombre);
-        });
-        return Array.from(map.entries())
-            .map(([id, nombre]) => ({ id, nombre }))
-            .sort((a, b) => a.nombre.localeCompare(b.nombre));
-    }, [pedidos, contratoRegionalMap]);
+    const regionalesUsados = useMemo(
+        () => catalogos?.regionales ?? [],
+        [catalogos],
+    );
 
     const filtered = useMemo(
         () =>

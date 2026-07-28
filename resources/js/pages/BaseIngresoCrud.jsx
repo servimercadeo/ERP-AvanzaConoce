@@ -33,7 +33,6 @@ const EMPTY_FORM = {
 };
 
 const ESTADOS = ['activa', 'en proceso', 'finalizada', 'cancelada'];
-const TIPOS_VINCULACION = ['Directa', 'Indirecta'];
 const ESTADO_FILTERS = [
   { value: 'Todos', label: 'Todos los estados' },
   { value: 'en proceso', label: 'En proceso' },
@@ -216,6 +215,10 @@ export default function BaseIngresoCrud() {
   const { data: _qBaseIngresos } = useQuery({ queryKey: ['base-ingresos'], queryFn: () => api.get('/base-ingresos').then(r => r.data) });
   const { data: _qCandidates }   = useQuery({ queryKey: ['candidatos'],    queryFn: () => api.get('/candidatos').then(r => r.data) });
   const { data: _qSedes }        = useQuery({ queryKey: ['sedes'],         queryFn: () => api.get('/sedes').then(r => r.data) });
+  const { data: _qCatalogos }    = useQuery({ queryKey: ['catalogos'],     queryFn: () => api.get('/catalogos').then(r => r.data), staleTime: 10 * 60 * 1000 });
+  const { data: _qSeleccionCatalogos } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data), staleTime: 10 * 60 * 1000 });
+  const tiposVinculacion = _qCatalogos?.tipos_vinculacion ?? [];
+  const empleadorOpts = (_qSeleccionCatalogos?.empleadores ?? []).map(e => e.nombre);
 
   useEffect(() => {
     if (_qBaseIngresos) { setData(_qBaseIngresos); setLoading(false); }
@@ -519,7 +522,7 @@ export default function BaseIngresoCrud() {
                 <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Teléfono" k="telefono" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={TIPOS_VINCULACION} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={tiposVinculacion} form={form} onChange={set} disabled={modalMode === 'view'} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' }}>Sede</label>
                   <SearchableSelect
@@ -532,7 +535,7 @@ export default function BaseIngresoCrud() {
                   />
                 </div>
                 <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Empleador" k="empleador" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Empleador" k="empleador" opts={empleadorOpts} form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha programación ingreso" k="fecha_programacion_ingreso" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de corrección" k="fecha_correccion" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />

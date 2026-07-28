@@ -1,9 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
+import { useDebounce } from '../hooks/useDebounce';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
+import { SearchableSelect } from '../components/SearchableSelect';
 
-const PROYECTOS   = ['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO', 'DIRECTV'];
+const POR_PAGINA = 50;
+
 const GENEROS     = ['Masculino', 'Femenino', 'Unisex'];
 const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
 const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
@@ -11,11 +14,19 @@ const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43'
 const TALLAS_UNICA = ['N/A'];
 const ALL_TALLAS_ORDER = [...TALLAS_UNICA, ...TALLAS_ROPA, ...TALLAS_JEAN, ...TALLAS_TENIS.filter(t => !TALLAS_JEAN.includes(t))];
 
-const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', prenda: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
+const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', sede_id: '', prenda: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
 const EMPTY_BULK_ROW = () => ({ ...EMPTY_ITEM });
 
+const fetchSedesPorProyecto = async (proyectos) => {
+    const entries = await Promise.all(proyectos.map(async (p) => {
+        const { data } = await api.get('/inventario-dotacion/sedes', { params: { proyecto: p } });
+        return [p, data];
+    }));
+    return Object.fromEntries(entries);
+};
+
 // ─── Modal agregar / editar un item ──────────────────────────────────────────
-function ItemModal({ item, onClose, onSaved }) {
+function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
     const isEdit = !!item?.id;
     const [form, setForm] = useState(isEdit
         ? { cantidad: item.cantidad, stock_minimo: item.stock_minimo, precio: item.precio ?? 0 }
@@ -23,7 +34,9 @@ function ItemModal({ item, onClose, onSaved }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+    const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value, ...(k === 'proyecto' ? { sede_id: '' } : {}) }));
+
+    const sedesDisponibles = sedesPorProyecto?.[form.proyecto] ?? [];
 
     const handleSave = async () => {
         setSaving(true); setError('');
@@ -39,6 +52,7 @@ function ItemModal({ item, onClose, onSaved }) {
                 if (!form.prenda.trim()) return setError('Ingresa el nombre de la prenda.') || setSaving(false);
                 const { data } = await api.post('/inventario-dotacion', {
                     ...form,
+                    sede_id: form.sede_id ? Number(form.sede_id) : null,
                     precio: Number(form.precio),
                     cantidad: Number(form.cantidad),
                     stock_minimo: Number(form.stock_minimo),
@@ -64,6 +78,7 @@ function ItemModal({ item, onClose, onSaved }) {
                         <>
                             <div style={S.readonlyGroup}>
                                 <span style={S.roLabel}>Proyecto</span><span style={S.roVal}>{item.proyecto}</span>
+                                <span style={S.roLabel}>Sede</span><span style={S.roVal}>{item.sede_nombre ?? 'Sin sede'}</span>
                                 <span style={S.roLabel}>Prenda</span><span style={S.roVal}>{item.prenda}</span>
                                 <span style={S.roLabel}>Género / Talla</span><span style={S.roVal}>{item.genero} / {item.talla}</span>
                             </div>
@@ -88,8 +103,17 @@ function ItemModal({ item, onClose, onSaved }) {
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
                                     <label style={S.label}>Proyecto *</label>
                                     <select style={S.input} value={form.proyecto} onChange={set('proyecto')}>
-                                        {PROYECTOS.map(p => <option key={p}>{p}</option>)}
+                                        {proyectos.map(p => <option key={p}>{p}</option>)}
                                     </select>
+                                </div>
+                                <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
+                                    <label style={S.label}>Sede</label>
+                                    <SearchableSelect
+                                        value={form.sede_id}
+                                        onChange={(v) => setForm(f => ({ ...f, sede_id: v }))}
+                                        defaultValue=""
+                                        options={sedesDisponibles.map(s => ({ label: s.nombre, value: s.id }))}
+                                    />
                                 </div>
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
                                     <label style={S.label}>Prenda *</label>
@@ -137,12 +161,12 @@ function ItemModal({ item, onClose, onSaved }) {
 }
 
 // ─── Modal carga masiva ──────────────────────────────────────────────────────
-function BulkModal({ onClose, onSaved }) {
+function BulkModal({ proyectos, sedesPorProyecto, onClose, onSaved }) {
     const [rows, setRows] = useState([EMPTY_BULK_ROW()]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const setRow = (idx, k, v) => setRows(rs => rs.map((r, i) => i === idx ? { ...r, [k]: v } : r));
+    const setRow = (idx, k, v) => setRows(rs => rs.map((r, i) => i === idx ? { ...r, [k]: v, ...(k === 'proyecto' ? { sede_id: '' } : {}) } : r));
     const addRow = () => setRows(rs => [...rs, EMPTY_BULK_ROW()]);
     const removeRow = (idx) => setRows(rs => rs.filter((_, i) => i !== idx));
 
@@ -152,7 +176,7 @@ function BulkModal({ onClose, onSaved }) {
         setSaving(true); setError('');
         try {
             const { data } = await api.post('/inventario-dotacion/bulk', {
-                items: rows.map(r => ({ ...r, precio: Number(r.precio), cantidad: Number(r.cantidad), stock_minimo: Number(r.stock_minimo) }))
+                items: rows.map(r => ({ ...r, sede_id: r.sede_id ? Number(r.sede_id) : null, precio: Number(r.precio), cantidad: Number(r.cantidad), stock_minimo: Number(r.stock_minimo) }))
             });
             onSaved(data.saved);
         } catch (e) {
@@ -173,7 +197,7 @@ function BulkModal({ onClose, onSaved }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                         <thead>
                             <tr style={{ background: 'var(--bg)' }}>
-                                {['Proyecto', 'Prenda', 'Género', 'Talla', 'Precio', 'Cantidad', 'Stock mín.', ''].map(h => (
+                                {['Proyecto', 'Sede', 'Prenda', 'Género', 'Talla', 'Precio', 'Cantidad', 'Stock mín.', ''].map(h => (
                                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', border: '1px solid var(--border)' }}>{h}</th>
                                 ))}
                             </tr>
@@ -183,7 +207,13 @@ function BulkModal({ onClose, onSaved }) {
                                 <tr key={idx}>
                                     <td style={S.tdCell}>
                                         <select style={S.cellInput} value={row.proyecto} onChange={e => setRow(idx, 'proyecto', e.target.value)}>
-                                            {PROYECTOS.map(p => <option key={p}>{p}</option>)}
+                                            {proyectos.map(p => <option key={p}>{p}</option>)}
+                                        </select>
+                                    </td>
+                                    <td style={S.tdCell}>
+                                        <select style={S.cellInput} value={row.sede_id} onChange={e => setRow(idx, 'sede_id', e.target.value)}>
+                                            <option value="">Sin sede</option>
+                                            {(sedesPorProyecto?.[row.proyecto] ?? []).map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                                         </select>
                                     </td>
                                     <td style={S.tdCell}>
@@ -240,6 +270,7 @@ const STOCK_MINIMO_IMPORT_DEFAULT = 10;
 
 const IMPORT_HEADER_MAP = {
     proyecto: 'proyecto',
+    sede: 'sede',
     prenda: 'prenda',
     genero: 'genero',
     talla: 'talla',
@@ -249,7 +280,7 @@ const IMPORT_HEADER_MAP = {
 
 const normalizeHeader = (s) => (s ?? '').toString().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
 
-function ImportModal({ onClose, onImported }) {
+function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
     const [fileName, setFileName] = useState('');
     const [validRows, setValidRows] = useState([]);
     const [invalidRows, setInvalidRows] = useState([]);
@@ -281,18 +312,28 @@ function ImportModal({ onClose, onImported }) {
                 });
 
                 const motivos = [];
-                if (!PROYECTOS.includes(mapped.proyecto)) motivos.push('proyecto inválido');
+                if (!proyectos.includes(mapped.proyecto)) motivos.push('proyecto inválido');
                 if (!mapped.prenda) motivos.push('prenda vacía');
                 if (!GENEROS.includes(mapped.genero)) motivos.push('género inválido');
                 if (!mapped.talla && mapped.talla !== 0) motivos.push('talla vacía');
                 const cantidad = Number(mapped.cantidad);
                 if (!Number.isFinite(cantidad) || cantidad < 0) motivos.push('cantidad inválida');
 
+                let sedeId = null;
+                const sedeTexto = (mapped.sede ?? '').toString().trim();
+                if (sedeTexto && proyectos.includes(mapped.proyecto)) {
+                    const sede = (sedesPorProyecto?.[mapped.proyecto] ?? [])
+                        .find(s => s.nombre.toLowerCase() === sedeTexto.toLowerCase());
+                    if (sede) sedeId = sede.id;
+                    else motivos.push('sede inválida para el proyecto');
+                }
+
                 if (motivos.length) {
                     invalid.push({ fila: idx + 2, motivos: motivos.join(', ') });
                 } else {
                     valid.push({
                         proyecto: mapped.proyecto,
+                        sede_id: sedeId,
                         prenda: mapped.prenda,
                         genero: mapped.genero,
                         talla: String(mapped.talla),
@@ -332,7 +373,7 @@ function ImportModal({ onClose, onImported }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: 0 }}>
-                        Columnas del archivo: <strong>Proyecto, Prenda, Género, Talla, Precio, Cantidad</strong>. No es necesario poner Estado ni Stock mínimo:
+                        Columnas del archivo: <strong>Proyecto, Sede, Prenda, Género, Talla, Precio, Cantidad</strong>. La columna Sede es opcional. No es necesario poner Estado ni Stock mínimo:
                         el estado se calcula solo según cantidad vs. stock mínimo, y los items nuevos quedan con stock mínimo <strong>{STOCK_MINIMO_IMPORT_DEFAULT}</strong> por defecto.
                         Si una combinación proyecto + prenda + talla + género ya existe, la cantidad se <strong>suma</strong> al stock actual; si no existe, se crea un item nuevo.
                     </p>
@@ -419,67 +460,73 @@ export default function ProductosDotacion() {
     const [prendaFiltro, setPrendaFiltro] = useState('Todos');
     const [generoFiltro, setGeneroFiltro] = useState('Todos');
     const [tallaFiltro, setTallaFiltro]   = useState('Todos');
+    const [sedeFiltro, setSedeFiltro]     = useState('Todas');
     const [search, setSearch]             = useState('');
+    const [page, setPage]                 = useState(1);
     const [editItem, setEditItem]         = useState(null);
     const [deleteItem, setDeleteItem]     = useState(null);
     const [addOpen, setAddOpen]           = useState(false);
     const [bulkOpen, setBulkOpen]         = useState(false);
     const [importOpen, setImportOpen]     = useState(false);
     const [toast, setToast]               = useState(null);
+    const [exporting, setExporting]       = useState(false);
 
     const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-    const { data: inventario = [], isLoading } = useQuery({
-        queryKey: ['inventario-dotacion-flat'],
-        queryFn: () => api.get('/inventario-dotacion?flat=true').then(r => r.data),
+    const debouncedSearch = useDebounce(search, 300);
+
+    // La página vuelve a 1 cada vez que cambia cualquier filtro.
+    useEffect(() => { setPage(1); }, [proyectoTab, sedeFiltro, prendaFiltro, generoFiltro, tallaFiltro, debouncedSearch]);
+
+    const filtrosActivos = {
+        proyecto: proyectoTab,
+        sede_id: sedeFiltro,
+        prenda: prendaFiltro,
+        genero: generoFiltro,
+        talla: tallaFiltro,
+        search: debouncedSearch || undefined,
+    };
+
+    const { data: pagina, isLoading, isFetching } = useQuery({
+        queryKey: ['inventario-dotacion', filtrosActivos, page],
+        queryFn: () => api.get('/inventario-dotacion', { params: { ...filtrosActivos, per_page: POR_PAGINA, page } }).then(r => r.data),
+        placeholderData: (prev) => prev,
     });
 
-    // Stats globales
-    const stats = useMemo(() => {
-        const total = inventario.reduce((s, i) => s + i.cantidad, 0);
-        const bajoStock = inventario.filter(i => i.cantidad <= i.stock_minimo && i.stock_minimo > 0).length;
-        const porProyecto = {};
-        PROYECTOS.forEach(p => {
-            const items = inventario.filter(i => i.proyecto === p);
-            porProyecto[p] = items.reduce((s, i) => s + i.cantidad, 0);
-        });
-        return { total, bajoStock, porProyecto };
-    }, [inventario]);
+    const filtrados = pagina?.data ?? [];
 
-    // Filtrado por tab, prenda, género, talla y búsqueda
-    const filtrados = useMemo(() => {
-        let items = inventario.filter(i => i.proyecto === proyectoTab);
-        if (prendaFiltro !== 'Todos') items = items.filter(i => i.prenda === prendaFiltro);
-        if (generoFiltro !== 'Todos') items = items.filter(i => i.genero === generoFiltro);
-        if (tallaFiltro !== 'Todos') items = items.filter(i => i.talla === tallaFiltro);
-        if (search.trim()) {
-            const q = search.toLowerCase();
-            items = items.filter(i =>
-                i.prenda.toLowerCase().includes(q) ||
-                i.genero.toLowerCase().includes(q) ||
-                i.talla.toLowerCase().includes(q)
-            );
-        }
-        return items;
-    }, [inventario, proyectoTab, prendaFiltro, generoFiltro, tallaFiltro, search]);
+    const { data: proyectos = [] } = useQuery({
+        queryKey: ['inventario-dotacion-proyectos'],
+        queryFn: () => api.get('/inventario-dotacion/proyectos').then(r => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
 
-    // Prendas disponibles en el tab actual
-    const prendasDisponibles = useMemo(() => {
-        const enTab = inventario.filter(i => i.proyecto === proyectoTab);
-        const presentes = [...new Set(enTab.map(i => i.prenda))].sort((a, b) => a.localeCompare(b));
-        return ['Todos', ...presentes];
-    }, [inventario, proyectoTab]);
+    const { data: sedesPorProyecto = {} } = useQuery({
+        queryKey: ['sedes-por-proyecto-dotacion', proyectos],
+        queryFn: () => fetchSedesPorProyecto(proyectos),
+        enabled: proyectos.length > 0,
+    });
 
-    // Tallas disponibles según proyecto + prenda + género activos
-    const tallasDisponibles = useMemo(() => {
-        let items = inventario.filter(i => i.proyecto === proyectoTab);
-        if (prendaFiltro !== 'Todos') items = items.filter(i => i.prenda === prendaFiltro);
-        if (generoFiltro !== 'Todos') items = items.filter(i => i.genero === generoFiltro);
-        const presentes = new Set(items.map(i => i.talla));
-        return ['Todos', ...ALL_TALLAS_ORDER.filter(t => presentes.has(t))];
-    }, [inventario, proyectoTab, prendaFiltro, generoFiltro]);
+    const sedesTab = sedesPorProyecto[proyectoTab] ?? [];
 
-    const invalidate = () => qc.invalidateQueries({ queryKey: ['inventario-dotacion-flat'] });
+    const { data: stats = { total: 0, bajoStock: 0, porProyecto: {} } } = useQuery({
+        queryKey: ['inventario-dotacion-resumen'],
+        queryFn: () => api.get('/inventario-dotacion/resumen').then(r => r.data),
+    });
+
+    const { data: opcionesFiltro = { prendas: [], tallas: [] } } = useQuery({
+        queryKey: ['inventario-dotacion-filtros', proyectoTab, sedeFiltro, prendaFiltro, generoFiltro],
+        queryFn: () => api.get('/inventario-dotacion/filtros', { params: { proyecto: proyectoTab, sede_id: sedeFiltro, prenda: prendaFiltro, genero: generoFiltro } }).then(r => r.data),
+    });
+
+    const prendasDisponibles = ['Todos', ...opcionesFiltro.prendas];
+    const tallasDisponibles = ['Todos', ...ALL_TALLAS_ORDER.filter(t => opcionesFiltro.tallas.includes(t))];
+
+    const invalidate = () => {
+        qc.invalidateQueries({ queryKey: ['inventario-dotacion'] });
+        qc.invalidateQueries({ queryKey: ['inventario-dotacion-resumen'] });
+        qc.invalidateQueries({ queryKey: ['inventario-dotacion-filtros'] });
+    };
 
     const handleSaved = (item, isEdit) => {
         invalidate();
@@ -500,7 +547,7 @@ export default function ProductosDotacion() {
     };
 
     const handleDeleted = (id) => {
-        qc.setQueryData(['inventario-dotacion-flat'], prev => (prev ?? []).filter(i => i.id !== id));
+        invalidate();
         setDeleteItem(null);
         showToast('Item eliminado.');
     };
@@ -513,35 +560,42 @@ export default function ProductosDotacion() {
     };
 
     const handleExport = async () => {
-        const XLSX = await import('xlsx');
-        const rows = filtrados.map(i => ({
-            Proyecto: i.proyecto,
-            Prenda: i.prenda,
-            Género: i.genero,
-            Talla: i.talla,
-            Precio: Number(i.precio ?? 0),
-            Cantidad: i.cantidad,
-            'Stock mínimo': i.stock_minimo,
-            Estado: badgeStock(i.cantidad, i.stock_minimo).label,
-        }));
+        setExporting(true);
+        try {
+            const { data: todos } = await api.get('/inventario-dotacion', { params: filtrosActivos });
+            const XLSX = await import('xlsx');
+            const rows = todos.map(i => ({
+                Proyecto: i.proyecto,
+                Sede: i.sede_nombre ?? '',
+                Prenda: i.prenda,
+                Género: i.genero,
+                Talla: i.talla,
+                Precio: Number(i.precio ?? 0),
+                Cantidad: i.cantidad,
+                'Stock mínimo': i.stock_minimo,
+                Estado: badgeStock(i.cantidad, i.stock_minimo).label,
+            }));
 
-        const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [
-            { wch: 20 }, { wch: 32 }, { wch: 12 },
-            { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
-        ];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [
+                { wch: 20 }, { wch: 26 }, { wch: 32 }, { wch: 12 },
+                { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+            ];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
 
-        const partes = [proyectoTab];
-        if (prendaFiltro !== 'Todos') partes.push(prendaFiltro);
-        if (generoFiltro !== 'Todos') partes.push(generoFiltro);
-        if (tallaFiltro !== 'Todos') partes.push(`Talla-${tallaFiltro}`);
-        const fecha = new Date().toISOString().slice(0, 10);
-        const nombre = `Inventario_Dotacion_${partes.join('_')}_${fecha}.xlsx`.replace(/\s+/g, '_');
+            const partes = [proyectoTab];
+            if (prendaFiltro !== 'Todos') partes.push(prendaFiltro);
+            if (generoFiltro !== 'Todos') partes.push(generoFiltro);
+            if (tallaFiltro !== 'Todos') partes.push(`Talla-${tallaFiltro}`);
+            const fecha = new Date().toISOString().slice(0, 10);
+            const nombre = `Inventario_Dotacion_${partes.join('_')}_${fecha}.xlsx`.replace(/\s+/g, '_');
 
-        XLSX.writeFile(wb, nombre);
-        showToast(`Excel exportado (${rows.length} item${rows.length !== 1 ? 's' : ''}).`);
+            XLSX.writeFile(wb, nombre);
+            showToast(`Excel exportado (${rows.length} item${rows.length !== 1 ? 's' : ''}).`);
+        } finally {
+            setExporting(false);
+        }
     };
 
     const pc = PROYECTO_COLORS[proyectoTab] ?? PROYECTO_COLORS['SYM TIGO EXPRESS'];
@@ -556,10 +610,10 @@ export default function ProductosDotacion() {
                     <div className="stat-num">{stats.total}</div>
                     <div className="stat-label">Total prendas</div>
                 </div>
-                {PROYECTOS.map(p => {
+                {proyectos.map(p => {
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }}>
+                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro('Todas'); }}>
                             <div className="stat-num" style={{ color: c.color }}>{stats.porProyecto[p] ?? 0}</div>
                             <div className="stat-label">{p}</div>
                         </div>
@@ -573,11 +627,11 @@ export default function ProductosDotacion() {
 
             {/* Tabs de proyecto */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', marginBottom: 20 }}>
-                {PROYECTOS.map(p => {
+                {proyectos.map(p => {
                     const active = proyectoTab === p;
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <button key={p} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); }} style={{
+                        <button key={p} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro('Todas'); }} style={{
                             padding: '10px 22px', border: 'none', borderBottom: active ? `2.5px solid ${c.border}` : '2.5px solid transparent',
                             marginBottom: -2, background: 'transparent', fontWeight: active ? 800 : 600,
                             fontSize: '0.9rem', fontFamily: 'Nunito,sans-serif', color: active ? c.color : 'var(--text-muted)',
@@ -585,7 +639,7 @@ export default function ProductosDotacion() {
                         }}>
                             {p}
                             <span style={{ marginLeft: 7, fontSize: '0.75rem', background: active ? c.bg : 'var(--bg)', color: active ? c.color : 'var(--text-muted)', borderRadius: 20, padding: '1px 8px', fontWeight: 700 }}>
-                                {inventario.filter(i => i.proyecto === p).reduce((s, i) => s + i.cantidad, 0)}
+                                {stats.porProyecto[p] ?? 0}
                             </span>
                         </button>
                     );
@@ -630,6 +684,19 @@ export default function ProductosDotacion() {
                 </div>
             </div>
 
+            {/* Filtro por sede */}
+            {sedesTab.length > 0 && (
+                <div style={{ maxWidth: 320, marginBottom: 14 }}>
+                    <label style={{ ...S.label, display: 'block', marginBottom: 4 }}>Sede</label>
+                    <SearchableSelect
+                        value={sedeFiltro}
+                        onChange={setSedeFiltro}
+                        defaultValue="Todas"
+                        options={[{ label: 'Todas las sedes', value: 'Todas' }, ...sedesTab.map(s => ({ label: s.nombre, value: s.id }))]}
+                    />
+                </div>
+            )}
+
             {/* Toolbar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
                 <div style={S.searchWrap}>
@@ -657,8 +724,8 @@ export default function ProductosDotacion() {
                     </div>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-                    <button style={S.btnSecondary} onClick={handleExport} disabled={filtrados.length === 0}>
-                        Exportar Excel
+                    <button style={S.btnSecondary} onClick={handleExport} disabled={exporting || (pagina?.total ?? 0) === 0}>
+                        {exporting ? 'Exportando…' : 'Exportar Excel'}
                     </button>
                     <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>Importar Excel</button>
                     <button style={S.btnSecondary} onClick={() => setBulkOpen(true)}>Carga masiva</button>
@@ -667,7 +734,7 @@ export default function ProductosDotacion() {
             </div>
 
             {/* Tabla */}
-            <div style={S.tableWrap}>
+            <div style={{ ...S.tableWrap, opacity: isFetching && !isLoading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
                 {isLoading ? (
                     <div style={S.empty}><IconLoading size={32} /><p>Cargando inventario…</p></div>
                 ) : filtrados.length === 0 ? (
@@ -681,6 +748,7 @@ export default function ProductosDotacion() {
                         <thead>
                             <tr>
                                 <th>Prenda</th>
+                                <th>Sede</th>
                                 <th>Género</th>
                                 <th style={{ textAlign: 'center' }}>Talla</th>
                                 <th style={{ textAlign: 'right' }}>Precio</th>
@@ -696,6 +764,7 @@ export default function ProductosDotacion() {
                                 return (
                                     <tr key={item.id}>
                                         <td style={{ fontWeight: 700 }}>{item.prenda}</td>
+                                        <td style={{ color: 'var(--text-muted)' }}>{item.sede_nombre ?? '—'}</td>
                                         <td>
                                             <span style={{ ...S.badge(item.genero === 'Masculino' ? '#e8f0ff' : item.genero === 'Femenino' ? '#fce8f5' : '#f1f5f9', item.genero === 'Masculino' ? '#1a4fa8' : item.genero === 'Femenino' ? '#8b267a' : '#475569') }}>
                                                 {item.genero}
@@ -729,11 +798,28 @@ export default function ProductosDotacion() {
                 )}
             </div>
 
+            {/* Paginación */}
+            {pagina && pagina.total > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                        Página {pagina.current_page} de {pagina.last_page} · Mostrando {filtrados.length} de {pagina.total}
+                    </span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <button style={S.btnSecondary} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
+                            ‹ Anterior
+                        </button>
+                        <button style={S.btnSecondary} onClick={() => setPage(p => Math.min(pagina.last_page, p + 1))} disabled={page >= pagina.last_page}>
+                            Siguiente ›
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Modales */}
-            {addOpen  && <ItemModal onClose={() => setAddOpen(false)} onSaved={handleSaved} />}
-            {editItem && <ItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={handleSaved} />}
-            {bulkOpen && <BulkModal onClose={() => setBulkOpen(false)} onSaved={handleBulkSaved} />}
-            {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImported={handleImported} />}
+            {addOpen  && <ItemModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setAddOpen(false)} onSaved={handleSaved} />}
+            {editItem && <ItemModal item={editItem} proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setEditItem(null)} onSaved={handleSaved} />}
+            {bulkOpen && <BulkModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setBulkOpen(false)} onSaved={handleBulkSaved} />}
+            {importOpen && <ImportModal proyectos={proyectos} sedesPorProyecto={sedesPorProyecto} onClose={() => setImportOpen(false)} onImported={handleImported} />}
             {deleteItem && <DeleteModal item={deleteItem} onClose={() => setDeleteItem(null)} onDeleted={handleDeleted} />}
         </div>
     );

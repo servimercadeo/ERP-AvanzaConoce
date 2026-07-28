@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\InventarioDotacion;
+use App\Models\Proyecto;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -78,12 +80,44 @@ class InventarioDotacionSeeder extends Seeder
             ];
         }
 
+        $sedeIdsPorProyecto = $this->sedeIdsPorProyectoDotacion();
+
+        $expandido = [];
+        foreach ($records as $record) {
+            $sedeIds = $sedeIdsPorProyecto[$record['proyecto']] ?? [];
+            if (empty($sedeIds)) {
+                // Proyecto de dotación sin sedes mapeadas en proyecto_sede: se deja sin sede
+                // en vez de perder el item.
+                $expandido[] = $record + ['sede_id' => null];
+                continue;
+            }
+            foreach ($sedeIds as $sedeId) {
+                $expandido[] = $record + ['sede_id' => $sedeId];
+            }
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
         DB::table('inventario_dotacion')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
-        DB::table('inventario_dotacion')->insert($records);
+        foreach (array_chunk($expandido, 500) as $chunk) {
+            DB::table('inventario_dotacion')->insert($chunk);
+        }
 
-        $this->command->info('✓ ' . count($records) . ' items de inventario de dotación importados desde el Excel.');
+        $this->command->info('✓ ' . count($records) . ' combinaciones prenda/talla repartidas entre las sedes de cada proyecto: ' . count($expandido) . ' filas de inventario_dotacion en total.');
+    }
+
+    /**
+     * Proyecto de dotación (PROYECTOS_DOTACION) => ids de sedes válidas para ese proyecto,
+     * resueltos vía InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO y el pivote proyecto_sede.
+     */
+    private function sedeIdsPorProyectoDotacion(): array
+    {
+        $mapa = [];
+        foreach (InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO as $proyectoDotacion => $nombreProyecto) {
+            $proyecto = Proyecto::where('nombre', $nombreProyecto)->first();
+            $mapa[$proyectoDotacion] = $proyecto ? $proyecto->sedes()->pluck('sedes.id')->all() : [];
+        }
+        return $mapa;
     }
 
     private function resolverProyecto(string $empresa, string $nombre): string
