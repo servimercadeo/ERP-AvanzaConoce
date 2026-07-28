@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // El contenedor solo es alcanzable a través de Traefik (nunca directo desde
+        // internet), así que confiar en cualquier origen es seguro aquí: sin esto, Laravel
+        // no sabe que Traefik terminó la petición en HTTPS y genera URLs de assets con
+        // http://, lo que el navegador bloquea como contenido mixto en la página https://.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
