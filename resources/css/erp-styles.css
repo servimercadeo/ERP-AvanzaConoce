@@ -191,9 +191,12 @@ body {
 .nav {
     display: flex;
     align-items: center;
-    gap: 0;
+    justify-content: center;
+    gap: 32px;
+    flex: 1;
     flex-wrap: nowrap;
     height: 100%;
+    margin-left: 8px;
 }
 
 .nav-item {
@@ -207,7 +210,7 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 14px;
+    padding: 0 22px;
     height: 100%;
     text-decoration: none;
     color: var(--text);

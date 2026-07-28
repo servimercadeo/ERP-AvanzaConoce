@@ -6,6 +6,7 @@ export const ERP_MODULES = [
     color: '#1a9b8c',
     desc: 'Gestión de sedes, regionales, subagentes y control de caja.',
     submods: [
+      /*
       {
         id: 'subagentes',
         label: 'Subagentes',
@@ -31,14 +32,15 @@ export const ERP_MODULES = [
           { id: 'conceptos_caja',  label: 'Conceptos de Caja' },
         ]
       }
+      */
     ],
     archivos: [
       { id: 'sedes_file',                      label: 'Sedes' },
-      { id: 'relacion',                         label: 'Relación Almacenista - Secretaria Sedes' },
-      { id: 'regionales',                       label: 'Regionales' },
-      { id: 'consultar_contratos',              label: 'Consultar Contratos' },
-      { id: 'importar_numeracion',              label: 'Importar Numeración de Contratos' },
-      { id: 'admin_contratos_vendedores',       label: 'Administración Contratos de Vendedores' },
+      // { id: 'relacion',                         label: 'Relación Almacenista - Secretaria Sedes' },
+      // { id: 'regionales',                       label: 'Regionales' },
+      // { id: 'consultar_contratos',              label: 'Consultar Contratos' },
+      // { id: 'importar_numeracion',              label: 'Importar Numeración de Contratos' },
+      // { id: 'admin_contratos_vendedores',       label: 'Administración Contratos de Vendedores' },
     ]
   },
   {
@@ -70,12 +72,13 @@ export const ERP_MODULES = [
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
           { id: 'Seguros_medicos', label: 'Seguimiento Medico' },
           { id: 'centros_costos_catalogo', label: 'Centros de Costos' },
-          { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
-          { id: 'empleadores', label: 'Empleadores' },
-          { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
-          { id: 'importar_contratos_activos', label: 'Importar Contratos Laborales Activos' }
+          // { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
+          // { id: 'empleadores', label: 'Empleadores' },
+          // { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
+          // { id: 'importar_contratos_activos', label: 'Importar Contratos Laborales Activos' }
         ]
       },
+      /*
       {
         id: 'work_orders',
         label: 'Work Orders',
@@ -117,15 +120,16 @@ export const ERP_MODULES = [
           { id: 'liquidaciones_registradas_tecnicos', label: 'Liquidaciones Registradas Técnicos' }
         ]
       }
+      */
     ],
     archivos: [
       { id: 'empleados', label: 'Empleados' },
-      { id: 'importar_codigos_directv', label: 'Importar Códigos DirecTv a Empleados' },
-      { id: 'importar_empleados', label: 'Importar Empleados' },
-      { id: 'vehiculos', label: 'Vehículos' },
-      { id: 'entrega_tecnicos', label: 'Entrega Técnicos' },
-      { id: 'devolucion_material', label: 'Devolución de Material' },
-      { id: 'capacitaciones', label: 'Capacitaciones' }
+      // { id: 'importar_codigos_directv', label: 'Importar Códigos DirecTv a Empleados' },
+      // { id: 'importar_empleados', label: 'Importar Empleados' },
+      // { id: 'vehiculos', label: 'Vehículos' },
+      // { id: 'entrega_tecnicos', label: 'Entrega Técnicos' },
+      // { id: 'devolucion_material', label: 'Devolución de Material' },
+      // { id: 'capacitaciones', label: 'Capacitaciones' }
     ]
   },
   {
@@ -135,6 +139,7 @@ export const ERP_MODULES = [
     color: '#27ae60',
     desc: 'Control de inventario y stock.',
     submods: [
+      /*
       {
         id: 'productos',
         label: 'Productos',
@@ -180,6 +185,7 @@ export const ERP_MODULES = [
           { id: 'salidas_inventario', label: 'Salidas de Inventario' }
         ]
       },
+      */
       {
         id: 'dotacion',
         label: 'Dotación',
@@ -193,6 +199,7 @@ export const ERP_MODULES = [
           { id: 'cronograma',          label: 'Cronograma' },
         ]
       },
+      /*
       {
         id: 'consultas',
         label: 'Consultas',
@@ -212,6 +219,7 @@ export const ERP_MODULES = [
           { id: 'saldos_inventario_general', label: 'Saldos de Inventario - General' }
         ]
       }
+      */
     ],
     archivos: []
   },
@@ -222,6 +230,7 @@ export const ERP_MODULES = [
     color: '#e74c3c',
     desc: 'Gestión de proveedores y órdenes de compra.',
     submods: [
+      /*
       {
         id: 'pedidos',
         label: 'Pedidos',
@@ -278,9 +287,11 @@ export const ERP_MODULES = [
           { id: 'formas_pago', label: 'Formas de Pago' }
         ]
       }
+      */
     ],
     archivos: []
   },
+  /*
   {
     id: 'ventas',
     label: 'Ventas',
@@ -522,4 +533,5 @@ export const ERP_MODULES = [
     ],
     archivos: []
   }
+  */
 ];
