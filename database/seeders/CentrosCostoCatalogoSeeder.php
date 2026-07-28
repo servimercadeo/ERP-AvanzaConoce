@@ -92,6 +92,8 @@ class CentrosCostoCatalogoSeeder extends Seeder
         ['S&M TIGO', '220608', 'TIGO EXPRESS CALDAS ANTIOQUIA', 'CALDAS', 'Tigo Express'],
         ['S&M TIGO', '220690', 'TIGO HOME MEDELLIN', 'MEDELLIN', 'HOME'],
         ['S&M TIGO', '120102', 'COMERCIAL', 'MONTERIA', 'hughesnet'],
+
+
         ['S&M TIGO', '1201031', 'OPERACIÓN', 'MONTERIA', 'hughesnet'],
         ['S&M TIGO', '221201', 'TIGO HOME MONTERIA', 'MONTERIA', 'HOME'],
         ['S&M TIGO', '222102', 'TIGO EXPRESS NACIONAL', 'NACIONAL EXPRESS', 'Nacional Express'],
@@ -143,7 +145,6 @@ class CentrosCostoCatalogoSeeder extends Seeder
         ['S&M TIGO', '220704', 'TIGO EXPRESS BOGOTA CRA 18 21 05 RESTREPO', 'BOGOTA', 'Tigo Express'],
         ['S&M TIGO', '220703', 'REG CENTRO TIGO EXPRESS FDV', 'BOGOTA', 'Tigo Express'],
         ['S&M TIGO', '220769', 'TIGO ORIENTE PDV', 'CUCUTA', 'Tigo Express'],
-
         ['SERVIMERCADEO', '020101', 'ADMINISTRACION', 'ARMENIA', null],
         ['SERVIMERCADEO', '020102', 'COMERCIAL', 'ARMENIA', null],
         ['SERVIMERCADEO', '0201031', 'OPERACIONES', 'ARMENIA', null],
@@ -195,12 +196,6 @@ class CentrosCostoCatalogoSeeder extends Seeder
         ['SERVIMERCADEO', '0602031', 'OPERACIONES', 'RIONEGRO', null],
     ];
 
-    /**
-     * Los nombres de empresa usados en FILAS ('CYC', 'S&M TIGO', 'SERVIMERCADEO') son etiquetas
-     * históricas de la fuente de datos, no empresas reales. Se resuelven contra la tabla
-     * `empresas`: CYC y S&M TIGO son ambas Servicios y Mercadeo COL (SYM); SERVIMERCADEO es
-     * Servimercadeo COL.
-     */
     private const EMPRESA_MAP = [
         'CYC'           => 'Servicios y Mercadeo COL',
         'S&M TIGO'      => 'Servicios y Mercadeo COL',
