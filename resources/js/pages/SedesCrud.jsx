@@ -293,12 +293,6 @@ function Modal({
                                 req
                                 {...fp}
                             />
-                            <Field
-                                label="Usuario Secretaria"
-                                k="id_secretaria_mac"
-                                opts={options.users}
-                                {...fp}
-                            />
                         </div>
 
                         {/* Right Column */}
@@ -335,12 +329,6 @@ function Modal({
                                     value: s.id,
                                     label: s.nombre,
                                 }))}
-                                {...fp}
-                            />
-                            <Field
-                                label="Usuario Jefe Oficina"
-                                k="id_jefe_mac"
-                                opts={options.users}
                                 {...fp}
                             />
                         </div>
