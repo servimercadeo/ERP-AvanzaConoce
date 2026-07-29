@@ -77,9 +77,6 @@ export default function Dashboard() {
                 <h2>¿Para qué sirve este ERP?</h2>
                 <div className="info-cards">
                     <div className="info-card">
-                        <div className="ic-icon">
-                            <IconLayers size={28} />
-                        </div>
                         <div>
                             <h3>Integración total</h3>
                             <p>
@@ -89,9 +86,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon">
-                            <IconParametros size={28} />
-                        </div>
                         <div>
                             <h3>Automatización</h3>
                             <p>
@@ -101,9 +95,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon">
-                            <IconVentas size={28} />
-                        </div>
                         <div>
                             <h3>Toma de decisiones</h3>
                             <p>
@@ -113,7 +104,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"></div>
                         <div>
                             <h3>Control de acceso</h3>
                             <p>
@@ -123,7 +113,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"></div>
                         <div>
                             <h3>Trazabilidad</h3>
                             <p>
@@ -133,7 +122,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="info-card">
-                        <div className="ic-icon"></div>
                         <div>
                             <h3>Acceso en la nube</h3>
                             <p>
