@@ -27,11 +27,11 @@ export default function Header() {
       </div>
 
       <Link className="header-logo" to="/dashboard">
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="18" cy="22" rx="10" ry="10" fill="#1a9b8c" opacity="0.18" />
-          <path d="M18 4 C18 4 10 14 10 22 A8 8 0 0 0 26 22 C26 14 18 4 18 4Z" fill="#1a9b8c" />
-          <path d="M18 12 C18 12 13 19 13 23 A5 5 0 0 0 23 23 C23 19 18 12 18 12Z" fill="#f5a623" />
-          <circle cx="27" cy="10" r="4" fill="#e8c41a" />
+        <svg width="36" height="36" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="100" cy="125" rx="46" ry="39" fill="#A9E1DF" />
+          <path fill="#0FA3A2" d="M100 20 C88 38 67 67 58 92 C52 109 55 131 66 147 C75 160 87 168 100 170 C113 168 125 160 134 147 C145 131 148 109 142 92 C133 67 112 38 100 20 Z" />
+          <path fill="#F9A825" d="M100 52 C92 65 80 85 75 104 C72 118 76 132 85 142 C90 148 95 151 100 152 C105 151 110 148 115 142 C124 132 128 118 125 104 C120 85 108 65 100 52 Z" />
+          <circle cx="142" cy="58" r="16" fill="#F2C300" />
         </svg>
         <span>ERP</span>
       </Link>
