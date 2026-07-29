@@ -49,15 +49,10 @@ function buildInventarioIndex(inventarioFlat) {
 }
 
 // Replica exactamente `inventarioFlat.find(i => i.proyecto===p && i.prenda===pr &&
-// (i.genero===genero || i.genero==='Unisex') && i.talla.toLowerCase()===talla.toLowerCase())`
-// pero usando el índice: primero intenta el género exacto del empleado, si no hay cae a Unisex.
+// i.genero===genero && i.talla.toLowerCase()===talla.toLowerCase())` pero usando el índice.
 function lookupInventario(idx, proyecto, prenda, talla, genero) {
     const tallaLower = String(talla ?? "").toLowerCase();
-    return (
-        idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ??
-        idx.get(`${proyecto}|${prenda}|${tallaLower}|Unisex`) ??
-        null
-    );
+    return idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ?? null;
 }
 
 function parseDateLocal(str) {
@@ -857,8 +852,7 @@ function ImportPedidosGlobalesModal({
                         proyecto,
                         regionalTexto,
                         empleado:
-                            empleados.find((e) => e.cedula === cedula) ??
-                            null,
+                            empleados.find((e) => e.cedula === cedula) ?? null,
                         fecha_pedido: hoy,
                         notas: "",
                         items: [],
@@ -871,7 +865,13 @@ function ImportPedidosGlobalesModal({
 
                 const generoEmpleado = grupo.empleado?.genero ?? "";
                 const cantidad = Number(fila.cantidad) || 0;
-                const inv = lookupInventario(invIndex, proyecto, fila.prenda, fila.talla, generoEmpleado);
+                const inv = lookupInventario(
+                    invIndex,
+                    proyecto,
+                    fila.prenda,
+                    fila.talla,
+                    generoEmpleado,
+                );
 
                 if (!inv || cantidad <= 0) {
                     grupo.erroresItems.push(
@@ -906,7 +906,9 @@ function ImportPedidosGlobalesModal({
                         `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
                     );
                 if (!g.proyecto)
-                    errores.unshift(`Falta el proyecto para la cédula ${g.cedula}.`);
+                    errores.unshift(
+                        `Falta el proyecto para la cédula ${g.cedula}.`,
+                    );
                 if (!regional)
                     errores.unshift(
                         `Regional "${g.regionalTexto}" no reconocida para la cédula ${g.cedula}.`,
@@ -1053,12 +1055,12 @@ function ImportPedidosGlobalesModal({
                             Cédula, Regional, Proyecto, Prenda, Talla, Cantidad
                         </strong>
                         . El código y el estado se generan automáticamente, el
-                        género se toma del empleado, la fecha es la de hoy y
-                        las notas se agregan luego desde la interfaz. Las
-                        filas con la misma cédula, proyecto y regional se
-                        agrupan en un solo pedido; cada combinación distinta
-                        de <strong>Proyecto + Regional</strong> del archivo
-                        crea su propio pedido global.
+                        género se toma del empleado, la fecha es la de hoy y las
+                        notas se agregan luego desde la interfaz. Las filas con
+                        la misma cédula, proyecto y regional se agrupan en un
+                        solo pedido; cada combinación distinta de{" "}
+                        <strong>Proyecto + Regional</strong> del archivo crea su
+                        propio pedido global.
                     </p>
                     <button
                         type="button"
@@ -1382,7 +1384,8 @@ export default function PedidosGlobalesCrud() {
                 const base = {
                     Código: p.codigo ?? "",
                     Cédula: p.empleado?.cedula ?? "",
-                    Empleado: `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.trim(),
+                    Empleado:
+                        `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.trim(),
                     Estado: p.estado ?? "",
                     "Fecha Pedido": dateOnly(p.fecha_pedido),
                 };
@@ -1722,9 +1725,7 @@ export default function PedidosGlobalesCrud() {
                                     );
                                 const someSelected =
                                     !allSelected &&
-                                    pedidoIds.some((id) =>
-                                        selectedIds.has(id),
-                                    );
+                                    pedidoIds.some((id) => selectedIds.has(id));
 
                                 return (
                                     <React.Fragment key={g.id}>

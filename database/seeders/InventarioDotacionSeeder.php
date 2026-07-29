@@ -14,7 +14,8 @@ class InventarioDotacionSeeder extends Seeder
 
     // Accesorios de carnet: el nombre de origen trae variaciones/typos ("PORTA
     // CANET"), así que se normalizan a un nombre de prenda fijo en vez de usar
-    // el texto tal cual viene. Siempre quedan en Unisex/N/A.
+    // el texto tal cual viene. Siempre quedan en Masculino/N/A (no hay concepto
+    // de género unisex en este catálogo).
     private const PRENDA_CARNET_POR_PRIMERA_PALABRA = [
         'CARNET' => 'Carnet',
         'BRAZALETE' => 'Carnet Brazalete',
@@ -148,11 +149,13 @@ class InventarioDotacionSeeder extends Seeder
         $nombre = str_replace('M/CXXXL', 'M/C XXXL', $nombre); // typo en el Excel origen (falta espacio)
 
         $generoPatrones = [
-            'Femenino' => '/\b(FEMENINO|FEMENINA|MUJER|DAMA)\b/',
+            'Femenino' => '/\b(FEMENINO|FEMENINA|MUJER|DAMA|MATERNA)\b/',
             'Masculino' => '/\b(MASCULINO|MASCULINA|HOMBRE|CABALLERO)\b/',
         ];
 
-        $genero = 'Unisex';
+        // Sin marca explícita de género en el nombre de origen: no existe un concepto de
+        // "unisex" en este catálogo, así que se asigna Masculino por defecto.
+        $genero = 'Masculino';
         foreach ($generoPatrones as $g => $patron) {
             if (preg_match($patron, $nombre, $m, PREG_OFFSET_CAPTURE)) {
                 $genero = $g;
@@ -175,7 +178,7 @@ class InventarioDotacionSeeder extends Seeder
         $primera = strtoupper($palabras[0] ?? '');
 
         if (isset(self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera])) {
-            $genero = 'Unisex';
+            $genero = 'Masculino';
             $talla = 'N/A';
             $prenda = self::PRENDA_CARNET_POR_PRIMERA_PALABRA[$primera];
         } else {

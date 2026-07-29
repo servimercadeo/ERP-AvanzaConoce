@@ -39,6 +39,12 @@ const MONTH_KEYS_SET = new Set([
     "ene", "feb", "mar", "abr", "may", "jun",
     "jul", "ago", "sep", "oct", "nov", "dic",
 ]);
+const MESES = [
+    ["ene", "Enero"], ["feb", "Febrero"], ["mar", "Marzo"],
+    ["abr", "Abril"], ["may", "Mayo"], ["jun", "Junio"],
+    ["jul", "Julio"], ["ago", "Agosto"], ["sep", "Septiembre"],
+    ["oct", "Octubre"], ["nov", "Noviembre"], ["dic", "Diciembre"],
+];
 
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },

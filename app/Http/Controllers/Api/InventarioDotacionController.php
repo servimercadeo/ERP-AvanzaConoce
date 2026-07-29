@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-const GENEROS_DOTACION = ['Masculino', 'Femenino', 'Unisex'];
+const GENEROS_DOTACION = ['Masculino', 'Femenino'];
 
 class InventarioDotacionController extends Controller
 {
@@ -208,7 +208,7 @@ class InventarioDotacionController extends Controller
             'proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'sede_id'      => 'nullable|integer|exists:sedes,id',
             'prenda'       => 'required|string|max:150',
-            'genero'       => 'required|in:Masculino,Femenino,Unisex',
+            'genero'       => 'required|in:Masculino,Femenino',
             'talla'        => 'required|string|max:10',
             'precio'       => 'nullable|integer|min:0',
             'cantidad'     => 'required|integer|min:0',
@@ -245,7 +245,7 @@ class InventarioDotacionController extends Controller
             'items.*.proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'items.*.sede_id'      => 'nullable|integer|exists:sedes,id',
             'items.*.prenda'       => 'required|string|max:150',
-            'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
+            'items.*.genero'       => 'required|in:Masculino,Femenino',
             'items.*.talla'        => 'required|string|max:10',
             'items.*.precio'       => 'nullable|integer|min:0',
             'items.*.cantidad'     => 'required|integer|min:0',
@@ -288,7 +288,7 @@ class InventarioDotacionController extends Controller
             'items.*.proyecto'     => 'required|in:' . implode(',', self::proyectosDotacion()),
             'items.*.sede_id'      => 'nullable|integer|exists:sedes,id',
             'items.*.prenda'       => 'required|string|max:150',
-            'items.*.genero'       => 'required|in:Masculino,Femenino,Unisex',
+            'items.*.genero'       => 'required|in:Masculino,Femenino',
             'items.*.talla'        => 'required|string|max:10',
             'items.*.precio'       => 'nullable|integer|min:0',
             'items.*.cantidad'     => 'required|integer|min:0',

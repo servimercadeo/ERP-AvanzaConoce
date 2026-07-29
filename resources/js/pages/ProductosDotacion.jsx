@@ -7,7 +7,7 @@ import { SearchableSelect } from '../components/SearchableSelect';
 
 const POR_PAGINA = 50;
 
-const GENEROS     = ['Masculino', 'Femenino', 'Unisex'];
+const GENEROS     = ['Masculino', 'Femenino'];
 const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
 const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
 const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
@@ -668,7 +668,6 @@ export default function ProductosDotacion() {
                         const active = generoFiltro === g;
                         const gColor = g === 'Masculino' ? { bg: '#e8f0ff', color: '#1a4fa8' }
                             : g === 'Femenino' ? { bg: '#fce8f5', color: '#8b267a' }
-                            : g === 'Unisex' ? { bg: '#f1f5f9', color: '#475569' }
                             : { bg: 'var(--bg)', color: 'var(--text-muted)' };
                         return (
                             <button key={g} onClick={() => setGeneroFiltro(g)} style={{
