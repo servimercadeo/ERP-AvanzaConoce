@@ -67,7 +67,7 @@ class PedidoGlobalController extends Controller
             }
         }
 
-        $seAcabaDeConfirmar = ($data['confirmado'] ?? false) && !$pedidoGlobal->confirmado;
+        $seAcabaDeConfirmarEntrega = ($data['entrega_confirmada'] ?? false) && !$pedidoGlobal->entrega_confirmada;
 
         if (array_key_exists('confirmado', $data) && $data['confirmado'] !== $pedidoGlobal->confirmado) {
             $data['confirmado_at'] = $data['confirmado'] ? now() : null;
@@ -87,7 +87,7 @@ class PedidoGlobalController extends Controller
         ])]);
         $this->resolverFotografias($fresh);
 
-        if ($seAcabaDeConfirmar) {
+        if ($seAcabaDeConfirmarEntrega) {
             $this->enviarActasEntrega($fresh->first(), $request->user()?->name ?: 'Sistema');
         }
 
@@ -95,10 +95,10 @@ class PedidoGlobalController extends Controller
     }
 
     /**
-     * Al confirmar un pedido global, envía por correo a cada empleado incluido su acta de
-     * entrega de dotación en PDF (una por pedido automático, con solo sus propias prendas).
-     * Un fallo puntual (correo inválido, SMTP caído) solo se loguea: no debe impedir que el
-     * pedido global quede confirmado.
+     * Al confirmar la ENTREGA de un pedido global (no al confirmar el pedido), envía por
+     * correo a cada empleado incluido su acta de entrega de dotación en PDF (una por pedido
+     * automático, con solo sus propias prendas). Un fallo puntual (correo inválido, SMTP
+     * caído) solo se loguea: no debe impedir que la entrega quede confirmada.
      */
     private function enviarActasEntrega(PedidoGlobal $global, string $creadoPor): void
     {
