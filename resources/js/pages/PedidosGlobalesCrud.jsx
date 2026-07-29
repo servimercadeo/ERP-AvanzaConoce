@@ -609,6 +609,8 @@ function ConfirmModal({ global: g, cronogramas, onClose, onConfirmed }) {
 function EntregaModal({ global: g, cronogramas, onClose, onConfirmed }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const [resultado, setResultado] = useState(null);
+    const [confirmedData, setConfirmedData] = useState(null);
 
     const pedidos = (g.pedidos_automaticos ?? []).filter((p) => p.codigo);
     const cronInfo = getCronogramaInfo(g, pedidos, cronogramas);
@@ -621,7 +623,17 @@ function EntregaModal({ global: g, cronogramas, onClose, onConfirmed }) {
             const { data } = await api.put(`/pedidos-globales/${g.id}`, {
                 entrega_confirmada: true,
             });
-            onConfirmed(data);
+            const actas = data.actas_entrega;
+            const huboProblemas =
+                actas &&
+                (actas.omitidas?.length > 0 || actas.fallidas?.length > 0);
+            if (huboProblemas) {
+                setConfirmedData(data);
+                setResultado(actas);
+                setSaving(false);
+            } else {
+                onConfirmed(data);
+            }
         } catch (e) {
             setError(
                 e?.response?.data?.message ?? "Error al confirmar la entrega.",
@@ -629,6 +641,80 @@ function EntregaModal({ global: g, cronogramas, onClose, onConfirmed }) {
             setSaving(false);
         }
     };
+
+    // La entrega ya quedó confirmada en el backend; esta pantalla solo informa qué actas
+    // de dotación no se pudieron enviar por correo, para que no pase inadvertido.
+    if (resultado) {
+        return (
+            <div style={S.overlay}>
+                <div style={{ ...S.modal, maxWidth: 460 }}>
+                    <div style={S.modalHeader}>
+                        <span
+                            style={{
+                                fontWeight: 800,
+                                fontSize: "1rem",
+                                color: "#1a4fa8",
+                            }}
+                        >
+                            Entrega confirmada
+                        </span>
+                        <button
+                            style={S.btnIcon}
+                            onClick={() => onConfirmed(confirmedData)}
+                        >
+                            <IconClose size={16} />
+                        </button>
+                    </div>
+                    <div style={S.modalBody}>
+                        {resultado.enviadas?.length > 0 && (
+                            <p style={{ marginBottom: 10 }}>
+                                Acta enviada a{" "}
+                                <strong>{resultado.enviadas.length}</strong>{" "}
+                                empleado{resultado.enviadas.length !== 1 ? "s" : ""}.
+                            </p>
+                        )}
+                        {resultado.omitidas?.length > 0 && (
+                            <div style={{ ...S.errorMsg, marginBottom: 10 }}>
+                                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>
+                                    Sin enviar (falta correo real registrado):
+                                </p>
+                                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                    {resultado.omitidas.map((o) => (
+                                        <li key={o.codigo}>
+                                            {o.empleado} — pedido #{o.codigo}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {resultado.fallidas?.length > 0 && (
+                            <div style={S.errorMsg}>
+                                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>
+                                    Error al enviar:
+                                </p>
+                                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                    {resultado.fallidas.map((f) => (
+                                        <li key={f.codigo}>
+                                            {f.empleado} — pedido #{f.codigo}:{" "}
+                                            {f.motivo}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                    <div style={S.modalFooter}>
+                        <button
+                            style={{ ...S.btnPrimary, background: "#1a4fa8" }}
+                            onClick={() => onConfirmed(confirmedData)}
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={S.overlay}>

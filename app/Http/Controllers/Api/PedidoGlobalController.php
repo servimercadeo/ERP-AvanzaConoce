@@ -67,7 +67,7 @@ class PedidoGlobalController extends Controller
             }
         }
 
-        $seAcabaDeConfirmar = ($data['confirmado'] ?? false) && !$pedidoGlobal->confirmado;
+        $seAcabaDeConfirmarEntrega = ($data['entrega_confirmada'] ?? false) && !$pedidoGlobal->entrega_confirmada;
 
         if (array_key_exists('confirmado', $data) && $data['confirmado'] !== $pedidoGlobal->confirmado) {
             $data['confirmado_at'] = $data['confirmado'] ? now() : null;
@@ -87,22 +87,32 @@ class PedidoGlobalController extends Controller
         ])]);
         $this->resolverFotografias($fresh);
 
-        if ($seAcabaDeConfirmar) {
-            $this->enviarActasEntrega($fresh->first(), $request->user()?->name ?: 'Sistema');
+        $actasEntrega = null;
+        if ($seAcabaDeConfirmarEntrega) {
+            $actasEntrega = $this->enviarActasEntrega($fresh->first(), $request->user()?->name ?: 'Sistema');
         }
 
-        return response()->json($fresh->first());
+        $respuesta = $fresh->first()->toArray();
+        if ($actasEntrega !== null) {
+            $respuesta['actas_entrega'] = $actasEntrega;
+        }
+
+        return response()->json($respuesta);
     }
 
     /**
-     * Al confirmar un pedido global, envía por correo a cada empleado incluido su acta de
-     * entrega de dotación en PDF (una por pedido automático, con solo sus propias prendas).
-     * Un fallo puntual (correo inválido, SMTP caído) solo se loguea: no debe impedir que el
-     * pedido global quede confirmado.
+     * Al confirmar la ENTREGA de un pedido global (no al confirmar el pedido), envía por
+     * correo a cada empleado incluido su acta de entrega de dotación en PDF (una por pedido
+     * automático, con solo sus propias prendas). Un fallo puntual (correo inválido, SMTP
+     * caído) no debe impedir que la entrega quede confirmada, pero sí debe quedar visible
+     * para quien confirmó: antes esto solo se logueaba en storage/logs/laravel.log, invisible
+     * para cualquiera sin acceso al servidor, así que ahora se devuelve un resumen
+     * (enviadas/omitidas/fallidas con motivo) para que el frontend lo muestre.
      */
-    private function enviarActasEntrega(PedidoGlobal $global, string $creadoPor): void
+    private function enviarActasEntrega(PedidoGlobal $global, string $creadoPor): array
     {
         $service = app(ActaEntregaDotacionService::class);
+        $resumen = ['enviadas' => [], 'omitidas' => [], 'fallidas' => []];
 
         foreach ($global->pedidosAutomaticos as $pedido) {
             if (!$pedido->codigo || $pedido->items->isEmpty()) {
@@ -110,24 +120,34 @@ class PedidoGlobalController extends Controller
             }
 
             $empleado = $pedido->empleado;
-            $correo   = $this->resolverEmailReal($empleado);
+            $nombreEmpleado = $empleado
+                ? trim("{$empleado->nombres} {$empleado->apellidos}") ?: $empleado->name
+                : '—';
+            $correo = $this->resolverEmailReal($empleado);
+
             if (!$empleado || !$correo) {
-                Log::warning("Acta de dotación no enviada: el empleado del pedido {$pedido->codigo} no tiene correo real registrado.");
+                $motivo = "El empleado del pedido {$pedido->codigo} no tiene correo real registrado.";
+                Log::warning("Acta de dotación no enviada: {$motivo}");
+                $resumen['omitidas'][] = ['codigo' => $pedido->codigo, 'empleado' => $nombreEmpleado, 'motivo' => 'Sin correo real registrado'];
                 continue;
             }
 
             try {
                 $pdf = $service->generar($pedido, $creadoPor);
                 Mail::to($correo)->send(new ActaEntregaDotacionMail(
-                    trim("{$empleado->nombres} {$empleado->apellidos}"),
+                    $nombreEmpleado,
                     $pedido->codigo,
                     $service->resolverEmpresa($pedido),
                     $pdf,
                 ));
+                $resumen['enviadas'][] = ['codigo' => $pedido->codigo, 'empleado' => $nombreEmpleado, 'correo' => $correo];
             } catch (\Throwable $e) {
                 Log::error("No se pudo enviar el acta de dotación del pedido {$pedido->codigo}: " . $e->getMessage());
+                $resumen['fallidas'][] = ['codigo' => $pedido->codigo, 'empleado' => $nombreEmpleado, 'motivo' => $e->getMessage()];
             }
         }
+
+        return $resumen;
     }
 
     /**

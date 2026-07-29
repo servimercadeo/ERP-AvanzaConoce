@@ -53,11 +53,19 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.erp.rule=Host(`erp.local`, `erp.servimercadeo.com`)"
       - "traefik.http.routers.erp.entrypoints=web"
-      - "traefik.http.routers.erp-secure.rule=Host(`erp.local`, `erp.servimercadeo.com`)"
+      # Router del dominio público: certificado real de Let's Encrypt (resolver "letsencrypt"
+      # configurado en el stack de Traefik en /srv/docker/traefik). Va separado del de
+      # erp.local a propósito: un certificado ACME no puede emitirse para un host interno
+      # no resoluble desde internet, así que no pueden compartir el mismo router/SAN.
+      - "traefik.http.routers.erp-secure.rule=Host(`erp.servimercadeo.com`)"
       - "traefik.http.routers.erp-secure.entrypoints=websecure"
-      # Sin certresolver: Traefik sirve su certificado autofirmado por defecto hasta que se
-      # configure un dominio público + Let's Encrypt (o se monte un certificado propio).
       - "traefik.http.routers.erp-secure.tls=true"
+      - "traefik.http.routers.erp-secure.tls.certresolver=letsencrypt"
+      # Router de erp.local: se mantiene con el certificado autofirmado por defecto de
+      # Traefik, para seguir accediendo desde la LAN sin depender de internet.
+      - "traefik.http.routers.erp-secure-local.rule=Host(`erp.local`)"
+      - "traefik.http.routers.erp-secure-local.entrypoints=websecure"
+      - "traefik.http.routers.erp-secure-local.tls=true"
       - "traefik.http.services.erp.loadbalancer.server.port=80"
 
   db:
