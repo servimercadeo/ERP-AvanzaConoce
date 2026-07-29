@@ -123,8 +123,8 @@ function estadoDisplay(pedido, g) {
             bg: "#e5e7eb",
             color: "#4b5563",
         };
-    if (pedido.estado === "Para ventas")
-        return { label: "Para ventas", bg: "#fef3c7", color: "#92400e" };
+    if (pedido.estado === "Enviar a compras")
+        return { label: "Enviar a compras", bg: "#fef3c7", color: "#92400e" };
     if (g.entrega_confirmada)
         return { label: "Completado", bg: "#dcfce7", color: "#0d6e5a" };
     if (g.confirmado)
@@ -1698,7 +1698,7 @@ export default function PedidosGlobalesCrud() {
                         disabled={bulkSaving}
                     >
                         <option value="Activo">En proceso</option>
-                        <option value="Para ventas">Para ventas</option>
+                        <option value="Enviar a compras">Enviar a compras</option>
                         <option value="Devolución">Devolución</option>
                         <option value="Devolución usada">
                             Devolución usada

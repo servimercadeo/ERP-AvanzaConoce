@@ -261,7 +261,10 @@ export default function BaseIngresoCrud() {
       ciudad:                   c.ciudad?.nombre  || req.ciudad?.nombre || p.ciudad,
       correo:                   c.correo                               || p.correo,
       telefono:                 c.celular                               || p.telefono,
-      proyecto:                 c.negocio         || req.proyecto?.nombre || p.proyecto,
+      // El proyecto se toma exclusivamente de la requisición actualmente vinculada al
+      // candidato. c.negocio (foto fija del registro público) ya no se usa aquí: queda
+      // desactualizado si luego se reasigna al candidato una requisición distinta.
+      proyecto:                 req.proyecto?.nombre || p.proyecto,
       empresa:                  req.empresa?.nombre                    || p.empresa,
       empleador:                req.empleador?.nombre                  || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,

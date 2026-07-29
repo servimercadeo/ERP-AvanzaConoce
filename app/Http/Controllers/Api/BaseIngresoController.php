@@ -282,7 +282,7 @@ class BaseIngresoController extends Controller
             $ingreso->update([
                 'cargo'            => $req && $req->cargo     ? $req->cargo->nombre     : $ingreso->cargo,
                 'empresa'          => $req && $req->empresa   ? $req->empresa->nombre   : $ingreso->empresa,
-                'proyecto'         => $c->negocio ?: ($req && $req->proyecto ? $req->proyecto->nombre : $ingreso->proyecto),
+                'proyecto'         => $req && $req->proyecto ? $req->proyecto->nombre : $ingreso->proyecto,
                 'lider_inmediato'  => $req ? ($req->responsable ?? $ingreso->lider_inmediato) : $ingreso->lider_inmediato,
                 'empleador'        => $req && $req->empleador ? $req->empleador->nombre : $ingreso->empleador,
                 'tipo_vinculacion' => $c->tipo_vinculacion    ?? $ingreso->tipo_vinculacion,
@@ -303,7 +303,7 @@ class BaseIngresoController extends Controller
                 'cargo'                      => $req ? ($req->cargo ? $req->cargo->nombre : null) : null,
                 'ciudad'                     => $c->ciudad ? $c->ciudad->nombre : ($req && $req->ciudad ? $req->ciudad->nombre : null),
                 'empresa'                    => $req ? ($req->empresa ? $req->empresa->nombre : null) : null,
-                'proyecto'                   => $c->negocio ?: ($req && $req->proyecto ? $req->proyecto->nombre : null),
+                'proyecto'                   => $req && $req->proyecto ? $req->proyecto->nombre : null,
                 'telefono'                   => $c->celular,
                 'correo'                     => $c->correo,
                 'tipo_vinculacion'           => $c->tipo_vinculacion,

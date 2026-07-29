@@ -321,9 +321,14 @@ class PedidoGlobalController extends Controller
             foreach ($global->pedidosAutomaticos as $pedido) {
                 $emp = $pedido->empleado;
                 if ($emp && !$emp->fotografia) {
-                    $emp->fotografia = DB::table('candidatos')
-                        ->where('identificacion', $emp->cedula)
-                        ->value('fotografia');
+                    // Primero respuestas_ingresos (fuente actual), luego candidatos (fuente
+                    // antigua, previa a que el campo se moviera al formulario de ingreso).
+                    $emp->fotografia = DB::table('respuestas_ingresos')
+                        ->where('documento', $emp->cedula)
+                        ->value('fotografia')
+                        ?: DB::table('candidatos')
+                            ->where('identificacion', $emp->cedula)
+                            ->value('fotografia');
                 }
             }
         }

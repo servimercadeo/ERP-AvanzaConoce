@@ -450,6 +450,8 @@ const STEPS = [
 
 export default function RegistroNuevosIngresosForm() {
     const [form, setForm] = useState(EMPTY_FORM);
+    const [fotografiaFile, setFotografiaFile] = useState(null);
+    const [fotografiaPreview, setFotografiaPreview] = useState(null);
     const [errors, setErrors] = useState({});
     const [step, setStep] = useState(0);
     const [submitted, setSubmitted] = useState(false);
@@ -570,10 +572,16 @@ export default function RegistroNuevosIngresosForm() {
         setLoading(true);
         try {
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+            const fd = new FormData();
+            Object.entries(form).forEach(([k, v]) => {
+                if (v !== null && v !== undefined) fd.append(k, v);
+            });
+            if (fotografiaFile) fd.append("fotografia", fotografiaFile);
+
             const res = await fetch("/api/registro-nuevos-ingresos/submit", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": csrf ?? "", Accept: "application/json" },
-                body: JSON.stringify(form)
+                headers: { "X-CSRF-TOKEN": csrf ?? "", Accept: "application/json" },
+                body: fd
             });
             if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? "Error del servidor"); }
             setSubmitted(true);
@@ -892,6 +900,91 @@ export default function RegistroNuevosIngresosForm() {
                                         <SearchableSelect value={form.talla_zapatos} defaultValue="" options={TALLA_ZAPATOS_OPTS.map(o => ({ value: o, label: o }))} onChange={v => set("talla_zapatos", v)} />
                                     </div>
                                 </Field>
+                                <div style={{ gridColumn: "span 2" }}>
+                                    <Field label="Fotografía" hint="Sube una foto reciente tuya (JPG, PNG o WEBP, máx. 5 MB). Se usará para tu carnet y registros de dotación.">
+                                        <label
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 14,
+                                                padding: "10px 14px",
+                                                border: "1.5px dashed var(--border, #c5e8e3)",
+                                                borderRadius: "var(--radius-sm, 10px)",
+                                                cursor: "pointer",
+                                                background: fotografiaFile ? "var(--bg2, #f0faf8)" : "var(--white, #fff)",
+                                                transition: "all 0.2s ease",
+                                            }}
+                                        >
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--teal, #1a9b8c)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                                            </svg>
+                                            <span style={{ fontSize: "0.88rem", fontFamily: "Nunito, sans-serif", color: fotografiaFile ? "var(--teal, #1a9b8c)" : "var(--text-muted, #5a7a75)", fontWeight: fotografiaFile ? 700 : 500 }}>
+                                                {fotografiaFile ? fotografiaFile.name : "Seleccionar imagen…"}
+                                            </span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                style={{ display: "none" }}
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0] || null;
+                                                    setFotografiaFile(file);
+                                                    if (fotografiaPreview) URL.revokeObjectURL(fotografiaPreview);
+                                                    setFotografiaPreview(file ? URL.createObjectURL(file) : null);
+                                                }}
+                                            />
+                                        </label>
+                                        {fotografiaPreview && (
+                                            <div style={{ marginTop: 14, display: "flex", alignItems: "flex-start", gap: 14 }}>
+                                                <img
+                                                    src={fotografiaPreview}
+                                                    alt="Vista previa"
+                                                    style={{
+                                                        width: 100,
+                                                        height: 100,
+                                                        objectFit: "cover",
+                                                        borderRadius: "50%",
+                                                        border: "3px solid var(--teal, #1a9b8c)",
+                                                        boxShadow: "0 4px 12px rgba(26,155,140,0.25)",
+                                                        flexShrink: 0,
+                                                    }}
+                                                />
+                                                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 6 }}>
+                                                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--teal-dark, #127a6d)", fontFamily: "Nunito, sans-serif" }}>
+                                                        Vista previa
+                                                    </span>
+                                                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted, #5a7a75)", fontFamily: "Nunito, sans-serif" }}>
+                                                        {fotografiaFile.name}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            URL.revokeObjectURL(fotografiaPreview);
+                                                            setFotografiaFile(null);
+                                                            setFotografiaPreview(null);
+                                                        }}
+                                                        style={{
+                                                            marginTop: 4,
+                                                            display: "inline-flex",
+                                                            alignItems: "center",
+                                                            gap: 5,
+                                                            background: "none",
+                                                            border: "1px solid #e74c3c",
+                                                            borderRadius: 6,
+                                                            color: "#e74c3c",
+                                                            fontSize: "0.75rem",
+                                                            fontWeight: 700,
+                                                            padding: "4px 10px",
+                                                            cursor: "pointer",
+                                                            fontFamily: "Nunito, sans-serif",
+                                                        }}
+                                                    >
+                                                        ✕ Quitar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Field>
+                                </div>
                             </div>
                             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
                                 <button type="button" className="rni-btn-secondary" onClick={handleBack}>Atrás</button>

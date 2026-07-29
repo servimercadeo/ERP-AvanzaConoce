@@ -78,7 +78,6 @@ Route::post('/candidatos/registro', function (Request $request) {
         'correo'           => 'required|email|max:160',
         'negocio'          => 'nullable|string|max:120',
         'token'            => 'nullable|string|max:40',
-        'fotografia'       => 'nullable|image|max:5120',
     ]);
 
     $requisicionId = null;
@@ -95,11 +94,6 @@ Route::post('/candidatos/registro', function (Request $request) {
         }
     }
 
-    $fotografiaPath = null;
-    if ($request->hasFile('fotografia')) {
-        $fotografiaPath = $request->file('fotografia')->store('candidatos/fotos', 'public');
-    }
-
     $candidato = DB::table('candidatos')->insertGetId([
         'requisicion_id'   => $requisicionId,
         'nombres'          => strtoupper(trim($data['nombres'] . ' ' . $data['apellidos'])),
@@ -112,7 +106,6 @@ Route::post('/candidatos/registro', function (Request $request) {
         'celular'          => $data['celular'],
         'correo'           => $data['correo'],
         'negocio'          => $data['negocio'] ?? null,
-        'fotografia'       => $fotografiaPath,
         'fuente'           => 'Fase Inicial',
         'fuente_especifica'=> 'Pendiente de Aval',
         'estado'           => 'Entrevista',
@@ -497,7 +490,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'cliente_proyecto'         => $req?->proyecto?->nombre,
                 'empleador'                => $ingreso?->empleador ?? $req?->empleador?->nombre,
                 'jefe_inmediato'           => $ingreso?->lider_inmediato ?? $req?->responsable,
-                'fotografia'               => $candidato?->fotografia,
+                'fotografia'               => $resp->fotografia ?: $candidato?->fotografia,
                 // Desde base de ingresos (aval)
                 'sede'                     => $ingreso?->lugar_trabajo,
                 'fecha_ingreso'            => $ingreso?->fecha_programacion_ingreso
@@ -683,7 +676,14 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
         'talla_camisa'            => 'required|string|max:20',
         'talla_pantalon'          => 'required|string|max:20',
         'talla_zapatos'           => 'required|string|max:20',
+        'fotografia'              => 'nullable|image|max:5120',
     ]);
+
+    if ($request->hasFile('fotografia')) {
+        $data['fotografia'] = $request->file('fotografia')->store('respuestas-ingreso/fotos', 'public');
+    } else {
+        unset($data['fotografia']);
+    }
 
     RespuestaIngreso::updateOrCreate(
         ['documento' => $data['documento']],
