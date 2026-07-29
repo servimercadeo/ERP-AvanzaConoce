@@ -21,11 +21,99 @@ class ContratoController extends Controller
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
     ];
 
+    // Nombre de departamento por código DANE (ciudades.codigo_dep). No existe una tabla
+    // "departamentos" en la base — el catálogo de ciudades solo trae el código numérico.
+    private const DEPARTAMENTOS_DANE = [
+        '05' => 'Antioquia',
+        '08' => 'Atlántico',
+        '11' => 'Bogotá D.C.',
+        '13' => 'Bolívar',
+        '15' => 'Boyacá',
+        '17' => 'Caldas',
+        '18' => 'Caquetá',
+        '19' => 'Cauca',
+        '20' => 'Cesar',
+        '23' => 'Córdoba',
+        '25' => 'Cundinamarca',
+        '27' => 'Chocó',
+        '41' => 'Huila',
+        '44' => 'La Guajira',
+        '47' => 'Magdalena',
+        '50' => 'Meta',
+        '52' => 'Nariño',
+        '54' => 'Norte de Santander',
+        '63' => 'Quindío',
+        '66' => 'Risaralda',
+        '68' => 'Santander',
+        '70' => 'Sucre',
+        '73' => 'Tolima',
+        '76' => 'Valle del Cauca',
+        '81' => 'Arauca',
+        '85' => 'Casanare',
+        '86' => 'Putumayo',
+        '88' => 'San Andrés y Providencia',
+        '91' => 'Amazonas',
+        '94' => 'Guainía',
+        '95' => 'Guaviare',
+        '97' => 'Vaupés',
+        '99' => 'Vichada',
+    ];
+
     private function fechaEnEspanol(\Carbon\Carbon|string|null $fecha): string
     {
         if (!$fecha) return '';
         $carbon = $fecha instanceof \Carbon\Carbon ? $fecha : \Carbon\Carbon::parse($fecha);
         return mb_strtoupper("{$carbon->day} DE " . self::MESES_ES[$carbon->month - 1] . " DE {$carbon->year}", 'UTF-8');
+    }
+
+    /**
+     * "Jefe Inmediato" es texto libre en el formulario de contratos, no un selector ligado a
+     * `users`, así que en la práctica trae de todo: solo el nombre, o "Nombre - correo@..."
+     * (la convención más común). Se intenta extraer el correo embebido primero; si no hay,
+     * se compara el nombre contra `users.name` sin distinguir mayúsculas/tildes de capitalización.
+     */
+    private function resolverCorreoSupervisor(?string $jefeInmediato): ?string
+    {
+        if (!$jefeInmediato) {
+            return null;
+        }
+
+        if (preg_match('/[\w.+-]+@[\w-]+\.[\w.-]+/', $jefeInmediato, $m)) {
+            return $m[0];
+        }
+
+        $nombre = trim(explode(' - ', $jefeInmediato)[0]);
+        if (!$nombre) {
+            return null;
+        }
+
+        return DB::table('users')->whereRaw('UPPER(name) = ?', [mb_strtoupper($nombre, 'UTF-8')])->value('email');
+    }
+
+    /**
+     * Departamento (geográfico) del empleado: se resuelve por la sede del contrato (más
+     * confiable, ligada a `sedes.id_ciudad`) y si no hay coincidencia, por el texto de ciudad
+     * de la respuesta de ingreso. El código DANE de departamento se traduce con
+     * self::DEPARTAMENTOS_DANE porque la tabla `ciudades` no guarda el nombre, solo el código.
+     */
+    private function resolverDepartamento(Contrato $contrato, ?RespuestaIngreso $respuesta): string
+    {
+        $codigoDep = null;
+
+        if ($contrato->sede) {
+            $idCiudad = DB::table('sedes')->where('nombre', $contrato->sede)->value('id_ciudad');
+            if ($idCiudad) {
+                $codigoDep = DB::table('ciudades')->where('id', $idCiudad)->value('codigo_dep');
+            }
+        }
+
+        if (!$codigoDep && $respuesta?->ciudad) {
+            $codigoDep = DB::table('ciudades')
+                ->whereRaw('UPPER(nombre) = ?', [mb_strtoupper(trim($respuesta->ciudad), 'UTF-8')])
+                ->value('codigo_dep');
+        }
+
+        return self::DEPARTAMENTOS_DANE[$codigoDep] ?? '';
     }
 
     private function enviarContratoASharepoint(Contrato $contrato): void
@@ -39,10 +127,6 @@ class ContratoController extends Controller
 
         $respuesta = RespuestaIngreso::where('documento', $cedula)->first();
         $candidato = Candidato::where('identificacion', $cedula)->first();
-
-        $correoSuper = $contrato->jefe_inmediato
-            ? DB::table('users')->where('name', $contrato->jefe_inmediato)->value('email')
-            : null;
 
         $data = [
             'nombres'             => $respuesta?->nombres ?? $empleado->nombres ?? '',
@@ -63,8 +147,8 @@ class ContratoController extends Controller
             't_camisa'            => $respuesta?->talla_camisa ?? '',
             't_pantalon'          => $respuesta?->talla_pantalon ?? '',
             't_zapatos'           => $respuesta?->talla_zapatos ?? '',
-            'CorreoSuper'         => $correoSuper ?? '',
-            'Departamento'        => $contrato->area_empresa ?? '',
+            'CorreoSuper'         => $this->resolverCorreoSupervisor($contrato->jefe_inmediato) ?? '',
+            'Departamento'        => $this->resolverDepartamento($contrato, $respuesta),
         ];
 
         try {
