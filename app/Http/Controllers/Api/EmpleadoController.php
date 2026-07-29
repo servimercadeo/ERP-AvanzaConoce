@@ -54,18 +54,18 @@ class EmpleadoController extends Controller
                             ->value('genero');
                     }
 
-                    // Fotografía: si users no tiene, buscar en candidatos
-                    if (!$user->fotografia) {
-                        $fotoCandidato = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->where('identificacion', $user->cedula)
-                            ->value('fotografia');
-                        if ($fotoCandidato) {
-                            $user->fotografia = $fotoCandidato;
-                        }
-                    }
-
                     // Datos desde respuestas_ingresos: tallas, profesión y datos personales nulos
                     $respuesta = \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first();
+
+                    // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
+                    // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
+                    // candidatos (fuente antigua, previa a que el campo se moviera aquí).
+                    if (!$user->fotografia) {
+                        $user->fotografia = $respuesta?->fotografia
+                            ?: \Illuminate\Support\Facades\DB::table('candidatos')
+                                ->where('identificacion', $user->cedula)
+                                ->value('fotografia');
+                    }
                     $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
                     $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
                     $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);

@@ -33,5 +33,6 @@ class RespuestaIngreso extends Model
         'talla_camisa',
         'talla_pantalon',
         'talla_zapatos',
+        'fotografia',
     ];
 }

@@ -183,9 +183,12 @@ class PedidoAutomaticoController extends Controller
 
             $emp = $pedidoAutomatico->empleado;
             if ($emp && !$emp->fotografia) {
-                $emp->fotografia = DB::table('candidatos')
-                    ->where('identificacion', $emp->cedula)
-                    ->value('fotografia');
+                $emp->fotografia = DB::table('respuestas_ingresos')
+                    ->where('documento', $emp->cedula)
+                    ->value('fotografia')
+                    ?: DB::table('candidatos')
+                        ->where('identificacion', $emp->cedula)
+                        ->value('fotografia');
             }
 
             return response()->json($pedidoAutomatico);
@@ -197,7 +200,7 @@ class PedidoAutomaticoController extends Controller
         $data = $request->validate([
             'ids'          => 'required|array|min:1',
             'ids.*'        => 'integer|exists:pedidos_automaticos,id',
-            'estado'       => 'required|string|in:Activo,Para ventas,Devolución,Devolución usada',
+            'estado'       => 'required|string|in:Activo,Enviar a compras,Devolución,Devolución usada',
         ]);
 
         return DB::transaction(function () use ($data) {
