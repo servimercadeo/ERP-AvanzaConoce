@@ -26,11 +26,15 @@ class ActaEntregaDotacionService
         $data = [
             'empresa'         => $this->resolverEmpresa($pedido),
             'entregaNumero'   => $pedido->codigo,
-            'creadoPor'       => $creadoPor,
+            'solicitadoPor'   => $creadoPor,
             'fechaRegistro'   => $pedido->fecha_pedido ? Carbon::parse($pedido->fecha_pedido)->format('d/m/Y') : '—',
             'fechaEntrega'    => now()->format('d/m/Y'),
-            'sede'            => $pedido->contrato?->sede ?: ($empleado?->sede ?: '—'),
-            'empleadoNombre'  => trim(($empleado?->nombres ?? '') . ' ' . ($empleado?->apellidos ?? '')) ?: '—',
+            // Origen: sede del contrato que generó el pedido (de dónde se gestiona/despacha la
+            // dotación). Destino: sede actual del empleado (a dónde va), pueden diferir si el
+            // empleado fue trasladado después de la fecha del contrato.
+            'sedeOrigen'      => $pedido->contrato?->sede ?: ($empleado?->sede ?: '—'),
+            'sedeDestino'     => $empleado?->sede ?: '—',
+            'solicitadoPara'  => trim(($empleado?->nombres ?? '') . ' ' . ($empleado?->apellidos ?? '')) ?: '—',
             'empleadoCedula'  => $empleado?->cedula ?? '—',
             'observaciones'   => $pedido->notas,
             'items'           => $items,

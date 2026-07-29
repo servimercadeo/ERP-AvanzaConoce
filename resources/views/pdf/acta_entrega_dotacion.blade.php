@@ -46,7 +46,7 @@
 
         .firma { margin-top: 30px; font-size: 10px; }
         .firma .label { font-weight: bold; margin-bottom: 30px; }
-        .firma .linea { border-top: 1px solid #444; width: 260px; margin-bottom: 6px; }
+        .firma .linea { border-top: 1px solid #444; width: 460px; margin-bottom: 6px; }
         .firma .dato { margin-bottom: 2px; }
     </style>
 </head>
@@ -75,23 +75,30 @@
 
     <table class="meta-row" width="100%">
         <tr>
-            <td width="50%"><strong>Entrega N&uacute;mero:</strong> {{ $entregaNumero }}</td>
-            <td width="50%"><strong>Creado por:</strong> {{ $creadoPor }}</td>
+            <td><strong>Entrega N&uacute;mero:</strong> {{ $entregaNumero }}</td>
         </tr>
     </table>
 
     <table class="box">
         <tr>
-            <th width="18%">Fecha de registro</th>
-            <th width="18%">Fecha de entrega</th>
-            <th width="24%">Ciudad / Sede Origen</th>
-            <th width="40%">Empleado</th>
+            <th width="15%">Fecha de registro</th>
+            <th width="15%">Fecha de entrega</th>
+            <th width="35%">Sede origen</th>
+            <th width="35%">Sede destino</th>
         </tr>
         <tr>
             <td>{{ $fechaRegistro }}</td>
             <td>{{ $fechaEntrega }}</td>
-            <td>{{ $sede }}</td>
-            <td>{{ $empleadoNombre }}</td>
+            <td>{{ $sedeOrigen }}</td>
+            <td>{{ $sedeDestino }}</td>
+        </tr>
+        <tr>
+            <th width="50%" colspan="2">Solicitado por</th>
+            <th width="50%" colspan="2">Solicitado para</th>
+        </tr>
+        <tr>
+            <td colspan="2">{{ $solicitadoPor }}</td>
+            <td colspan="2">{{ $solicitadoPara }}</td>
         </tr>
     </table>
 
@@ -138,7 +145,7 @@
     <div class="firma">
         <div class="label">RECIBIDO POR:</div>
         <div class="linea"></div>
-        <div class="dato">Nombre: {{ $empleadoNombre }}</div>
+        <div class="dato">Nombre: {{ $solicitadoPara }}</div>
         <div class="dato">C&eacute;dula: {{ $empleadoCedula }}</div>
     </div>
 </body>

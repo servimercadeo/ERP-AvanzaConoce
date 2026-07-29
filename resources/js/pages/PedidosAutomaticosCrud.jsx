@@ -256,15 +256,10 @@ function buildInventarioIndex(inventarioFlat) {
 }
 
 // Replica exactamente `inventarioFlat.find(i => i.proyecto===p && i.prenda===pr &&
-// (i.genero===genero || i.genero==='Unisex') && i.talla.toLowerCase()===talla.toLowerCase())`
-// pero usando el índice: primero intenta el género exacto del empleado, si no hay cae a Unisex.
+// i.genero===genero && i.talla.toLowerCase()===talla.toLowerCase())` pero usando el índice.
 function lookupInventario(idx, proyecto, prenda, talla, genero) {
     const tallaLower = String(talla ?? "").toLowerCase();
-    return (
-        idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ??
-        idx.get(`${proyecto}|${prenda}|${tallaLower}|Unisex`) ??
-        null
-    );
+    return idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ?? null;
 }
 
 // Vuelve a resolver una prenda de un pedido anterior contra el inventario ACTUAL:
