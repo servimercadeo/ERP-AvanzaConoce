@@ -977,7 +977,6 @@ function Modal({
                                     k="codigo_directv"
                                     {...fp}
                                 />
-                                <div /> {/* espaciador */}
                                 <Field
                                     label="Empresa"
                                     k="empresa_id"
@@ -985,6 +984,14 @@ function Modal({
                                         value: e.id,
                                         label: e.nombre,
                                     }))}
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Empleador"
+                                    k="empleador"
+                                    opts={(catalogs.empleadores || []).map(
+                                        (e) => e.nombre,
+                                    )}
                                     {...fp}
                                 />
                             </div>
