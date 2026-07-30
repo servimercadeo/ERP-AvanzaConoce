@@ -18,7 +18,6 @@ const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""
 function FormModal({ open, onClose, onSave, editTarget }) {
     const [nombre, setNombre] = useState("");
     const [tipo, setTipo] = useState("Indirecto");
-    const [correo, setCorreo] = useState("");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -26,7 +25,6 @@ function FormModal({ open, onClose, onSave, editTarget }) {
         if (open) {
             setNombre(editTarget?.nombre ?? "");
             setTipo(editTarget?.tipo ?? "Indirecto");
-            setCorreo(editTarget?.correo ?? "");
             setError("");
         }
     }, [open, editTarget]);
@@ -41,11 +39,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
         setSaving(true);
         setError("");
         try {
-            await onSave({
-                nombre: nombre.trim(),
-                tipo,
-                correo: correo.trim() || null,
-            });
+            await onSave({ nombre: nombre.trim(), tipo });
             onClose();
         } catch (err) {
             setError(
@@ -93,16 +87,6 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                             <option value="Directo">Directo</option>
                             <option value="Indirecto">Indirecto</option>
                         </select>
-                    </div>
-                    <div style={S.formGroup}>
-                        <label style={S.label}>Correo</label>
-                        <input
-                            style={S.input}
-                            type="email"
-                            value={correo}
-                            onChange={(e) => setCorreo(e.target.value)}
-                            placeholder="correo@empleador.com"
-                        />
                     </div>
                 </div>
                 <div style={S.modalFooter}>
@@ -246,7 +230,6 @@ export default function EmpleadoresCrud() {
                             <tr>
                                 <th>Nombre</th>
                                 <th style={{ textAlign: "center" }}>Tipo</th>
-                                <th>Correo</th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
                                 </th>
@@ -269,7 +252,6 @@ export default function EmpleadoresCrud() {
                                                 : "Indirecto"}
                                         </span>
                                     </td>
-                                    <td>{e.correo || "—"}</td>
                                     <td>
                                         <div style={S.actions}>
                                             <button

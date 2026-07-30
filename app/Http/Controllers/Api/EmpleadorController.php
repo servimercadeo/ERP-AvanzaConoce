@@ -24,7 +24,6 @@ class EmpleadorController extends Controller
         $data = $request->validate([
             'nombre' => 'required|string|max:150',
             'tipo'   => 'nullable|string|in:Directo,Indirecto',
-            'correo' => 'nullable|email|max:180',
         ]);
         $data['tipo'] = $data['tipo'] ?? 'Indirecto';
 
@@ -47,7 +46,6 @@ class EmpleadorController extends Controller
         $data = $request->validate([
             'nombre' => 'required|string|max:150',
             'tipo'   => 'required|string|in:Directo,Indirecto',
-            'correo' => 'nullable|email|max:180',
         ]);
 
         $empleador->update($data);
