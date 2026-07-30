@@ -12,7 +12,7 @@ class Candidato extends Model
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
         'fecha_expedicion', 'lugar_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
-        'pruebas', 'aval', 'tipo_vinculacion', 'fecha_aval', 'negocio', 'observaciones',
+        'pruebas', 'aval', 'tipo_vinculacion', 'empleador_id', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
         'asmt_ejercicio', 'asmt_nombre_ejercicio',
         'asmt_claridad_mensaje', 'asmt_conviccion_energia', 'asmt_adaptabilidad_escucha',
@@ -53,6 +53,11 @@ class Candidato extends Model
     public function requisicion()
     {
         return $this->belongsTo(Requisicion::class);
+    }
+
+    public function empleador()
+    {
+        return $this->belongsTo(Empleador::class);
     }
 
     public function ciudad()

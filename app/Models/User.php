@@ -82,6 +82,7 @@ class User extends Authenticatable
         return $this->hasOne(UserPreference::class);
     }
 
+
     protected function casts(): array
     {
         return [

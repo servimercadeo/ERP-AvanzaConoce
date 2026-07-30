@@ -8,59 +8,45 @@ import {
 } from "../components/Icons";
 
 const POR_PAGINA = 15;
-const CAMPOS_VACIOS = { codigo: "", nombre: "", ciudad: "", proyecto: "", activo: true };
 
 const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /* ─── Modal de creación / edición ──────────────────────────────────── */
 function FormModal({ open, onClose, onSave, editTarget }) {
-    const [form, setForm] = useState(CAMPOS_VACIOS);
-    const [errors, setErrors] = useState({});
+    const [nombre, setNombre] = useState("");
+    const [descripcion, setDescripcion] = useState("");
+    const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
     React.useEffect(() => {
         if (open) {
-            setForm(editTarget ? {
-                codigo: editTarget.codigo ?? "",
-                nombre: editTarget.nombre ?? "",
-                ciudad: editTarget.ciudad ?? "",
-                proyecto: editTarget.proyecto ?? "",
-                activo: !!editTarget.activo,
-            } : CAMPOS_VACIOS);
-            setErrors({});
+            setNombre(editTarget?.nombre ?? "");
+            setDescripcion(editTarget?.descripcion ?? "");
+            setError("");
         }
     }, [open, editTarget]);
 
     if (!open) return null;
 
-    const onChange = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-    const validate = () => {
-        const e = {};
-        if (!form.codigo.trim()) e.codigo = "Requerido";
-        if (!form.nombre.trim()) e.nombre = "Requerido";
-        return e;
-    };
-
     const handleSave = async () => {
-        const e = validate();
-        if (Object.keys(e).length) { setErrors(e); return; }
+        if (!nombre.trim()) {
+            setError("Requerido");
+            return;
+        }
         setSaving(true);
-        setErrors({});
+        setError("");
         try {
             await onSave({
-                codigo: form.codigo.trim(),
-                nombre: form.nombre.trim(),
-                ciudad: form.ciudad.trim() || null,
-                proyecto: form.proyecto.trim() || null,
-                activo: form.activo,
+                nombre: nombre.trim(),
+                descripcion: descripcion.trim() || null,
             });
             onClose();
         } catch (err) {
-            const msg = err?.response?.data?.errors?.codigo?.[0]
-                ?? err?.response?.data?.message
-                ?? "No se pudo guardar el centro de costo.";
-            setErrors({ codigo: msg });
+            setError(
+                err?.response?.data?.errors?.nombre?.[0] ??
+                    err?.response?.data?.message ??
+                    "No se pudo guardar la regional.",
+            );
         } finally {
             setSaving(false);
         }
@@ -71,53 +57,46 @@ function FormModal({ open, onClose, onSave, editTarget }) {
             <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>
-                        {editTarget ? "Editar Centro de Costo" : "Nuevo Centro de Costo"}
+                        {editTarget ? "Editar Regional" : "Nueva Regional"}
                     </span>
                     <button style={S.closeBtnWhite} onClick={onClose}>
                         <IconClose size={14} />
                     </button>
                 </div>
                 <div style={S.modalBody}>
-                    <div style={S.grid2}>
-                        <div style={S.formGroup}>
-                            <label style={S.label}>Código *</label>
-                            <input
-                                style={{ ...S.input, ...(errors.codigo ? { borderColor: "#e74c3c" } : {}) }}
-                                value={form.codigo}
-                                onChange={onChange("codigo")}
-                            />
-                            {errors.codigo && <span style={S.err}>{errors.codigo}</span>}
-                        </div>
-                        <div style={S.formGroup}>
-                            <label style={S.label}>Ciudad</label>
-                            <input style={S.input} value={form.ciudad} onChange={onChange("ciudad")} />
-                        </div>
-                    </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Nombre *</label>
                         <input
-                            style={{ ...S.input, ...(errors.nombre ? { borderColor: "#e74c3c" } : {}) }}
-                            value={form.nombre}
-                            onChange={onChange("nombre")}
+                            style={{
+                                ...S.input,
+                                ...(error ? { borderColor: "#e74c3c" } : {}),
+                            }}
+                            value={nombre}
+                            onChange={(e) => setNombre(e.target.value)}
+                            placeholder="Ej. CENTRO, COSTA, ANDINA…"
                         />
-                        {errors.nombre && <span style={S.err}>{errors.nombre}</span>}
+                        {error && <span style={S.err}>{error}</span>}
                     </div>
                     <div style={S.formGroup}>
-                        <label style={S.label}>Proyecto</label>
-                        <input style={S.input} value={form.proyecto} onChange={onChange("proyecto")} />
-                    </div>
-                    <label style={S.checkboxRow}>
+                        <label style={S.label}>Descripción</label>
                         <input
-                            type="checkbox"
-                            checked={form.activo}
-                            onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
+                            style={S.input}
+                            value={descripcion}
+                            onChange={(e) => setDescripcion(e.target.value)}
+                            placeholder="Ej. Bogotá y Cundinamarca"
                         />
-                        Activo
-                    </label>
+                    </div>
                 </div>
                 <div style={S.modalFooter}>
-                    <button className="btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
-                    <button className="btn-primary" style={{ opacity: saving ? 0.6 : 1 }} onClick={handleSave} disabled={saving}>
+                    <button className="btn-secondary" onClick={onClose} disabled={saving}>
+                        Cancelar
+                    </button>
+                    <button
+                        className="btn-primary"
+                        style={{ opacity: saving ? 0.6 : 1 }}
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
                         {saving ? "Guardando…" : "Guardar"}
                     </button>
                 </div>
@@ -127,7 +106,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════ */
-export default function CentrosCostosCrud() {
+export default function RegionalesCrud() {
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 280);
@@ -136,27 +115,32 @@ export default function CentrosCostosCrud() {
     const [editTarget, setEditTarget] = useState(null);
     const [toast, setToast] = useState(null);
 
-    const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3200); };
+    const showToast = (msg) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 3200);
+    };
 
-    const { data: centros = [], isLoading } = useQuery({
-        queryKey: ["centros-costo-catalogo-admin"],
-        queryFn: () => api.get("/centros-costo-catalogo?all=1").then((r) => r.data),
+    const { data: regionales = [], isLoading } = useQuery({
+        queryKey: ["regionales-admin"],
+        queryFn: () => api.get("/regionales").then((r) => r.data),
     });
 
     const filtered = useMemo(() => {
         const q = norm(debSearch);
-        if (!q) return centros;
-        return centros.filter((c) =>
-            [c.codigo, c.nombre, c.ciudad, c.proyecto].some((v) => norm(v ?? "").includes(q)),
-        );
-    }, [centros, debSearch]);
+        if (!q) return regionales;
+        return regionales.filter((r) => norm(r.nombre ?? "").includes(q));
+    }, [regionales, debSearch]);
 
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
-    const paginated = filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+    const paginated = filtered.slice(
+        (pagina - 1) * POR_PAGINA,
+        pagina * POR_PAGINA,
+    );
 
     const invalidate = () => {
-        qc.invalidateQueries({ queryKey: ["centros-costo-catalogo-admin"] });
-        qc.invalidateQueries({ queryKey: ["centros-costo-catalogo"] });
+        qc.invalidateQueries({ queryKey: ["regionales-admin"] });
+        qc.invalidateQueries({ queryKey: ["catalogos"] });
+        qc.invalidateQueries({ queryKey: ["seleccion-catalogos"] });
     };
 
     const handleCreate = () => {
@@ -164,31 +148,34 @@ export default function CentrosCostosCrud() {
         setModalOpen(true);
     };
 
-    const handleEdit = (centro) => {
-        setEditTarget(centro);
+    const handleEdit = (r) => {
+        setEditTarget(r);
         setModalOpen(true);
     };
 
     const handleSave = async (payload) => {
         if (editTarget) {
-            await api.put(`/centros-costo-catalogo/${editTarget.id}`, payload);
+            await api.put(`/regionales/${editTarget.id}`, payload);
             invalidate();
-            showToast("Centro de costo actualizado.");
+            showToast("Regional actualizada.");
         } else {
-            await api.post("/centros-costo-catalogo", payload);
+            await api.post("/regionales", payload);
             invalidate();
-            showToast("Centro de costo creado.");
+            showToast("Regional creada.");
         }
     };
 
-    const handleDelete = async (centro) => {
-        if (!confirm(`¿Eliminar el centro de costo "${centro.codigo} · ${centro.nombre}"?`)) return;
+    const handleDelete = async (r) => {
+        if (!confirm(`¿Eliminar la regional "${r.nombre}"?`)) return;
         try {
-            await api.delete(`/centros-costo-catalogo/${centro.id}`);
+            await api.delete(`/regionales/${r.id}`);
             invalidate();
-            showToast("Centro de costo eliminado.");
-        } catch {
-            showToast("No se pudo eliminar el centro de costo.");
+            showToast("Regional eliminada.");
+        } catch (err) {
+            showToast(
+                err?.response?.data?.message ??
+                    "No se pudo eliminar la regional.",
+            );
         }
     };
 
@@ -198,65 +185,73 @@ export default function CentrosCostosCrud() {
 
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{centros.length}</div>
-                    <div className="stat-label">Total centros de costo</div>
+                    <div className="stat-num">{regionales.length}</div>
+                    <div className="stat-label">Total regionales</div>
                 </div>
             </div>
 
             <div style={S.toolbar}>
                 <div style={S.searchWrap}>
-                    <span style={S.searchIcon}><IconSearch size={15} /></span>
+                    <span style={S.searchIcon}>
+                        <IconSearch size={15} />
+                    </span>
                     <input
                         style={S.searchInput}
-                        placeholder="Buscar por código, nombre, ciudad, proyecto…"
+                        placeholder="Buscar por nombre…"
                         value={search}
-                        onChange={(e) => { setSearch(e.target.value); setPagina(1); }}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPagina(1);
+                        }}
                     />
                 </div>
                 <button className="btn-primary" onClick={handleCreate}>
-                    + Nuevo Centro de Costo
+                    + Nueva Regional
                 </button>
             </div>
 
             <div style={S.tableWrap}>
                 {isLoading ? (
-                    <div style={S.empty}><IconLoading size={32} /><p>Cargando…</p></div>
+                    <div style={S.empty}>
+                        <IconLoading size={32} />
+                        <p>Cargando…</p>
+                    </div>
                 ) : filtered.length === 0 ? (
-                    <div style={S.empty}><IconEmptySearch size={44} /><p>No se encontraron centros de costo.</p></div>
+                    <div style={S.empty}>
+                        <IconEmptySearch size={44} />
+                        <p>No se encontraron regionales.</p>
+                    </div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Código</th>
                                 <th>Nombre</th>
-                                <th>Ciudad</th>
-                                <th>Proyecto</th>
-                                <th style={{ textAlign: "center" }}>Estado</th>
+                                <th>Descripción</th>
                                 <th style={{ textAlign: "center" }}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {paginated.map((c) => (
-                                <tr key={c.id}>
-                                    <td>{c.codigo}</td>
-                                    <td>{c.nombre}</td>
-                                    <td>{c.ciudad || "—"}</td>
-                                    <td>{c.proyecto || "—"}</td>
-                                    <td style={{ textAlign: "center" }}>
-                                        <span style={S.badge(!!c.activo)}>
-                                            {c.activo ? "Activo" : "Inactivo"}
-                                        </span>
-                                    </td>
+                            {paginated.map((r) => (
+                                <tr key={r.id}>
+                                    <td style={{ fontWeight: 700 }}>{r.nombre}</td>
+                                    <td>{r.descripcion || "—"}</td>
                                     <td>
                                         <div style={S.actions}>
                                             <button
-                                                style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")}
+                                                style={S.actionBtn(
+                                                    "var(--primary-light)",
+                                                    "var(--primary-dark)",
+                                                )}
                                                 title="Editar"
-                                                onClick={() => handleEdit(c)}
+                                                onClick={() => handleEdit(r)}
                                             >
                                                 <IconEdit size={14} />
                                             </button>
-                                            <button style={S.actionBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => handleDelete(c)}>
+                                            <button
+                                                style={S.actionBtn("#fce8e8", "#a33")}
+                                                title="Eliminar"
+                                                onClick={() => handleDelete(r)}
+                                            >
                                                 <IconTrash size={14} />
                                             </button>
                                         </div>
@@ -271,22 +266,58 @@ export default function CentrosCostosCrud() {
             {!isLoading && filtered.length > POR_PAGINA && (
                 <div style={S.paginationBar}>
                     <span style={S.paginationInfo}>
-                        Mostrando {(pagina - 1) * POR_PAGINA + 1}–{Math.min(pagina * POR_PAGINA, filtered.length)} de {filtered.length}
+                        Mostrando {(pagina - 1) * POR_PAGINA + 1}–
+                        {Math.min(pagina * POR_PAGINA, filtered.length)} de{" "}
+                        {filtered.length}
                     </span>
                     <div style={S.paginationBtns}>
-                        <button style={S.pageBtn(pagina === 1, false)} disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>‹</button>
+                        <button
+                            style={S.pageBtn(pagina === 1, false)}
+                            disabled={pagina === 1}
+                            onClick={() => setPagina((p) => p - 1)}
+                        >
+                            ‹
+                        </button>
                         {Array.from({ length: totalPaginas }, (_, i) => i + 1)
-                            .filter((p) => p === 1 || p === totalPaginas || Math.abs(p - pagina) <= 1)
+                            .filter(
+                                (p) =>
+                                    p === 1 ||
+                                    p === totalPaginas ||
+                                    Math.abs(p - pagina) <= 1,
+                            )
                             .reduce((acc, p, idx, arr) => {
                                 if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
                                 acc.push(p);
                                 return acc;
                             }, [])
-                            .map((p, i) => (p === "…"
-                                ? <span key={`e${i}`} style={{ padding: "0 4px", color: "var(--text-muted)" }}>…</span>
-                                : <button key={p} style={S.pageBtn(false, p === pagina)} onClick={() => setPagina(p)}>{p}</button>
-                            ))}
-                        <button style={S.pageBtn(pagina === totalPaginas, false)} disabled={pagina === totalPaginas} onClick={() => setPagina((p) => p + 1)}>›</button>
+                            .map((p, i) =>
+                                p === "…" ? (
+                                    <span
+                                        key={`e${i}`}
+                                        style={{
+                                            padding: "0 4px",
+                                            color: "var(--text-muted)",
+                                        }}
+                                    >
+                                        …
+                                    </span>
+                                ) : (
+                                    <button
+                                        key={p}
+                                        style={S.pageBtn(false, p === pagina)}
+                                        onClick={() => setPagina(p)}
+                                    >
+                                        {p}
+                                    </button>
+                                ),
+                            )}
+                        <button
+                            style={S.pageBtn(pagina === totalPaginas, false)}
+                            disabled={pagina === totalPaginas}
+                            onClick={() => setPagina((p) => p + 1)}
+                        >
+                            ›
+                        </button>
                     </div>
                 </div>
             )}
@@ -315,12 +346,6 @@ const S = {
     tableWrap: { background: "var(--white)", border: "1.5px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", overflowX: "auto" },
     actions: { display: "flex", gap: 6, justifyContent: "center" },
     actionBtn: (bg, color) => ({ background: bg, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", color, transition: "opacity 0.15s", display: "inline-flex", alignItems: "center" }),
-    badge: (activo) => ({
-        display: "inline-block", padding: "3px 10px", borderRadius: 999,
-        fontSize: "0.74rem", fontWeight: 700,
-        background: activo ? "#e3f6ee" : "#fce8e8",
-        color: activo ? "#1a8f5e" : "#a33",
-    }),
     empty: { padding: "60px 20px", textAlign: "center", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
     paginationBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },
     paginationInfo: { fontSize: "0.84rem", color: "var(--text-muted)", fontWeight: 600 },
@@ -336,7 +361,7 @@ const S = {
 
     /* modal */
     overlay: { position: "fixed", inset: 0, background: "rgba(26,58,53,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 5000, padding: "32px 16px", overflowY: "auto" },
-    modal: { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 16px 60px rgba(26,155,140,0.22)", width: "100%", maxWidth: 480, display: "flex", flexDirection: "column" },
+    modal: { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 16px 60px rgba(26,155,140,0.22)", width: "100%", maxWidth: 440, display: "flex", flexDirection: "column" },
     modalHeaderGreen: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 28px", background: "var(--primary)", borderTopLeftRadius: "var(--radius)", borderTopRightRadius: "var(--radius)", flexShrink: 0 },
     modalTitleWhite: { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "#fff" },
     closeBtnWhite: { background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" },
@@ -344,10 +369,8 @@ const S = {
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 28px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
 
     /* form */
-    grid2: { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },
-    checkboxRow: { display: "flex", alignItems: "center", gap: 8, fontSize: "0.86rem", fontWeight: 600, color: "var(--text)", cursor: "pointer" },
     err: { color: "#e74c3c", fontSize: "0.75rem", marginTop: 2 },
 };

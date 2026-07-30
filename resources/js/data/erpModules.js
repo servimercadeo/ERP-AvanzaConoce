@@ -291,6 +291,61 @@ export const ERP_MODULES = [
     ],
     archivos: []
   },
+  {
+    id: 'parametros',
+    label: 'Parametros',
+    icon: 'parametros',
+    color: '#8e44ad',
+    desc: 'Parámetros y catálogos generales del sistema.',
+    submods: [
+      {
+        id: 'empleadores',
+        label: 'Empleadores',
+        icon: 'usuarios',
+        desc: 'Catálogo de empleadores',
+        archivos: [
+          { id: 'empleadores_file', label: 'Empleadores' },
+        ]
+      },
+      {
+        id: 'empresas',
+        label: 'Empresas',
+        icon: 'usuarios',
+        desc: 'Catálogo de empresas',
+        archivos: [
+          { id: 'empresas_file', label: 'Empresas' },
+        ]
+      },
+      {
+        id: 'regionales',
+        label: 'Regionales',
+        icon: 'usuarios',
+        desc: 'Catálogo de regionales',
+        archivos: [
+          { id: 'regionales_file', label: 'Regionales' },
+        ]
+      },
+      {
+        id: 'centros_costos',
+        label: 'Centros de Costos',
+        icon: 'usuarios',
+        desc: 'Catálogo de centros de costo',
+        archivos: [
+          { id: 'centros_costos_file', label: 'Centros de Costos' },
+        ]
+      },
+      {
+        id: 'proyectos',
+        label: 'Proyectos',
+        icon: 'usuarios',
+        desc: 'Catálogo de proyectos',
+        archivos: [
+          { id: 'proyectos_file', label: 'Proyectos' },
+        ]
+      }
+    ],
+    archivos: []
+  },
   /*
   {
     id: 'ventas',

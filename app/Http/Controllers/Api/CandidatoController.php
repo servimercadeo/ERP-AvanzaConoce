@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
+use App\Models\Empleador;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -19,6 +20,7 @@ class CandidatoController extends Controller
             'requisicion.empresa',
             'requisicion.cargo',
             'requisicion.empleador',
+            'empleador',
             'ciudad',
             'documentos' => fn($q) => $q->whereIn('nombre', ['Hoja de vida', 'Pruebas psicotécnicas'])
                                         ->select(['id', 'candidato_id', 'nombre']),
@@ -118,6 +120,7 @@ class CandidatoController extends Controller
             'pruebas'                  => 'nullable|boolean',
             'aval'                     => 'nullable|boolean',
             'tipo_vinculacion'         => 'nullable|string|in:Directa,Indirecta',
+            'empleador_id'             => 'nullable|exists:empleadores,id',
             'fecha_aval'               => 'nullable|date',
             'negocio'                  => 'nullable|string|max:150',
             'observaciones'            => 'nullable|string',
@@ -231,6 +234,37 @@ class CandidatoController extends Controller
                         ['message' => 'Completa los campos de remuneración del candidato (Tasa de riesgo ARL y Salario básico) antes de activar el Aval.'],
                         422
                     );
+                }
+
+                $tipoVinculacion = $data['tipo_vinculacion'] ?? $candidato->tipo_vinculacion;
+
+                if ($tipoVinculacion === 'Indirecta') {
+                    $empleador = Empleador::find($data['empleador_id'] ?? null);
+                    if (!$empleador || $empleador->tipo !== 'Indirecto') {
+                        return response()->json(
+                            ['message' => 'Selecciona un empleador indirecto (temporal) válido para confirmar el aval.'],
+                            422
+                        );
+                    }
+                } elseif ($tipoVinculacion === 'Directa') {
+                    $candidato->loadMissing('requisicion.empresa');
+                    $empresaNombre = strtoupper($candidato->requisicion?->empresa?->nombre ?? '');
+                    $empleadorDirecto = Empleador::where('tipo', 'Directo')->get()
+                        ->first(function ($emp) use ($empresaNombre) {
+                            $keyword = strtoupper(str_replace('S&M ', '', $emp->nombre));
+                            return $empresaNombre !== '' && (
+                                str_contains($empresaNombre, $keyword) || str_contains($keyword, $empresaNombre)
+                            );
+                        });
+
+                    if (!$empleadorDirecto) {
+                        return response()->json(
+                            ['message' => 'La empresa de la requisición ("' . ($candidato->requisicion?->empresa?->nombre ?? 'sin empresa asignada') . '") no corresponde a un empleador directo (Servimercadeo o Servicios y Mercadeo). No se puede confirmar el aval como vinculación Directa.'],
+                            422
+                        );
+                    }
+
+                    $data['empleador_id'] = $empleadorDirecto->id;
                 }
             }
         }
