@@ -8,11 +8,10 @@ class EmpresaProyectoRules
      * Empresa (nombre exacto de la tabla `empresas`) => proyectos (nombre exacto de
      * `proyectos`) permitidos para esa empresa. Empresas que no aparecen aquí (Servimercadeo EC,
      * Servicios y Mercadeo EC, E2BPO, Confianza y Colaboración, FT&H Consulting, Altycom) no están
-     * sujetas a esta regla. "Solo Ausentismos" es el proyecto que en el negocio se conoce como
-     * "Administrativo".
+     * sujetas a esta regla.
      */
     private const REGLAS = [
-        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'SOLO AUSENTISMOS'],
+        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRATIVO'],
         'SERVIMERCADEO COL'        => ['DIRECTV CO'],
     ];
 

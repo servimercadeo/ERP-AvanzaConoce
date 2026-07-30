@@ -8,5 +8,5 @@ class Empleador extends Model
 {
     protected $table = 'empleadores';
     public $incrementing = false;
-    protected $fillable = ['id', 'nombre', 'tipo', 'correo'];
+    protected $fillable = ['id', 'nombre', 'tipo'];
 }

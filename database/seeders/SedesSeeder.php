@@ -9,11 +9,11 @@ class SedesSeeder extends Seeder
 {
     /**
      * Nombre de proyecto tal como viene en sedes_activas.csv => nombre exacto en la tabla
-     * `proyectos`. "ADMINISTRACION" y "DIRECTV COL" son los alias de negocio para "SOLO
-     * AUSENTISMOS" y "DIRECTV CO" respectivamente (ver App\Services\EmpresaProyectoRules).
+     * `proyectos`. "ADMINISTRACION" y "DIRECTV COL" son los alias de negocio para "ADMINISTRATIVO"
+     * y "DIRECTV CO" respectivamente (ver App\Services\EmpresaProyectoRules).
      */
     private const CSV_PROYECTO_A_PROYECTOS = [
-        'ADMINISTRACION' => 'SOLO AUSENTISMOS',
+        'ADMINISTRACION' => 'ADMINISTRATIVO',
         'DIRECTV COL'    => 'DIRECTV CO',
         'TIGO EXPRESS'   => 'TIGO EXPRESS',
         'TIGO HOME'      => 'TIGO HOME',
