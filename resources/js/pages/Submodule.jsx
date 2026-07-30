@@ -20,6 +20,10 @@ const PedidosAutomaticosCrud = lazy(() => import('./PedidosAutomaticosCrud'));
 const PedidosGlobalesCrud = lazy(() => import('./PedidosGlobalesCrud'));
 const TrazabilidadPedidos = lazy(() => import('./TrazabilidadPedidos'));
 const CronogramaDotacion = lazy(() => import('./CronogramaDotacion'));
+const EmpleadoresCrud = lazy(() => import('./EmpleadoresCrud'));
+const EmpresasCrud = lazy(() => import('./EmpresasCrud'));
+const RegionalesCrud = lazy(() => import('./RegionalesCrud'));
+const ProyectosCrud = lazy(() => import('./ProyectosCrud'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -218,6 +222,31 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
     /* ── PARÁMETROS ─────────────────────────────────────── */
     case 'parametros':
       switch (submoduleId) {
+        case 'empleadores':
+          switch (archivoId) {
+            case 'empleadores_file': return EmpleadoresCrud;
+            default: return null;
+          }
+        case 'empresas':
+          switch (archivoId) {
+            case 'empresas_file': return EmpresasCrud;
+            default: return null;
+          }
+        case 'regionales':
+          switch (archivoId) {
+            case 'regionales_file': return RegionalesCrud;
+            default: return null;
+          }
+        case 'centros_costos':
+          switch (archivoId) {
+            case 'centros_costos_file': return CentrosCostosCrud;
+            default: return null;
+          }
+        case 'proyectos':
+          switch (archivoId) {
+            case 'proyectos_file': return ProyectosCrud;
+            default: return null;
+          }
         case 'par_generales':
         case 'par_administrativos':
         case 'par_comerciales_tecnicos':

@@ -78,6 +78,7 @@ export default function CandidatosCrud() {
     const [sedesOpts, setSedesOpts] = useState([]);
     const [arlsOpts, setArlsOpts] = useState([]);
     const [cajasOpts, setCajasOpts] = useState([]);
+    const [empleadoresCatalogo, setEmpleadoresCatalogo] = useState([]);
     // loadingData is derived from React Query (see queries below)
     const [candDetailSearch, setCandDetailSearch] = useState("");
     const debouncedSearch = useDebounce(candDetailSearch, 300);
@@ -124,6 +125,7 @@ export default function CandidatosCrud() {
         open: false,
         candidateId: null,
         tipo: "Directa",
+        empleadorId: "",
     });
     const [toast, setToast] = useState(null);
     const [confirmDlg, setConfirmDlg] = useState({
@@ -190,6 +192,7 @@ export default function CandidatosCrud() {
             );
             setArlsOpts((_qCatalogos.arls || []).map((n) => ({ value: n, label: n })));
             setCajasOpts((_qCatalogos.cajas || []).map((n) => ({ value: n, label: n })));
+            setEmpleadoresCatalogo(_qCatalogos.empleadores || []);
         }
     }, [_qCatalogos]);
     useEffect(() => {
@@ -290,20 +293,29 @@ export default function CandidatosCrud() {
                 );
                 return;
             }
-            setVinculacionModal({ open: true, candidateId, tipo: "Directa" });
+            setVinculacionModal({ open: true, candidateId, tipo: "Directa", empleadorId: "" });
             return;
         }
         doToggleField(candidateId, field);
     };
 
     const handleConfirmVinculacion = () => {
+        if (vinculacionModal.tipo === "Indirecta" && !vinculacionModal.empleadorId) {
+            showAlert("Empleador requerido", "Selecciona el empleador temporal para la vinculación Indirecta.");
+            return;
+        }
         doToggleField(vinculacionModal.candidateId, "aval", {
             tipo_vinculacion: vinculacionModal.tipo,
+            empleador_id:
+                vinculacionModal.tipo === "Indirecta"
+                    ? Number(vinculacionModal.empleadorId)
+                    : null,
         });
         setVinculacionModal({
             open: false,
             candidateId: null,
             tipo: "Directa",
+            empleadorId: "",
         });
     };
 
@@ -2769,6 +2781,7 @@ export default function CandidatosCrud() {
                             open: false,
                             candidateId: null,
                             tipo: "Directa",
+                            empleadorId: "",
                         })
                     }
                 >
@@ -2857,6 +2870,89 @@ export default function CandidatosCrud() {
                                     </label>
                                 ))}
                             </div>
+
+                            {vinculacionModal.tipo === "Indirecta" && (
+                                <div style={{ marginTop: 16 }}>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "0.78rem",
+                                            fontWeight: 700,
+                                            color: "var(--text)",
+                                            marginBottom: 5,
+                                        }}
+                                    >
+                                        Empleador (temporal) *
+                                    </label>
+                                    <select
+                                        style={{
+                                            width: "100%",
+                                            boxSizing: "border-box",
+                                            padding: "8px 10px",
+                                            border: "1.5px solid var(--border)",
+                                            borderRadius: "var(--radius-sm)",
+                                            fontSize: "0.88rem",
+                                            fontFamily: "Nunito,sans-serif",
+                                            color: "var(--text)",
+                                            background: "var(--white)",
+                                            outline: "none",
+                                        }}
+                                        value={vinculacionModal.empleadorId}
+                                        onChange={(e) =>
+                                            setVinculacionModal((p) => ({
+                                                ...p,
+                                                empleadorId: e.target.value,
+                                            }))
+                                        }
+                                    >
+                                        <option value="">Selecciona un empleador…</option>
+                                        {empleadoresCatalogo
+                                            .filter((emp) => emp.tipo === "Indirecto")
+                                            .map((emp) => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.nombre}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {vinculacionModal.tipo === "Directa" && (() => {
+                                const cand = candidates.find(
+                                    (c) => c.id === vinculacionModal.candidateId,
+                                );
+                                const empresaNombre =
+                                    cand?.requisicion?.empresa?.nombre;
+                                return (
+                                    <div
+                                        style={{
+                                            marginTop: 16,
+                                            padding: "10px 14px",
+                                            borderRadius: "var(--radius-sm)",
+                                            background: "var(--bg)",
+                                            border: "1.5px solid var(--border)",
+                                            fontSize: "0.85rem",
+                                            fontFamily: "Nunito,sans-serif",
+                                            color: "var(--text)",
+                                        }}
+                                    >
+                                        Empresa de la requisición:{" "}
+                                        <strong>
+                                            {empresaNombre || "Sin empresa asignada"}
+                                        </strong>
+                                        <div
+                                            style={{
+                                                marginTop: 4,
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                            }}
+                                        >
+                                            Se valida automáticamente contra Servimercadeo /
+                                            Servicios y Mercadeo al confirmar.
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div
                             style={{
@@ -2874,13 +2970,24 @@ export default function CandidatosCrud() {
                                         open: false,
                                         candidateId: null,
                                         tipo: "Directa",
+                                        empleadorId: "",
                                     })
                                 }
                             >
                                 Cancelar
                             </button>
                             <button
-                                style={S.btnPrimaryGreen}
+                                style={{
+                                    ...S.btnPrimaryGreen,
+                                    ...(vinculacionModal.tipo === "Indirecta" &&
+                                    !vinculacionModal.empleadorId
+                                        ? { opacity: 0.55, cursor: "not-allowed" }
+                                        : {}),
+                                }}
+                                disabled={
+                                    vinculacionModal.tipo === "Indirecta" &&
+                                    !vinculacionModal.empleadorId
+                                }
                                 onClick={handleConfirmVinculacion}
                             >
                                 Confirmar aval

@@ -20,7 +20,7 @@ const fmtDateTime = (str) => {
 function construirPasos(global) {
     return [
         {
-            label: 'Pedido recibido',
+            label: 'Pedido generado',
             completado: true,
             fecha: fmtDate(global.fecha),
         },

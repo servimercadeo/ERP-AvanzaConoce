@@ -199,8 +199,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de contratos
     Route::apiResource('contratos', ContratoController::class);
 
-    // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato
-    Route::get('centros-costo-catalogo', function () {
+    // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato.
+    // Parametros > Centros de Costos pide el listado completo (incl. inactivos) vía ?all=1.
+    Route::get('centros-costo-catalogo', function (Request $request) {
+        if ($request->boolean('all')) {
+            return response()->json(
+                \App\Models\CentroCostoCatalogo::orderBy('ciudad')->orderBy('codigo')->get()
+            );
+        }
+
         return response()->json(
             \App\Models\CentroCostoCatalogo::where('activo', true)
                 ->orderBy('ciudad')->orderBy('codigo')
@@ -233,6 +240,32 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($centro, 201);
     });
 
+    // Edita un centro de costo del catálogo (Parametros > Centros de Costos)
+    Route::put('centros-costo-catalogo/{centroCosto}', function (Request $request, \App\Models\CentroCostoCatalogo $centroCosto) {
+        $data = $request->validate([
+            'codigo'   => 'required|string|max:30',
+            'nombre'   => 'required|string|max:200',
+            'ciudad'   => 'nullable|string|max:100',
+            'proyecto' => 'nullable|string|max:100',
+            'activo'   => 'boolean',
+        ]);
+
+        $existe = \App\Models\CentroCostoCatalogo::where('codigo', $data['codigo'])
+            ->where('nombre', $data['nombre'])
+            ->where('ciudad', $data['ciudad'] ?? null)
+            ->where('id', '!=', $centroCosto->id)
+            ->exists();
+        if ($existe) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'codigo' => "Ya existe ese centro de costo.",
+            ]);
+        }
+
+        $centroCosto->update($data);
+
+        return response()->json($centroCosto->fresh());
+    });
+
     // Elimina un centro de costo del catálogo
     Route::delete('centros-costo-catalogo/{centroCosto}', function (\App\Models\CentroCostoCatalogo $centroCosto) {
         $centroCosto->delete();
@@ -242,6 +275,27 @@ Route::middleware('auth:sanctum')->group(function () {
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
     Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
+
+    // Catálogo de empleadores (Parametros > Empleadores)
+    // "empleadores" -> "empleador" explícito: el inflector de Laravel no sabe español y por
+    // defecto habría generado {empleadore}, que no coincide con el type-hint del controlador.
+    Route::apiResource('empleadores', App\Http\Controllers\Api\EmpleadorController::class)
+        ->parameters(['empleadores' => 'empleador']);
+
+    // Catálogo de empresas (Parametros > Empresas). El GET público de /empresas
+    // (fuera de este grupo, línea ~125) sigue igual para los combos existentes.
+    Route::post('empresas', [EmpresaController::class, 'store']);
+    Route::get('empresas/{empresa}', [EmpresaController::class, 'show']);
+    Route::put('empresas/{empresa}', [EmpresaController::class, 'update']);
+    Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy']);
+
+    // Catálogo de regionales (Parametros > Regionales)
+    Route::apiResource('regionales', App\Http\Controllers\Api\RegionalController::class)
+        ->parameters(['regionales' => 'regional']);
+
+    // Catálogo de proyectos (Parametros > Proyectos)
+    Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
+        ->parameters(['proyectos' => 'proyecto']);
 
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
@@ -426,7 +480,7 @@ Route::middleware('auth:sanctum')->group(function () {
                                ->orderBy('name')
                                ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
-            'empleadores'  => DB::table('empleadores')->select('id', 'nombre')->orderBy('nombre')->get(),
+            'empleadores'  => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
             'arls'         => DB::table('arls')->select('nombre')->orderBy('nombre')->pluck('nombre'),
             'cajas'        => DB::table('cajas_compensacion')->select('nombre')->orderBy('nombre')->pluck('nombre'),
         ]);
