@@ -148,6 +148,7 @@ Route::get('/catalogos', function () {
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
+        'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
         'tipos_funcionario' => $merge(

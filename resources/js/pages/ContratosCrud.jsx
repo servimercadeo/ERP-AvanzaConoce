@@ -621,6 +621,7 @@ function Modal({
     candidatosContrato = [],
     proyectoOpts = [],
     empleadorOpts = [],
+    empresasOpts = [],
     centrosCostoCatalogo = [],
     readOnly = false,
 }) {
@@ -1124,7 +1125,16 @@ function Modal({
                                     opts={empleadorOpts}
                                     {...fp}
                                 />
-                                <Field label="Empresa" k="empresa" {...fp} />
+                                <Field
+                                    label="Empresa"
+                                    k="empresa"
+                                    opts={
+                                        empresasOpts.length
+                                            ? empresasOpts
+                                            : undefined
+                                    }
+                                    {...fp}
+                                />
                                 <Field
                                     label="Cliente / Proyecto"
                                     k="cliente_proyecto"
@@ -2854,6 +2864,7 @@ export default function ContratosCrud() {
                 candidatosContrato={candidatosContrato}
                 proyectoOpts={proyectoOpts}
                 empleadorOpts={empleadorOpts}
+                empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
             />
 
@@ -2866,6 +2877,7 @@ export default function ContratosCrud() {
                 catalogs={catalogs}
                 proyectoOpts={proyectoOpts}
                 empleadorOpts={empleadorOpts}
+                empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
             />
