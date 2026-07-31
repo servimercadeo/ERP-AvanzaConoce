@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { SearchableSelect } from "../components/SearchableSelect";
 import {
     IconSearch,
     IconEdit,
@@ -9,6 +10,8 @@ import {
     IconClose,
     IconEmptySearch,
     IconLoading,
+    IconEye,
+    IconPlus,
 } from "../components/Icons";
 
 const POR_PAGINA = 15;
@@ -17,6 +20,7 @@ const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""
 
 function FormModal({ open, onClose, onSave, editTarget }) {
     const [nombre, setNombre] = useState("");
+    const [nit, setNit] = useState("");
     const [tipo, setTipo] = useState("Indirecto");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -24,6 +28,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     React.useEffect(() => {
         if (open) {
             setNombre(editTarget?.nombre ?? "");
+            setNit(editTarget?.nit ?? "");
             setTipo(editTarget?.tipo ?? "Indirecto");
             setError("");
         }
@@ -39,7 +44,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
         setSaving(true);
         setError("");
         try {
-            await onSave({ nombre: nombre.trim(), tipo });
+            await onSave({ nombre: nombre.trim(), nit: nit.trim(), tipo });
             onClose();
         } catch (err) {
             setError(
@@ -78,6 +83,15 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                         {error && <span style={S.err}>{error}</span>}
                     </div>
                     <div style={S.formGroup}>
+                        <label style={S.label}>NIT</label>
+                        <input
+                            style={S.input}
+                            value={nit}
+                            onChange={(e) => setNit(e.target.value)}
+                            placeholder="Ej. 900.896.003-1"
+                        />
+                    </div>
+                    <div style={S.formGroup}>
                         <label style={S.label}>Tipo *</label>
                         <select
                             style={S.input}
@@ -111,6 +125,288 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     );
 }
 
+function ContactoFormModal({
+    open,
+    onClose,
+    onSave,
+    editTarget,
+    regionesDisponibles,
+}) {
+    const [nombre, setNombre] = useState("");
+    const [correo, setCorreo] = useState("");
+    const [regional, setRegional] = useState("");
+    const [error, setError] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    React.useEffect(() => {
+        if (open) {
+            setNombre(editTarget?.nombre ?? "");
+            setCorreo(editTarget?.correo ?? "");
+            setRegional(
+                editTarget?.regional_id
+                    ? String(editTarget.regional_id)
+                    : "",
+            );
+            setError("");
+        }
+    }, [open, editTarget]);
+
+    if (!open) return null;
+
+    const handleSave = async () => {
+        const regionalTexto = String(regional ?? "").trim();
+        if (!nombre.trim() || !correo.trim() || !regionalTexto) {
+            setError("Todos los campos son requeridos.");
+            return;
+        }
+        setSaving(true);
+        setError("");
+        try {
+            // Si "regional" coincide con el id de una opción del catálogo, se manda tal cual;
+            // si es texto libre (una regional nueva que no existe todavía), se manda el nombre
+            // para que el backend la cree en `regionales` y resuelva su id.
+            const opcionExistente = regionesDisponibles.find(
+                (r) => String(r.id) === regionalTexto,
+            );
+            await onSave({
+                nombre: nombre.trim(),
+                correo: correo.trim(),
+                ...(opcionExistente
+                    ? { regional_id: opcionExistente.id }
+                    : { regional_nombre: regionalTexto }),
+            });
+            onClose();
+        } catch (err) {
+            setError(
+                err?.response?.data?.errors?.correo?.[0] ??
+                    err?.response?.data?.message ??
+                    "No se pudo guardar el contacto.",
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div style={{ ...S.overlay, zIndex: 5100 }} onClick={onClose}>
+            <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+                <div style={S.modalHeaderGreen}>
+                    <span style={S.modalTitleWhite}>
+                        {editTarget ? "Editar Contacto" : "Nuevo Contacto"}
+                    </span>
+                    <button style={S.closeBtnWhite} onClick={onClose}>
+                        <IconClose size={14} />
+                    </button>
+                </div>
+                <div style={{ ...S.modalBody, overflow: "visible" }}>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Nombre del contacto *</label>
+                        <input
+                            style={S.input}
+                            value={nombre}
+                            onChange={(e) => setNombre(e.target.value)}
+                            placeholder="Ej. Katherine Bueno"
+                        />
+                    </div>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Correo *</label>
+                        <input
+                            style={S.input}
+                            type="email"
+                            value={correo}
+                            onChange={(e) => setCorreo(e.target.value)}
+                            placeholder="nombre@dominio.com"
+                        />
+                    </div>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Regional *</label>
+                        <SearchableSelect
+                            value={regional}
+                            onChange={setRegional}
+                            defaultValue=""
+                            freeText
+                            options={regionesDisponibles.map((r) => ({
+                                value: String(r.id),
+                                label: r.nombre,
+                            }))}
+                        />
+                    </div>
+                    {error && <span style={S.err}>{error}</span>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button
+                        className="btn-secondary"
+                        onClick={onClose}
+                        disabled={saving}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        className="btn-primary"
+                        style={{ opacity: saving ? 0.6 : 1 }}
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? "Guardando…" : "Guardar"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ContactosModal({
+    open,
+    onClose,
+    empleador,
+    onChanged,
+    regionesDisponibles,
+}) {
+    const [contactoModalOpen, setContactoModalOpen] = useState(false);
+    const [editContacto, setEditContacto] = useState(null);
+
+    if (!open || !empleador) return null;
+
+    const contactos = empleador.contactos ?? [];
+
+    const handleSaveContacto = async (payload) => {
+        if (editContacto) {
+            await api.put(
+                `/empleadores/${empleador.id}/contactos/${editContacto.id}`,
+                payload,
+            );
+        } else {
+            await api.post(`/empleadores/${empleador.id}/contactos`, payload);
+        }
+        onChanged();
+    };
+
+    const handleDeleteContacto = async (c) => {
+        if (!confirm(`¿Eliminar el contacto "${c.nombre}"?`)) return;
+        await api.delete(`/empleadores/${empleador.id}/contactos/${c.id}`);
+        onChanged();
+    };
+
+    return (
+        <div style={S.overlay} onClick={onClose}>
+            <div
+                style={{ ...S.modal, maxWidth: 860 }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div style={S.modalHeaderGreen}>
+                    <span style={S.modalTitleWhite}>
+                        Contactos — {empleador.nombre}
+                    </span>
+                    <button style={S.closeBtnWhite} onClick={onClose}>
+                        <IconClose size={14} />
+                    </button>
+                </div>
+                <div style={{ ...S.modalBody, gap: 0 }}>
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            marginBottom: 12,
+                        }}
+                    >
+                        <button
+                            className="btn-primary"
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontSize: "0.84rem",
+                                padding: "7px 14px",
+                            }}
+                            onClick={() => {
+                                setEditContacto(null);
+                                setContactoModalOpen(true);
+                            }}
+                        >
+                            <IconPlus size={13} /> Nuevo contacto
+                        </button>
+                    </div>
+
+                    {contactos.length === 0 ? (
+                        <div style={{ ...S.empty, padding: "30px 10px" }}>
+                            <IconEmptySearch size={36} />
+                            <p>Este empleador aún no tiene contactos.</p>
+                        </div>
+                    ) : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Contacto</th>
+                                    <th>Correo</th>
+                                    <th>Regional</th>
+                                    <th style={{ textAlign: "center" }}>
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {contactos.map((c) => (
+                                    <tr key={c.id}>
+                                        <td style={{ fontWeight: 700 }}>
+                                            {c.nombre}
+                                        </td>
+                                        <td>{c.correo}</td>
+                                        <td>{c.regional?.nombre ?? "—"}</td>
+                                        <td>
+                                            <div style={S.actions}>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "var(--primary-light)",
+                                                        "var(--primary-dark)",
+                                                    )}
+                                                    title="Editar"
+                                                    onClick={() => {
+                                                        setEditContacto(c);
+                                                        setContactoModalOpen(
+                                                            true,
+                                                        );
+                                                    }}
+                                                >
+                                                    <IconEdit size={14} />
+                                                </button>
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#fce8e8",
+                                                        "#a33",
+                                                    )}
+                                                    title="Eliminar"
+                                                    onClick={() =>
+                                                        handleDeleteContacto(c)
+                                                    }
+                                                >
+                                                    <IconTrash size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <div style={S.modalFooter}>
+                    <button className="btn-secondary" onClick={onClose}>
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+
+            <ContactoFormModal
+                open={contactoModalOpen}
+                editTarget={editContacto}
+                onClose={() => setContactoModalOpen(false)}
+                onSave={handleSaveContacto}
+                regionesDisponibles={regionesDisponibles}
+            />
+        </div>
+    );
+}
+
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function EmpleadoresCrud() {
     const qc = useQueryClient();
@@ -119,6 +415,7 @@ export default function EmpleadoresCrud() {
     const [pagina, setPagina] = useState(1);
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
+    const [viewTargetId, setViewTargetId] = useState(null);
     const [toast, setToast] = useState(null);
 
     const showToast = (msg) => {
@@ -136,6 +433,20 @@ export default function EmpleadoresCrud() {
         if (!q) return empleadores;
         return empleadores.filter((e) => norm(e.nombre ?? "").includes(q));
     }, [empleadores, debSearch]);
+
+    const viewTarget = useMemo(
+        () => empleadores.find((e) => e.id === viewTargetId) ?? null,
+        [empleadores, viewTargetId],
+    );
+
+    // Mismo catálogo `regionales` que usan Contratos y Pedidos (tabla compartida). Al guardar
+    // un contacto con una regional nueva, el backend la agrega sola ahí, así que basta con
+    // invalidar esta query tras guardar/editar para que aparezca en el selector.
+    const { data: regionesConocidas = [] } = useQuery({
+        queryKey: ["catalogos-regionales"],
+        queryFn: () =>
+            api.get("/catalogos").then((r) => r.data.regionales ?? []),
+    });
 
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
     const paginated = filtered.slice(
@@ -229,7 +540,11 @@ export default function EmpleadoresCrud() {
                         <thead>
                             <tr>
                                 <th>Nombre</th>
+                                <th>NIT</th>
                                 <th style={{ textAlign: "center" }}>Tipo</th>
+                                <th style={{ textAlign: "center" }}>
+                                    Contactos
+                                </th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
                                 </th>
@@ -241,6 +556,9 @@ export default function EmpleadoresCrud() {
                                     <td style={{ fontWeight: 700 }}>
                                         {e.nombre}
                                     </td>
+                                    <td style={{ color: "var(--text-muted)" }}>
+                                        {e.nit || "—"}
+                                    </td>
                                     <td style={{ textAlign: "center" }}>
                                         <span
                                             style={S.badge(
@@ -251,6 +569,27 @@ export default function EmpleadoresCrud() {
                                                 ? "Directo"
                                                 : "Indirecto"}
                                         </span>
+                                    </td>
+                                    <td style={{ textAlign: "center" }}>
+                                        <button
+                                            style={{
+                                                ...S.actionBtn(
+                                                    "var(--bg)",
+                                                    "var(--text-muted)",
+                                                ),
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 6,
+                                                padding: "5px 10px",
+                                            }}
+                                            title="Ver contactos"
+                                            onClick={() =>
+                                                setViewTargetId(e.id)
+                                            }
+                                        >
+                                            <IconEye size={14} />
+                                            {(e.contactos ?? []).length}
+                                        </button>
                                     </td>
                                     <td>
                                         <div style={S.actions}>
@@ -348,6 +687,19 @@ export default function EmpleadoresCrud() {
                 editTarget={editTarget}
                 onClose={() => setModalOpen(false)}
                 onSave={handleSave}
+            />
+
+            <ContactosModal
+                open={!!viewTarget}
+                empleador={viewTarget}
+                onClose={() => setViewTargetId(null)}
+                onChanged={() => {
+                    qc.invalidateQueries({ queryKey: ["empleadores"] });
+                    qc.invalidateQueries({
+                        queryKey: ["catalogos-regionales"],
+                    });
+                }}
+                regionesDisponibles={regionesConocidas}
             />
         </div>
     );
