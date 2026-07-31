@@ -11,7 +11,7 @@ class EmpresaProyectoRules
      * sujetas a esta regla.
      */
     private const REGLAS = [
-        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRATIVO'],
+        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRACION'],
         'SERVIMERCADEO COL'        => ['DIRECTV CO'],
     ];
 

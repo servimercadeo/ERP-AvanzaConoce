@@ -15,6 +15,7 @@ import {
     IconEmptySearch,
     IconLoading,
 } from "../components/Icons";
+import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
 
 const POR_PAGINA = 5;
 
@@ -2099,6 +2100,11 @@ export default function ContratosCrud() {
     const [viewTarget, setViewTarget] = useState(null);
     const [toast, setToast] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importFileName, setImportFileName] = useState("");
+    const [importing, setImporting] = useState(false);
+    const [importError, setImportError] = useState("");
     const [pagina, setPagina] = useState(1);
 
     const { data: _qContratos } = useQuery({
@@ -2328,6 +2334,81 @@ export default function ContratosCrud() {
         setFiltroFondoPensiones("Todos");
     };
 
+    const handleImportExcel = async () => {
+        if (!importFile) {
+            setImportError("Selecciona un archivo Excel válido (.xlsx o .xls).");
+            return;
+        }
+
+        setImporting(true);
+        setImportError("");
+
+        try {
+            const XLSX = await import("xlsx");
+            const workbook = XLSX.read(await importFile.arrayBuffer(), { type: "array" });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+            const payloads = buildContratoPayloadFromExcelRows(rows, {
+                regionales: catalogs.regionales || [],
+                centrosCostoCatalogo: centrosCostoCatalogo || [],
+            }).filter((row) => Object.values(row).some((value) => String(value ?? "").trim() !== ""));
+
+            if (!payloads.length) {
+                throw new Error("No se encontraron filas con datos válidos en el archivo.");
+            }
+
+            const cedulasExistentes = new Set(
+                (contratos || [])
+                    .map((c) => c.empleado?.cedula ?? c.documento)
+                    .filter(Boolean)
+                    .map((c) => String(c).trim())
+            );
+
+            let created = 0;
+            let omitted = 0;
+            const errors = [];
+            for (const [index, payload] of payloads.entries()) {
+                const documento = payload.documento ? String(payload.documento).trim() : "";
+                if (documento && cedulasExistentes.has(documento)) {
+                    omitted += 1;
+                    continue;
+                }
+                try {
+                    await api.post("/contratos", payload);
+                    created += 1;
+                    if (documento) cedulasExistentes.add(documento);
+                } catch (err) {
+                    const message = err?.response?.data?.message || err?.message || "Error desconocido";
+                    const who = payload.documento ? `Cédula ${payload.documento}` : `Contrato ${index + 1}`;
+                    errors.push(`${who}: ${message}`);
+                }
+            }
+
+            qc.invalidateQueries({ queryKey: ["contratos"] });
+            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+
+            if (errors.length && created === 0 && omitted === 0) {
+                throw new Error(errors.join(" \n"));
+            }
+
+            const resumen = [];
+            if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} importado${created === 1 ? "" : "s"}`);
+            if (omitted > 0) resumen.push(`${omitted} omitido${omitted === 1 ? "" : "s"} (ya existía un contrato con esa cédula)`);
+            if (errors.length) resumen.push(`${errors.length} con error`);
+            showToast(resumen.length ? resumen.join(", ") : "No se importó ningún contrato.");
+            setImportOpen(false);
+            setImportFile(null);
+            setImportFileName("");
+        } catch (err) {
+            const msg = err?.message || "No se pudo importar el Excel.";
+            setImportError(msg);
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
@@ -2447,15 +2528,36 @@ export default function ContratosCrud() {
                         ]}
                     />
                 </div>
-                <button
-                    className="btn-primary"
-                    onClick={() => {
-                        setEditTarget(null);
-                        setModalOpen(true);
-                    }}
-                >
-                    + Nuevo contrato
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                        style={{
+                            border: "1px solid var(--border)",
+                            background: "var(--white)",
+                            color: "var(--text)",
+                            padding: "9px 14px",
+                            borderRadius: "var(--radius-sm)",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                        onClick={() => {
+                            setImportFile(null);
+                            setImportFileName("");
+                            setImportError("");
+                            setImportOpen(true);
+                        }}
+                    >
+                        Importar Excel
+                    </button>
+                    <button
+                        className="btn-primary"
+                        onClick={() => {
+                            setEditTarget(null);
+                            setModalOpen(true);
+                        }}
+                    >
+                        + Nuevo contrato
+                    </button>
+                </div>
             </div>
 
             <div style={S.tableWrap}>
@@ -2604,6 +2706,74 @@ export default function ContratosCrud() {
                     </table>
                 )}
             </div>
+
+            {importOpen && (
+                <div style={S.overlay} onClick={() => setImportOpen(false)}>
+                    <div
+                        style={{ ...S.modal, maxWidth: 560 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeaderGreen}>
+                            <span style={S.modalTitleWhite}>Importar contratos desde Excel</span>
+                            <button style={S.closeBtnWhite} onClick={() => setImportOpen(false)}>
+                                <IconClose size={14} />
+                            </button>
+                        </div>
+                        <div style={{ padding: 24 }}>
+                            <p style={{ margin: "0 0 12px", color: "var(--text-muted)", lineHeight: 1.5 }}>
+                                Sube un archivo con las columnas de contrato. El sistema intentará mapear encabezados como cédula, nombres, apellidos, cargo, sede, fecha de ingreso, tipo de contrato, salario y proyecto.
+                            </p>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: "18px",
+                                    border: "2px dashed var(--border)",
+                                    borderRadius: "var(--radius-sm)",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    color: "var(--primary)",
+                                    background: "var(--bg)",
+                                }}
+                            >
+                                <input
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    style={{ display: "none" }}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] || null;
+                                        setImportFile(file);
+                                        setImportFileName(file ? file.name : "");
+                                        setImportError("");
+                                    }}
+                                />
+                                {importFileName || "Seleccionar archivo Excel"}
+                            </label>
+                            {importError && (
+                                <div style={{ ...S.err, marginTop: 12, whiteSpace: "pre-wrap" }}>
+                                    {importError}
+                                </div>
+                            )}
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button style={S.btnSecondary} onClick={() => setImportOpen(false)}>
+                                Cancelar
+                            </button>
+                            <button
+                                style={{
+                                    ...S.btnPrimary,
+                                    opacity: importing ? 0.6 : 1,
+                                }}
+                                onClick={handleImportExcel}
+                                disabled={importing}
+                            >
+                                {importing ? "Importando…" : "Importar contratos"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {!loading && filtered.length > 0 && (
                 <div style={S.paginationBar}>
