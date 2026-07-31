@@ -301,7 +301,7 @@ export const ERP_MODULES = [
       {
         id: 'empleadores',
         label: 'Empleadores',
-        icon: 'usuarios',
+        icon: 'empleadores_cat',
         desc: 'Catálogo de empleadores',
         archivos: [
           { id: 'empleadores_file', label: 'Empleadores' },
@@ -310,7 +310,7 @@ export const ERP_MODULES = [
       {
         id: 'empresas',
         label: 'Empresas',
-        icon: 'usuarios',
+        icon: 'empresas_cat',
         desc: 'Catálogo de empresas',
         archivos: [
           { id: 'empresas_file', label: 'Empresas' },
@@ -319,7 +319,7 @@ export const ERP_MODULES = [
       {
         id: 'regionales',
         label: 'Regionales',
-        icon: 'usuarios',
+        icon: 'regionales_cat',
         desc: 'Catálogo de regionales',
         archivos: [
           { id: 'regionales_file', label: 'Regionales' },
@@ -328,7 +328,7 @@ export const ERP_MODULES = [
       {
         id: 'centros_costos',
         label: 'Centros de Costos',
-        icon: 'usuarios',
+        icon: 'centros_costos_cat',
         desc: 'Catálogo de centros de costo',
         archivos: [
           { id: 'centros_costos_file', label: 'Centros de Costos' },
@@ -337,7 +337,7 @@ export const ERP_MODULES = [
       {
         id: 'proyectos',
         label: 'Proyectos',
-        icon: 'usuarios',
+        icon: 'proyectos_cat',
         desc: 'Catálogo de proyectos',
         archivos: [
           { id: 'proyectos_file', label: 'Proyectos' },
