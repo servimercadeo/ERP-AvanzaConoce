@@ -6,29 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
+use App\Models\EmpleadorContacto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class CandidatoController extends Controller
 {
-    // Destinatarios fijos del correo de aval, según el tipo de vinculación elegido al confirmar.
+    // Destinatarios fijos del correo de aval para vinculación Directa (siempre el mismo
+    // equipo interno). Para Indirecta ya no hay lista fija: se valida contra los contactos
+    // reales registrados en Parámetros > Empleadores (tabla `empleador_contactos`), elegidos
+    // en el frontend según el empleador y la regional del candidato.
     private const CORREOS_DIRECTO = [
         'julianvalencia@servimercadeo.com',
         'coordinador.th@servimercadeo.com',
         'nomina@servimercadeo.com',
         'coordinadora.sst@servimercadeo.com',
-    ];
-
-    private const CORREOS_INDIRECTO = [
-        'generalista.ejecafetero@staffing.com.co',
-        'vtorres@staffing.com.co',
-        'jrubio@staffing.com.co',
-        'zroa@staffing.com.co',
-        'dparra@staffing.com.co',
-        'ahernandez@staffing.com.co',
-        'eprodriguez@staffing.com.co',
-        'jlambrano@staffing.com.co',
     ];
 
     public function index(Request $request)
@@ -256,9 +249,17 @@ class CandidatoController extends Controller
 
                 $tipoVinculacion = $data['tipo_vinculacion'] ?? $candidato->tipo_vinculacion;
                 $correosAval     = $data['correos_aval'] ?? [];
-                $correosPermitidos = $tipoVinculacion === 'Directa'
-                    ? self::CORREOS_DIRECTO
-                    : ($tipoVinculacion === 'Indirecta' ? self::CORREOS_INDIRECTO : []);
+
+                if ($tipoVinculacion === 'Directa') {
+                    $correosPermitidos = self::CORREOS_DIRECTO;
+                } elseif ($tipoVinculacion === 'Indirecta') {
+                    // Cualquier correo de contacto registrado en algún empleador Indirecto
+                    // (el frontend ya filtra por empleador+regional, esto solo evita que
+                    // llegue un correo que no está en el catálogo).
+                    $correosPermitidos = EmpleadorContacto::pluck('correo')->all();
+                } else {
+                    $correosPermitidos = [];
+                }
 
                 if (array_diff($correosAval, $correosPermitidos)) {
                     return response()->json(
