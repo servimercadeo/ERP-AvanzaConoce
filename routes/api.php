@@ -283,6 +283,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('empleadores', App\Http\Controllers\Api\EmpleadorController::class)
         ->parameters(['empleadores' => 'empleador']);
 
+    // Contactos de un empleador (nombre, correo, regional que atiende)
+    Route::post('empleadores/{empleador}/contactos', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'store']);
+    Route::put('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'update']);
+    Route::delete('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'destroy']);
+
     // Catálogo de empresas (Parametros > Empresas). El GET público de /empresas
     // (fuera de este grupo, línea ~125) sigue igual para los combos existentes.
     Route::post('empresas', [EmpresaController::class, 'store']);

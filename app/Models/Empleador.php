@@ -8,5 +8,10 @@ class Empleador extends Model
 {
     protected $table = 'empleadores';
     public $incrementing = false;
-    protected $fillable = ['id', 'nombre', 'tipo'];
+    protected $fillable = ['id', 'nombre', 'tipo', 'nit'];
+
+    public function contactos()
+    {
+        return $this->hasMany(EmpleadorContacto::class)->orderBy('nombre');
+    }
 }

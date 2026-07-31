@@ -10,7 +10,7 @@ class EmpleadorController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Empleador::query();
+        $query = Empleador::with('contactos.regional');
 
         if ($request->search) {
             $query->where('nombre', 'like', "%{$request->search}%");
@@ -24,6 +24,7 @@ class EmpleadorController extends Controller
         $data = $request->validate([
             'nombre' => 'required|string|max:150',
             'tipo'   => 'nullable|string|in:Directo,Indirecto',
+            'nit'    => 'nullable|string|max:20',
         ]);
         $data['tipo'] = $data['tipo'] ?? 'Indirecto';
 
@@ -38,7 +39,7 @@ class EmpleadorController extends Controller
 
     public function show(Empleador $empleador)
     {
-        return response()->json($empleador);
+        return response()->json($empleador->load('contactos.regional'));
     }
 
     public function update(Request $request, Empleador $empleador)
@@ -46,6 +47,7 @@ class EmpleadorController extends Controller
         $data = $request->validate([
             'nombre' => 'required|string|max:150',
             'tipo'   => 'required|string|in:Directo,Indirecto',
+            'nit'    => 'nullable|string|max:20',
         ]);
 
         $empleador->update($data);

@@ -14,22 +14,14 @@ const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FIXED_DOCS = ["Hoja de vida", "Pruebas psicotécnicas"];
 
+// Para Indirecta ya no hay lista fija: los correos salen de los contactos del empleador
+// (Parámetros > Empleadores), filtrados por empleador + regional elegidos en el modal.
 const CORREOS_AVAL = {
     Directa: [
         "julianvalencia@servimercadeo.com",
         "coordinador.th@servimercadeo.com",
         "nomina@servimercadeo.com",
         "coordinadora.sst@servimercadeo.com",
-    ],
-    Indirecta: [
-        "generalista.ejecafetero@staffing.com.co",
-        "vtorres@staffing.com.co",
-        "jrubio@staffing.com.co",
-        "zroa@staffing.com.co",
-        "dparra@staffing.com.co",
-        "ahernandez@staffing.com.co",
-        "eprodriguez@staffing.com.co",
-        "jlambrano@staffing.com.co",
     ],
 };
 
@@ -139,12 +131,17 @@ export default function CandidatosCrud() {
 
     const [isProcModalOpen, setIsProcModalOpen] = useState(false);
     const [procModalCandidate, setProcModalCandidate] = useState(null);
-    const [vinculacionModal, setVinculacionModal] = useState({
+    const VINCULACION_MODAL_INICIAL = {
         open: false,
         candidateId: null,
         tipo: "Directa",
         correos: CORREOS_AVAL.Directa,
-    });
+        empleadorId: "",
+        regional: "",
+    };
+    const [vinculacionModal, setVinculacionModal] = useState(
+        VINCULACION_MODAL_INICIAL,
+    );
     const [toast, setToast] = useState(null);
     const [confirmDlg, setConfirmDlg] = useState({
         open: false,
@@ -191,6 +188,17 @@ export default function CandidatosCrud() {
     const { data: _qSedes } = useQuery({
         queryKey: ["sedes"],
         queryFn: () => api.get("/sedes").then((r) => r.data),
+    });
+    // Empleadores indirectos (con sus contactos y regional) para resolver a quién se le envía
+    // el aval cuando la vinculación es Indirecta.
+    const { data: empleadoresIndirectos = [] } = useQuery({
+        queryKey: ["empleadores-indirectos"],
+        queryFn: () =>
+            api
+                .get("/empleadores")
+                .then((r) =>
+                    (r.data ?? []).filter((e) => e.tipo === "Indirecto"),
+                ),
     });
     const loadingData = _lc || _lr || _lk;
 
@@ -326,12 +334,7 @@ export default function CandidatosCrud() {
             tipo_vinculacion: vinculacionModal.tipo,
             correos_aval: vinculacionModal.correos,
         });
-        setVinculacionModal({
-            open: false,
-            candidateId: null,
-            tipo: "Directa",
-            correos: CORREOS_AVAL.Directa,
-        });
+        setVinculacionModal(VINCULACION_MODAL_INICIAL);
     };
 
     const handleAddCandidate = () => {
@@ -757,6 +760,26 @@ export default function CandidatosCrud() {
                 c.estado.toLowerCase().includes(term),
         );
     }, [candidates, debouncedSearch]);
+
+    // Empleador elegido en el modal de vinculación Indirecta, sus regionales con contacto
+    // registrado, y los contactos que coinciden con la regional elegida (más los de
+    // "Todo a nivel nacional", que aplican sin importar la regional específica).
+    const empleadorVinc = empleadoresIndirectos.find(
+        (e) => String(e.id) === String(vinculacionModal.empleadorId),
+    );
+    const contactosEmpleadorVinc = empleadorVinc?.contactos ?? [];
+    const regionalesEmpleadorVinc = Array.from(
+        new Set(
+            contactosEmpleadorVinc.map((c) => c.regional?.nombre).filter(Boolean),
+        ),
+    ).sort((a, b) => a.localeCompare(b));
+    const contactosCoincidentesVinc = vinculacionModal.regional
+        ? contactosEmpleadorVinc.filter(
+              (c) =>
+                  c.regional?.nombre === vinculacionModal.regional ||
+                  c.regional?.nombre === "TODO A NIVEL NACIONAL",
+          )
+        : [];
 
     return (
         <div
@@ -2792,12 +2815,7 @@ export default function CandidatosCrud() {
                 <div
                     style={{ ...S.overlay, zIndex: 6100 }}
                     onClick={() =>
-                        setVinculacionModal({
-                            open: false,
-                            candidateId: null,
-                            tipo: "Directa",
-                            correos: CORREOS_AVAL.Directa,
-                        })
+                        setVinculacionModal(VINCULACION_MODAL_INICIAL)
                     }
                 >
                     <div
@@ -2807,7 +2825,6 @@ export default function CandidatosCrud() {
                             boxShadow: "0 16px 60px rgba(26,155,140,0.28)",
                             width: "100%",
                             maxWidth: 420,
-                            overflow: "hidden",
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -2873,7 +2890,12 @@ export default function CandidatosCrud() {
                                                 setVinculacionModal((p) => ({
                                                     ...p,
                                                     tipo: op,
-                                                    correos: CORREOS_AVAL[op],
+                                                    correos:
+                                                        op === "Directa"
+                                                            ? CORREOS_AVAL.Directa
+                                                            : [],
+                                                    empleadorId: "",
+                                                    regional: "",
                                                 }))
                                             }
                                             style={{
@@ -2887,33 +2909,143 @@ export default function CandidatosCrud() {
                                 ))}
                             </div>
 
-                            <div style={{ marginTop: 16 }}>
-                                <label
-                                    style={{
-                                        display: "block",
-                                        fontSize: "0.78rem",
-                                        fontWeight: 700,
-                                        color: "var(--text)",
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    Correos que recibirán el aval
-                                </label>
+                            {vinculacionModal.tipo === "Indirecta" && (
                                 <div
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: 8,
-                                        maxHeight: 220,
-                                        overflowY: "auto",
-                                        padding: "10px 14px",
-                                        borderRadius: "var(--radius-sm)",
-                                        border: "1.5px solid var(--border)",
-                                        background: "var(--bg)",
+                                        gap: 12,
+                                        marginTop: 16,
                                     }}
                                 >
-                                    {CORREOS_AVAL[vinculacionModal.tipo].map(
-                                        (correo) => {
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: "block",
+                                                fontSize: "0.78rem",
+                                                fontWeight: 700,
+                                                color: "var(--text)",
+                                                marginBottom: 6,
+                                            }}
+                                        >
+                                            Empleador
+                                        </label>
+                                        <SearchableSelect
+                                            value={vinculacionModal.empleadorId}
+                                            onChange={(v) =>
+                                                setVinculacionModal((p) => ({
+                                                    ...p,
+                                                    empleadorId: v,
+                                                    regional: "",
+                                                    correos: [],
+                                                }))
+                                            }
+                                            defaultValue=""
+                                            options={empleadoresIndirectos.map(
+                                                (e) => ({
+                                                    value: String(e.id),
+                                                    label: e.nombre,
+                                                }),
+                                            )}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            style={{
+                                                display: "block",
+                                                fontSize: "0.78rem",
+                                                fontWeight: 700,
+                                                color: "var(--text)",
+                                                marginBottom: 6,
+                                            }}
+                                        >
+                                            Regional
+                                        </label>
+                                        <SearchableSelect
+                                            value={vinculacionModal.regional}
+                                            disabled={!vinculacionModal.empleadorId}
+                                            onChange={(v) => {
+                                                const coincidentes =
+                                                    contactosEmpleadorVinc.filter(
+                                                        (c) =>
+                                                            c.regional
+                                                                ?.nombre === v ||
+                                                            c.regional
+                                                                ?.nombre ===
+                                                                "TODO A NIVEL NACIONAL",
+                                                    );
+                                                setVinculacionModal((p) => ({
+                                                    ...p,
+                                                    regional: v,
+                                                    correos: coincidentes.map(
+                                                        (c) => c.correo,
+                                                    ),
+                                                }));
+                                            }}
+                                            defaultValue=""
+                                            options={regionalesEmpleadorVinc.map(
+                                                (r) => ({ value: r, label: r }),
+                                            )}
+                                        />
+                                    </div>
+                                    {vinculacionModal.empleadorId &&
+                                        regionalesEmpleadorVinc.length === 0 && (
+                                            <div
+                                                style={{
+                                                    fontSize: "0.82rem",
+                                                    color: "#a33",
+                                                }}
+                                            >
+                                                Este empleador no tiene
+                                                contactos registrados. Ve a
+                                                Parámetros → Empleadores para
+                                                agregarlos.
+                                            </div>
+                                        )}
+                                </div>
+                            )}
+
+                            {(vinculacionModal.tipo === "Directa" ||
+                                vinculacionModal.regional) && (
+                                <div style={{ marginTop: 16 }}>
+                                    <label
+                                        style={{
+                                            display: "block",
+                                            fontSize: "0.78rem",
+                                            fontWeight: 700,
+                                            color: "var(--text)",
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        Correos que recibirán el aval
+                                    </label>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 8,
+                                            maxHeight: 220,
+                                            overflowY: "auto",
+                                            padding: "10px 14px",
+                                            borderRadius: "var(--radius-sm)",
+                                            border: "1.5px solid var(--border)",
+                                            background: "var(--bg)",
+                                        }}
+                                    >
+                                        {(vinculacionModal.tipo === "Directa"
+                                            ? CORREOS_AVAL.Directa.map(
+                                                  (correo) => ({
+                                                      correo,
+                                                      label: correo,
+                                                  }),
+                                              )
+                                            : contactosCoincidentesVinc.map(
+                                                  (c) => ({
+                                                      correo: c.correo,
+                                                      label: `${c.nombre} — ${c.correo} (${c.regional?.nombre})`,
+                                                  }),
+                                              )
+                                        ).map(({ correo, label }) => {
                                             const checked =
                                                 vinculacionModal.correos.includes(
                                                     correo,
@@ -2960,13 +3092,13 @@ export default function CandidatosCrud() {
                                                             height: 15,
                                                         }}
                                                     />
-                                                    {correo}
+                                                    {label}
                                                 </label>
                                             );
-                                        },
-                                    )}
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                         <div
                             style={{
@@ -2980,18 +3112,21 @@ export default function CandidatosCrud() {
                             <button
                                 style={S.btnSecondary}
                                 onClick={() =>
-                                    setVinculacionModal({
-                                        open: false,
-                                        candidateId: null,
-                                        tipo: "Directa",
-                                        correos: CORREOS_AVAL.Directa,
-                                    })
+                                    setVinculacionModal(
+                                        VINCULACION_MODAL_INICIAL,
+                                    )
                                 }
                             >
                                 Cancelar
                             </button>
                             <button
-                                style={S.btnPrimaryGreen}
+                                style={{
+                                    ...S.btnPrimaryGreen,
+                                    ...(vinculacionModal.correos.length === 0
+                                        ? { opacity: 0.5, cursor: "default" }
+                                        : {}),
+                                }}
+                                disabled={vinculacionModal.correos.length === 0}
                                 onClick={handleConfirmVinculacion}
                             >
                                 Confirmar aval
