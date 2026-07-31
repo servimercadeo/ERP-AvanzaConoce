@@ -120,7 +120,7 @@ class InventarioDotacionController extends Controller
      */
     private function olvidarCacheFlat(): void
     {
-        Cache::forget(self::CACHE_KEY_FLAT);
+        Cache::store('file')->forget(self::CACHE_KEY_FLAT);
     }
 
     /**
@@ -145,7 +145,13 @@ class InventarioDotacionController extends Controller
             // ->with('sede')->get()->map(fn($r) => $r->toArray()...) tarda decenas de
             // segundos por el costo de hidratar y serializar miles de modelos; un JOIN +
             // DB::table() hace lo mismo en un par de segundos.
-            $data = Cache::remember(self::CACHE_KEY_FLAT, 180, function () {
+            //
+            // Se cachea explícitamente en el store "file" (no en el de la app, "database"):
+            // el JSON de todo el catálogo pesa ~1.9MB y el `cache` de MySQL tiene
+            // max_allowed_packet=1MB, así que con el store de BD el propio Cache::remember()
+            // lanzaba "Got a packet bigger than 'max_allowed_packet' bytes" y tumbaba este
+            // endpoint completo (index() nunca llegaba a responder).
+            $data = Cache::store('file')->remember(self::CACHE_KEY_FLAT, 180, function () {
                 return DB::table('inventario_dotacion as i')
                     ->leftJoin('sedes as s', 's.id', '=', 'i.sede_id')
                     ->orderBy('i.proyecto')->orderBy('i.prenda')->orderBy('i.genero')->orderBy('i.talla')

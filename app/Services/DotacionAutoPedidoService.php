@@ -6,6 +6,7 @@ use App\Models\Contrato;
 use App\Models\InventarioDotacion;
 use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
+use App\Models\Sede;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -60,7 +61,16 @@ class DotacionAutoPedidoService
             return null;
         }
 
-        return DB::transaction(function () use ($contrato, $reglas) {
+        // La dotación se descuenta de la sede específica del contrato (cada proyecto tiene
+        // dotación repartida entre varias sedes). Sin sede resuelta no hay forma segura de
+        // saber de cuál sede descontar, así que no se asigna ninguna línea.
+        $sedeId = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
+        if (!$sedeId) {
+            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}; no se genera pedido automático.");
+            return null;
+        }
+
+        return DB::transaction(function () use ($contrato, $reglas, $sedeId) {
             $pedido = PedidoAutomatico::create([
                 'codigo'       => PedidoAutomatico::generarCodigo(),
                 'contrato_id'  => $contrato->id,
@@ -71,7 +81,7 @@ class DotacionAutoPedidoService
             ]);
 
             foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
-                $inv = $this->buscarItemConStock($proyecto, $prenda, $genero, $talla, $cantidad);
+                $inv = $this->buscarItemConStock($proyecto, $sedeId, $prenda, $genero, $talla, $cantidad);
                 if (!$inv) {
                     continue;
                 }
@@ -111,9 +121,9 @@ class DotacionAutoPedidoService
      * del empleado no está registrada, o si no hay stock suficiente, devuelve null y
      * deja constancia en el log (esa línea simplemente se omite del pedido).
      */
-    private function buscarItemConStock(string $proyecto, string $prenda, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
+    private function buscarItemConStock(string $proyecto, int $sedeId, string $prenda, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
     {
-        $descripcion = "{$prenda} ({$proyecto}, {$genero})";
+        $descripcion = "{$prenda} ({$proyecto}, {$genero}, sede_id {$sedeId})";
 
         if (!$talla) {
             Log::info("DotacionAutoPedidoService: talla no registrada para el empleado, no se asigna {$descripcion}.");
@@ -121,6 +131,7 @@ class DotacionAutoPedidoService
         }
 
         $query = InventarioDotacion::where('proyecto', $proyecto)
+            ->where('sede_id', $sedeId)
             ->where('prenda', $prenda)
             ->where('talla', $talla)
             ->where('genero', $genero);
