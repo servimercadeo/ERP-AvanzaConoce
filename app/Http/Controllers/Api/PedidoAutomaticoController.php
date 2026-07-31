@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PedidoAutomatico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class PedidoAutomaticoController extends Controller
 {
@@ -47,26 +48,30 @@ class PedidoAutomaticoController extends Controller
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
 
-        return DB::transaction(function () use ($data) {
-            $data['codigo']       = $data['codigo'] ?? PedidoAutomatico::generarCodigo();
-            $data['estado']       = $data['estado'] ?? 'Activo';
-            $data['fecha_pedido'] = $data['fecha_pedido'] ?? now()->toDateString();
+        try {
+            return DB::transaction(function () use ($data) {
+                $data['codigo']       = $data['codigo'] ?? PedidoAutomatico::generarCodigo();
+                $data['estado']       = $data['estado'] ?? 'Activo';
+                $data['fecha_pedido'] = $data['fecha_pedido'] ?? now()->toDateString();
 
-            $pedido = PedidoAutomatico::create($data);
+                $pedido = PedidoAutomatico::create($data);
 
-            if (!empty($data['items'])) {
-                if ($data['estado'] === 'Activo') {
-                    $pedido->asignarItems($data['items']);
-                } else {
-                    $this->guardarItemsSinDescontar($pedido, $data['items']);
+                if (!empty($data['items'])) {
+                    if ($data['estado'] === 'Activo') {
+                        $pedido->asignarItems($data['items']);
+                    } else {
+                        $this->guardarItemsSinDescontar($pedido, $data['items']);
+                    }
                 }
-            }
 
-            return response()->json(
-                $pedido->load(['empleado', 'contrato', 'items.inventario']),
-                201
-            );
-        });
+                return response()->json(
+                    $pedido->load(['empleado', 'contrato', 'items.inventario']),
+                    201
+                );
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function show(PedidoAutomatico $pedidoAutomatico)
@@ -89,54 +94,68 @@ class PedidoAutomaticoController extends Controller
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
 
-        return DB::transaction(function () use ($data, $pedidoAutomatico) {
-            $estadoAnterior = $pedidoAutomatico->estado;
-            $nuevoEstado    = $data['estado'] ?? $estadoAnterior;
+        try {
+            return DB::transaction(function () use ($data, $pedidoAutomatico) {
+                $estadoAnterior = $pedidoAutomatico->estado;
+                $nuevoEstado    = $data['estado'] ?? $estadoAnterior;
 
-            if ($estadoAnterior === 'Activo' && $nuevoEstado === 'Cancelado') {
-                // Restaurar todo el inventario y limpiar items
-                $this->restaurarInventario($pedidoAutomatico);
-                $pedidoAutomatico->items()->delete();
+                if ($estadoAnterior === 'Activo' && $nuevoEstado === 'Cancelado') {
+                    // Restaurar todo el inventario y limpiar items
+                    $this->restaurarInventario($pedidoAutomatico);
+                    $pedidoAutomatico->items()->delete();
 
-            } elseif ($estadoAnterior === 'Activo' && $nuevoEstado === 'Activo') {
-                // Edición de items activos: restaurar anteriores y descontar nuevos
-                $this->restaurarInventario($pedidoAutomatico);
-                $pedidoAutomatico->items()->delete();
-                if (!empty($data['items'])) {
-                    $pedidoAutomatico->asignarItems($data['items']);
+                } elseif ($estadoAnterior === 'Activo' && $nuevoEstado === 'Activo') {
+                    // Edición de items activos: restaurar anteriores y descontar nuevos
+                    $this->restaurarInventario($pedidoAutomatico);
+                    $pedidoAutomatico->items()->delete();
+                    if (!empty($data['items'])) {
+                        $pedidoAutomatico->asignarItems($data['items']);
+                    }
+
+                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Activo') {
+                    // Primera activación: descontar items del payload
+                    $pedidoAutomatico->items()->delete();
+                    if (!empty($data['items'])) {
+                        $pedidoAutomatico->asignarItems($data['items']);
+                    }
+
+                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Pendiente') {
+                    // Edición sin activar: guardar items sin tocar inventario
+                    $pedidoAutomatico->items()->delete();
+                    if (!empty($data['items'])) {
+                        $this->guardarItemsSinDescontar($pedidoAutomatico, $data['items']);
+                    }
+
+                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Cancelado') {
+                    // Cancelar antes de activar: solo limpiar items (inventario nunca fue descontado)
+                    $pedidoAutomatico->items()->delete();
+
+                } elseif ($estadoAnterior === 'Completado' && $nuevoEstado === 'Cancelado') {
+                    // Revertir un pedido completado: restaurar inventario y desvincular del global
+                    $this->restaurarInventario($pedidoAutomatico);
+                    $pedidoAutomatico->items()->delete();
+                    $data['pedido_global_id'] = null;
+
+                } elseif ($estadoAnterior === 'Completado' && $nuevoEstado === 'Completado') {
+                    // Edición de items de un pedido ya completado: restaurar anteriores y
+                    // descontar nuevos, igual que la edición de un pedido Activo (antes esta
+                    // combinación no tenía rama y el cambio de items se descartaba en silencio).
+                    $this->restaurarInventario($pedidoAutomatico);
+                    $pedidoAutomatico->items()->delete();
+                    if (!empty($data['items'])) {
+                        $pedidoAutomatico->asignarItems($data['items']);
+                    }
                 }
 
-            } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Activo') {
-                // Primera activación: descontar items del payload
-                $pedidoAutomatico->items()->delete();
-                if (!empty($data['items'])) {
-                    $pedidoAutomatico->asignarItems($data['items']);
-                }
+                $pedidoAutomatico->update($data);
 
-            } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Pendiente') {
-                // Edición sin activar: guardar items sin tocar inventario
-                $pedidoAutomatico->items()->delete();
-                if (!empty($data['items'])) {
-                    $this->guardarItemsSinDescontar($pedidoAutomatico, $data['items']);
-                }
-
-            } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Cancelado') {
-                // Cancelar antes de activar: solo limpiar items (inventario nunca fue descontado)
-                $pedidoAutomatico->items()->delete();
-
-            } elseif ($estadoAnterior === 'Completado' && $nuevoEstado === 'Cancelado') {
-                // Revertir un pedido completado: restaurar inventario y desvincular del global
-                $this->restaurarInventario($pedidoAutomatico);
-                $pedidoAutomatico->items()->delete();
-                $data['pedido_global_id'] = null;
-            }
-
-            $pedidoAutomatico->update($data);
-
-            return response()->json(
-                $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
-            );
-        });
+                return response()->json(
+                    $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
+                );
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function ultimoPorEmpleado(int $empleadoId)
