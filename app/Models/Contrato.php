@@ -12,6 +12,7 @@ class Contrato extends Model
     protected $table = 'contratos';
 
     protected $fillable = [
+        'id_macaw',
         'empleado_id',
         'tipo_contrato',
         'tipo_vinculacion',
@@ -19,6 +20,8 @@ class Contrato extends Model
         'sede',
         'area_empresa',
         'jefe_inmediato',
+        'jefe_inmediato_nombre',
+        'jefe_inmediato_correo',
         'fecha_ingreso',
         'fecha_retiro',
         'salario',
