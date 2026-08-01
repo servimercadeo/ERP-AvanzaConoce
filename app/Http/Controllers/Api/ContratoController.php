@@ -67,13 +67,18 @@ class ContratoController extends Controller
     }
 
     /**
-     * "Jefe Inmediato" es texto libre en el formulario de contratos, no un selector ligado a
-     * `users`, así que en la práctica trae de todo: solo el nombre, o "Nombre - correo@..."
-     * (la convención más común). Se intenta extraer el correo embebido primero; si no hay,
-     * se compara el nombre contra `users.name` sin distinguir mayúsculas/tildes de capitalización.
+     * Correo del jefe inmediato del contrato. `jefe_inmediato_correo` es la fuente de verdad
+     * (columna propia, poblada por el import de contratos y por el flujo normal desde ahora en
+     * adelante); para contratos viejos que no la tienen, cae al parseo del legacy
+     * `jefe_inmediato` de texto libre ("Nombre - correo@..." o solo nombre contra `users.name`).
      */
-    private function resolverCorreoSupervisor(?string $jefeInmediato): ?string
+    private function resolverCorreoSupervisor(Contrato $contrato): ?string
     {
+        if ($contrato->jefe_inmediato_correo) {
+            return $contrato->jefe_inmediato_correo;
+        }
+
+        $jefeInmediato = $contrato->jefe_inmediato;
         if (!$jefeInmediato) {
             return null;
         }
@@ -147,7 +152,7 @@ class ContratoController extends Controller
             't_camisa'            => $respuesta?->talla_camisa ?? '',
             't_pantalon'          => $respuesta?->talla_pantalon ?? '',
             't_zapatos'           => $respuesta?->talla_zapatos ?? '',
-            'CorreoSuper'         => $this->resolverCorreoSupervisor($contrato->jefe_inmediato) ?? '',
+            'CorreoSuper'         => $this->resolverCorreoSupervisor($contrato) ?? '',
             'Departamento'        => $this->resolverDepartamento($contrato, $respuesta),
         ];
 

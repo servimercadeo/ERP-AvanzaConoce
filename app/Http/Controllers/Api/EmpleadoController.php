@@ -19,6 +19,7 @@ class EmpleadoController extends Controller
             }])
                 ->whereNotNull('cedula')
                 ->where('cedula', '!=', '')
+                ->where('pendiente_alta', false)
                 ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
                 ->orderByRaw('nombres IS NULL ASC, nombres ASC')
                 ->get()
@@ -206,6 +207,31 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
+
+            // El registro existente vino de un import (p. ej. de contratos) y todavía no se
+            // dio de alta manualmente aquí — esta es su alta real, así que se le generan
+            // credenciales nuevas en vez de tratarlo como una simple actualización.
+            if ($empleado->pendiente_alta) {
+                $data['rol']            = $data['rol'] ?? 'consultor';
+                $data['activo']         = true;
+                $data['pendiente_alta'] = false;
+
+                $plainPassword     = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
+                $data['password']  = Hash::make($plainPassword);
+
+                $empleado->update($data);
+
+                app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
+
+                return response()->json([
+                    'empleado'     => $empleado->fresh()->load('empresa'),
+                    'credenciales' => [
+                        'email'    => $empleado->email,
+                        'password' => $plainPassword,
+                    ],
+                ], 201);
+            }
+
             $empleado->update($data);
             return response()->json([
                 'empleado'     => $empleado->fresh()->load('empresa'),

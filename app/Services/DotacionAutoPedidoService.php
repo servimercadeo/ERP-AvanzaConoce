@@ -20,6 +20,13 @@ class DotacionAutoPedidoService
         'DIRECTV ECU'  => 'DIRECTV',
     ];
 
+    // El kit administrativo (SYM ADMINISTRATIVO) no tiene dotación repartida por sede: en
+    // proyecto_sede solo está vinculado a las sedes de Pereira (así viene de
+    // sedes_activas.csv, porque Administración es un área centralizada en el HQ). Por eso
+    // sus líneas siempre se descuentan de esta sede fija, sin importar dónde esté la sede
+    // del contrato del empleado.
+    private const SEDE_CENTRAL_ADMINISTRATIVA = 'SYM PEREIRA';
+
     // Cargos DIRECTV cuya labor es instalación en campo (coincidencia exacta,
     // a diferencia de los demás grupos: "TECNICO" como substring atrapa
     // cargos de oficina/calidad que no deben recibir el kit de instalador.
@@ -61,16 +68,35 @@ class DotacionAutoPedidoService
             return null;
         }
 
-        // La dotación se descuenta de la sede específica del contrato (cada proyecto tiene
-        // dotación repartida entre varias sedes). Sin sede resuelta no hay forma segura de
-        // saber de cuál sede descontar, así que no se asigna ninguna línea.
-        $sedeId = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
-        if (!$sedeId) {
-            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}; no se genera pedido automático.");
+        // Las líneas "SYM ADMINISTRATIVO" (kit administrativo, y el carnet/gorra que varias
+        // reglas de Tigo Express/Home toman prestados de ese mismo pool central) siempre se
+        // descuentan de la sede central. El resto de líneas sí tiene dotación repartida por
+        // sede y se descuenta de la sede del contrato. Una regla puede necesitar cualquiera de
+        // las dos, así que la sede se resuelve por línea, no una sola vez para todo el pedido.
+        $sedeCentral = Sede::where('nombre', self::SEDE_CENTRAL_ADMINISTRATIVA)->value('id');
+        if (!$sedeCentral) {
+            Log::error('DotacionAutoPedidoService: no se encontró la sede central administrativa "' . self::SEDE_CENTRAL_ADMINISTRATIVA . '"; no se genera pedido automático para el contrato ' . $contrato->id . '.');
             return null;
         }
 
-        return DB::transaction(function () use ($contrato, $reglas, $sedeId) {
+        $sedeContrato = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
+
+        $tieneLineaNoAdministrativa = collect($reglas)->contains(fn ($r) => $r[0] !== 'SYM ADMINISTRATIVO');
+        $tieneLineaAdministrativa   = collect($reglas)->contains(fn ($r) => $r[0] === 'SYM ADMINISTRATIVO');
+
+        if (!$sedeContrato) {
+            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}.");
+            // Sin sede de contrato y sin ninguna línea que pueda salir de la sede central, no
+            // hay nada que asignar — se omite el pedido en vez de crear uno vacío.
+            if (!$tieneLineaAdministrativa) {
+                return null;
+            }
+        }
+        if (!$tieneLineaNoAdministrativa) {
+            $sedeContrato = null; // no se necesita para ninguna línea, evita usarla por error
+        }
+
+        return DB::transaction(function () use ($contrato, $reglas, $sedeCentral, $sedeContrato) {
             $pedido = PedidoAutomatico::create([
                 'codigo'       => PedidoAutomatico::generarCodigo(),
                 'contrato_id'  => $contrato->id,
@@ -81,6 +107,11 @@ class DotacionAutoPedidoService
             ]);
 
             foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
+                $sedeId = $proyecto === 'SYM ADMINISTRATIVO' ? $sedeCentral : $sedeContrato;
+                if (!$sedeId) {
+                    continue;
+                }
+
                 $inv = $this->buscarItemConStock($proyecto, $sedeId, $prenda, $genero, $talla, $cantidad);
                 if (!$inv) {
                     continue;
@@ -171,15 +202,15 @@ class DotacionAutoPedidoService
             if ($esSupervisorComercial) {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO EXPRESS') {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO HOME') {
                 $reglas[] = ['SYM TIGO HOME', 'Polo Ml Azul Home', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['SYM TIGO HOME', 'Gorra', 'Masculino', 'N/A', 1];
-                $reglas[] = ['SYM TIGO HOME', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Gorra Tigo', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } else {
                 // Cargo no comercial (ej. Analista, Coordinador) en un proyecto Tigo: recibe el
                 // mismo kit que "personal administrativo" (proyecto Solo Ausentismos).
@@ -225,7 +256,7 @@ class DotacionAutoPedidoService
     {
         return [
             ['SYM ADMINISTRATIVO', 'Polo Gris Manga Corta', $genero, $empleado->talla_camisa, 2],
-            ['SYM ADMINISTRATIVO', 'Pantalon Administrativo', $genero, $empleado->talla_pantalon, 1],
+            ['SYM ADMINISTRATIVO', 'Jean Azul', $genero, $empleado->talla_pantalon, 1],
             ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1],
         ];
     }
