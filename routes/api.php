@@ -195,6 +195,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
     // CRUD completo de empleados
     Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
+    Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
     Route::apiResource('empleados', EmpleadoController::class);
 
     // CRUD completo de contratos

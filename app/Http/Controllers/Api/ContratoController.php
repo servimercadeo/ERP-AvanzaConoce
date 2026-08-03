@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\CentroCostoCatalogo;
 use App\Models\Contrato;
+use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
@@ -224,6 +225,25 @@ class ContratoController extends Controller
         return $resueltos;
     }
 
+    // Un contrato en "No ingreso" significa que el empleado nunca llegó a
+    // ingresar: cualquier pedido automático de dotación generado para él (activo
+    // o completado) restaura el inventario descontado y se elimina, igual que un
+    // pedido cancelado manualmente (ver PedidoAutomaticoController::destroy).
+    private function eliminarPedidosAutomaticosDeContrato(Contrato $contrato): void
+    {
+        $pedidos = PedidoAutomatico::where('contrato_id', $contrato->id)->get();
+        foreach ($pedidos as $pedido) {
+            if (in_array($pedido->estado, ['Activo', 'Completado'], true)) {
+                foreach ($pedido->items()->with('inventario')->get() as $item) {
+                    if ($item->inventario) {
+                        $item->inventario->increment('cantidad', $item->cantidad);
+                    }
+                }
+            }
+            $pedido->delete();
+        }
+    }
+
     public function index(Request $request)
     {
         $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
@@ -416,12 +436,14 @@ class ContratoController extends Controller
         }
 
         $pedidoAutomatico = null;
-        try {
-            $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
-        } catch (\Throwable $e) {
-            Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
-                'error' => $e->getMessage(),
-            ]);
+        if ($contrato->estado_contrato !== 'No ingreso') {
+            try {
+                $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
+            } catch (\Throwable $e) {
+                Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional'])->toArray();
@@ -486,6 +508,10 @@ class ContratoController extends Controller
             $data['completado'] = true;
 
             $contrato->update($data);
+
+            if ($contrato->estado_contrato === 'No ingreso') {
+                $this->eliminarPedidosAutomaticosDeContrato($contrato);
+            }
 
             // Sincronizar centros de costos
             $contrato->centrosCostos()->delete();

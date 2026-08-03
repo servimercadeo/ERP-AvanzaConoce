@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 
 const inputStyle = {
     width: "100%",
@@ -68,7 +69,9 @@ export function SearchableSelect({
     const [query, setQuery] = useState(() => getLabel(value));
     const [open, setOpen] = useState(false);
     const [hovered, setHovered] = useState(-1);
+    const [coords, setCoords] = useState(null);
     const ref = useRef(null);
+    const panelRef = useRef(null);
     // Rastrea si el usuario está escribiendo activamente
     const isTyping = useRef(false);
     const prevValue = useRef(value);
@@ -85,7 +88,8 @@ export function SearchableSelect({
     // Clic fuera cierra el dropdown
     useEffect(() => {
         function onOutside(e) {
-            if (ref.current && !ref.current.contains(e.target)) {
+            const insidePanel = panelRef.current && panelRef.current.contains(e.target);
+            if (ref.current && !ref.current.contains(e.target) && !insidePanel) {
                 isTyping.current = false;
                 setOpen(false);
                 if (freeText) {
@@ -103,6 +107,24 @@ export function SearchableSelect({
         document.addEventListener("mousedown", onOutside);
         return () => document.removeEventListener("mousedown", onOutside);
     }, [value, options, freeText, query, onChange, defaultValue]);
+
+    // Recalcula la posición del panel (portal) para que no quede recortado
+    // por contenedores con overflow (p. ej. el cuerpo con scroll de un modal).
+    useEffect(() => {
+        if (!open) return;
+        const updateCoords = () => {
+            if (!ref.current) return;
+            const r = ref.current.getBoundingClientRect();
+            setCoords({ top: r.bottom + 8, left: r.left, width: r.width });
+        };
+        updateCoords();
+        window.addEventListener("scroll", updateCoords, true);
+        window.addEventListener("resize", updateCoords);
+        return () => {
+            window.removeEventListener("scroll", updateCoords, true);
+            window.removeEventListener("resize", updateCoords);
+        };
+    }, [open]);
 
     const q = norm(query);
 
@@ -181,17 +203,19 @@ export function SearchableSelect({
                 </svg>
             </span>
 
-            {open && !disabled && (
-                <div style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    right: 0,
+            {open && !disabled && coords && createPortal(
+                <div
+                    ref={panelRef}
+                    style={{
+                    position: "fixed",
+                    top: coords.top,
+                    left: coords.left,
+                    width: coords.width,
                     background: "var(--white)",
                     border: "1.5px solid rgba(26,155,140,0.14)",
                     borderRadius: "14px",
                     boxShadow: "0 18px 36px rgba(26,155,140,0.16)",
-                    zIndex: 2000,
+                    zIndex: 9999,
                     maxHeight: 220,
                     overflowY: "auto",
                     padding: "8px",
@@ -249,7 +273,7 @@ export function SearchableSelect({
                                 <>
                                     {filtered.map((o, i) => (
                                         <div
-                                            key={o.value}
+                                            key={`${o.value}__${i}`}
                                             style={{
                                                 padding: "10px 12px",
                                                 cursor: "pointer",
@@ -282,7 +306,8 @@ export function SearchableSelect({
                             )}
                         </>
                     )}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
