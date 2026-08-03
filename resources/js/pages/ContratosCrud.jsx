@@ -19,7 +19,7 @@ import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
 
 const POR_PAGINA = 5;
 
-const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Translado"];
+const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Translado", "No ingreso"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -625,10 +625,15 @@ function Modal({
     empresasOpts = [],
     centrosCostoCatalogo = [],
     readOnly = false,
+    onFotografiaUpdated,
 }) {
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
+    const [fotoOverride, setFotoOverride] = useState(null);
+    const [fotoUploading, setFotoUploading] = useState(false);
+    const [fotoError, setFotoError] = useState("");
+    const [fotoLightbox, setFotoLightbox] = useState(false);
     const [eventosMedicos, setEventosMedicos] = useState([]);
     const [eventosCollapsed, setEventosCollapsed] = useState([]);
     const [evObsYears, setEvObsYears]             = useState([]);
@@ -679,6 +684,10 @@ function Modal({
             setErrors({});
             setActive("principal");
             setSaving(false);
+            setFotoOverride(null);
+            setFotoUploading(false);
+            setFotoError("");
+            setFotoLightbox(false);
             const _evs = (initial.eventos_medicos || []).map((ev) => ({
                 ...ev,
                 fecha_ingreso_seguimiento: dateOnly(ev.fecha_ingreso_seguimiento),
@@ -711,6 +720,36 @@ function Modal({
 
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
+
+    const empleadoActual = empleados.find(
+        (e) => String(e.id) === String(form.empleado_id),
+    );
+    const fotografiaActual = fotoOverride || empleadoActual?.fotografia || null;
+
+    const handleFotoChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file || !form.empleado_id) return;
+        setFotoError("");
+        setFotoUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("fotografia", file);
+            const { data } = await api.post(
+                `/empleados/${form.empleado_id}/fotografia`,
+                fd,
+            );
+            setFotoOverride(data.fotografia);
+            onFotografiaUpdated?.(form.empleado_id, data.fotografia);
+        } catch (err) {
+            setFotoError(
+                err?.response?.data?.message ??
+                    "No se pudo subir la fotografía.",
+            );
+        } finally {
+            setFotoUploading(false);
+        }
+    };
 
     const handleCandidatoSelect = (c) => {
         if (!c) return;
@@ -976,6 +1015,165 @@ function Modal({
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {form.empleado_id && (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 16,
+                            padding: "16px 28px",
+                            borderBottom: "2px solid var(--border)",
+                            background: "var(--bg)",
+                        }}
+                    >
+                        <div
+                            onClick={() =>
+                                fotografiaActual && setFotoLightbox(true)
+                            }
+                            title={
+                                fotografiaActual ? "Ver en grande" : undefined
+                            }
+                            style={{
+                                width: 84,
+                                height: 84,
+                                borderRadius: 12,
+                                overflow: "hidden",
+                                background: "var(--primary)",
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 800,
+                                fontSize: "1.6rem",
+                                fontFamily: "'Poppins',sans-serif",
+                                flexShrink: 0,
+                                border: "1.5px solid var(--border)",
+                                cursor: fotografiaActual
+                                    ? "zoom-in"
+                                    : "default",
+                            }}
+                        >
+                            {fotografiaActual ? (
+                                <img
+                                    src={`/storage/${fotografiaActual}`}
+                                    alt=""
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                            ) : (
+                                (form.nombres || "?").charAt(0).toUpperCase()
+                            )}
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    color: "var(--text-muted)",
+                                    fontFamily: "Nunito,sans-serif",
+                                }}
+                            >
+                                Fotografía del empleado
+                            </span>
+                            <div
+                                style={{
+                                    display: "flex",
+                                    gap: 10,
+                                    flexWrap: "wrap",
+                                }}
+                            >
+                                {fotografiaActual && (
+                                    <a
+                                        href={`/storage/${fotografiaActual}`}
+                                        download
+                                        style={{
+                                            ...S.btnSecondary,
+                                            textDecoration: "none",
+                                            fontSize: "0.82rem",
+                                            padding: "6px 14px",
+                                        }}
+                                    >
+                                        Descargar
+                                    </a>
+                                )}
+                                {!readOnly && (
+                                    <label
+                                        style={{
+                                            ...S.btnSecondary,
+                                            fontSize: "0.82rem",
+                                            padding: "6px 14px",
+                                            cursor: fotoUploading
+                                                ? "default"
+                                                : "pointer",
+                                            opacity: fotoUploading ? 0.6 : 1,
+                                        }}
+                                    >
+                                        {fotoUploading
+                                            ? "Subiendo…"
+                                            : fotografiaActual
+                                              ? "Cambiar foto"
+                                              : "Subir foto"}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={fotoUploading}
+                                            style={{ display: "none" }}
+                                            onChange={handleFotoChange}
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                            {fotoError && (
+                                <span
+                                    style={{
+                                        color: "#c0392b",
+                                        fontSize: "0.78rem",
+                                    }}
+                                >
+                                    {fotoError}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {fotoLightbox && fotografiaActual && (
+                    <div
+                        onClick={() => setFotoLightbox(false)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            background: "rgba(0,0,0,0.78)",
+                            zIndex: 6000,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "zoom-out",
+                            padding: 40,
+                        }}
+                    >
+                        <img
+                            src={`/storage/${fotografiaActual}`}
+                            alt=""
+                            style={{
+                                maxWidth: "90vw",
+                                maxHeight: "90vh",
+                                borderRadius: 10,
+                                boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+                            }}
+                        />
                     </div>
                 )}
 
@@ -2220,8 +2418,9 @@ export default function ContratosCrud() {
                     (c.empleado?.cedula ?? "").includes(q) ||
                     (c.cargo ?? "").toLowerCase().includes(q);
                 const matchE =
-                    filtroEstado === "Todos" ||
-                    c.estado_contrato === filtroEstado;
+                    filtroEstado === "Todos"
+                        ? c.estado_contrato !== "No ingreso"
+                        : c.estado_contrato === filtroEstado;
                 const matchS = filtroSede === "Todas" || c.sede === filtroSede;
                 const matchTC =
             
@@ -2502,6 +2701,13 @@ export default function ContratosCrud() {
                                 apply: () => {
                                     clearFilters();
                                     setFiltroEstado("Translado");
+                                },
+                            },
+                            {
+                                label: "Contratos con No ingreso",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("No ingreso");
                                 },
                             },
                             {
@@ -3036,6 +3242,15 @@ export default function ContratosCrud() {
                 empleadorOpts={empleadorOpts}
                 empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
+                onFotografiaUpdated={(empleadoId, fotografia) =>
+                    setEmpleados((prev) =>
+                        prev.map((e) =>
+                            String(e.id) === String(empleadoId)
+                                ? { ...e, fotografia }
+                                : e,
+                        ),
+                    )
+                }
             />
 
             <Modal
@@ -3050,6 +3265,15 @@ export default function ContratosCrud() {
                 empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
+                onFotografiaUpdated={(empleadoId, fotografia) =>
+                    setEmpleados((prev) =>
+                        prev.map((e) =>
+                            String(e.id) === String(empleadoId)
+                                ? { ...e, fotografia }
+                                : e,
+                        ),
+                    )
+                }
             />
         </div>
     );

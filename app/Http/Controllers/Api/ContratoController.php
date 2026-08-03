@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\CentroCostoCatalogo;
 use App\Models\Contrato;
+use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
@@ -67,13 +68,18 @@ class ContratoController extends Controller
     }
 
     /**
-     * "Jefe Inmediato" es texto libre en el formulario de contratos, no un selector ligado a
-     * `users`, así que en la práctica trae de todo: solo el nombre, o "Nombre - correo@..."
-     * (la convención más común). Se intenta extraer el correo embebido primero; si no hay,
-     * se compara el nombre contra `users.name` sin distinguir mayúsculas/tildes de capitalización.
+     * Correo del jefe inmediato del contrato. `jefe_inmediato_correo` es la fuente de verdad
+     * (columna propia, poblada por el import de contratos y por el flujo normal desde ahora en
+     * adelante); para contratos viejos que no la tienen, cae al parseo del legacy
+     * `jefe_inmediato` de texto libre ("Nombre - correo@..." o solo nombre contra `users.name`).
      */
-    private function resolverCorreoSupervisor(?string $jefeInmediato): ?string
+    private function resolverCorreoSupervisor(Contrato $contrato): ?string
     {
+        if ($contrato->jefe_inmediato_correo) {
+            return $contrato->jefe_inmediato_correo;
+        }
+
+        $jefeInmediato = $contrato->jefe_inmediato;
         if (!$jefeInmediato) {
             return null;
         }
@@ -147,7 +153,7 @@ class ContratoController extends Controller
             't_camisa'            => $respuesta?->talla_camisa ?? '',
             't_pantalon'          => $respuesta?->talla_pantalon ?? '',
             't_zapatos'           => $respuesta?->talla_zapatos ?? '',
-            'CorreoSuper'         => $this->resolverCorreoSupervisor($contrato->jefe_inmediato) ?? '',
+            'CorreoSuper'         => $this->resolverCorreoSupervisor($contrato) ?? '',
             'Departamento'        => $this->resolverDepartamento($contrato, $respuesta),
         ];
 
@@ -217,6 +223,25 @@ class ContratoController extends Controller
         }
 
         return $resueltos;
+    }
+
+    // Un contrato en "No ingreso" significa que el empleado nunca llegó a
+    // ingresar: cualquier pedido automático de dotación generado para él (activo
+    // o completado) restaura el inventario descontado y se elimina, igual que un
+    // pedido cancelado manualmente (ver PedidoAutomaticoController::destroy).
+    private function eliminarPedidosAutomaticosDeContrato(Contrato $contrato): void
+    {
+        $pedidos = PedidoAutomatico::where('contrato_id', $contrato->id)->get();
+        foreach ($pedidos as $pedido) {
+            if (in_array($pedido->estado, ['Activo', 'Completado'], true)) {
+                foreach ($pedido->items()->with('inventario')->get() as $item) {
+                    if ($item->inventario) {
+                        $item->inventario->increment('cantidad', $item->cantidad);
+                    }
+                }
+            }
+            $pedido->delete();
+        }
     }
 
     public function index(Request $request)
@@ -411,12 +436,14 @@ class ContratoController extends Controller
         }
 
         $pedidoAutomatico = null;
-        try {
-            $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
-        } catch (\Throwable $e) {
-            Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
-                'error' => $e->getMessage(),
-            ]);
+        if ($contrato->estado_contrato !== 'No ingreso') {
+            try {
+                $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
+            } catch (\Throwable $e) {
+                Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional'])->toArray();
@@ -481,6 +508,10 @@ class ContratoController extends Controller
             $data['completado'] = true;
 
             $contrato->update($data);
+
+            if ($contrato->estado_contrato === 'No ingreso') {
+                $this->eliminarPedidosAutomaticosDeContrato($contrato);
+            }
 
             // Sincronizar centros de costos
             $contrato->centrosCostos()->delete();

@@ -274,7 +274,6 @@ const IMPORT_HEADER_MAP = {
     prenda: 'prenda',
     genero: 'genero',
     talla: 'talla',
-    precio: 'precio',
     cantidad: 'cantidad',
 };
 
@@ -337,7 +336,6 @@ function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
                         prenda: mapped.prenda,
                         genero: mapped.genero,
                         talla: String(mapped.talla),
-                        precio: Number(mapped.precio) || 0,
                         cantidad,
                         stock_minimo: STOCK_MINIMO_IMPORT_DEFAULT,
                     });
@@ -373,9 +371,9 @@ function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: 0 }}>
-                        Columnas del archivo: <strong>Proyecto, Sede, Prenda, Género, Talla, Precio, Cantidad</strong>. La columna Sede es opcional. No es necesario poner Estado ni Stock mínimo:
-                        el estado se calcula solo según cantidad vs. stock mínimo, y los items nuevos quedan con stock mínimo <strong>{STOCK_MINIMO_IMPORT_DEFAULT}</strong> por defecto.
-                        Si una combinación proyecto + prenda + talla + género ya existe, la cantidad se <strong>suma</strong> al stock actual; si no existe, se crea un item nuevo.
+                        Columnas del archivo: <strong>Proyecto, Sede, Prenda, Género, Talla, Cantidad</strong>. La columna Sede es opcional. No es necesario poner Precio, Estado ni Stock mínimo:
+                        el precio se conserva del item existente (no se modifica al importar), el estado se calcula solo según cantidad vs. stock mínimo, y los items nuevos quedan con stock mínimo <strong>{STOCK_MINIMO_IMPORT_DEFAULT}</strong> por defecto.
+                        Si una combinación proyecto + prenda + talla + género ya existe, la cantidad se <strong>suma</strong> al stock actual; si no existe, se crea un item nuevo (con precio 0, editable después).
                     </p>
                     <label htmlFor="import-excel-file" style={S.fileDrop}>
                         <input id="import-excel-file" type="file" accept=".xlsx,.xls" onChange={handleFile} style={{ display: 'none' }} />

@@ -419,6 +419,53 @@ export const IconServiexpress = ({ size = 18 }) => (
   </svg>
 );
 
+/** Empleadores — maletín */
+export const IconEmpleadoresCat = ({ size = 18 }) => (
+  <svg {...props(size)}>
+    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+  </svg>
+);
+
+/** Empresas — dos edificios */
+export const IconEmpresasCat = ({ size = 18 }) => (
+  <svg {...props(size)}>
+    <rect x="3" y="3" width="7" height="18" rx="1" />
+    <rect x="14" y="8" width="7" height="13" rx="1" />
+    <line x1="6" y1="7" x2="6" y2="7.01" />
+    <line x1="6" y1="11" x2="6" y2="11.01" />
+    <line x1="6" y1="15" x2="6" y2="15.01" />
+    <line x1="17" y1="12" x2="17" y2="12.01" />
+    <line x1="17" y1="16" x2="17" y2="16.01" />
+  </svg>
+);
+
+/** Regionales — pin de mapa */
+export const IconRegionalesCat = ({ size = 18 }) => (
+  <svg {...props(size)}>
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+/** Centros de Costos — billetera */
+export const IconCentrosCostosCat = ({ size = 18 }) => (
+  <svg {...props(size)}>
+    <path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" />
+    <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4h-5a2 2 0 0 1 0-4h5" />
+    <circle cx="17" cy="13" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+/** Proyectos — diana/objetivo */
+export const IconProyectosCat = ({ size = 18 }) => (
+  <svg {...props(size)}>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+);
+
 /** Vehículos */
 export const IconVehiculos = ({ size = 18 }) => (
   <svg {...props(size)}>
@@ -574,4 +621,9 @@ export const MODULE_ICONS = {
   comerciales_tecnicos:    IconComercialesTecnicos,
   config:                  IconConfig,
   vehiculos:               IconVehiculos,
+  empleadores_cat:         IconEmpleadoresCat,
+  empresas_cat:            IconEmpresasCat,
+  regionales_cat:          IconRegionalesCat,
+  centros_costos_cat:      IconCentrosCostosCat,
+  proyectos_cat:           IconProyectosCat,
 };

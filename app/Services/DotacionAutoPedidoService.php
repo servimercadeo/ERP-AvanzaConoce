@@ -20,6 +20,13 @@ class DotacionAutoPedidoService
         'DIRECTV ECU'  => 'DIRECTV',
     ];
 
+    // El kit administrativo (SYM ADMINISTRATIVO) no tiene dotación repartida por sede: en
+    // proyecto_sede solo está vinculado a las sedes de Pereira (así viene de
+    // sedes_activas.csv, porque Administración es un área centralizada en el HQ). Por eso
+    // sus líneas siempre se descuentan de esta sede fija, sin importar dónde esté la sede
+    // del contrato del empleado.
+    private const SEDE_CENTRAL_ADMINISTRATIVA = 'SYM PEREIRA';
+
     // Cargos DIRECTV cuya labor es instalación en campo (coincidencia exacta,
     // a diferencia de los demás grupos: "TECNICO" como substring atrapa
     // cargos de oficina/calidad que no deben recibir el kit de instalador.
@@ -54,23 +61,32 @@ class DotacionAutoPedidoService
 
         $reglas = $this->resolverReglas($proyecto, $cargo, $genero, $empleado);
 
-        // Solo se genera pedido cuando el proyecto+cargo coincide con una de las reglas
-        // definidas. Si el cargo no está cubierto, no se crea nada (aunque el proyecto sí
-        // sea SYM/DIRECTV) — evita pedidos vacíos para cargos fuera de las reglas dadas.
         if (empty($reglas)) {
             return null;
         }
 
-        // La dotación se descuenta de la sede específica del contrato (cada proyecto tiene
-        // dotación repartida entre varias sedes). Sin sede resuelta no hay forma segura de
-        // saber de cuál sede descontar, así que no se asigna ninguna línea.
-        $sedeId = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
-        if (!$sedeId) {
-            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}; no se genera pedido automático.");
+        $sedeCentral = Sede::where('nombre', self::SEDE_CENTRAL_ADMINISTRATIVA)->value('id');
+        if (!$sedeCentral) {
+            Log::error('DotacionAutoPedidoService: no se encontró la sede central administrativa "' . self::SEDE_CENTRAL_ADMINISTRATIVA . '"; no se genera pedido automático para el contrato ' . $contrato->id . '.');
             return null;
         }
 
-        return DB::transaction(function () use ($contrato, $reglas, $sedeId) {
+        $sedeContrato = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
+
+        $tieneLineaNoAdministrativa = collect($reglas)->contains(fn ($r) => $r[0] !== 'SYM ADMINISTRATIVO');
+        $tieneLineaAdministrativa   = collect($reglas)->contains(fn ($r) => $r[0] === 'SYM ADMINISTRATIVO');
+
+        if (!$sedeContrato) {
+            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}.");
+            if (!$tieneLineaAdministrativa) {
+                return null;
+            }
+        }
+        if (!$tieneLineaNoAdministrativa) {
+            $sedeContrato = null; 
+        }
+
+        return DB::transaction(function () use ($contrato, $reglas, $sedeCentral, $sedeContrato) {
             $pedido = PedidoAutomatico::create([
                 'codigo'       => PedidoAutomatico::generarCodigo(),
                 'contrato_id'  => $contrato->id,
@@ -81,6 +97,11 @@ class DotacionAutoPedidoService
             ]);
 
             foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
+                $sedeId = $proyecto === 'SYM ADMINISTRATIVO' ? $sedeCentral : $sedeContrato;
+                if (!$sedeId) {
+                    continue;
+                }
+
                 $inv = $this->buscarItemConStock($proyecto, $sedeId, $prenda, $genero, $talla, $cantidad);
                 if (!$inv) {
                     continue;
@@ -97,11 +118,6 @@ class DotacionAutoPedidoService
         });
     }
 
-    /**
-     * Completa (en memoria, sin persistir) las tallas del empleado que falten con las
-     * registradas en "Respuestas de Ingresos" (documento = cédula), igual que hace
-     * EmpleadoController::index() para la lista de empleados.
-     */
     private function completarTallasDesdeRespuestaIngreso(User $empleado): void
     {
         if ($empleado->talla_camisa && $empleado->talla_pantalon && $empleado->talla_zapatos) {
@@ -115,12 +131,6 @@ class DotacionAutoPedidoService
         $empleado->talla_zapatos  = $empleado->talla_zapatos  ?: $respuesta?->talla_zapatos;
     }
 
-    /**
-     * Busca el item de inventario para una línea de dotación, con lock para evitar
-     * condiciones de carrera con otros pedidos concurrentes. Si no existe, si la talla
-     * del empleado no está registrada, o si no hay stock suficiente, devuelve null y
-     * deja constancia en el log (esa línea simplemente se omite del pedido).
-     */
     private function buscarItemConStock(string $proyecto, int $sedeId, string $prenda, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
     {
         $descripcion = "{$prenda} ({$proyecto}, {$genero}, sede_id {$sedeId})";
@@ -171,15 +181,15 @@ class DotacionAutoPedidoService
             if ($esSupervisorComercial) {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO EXPRESS') {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM TIGO EXPRESS', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO HOME') {
                 $reglas[] = ['SYM TIGO HOME', 'Polo Ml Azul Home', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['SYM TIGO HOME', 'Gorra', 'Masculino', 'N/A', 1];
-                $reglas[] = ['SYM TIGO HOME', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Gorra Tigo', 'Masculino', 'N/A', 1];
+                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
             } else {
                 // Cargo no comercial (ej. Analista, Coordinador) en un proyecto Tigo: recibe el
                 // mismo kit que "personal administrativo" (proyecto Solo Ausentismos).
@@ -225,7 +235,7 @@ class DotacionAutoPedidoService
     {
         return [
             ['SYM ADMINISTRATIVO', 'Polo Gris Manga Corta', $genero, $empleado->talla_camisa, 2],
-            ['SYM ADMINISTRATIVO', 'Pantalon Administrativo', $genero, $empleado->talla_pantalon, 1],
+            ['SYM ADMINISTRATIVO', 'Jean Azul', $genero, $empleado->talla_pantalon, 1],
             ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1],
         ];
     }

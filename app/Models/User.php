@@ -23,7 +23,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         // Acceso al sistema
-        'name', 'email', 'password', 'avanzaconoce_id', 'rol', 'activo', 'ultimo_sso_at',
+        'name', 'email', 'password', 'avanzaconoce_id', 'rol', 'activo', 'pendiente_alta', 'ultimo_sso_at',
 
         // Información General
         'cedula', 'fecha_expedicion', 'apellidos', 'nombres', 'fotografia',
@@ -42,7 +42,8 @@ class User extends Authenticatable
         'tiene_cert_alturas', 'cert_alturas_vence',
 
         // Estado
-        'estado_empleado', 'codigo_directv', 'empresa_id', 'empleador', 'jefe_inmediato', 'comentarios',
+        'estado_empleado', 'codigo_directv', 'empresa_id', 'empleador', 'jefe_inmediato',
+        'jefe_inmediato_nombre', 'jefe_inmediato_correo', 'comentarios',
 
         // Información Adicional
         'cargo', 'tipo_funcionario', 'tipo_vinculacion',
@@ -89,6 +90,7 @@ class User extends Authenticatable
             'email_verified_at'    => 'datetime',
             'password'             => 'hashed',
             'activo'               => 'boolean',
+            'pendiente_alta'       => 'boolean',
             'ultimo_sso_at'        => 'datetime',
             'fecha_nacimiento'     => 'date',
             'fecha_expedicion'     => 'date',
