@@ -228,7 +228,7 @@ export default function CentrosCostosCrud() {
                         <thead>
                             <tr>
                                 <th>Código</th>
-                                <th>Nombre</th>
+                                <th>operaciones</th>
                                 <th>Ciudad</th>
                                 <th>Proyecto</th>
                                 <th style={{ textAlign: "center" }}>Estado</th>
