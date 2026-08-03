@@ -330,6 +330,22 @@ class EmpleadoController extends Controller
         ]);
     }
 
+    public function updateFotografia(Request $request, User $empleado)
+    {
+        $data = $request->validate([
+            'fotografia' => 'required|image|max:5120',
+        ]);
+
+        $empleado->update([
+            'fotografia' => $request->file('fotografia')->store('empleados/fotos', 'public'),
+        ]);
+
+        return response()->json([
+            'id'         => $empleado->id,
+            'fotografia' => $empleado->fotografia,
+        ]);
+    }
+
     public function destroy(User $empleado)
     {
         $empleado->delete();

@@ -86,6 +86,10 @@ export default function CandidatosCrud() {
     const [candidates, setCandidates] = useState([]);
     const [requisitions, setRequisitions] = useState([]);
     const [ciudadesOpts, setCiudadesOpts] = useState([]);
+    const ciudadesOptsNombre = useMemo(
+        () => ciudadesOpts.map((o) => ({ value: o.label, label: o.label })),
+        [ciudadesOpts],
+    );
     const [sedesOpts, setSedesOpts] = useState([]);
     const [arlsOpts, setArlsOpts] = useState([]);
     const [cajasOpts, setCajasOpts] = useState([]);
@@ -2667,22 +2671,23 @@ export default function CandidatosCrud() {
                                             >
                                                 CIUDAD
                                             </label>
-                                            <input
+                                            <SearchableSelect
                                                 value={
                                                     procForm.fraudes?.ciudad ||
                                                     ""
                                                 }
-                                                onChange={(e) =>
+                                                onChange={(val) =>
                                                     setProcForm((p) => ({
                                                         ...p,
                                                         fraudes: {
                                                             ...p.fraudes,
-                                                            ciudad: e.target
-                                                                .value,
+                                                            ciudad: val,
                                                         },
                                                     }))
                                                 }
-                                                style={S.formInput}
+                                                options={ciudadesOptsNombre}
+                                                defaultValue=""
+                                                freeText
                                             />
                                         </div>
                                         <div>
