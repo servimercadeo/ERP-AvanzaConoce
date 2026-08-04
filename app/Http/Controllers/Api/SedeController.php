@@ -97,12 +97,26 @@ class SedeController extends Controller
 
         $sede = Sede::create($data);
 
-        return response()->json($sede, 201);
+        return response()->json($this->conCiudad($sede), 201);
     }
 
     public function show(Sede $sede)
     {
-        return response()->json($sede->load(['padre', 'almacenista', 'secretaria', 'jefe']));
+        return response()->json($this->conCiudad($sede->load(['padre', 'almacenista', 'secretaria', 'jefe'])));
+    }
+
+    /**
+     * `index()` trae ciudad_nombre/id_departamento via leftJoin; store/update/show devuelven el
+     * modelo directo, así que se agregan aquí a mano para que el frontend (que reemplaza la fila
+     * en su estado local con esta respuesta, sin recargar la lista) no muestre la ciudad en blanco.
+     */
+    private function conCiudad(Sede $sede): Sede
+    {
+        $sede->load('ciudad');
+        $sede->ciudad_nombre = $sede->ciudad?->nombre;
+        $sede->id_departamento = $sede->ciudad?->id_departamento;
+
+        return $sede;
     }
 
     public function update(Request $request, Sede $sede)
@@ -125,7 +139,7 @@ class SedeController extends Controller
 
         $sede->update($data);
 
-        return response()->json($sede->fresh(['padre', 'almacenista', 'secretaria', 'jefe']));
+        return response()->json($this->conCiudad($sede->fresh(['padre', 'almacenista', 'secretaria', 'jefe'])));
     }
 
     public function destroy(Sede $sede)
