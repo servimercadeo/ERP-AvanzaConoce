@@ -62,6 +62,7 @@ export default function SeleccionCrud() {
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState('create');
   const [form, setForm] = useState({});
+  const [errors, setErrors] = useState({});
   const [page, setPage] = useState(1);
   const [copiedId, setCopiedId] = useState(null);
 
@@ -87,7 +88,17 @@ export default function SeleccionCrud() {
   useEffect(() => { setPage(1); }, [estadoF]);
 
   const ch    = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
-  const chVal = k => val => setForm(p => ({ ...p, [k]: val }));
+  const chVal = k => val => {
+    setForm(p => ({ ...p, [k]: val }));
+    // Cambiar proyecto o empresa puede resolver el choque de EmpresaProyectoRules: limpiar ese error.
+    if (k === 'proyecto_id' || k === 'empresa_id') {
+      setErrors(prev => {
+        if (!prev.proyecto_id && !prev._general) return prev;
+        const { proyecto_id, _general, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
 
   const reload = () => {
     api.get('/requisiciones').then(r => setData(r.data)).catch(console.error);
@@ -114,6 +125,7 @@ export default function SeleccionCrud() {
   /* ── Modal requisicion ─────────────────────────────────────────── */
   const openModal = (m, row = null) => {
     setMode(m);
+    setErrors({});
     if (m === 'create') {
       setForm({ fecha_solicitud: today(), estado: 'Abierta', solicitud_confidencial: 'No', pais: 'Colombia' });
     } else if (row) {
@@ -143,6 +155,7 @@ export default function SeleccionCrud() {
   };
 
   const saveModal = async () => {
+    setErrors({});
     try {
       setSaving(true);
       const payload = {
@@ -174,7 +187,14 @@ export default function SeleccionCrud() {
       }
       setModal(false);
     } catch (e) {
-      alert('Error al guardar: ' + (e.response?.data?.message || e.message));
+      const apiErrors = e.response?.data?.errors;
+      if (apiErrors) {
+        const flat = {};
+        Object.entries(apiErrors).forEach(([k, v]) => { flat[k] = Array.isArray(v) ? v[0] : v; });
+        setErrors(flat);
+      } else {
+        setErrors({ _general: e.response?.data?.message || e.message || 'No se pudo guardar la requisición.' });
+      }
     } finally {
       setSaving(false);
     }
@@ -315,6 +335,11 @@ export default function SeleccionCrud() {
               <button style={S.mClose} onClick={() => setModal(false)}><IconClose size={13}/></button>
             </div>
             <div style={S.mBody}>
+              {(errors._general || errors.proyecto_id) && (
+                <div style={S.errorBanner}>
+                  {errors._general || errors.proyecto_id}
+                </div>
+              )}
               <div style={S.g3}>
                 {/* Responsable — selección con auto-relleno */}
                 <SField l="Nombre responsable" req={!isRO(mode)}>
@@ -334,7 +359,7 @@ export default function SeleccionCrud() {
                 <F l="Cargo requerido"             k="cargo_id"                     req={!isRO(mode)} opts={cargosOpts} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Tipo de solicitud"           k="tipo_solicitud"               req={!isRO(mode)} opts={OPT.tipos} form={form} ch={ch} dis={isRO(mode)} />
                 {/* Proyecto – SearchableSelect */}
-                <SField l="Proyecto" req={!isRO(mode)}>
+                <SField l="Proyecto" req={!isRO(mode)} err={errors.proyecto_id}>
                   <SearchableSelect
                     key={`proy-${form.proyecto_id ?? ''}`}
                     value={form.proyecto_id ?? ''}
@@ -346,7 +371,7 @@ export default function SeleccionCrud() {
                 </SField>
 
                 {/* Empresa – SearchableSelect */}
-                <SField l="Empresa" req={!isRO(mode)}>
+                <SField l="Empresa" req={!isRO(mode)} err={errors.proyecto_id}>
                   <SearchableSelect
                     key={`emp-${form.empresa_id ?? ''}`}
                     value={form.empresa_id ?? ''}
@@ -428,13 +453,15 @@ function F({ l, k, type = 'text', opts, req, span, form, ch, dis }) {
   );
 }
 
-function SField({ l, req, children }) {
+function SField({ l, req, err, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text)', fontFamily: NUN }}>
         {l}{req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
-      {children}
+      <div style={err ? { border: '1.5px solid #e74c3c', borderRadius: 'var(--radius-sm)' } : undefined}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -468,6 +495,7 @@ const S = {
   mTitle:      { fontFamily: POP, fontWeight: 700, fontSize: '1.05rem', color: '#fff' },
   mClose:      { background: 'none', border: '1.5px solid rgba(255,255,255,0.5)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', flexShrink: 0 },
   mBody:       { padding: '20px 24px 24px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
+  errorBanner: { background: '#fce8e8', color: '#a33', border: '1.5px solid #f0b8b8', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 600, fontFamily: NUN, marginBottom: 14 },
   mFoot:       { display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 24px', borderTop: BD, flexShrink: 0 },
   g3:          { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 },
   secTitle:    { margin: '22px 0 10px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--primary)', fontFamily: POP },
