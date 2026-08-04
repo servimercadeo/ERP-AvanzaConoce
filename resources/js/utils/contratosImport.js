@@ -147,8 +147,8 @@ function normalizeEstado(value) {
         inactivo: "Inactivo",
         "no vigente": "Inactivo",
         cancelado: "Cancelado",
-        traslado: "Translado",
-        transladado: "Translado",
+        traslado: "Traslado",
+        transladado: "Traslado",
     };
     return map[clean] || String(value).trim();
 }

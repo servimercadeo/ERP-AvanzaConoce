@@ -47,8 +47,8 @@ class ImportarContratosActivosCommand extends Command
         'inactivo' => 'Inactivo',
         'no vigente' => 'Inactivo',
         'cancelado' => 'Cancelado',
-        'traslado' => 'Translado',
-        'transladado' => 'Translado',
+        'traslado' => 'Traslado',
+        'transladado' => 'Traslado',
     ];
 
     // CSV trae "DIRECTV COL"; el resto de la app (EmpresaProyectoRules, DotacionAutoPedidoService)

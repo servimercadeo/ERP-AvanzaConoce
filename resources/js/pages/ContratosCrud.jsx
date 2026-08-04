@@ -19,7 +19,7 @@ import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
 
 const POR_PAGINA = 5;
 
-const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Translado", "No ingreso"];
+const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Traslado", "No ingreso"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -2484,7 +2484,7 @@ export default function ContratosCrud() {
                 (c) => c.estado_contrato === "Cancelado",
             ).length,
             translados: contratos.filter(
-                (c) => c.estado_contrato === "Translado",
+                (c) => c.estado_contrato === "Traslado",
             ).length,
         }),
         [contratos],
@@ -2658,7 +2658,7 @@ export default function ContratosCrud() {
                     <div className="stat-num" style={{ color: "#3498db" }}>
                         {stats.translados}
                     </div>
-                    <div className="stat-label">Translados</div>
+                    <div className="stat-label">Traslados</div>
                 </div>
             </div>
 
@@ -2719,7 +2719,7 @@ export default function ContratosCrud() {
                                 label: "Contratos en translado",
                                 apply: () => {
                                     clearFilters();
-                                    setFiltroEstado("Translado");
+                                    setFiltroEstado("Traslado");
                                 },
                             },
                             {
@@ -2875,7 +2875,7 @@ export default function ContratosCrud() {
                                                 c.estado_contrato === "Activo"
                                                     ? "#e0f7f4"
                                                     : c.estado_contrato ===
-                                                        "Translado"
+                                                        "Traslado"
                                                       ? "#e8f0ff"
                                                       : c.estado_contrato ===
                                                           "Inactivo"
@@ -2884,7 +2884,7 @@ export default function ContratosCrud() {
                                                 c.estado_contrato === "Activo"
                                                     ? "#0d6e5a"
                                                     : c.estado_contrato ===
-                                                        "Translado"
+                                                        "Traslado"
                                                       ? "#1a4fa8"
                                                       : c.estado_contrato ===
                                                           "Inactivo"
