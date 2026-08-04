@@ -8,7 +8,7 @@
   body { font-family: Arial, sans-serif; font-size: 13px; color: #222; background: #fff; margin: 0; padding: 20px; }
   .greeting { margin-bottom: 18px; line-height: 1.6; }
   table { border-collapse: collapse; width: 100%; font-size: 11px; }
-  th { background: #c0392b; color: #fff; text-align: center; padding: 6px 5px; font-size: 10px; white-space: nowrap; }
+  th { background: #1a4fa8; color: #fff; text-align: center; padding: 6px 5px; font-size: 10px; white-space: nowrap; }
   td { border: 1px solid #ccc; padding: 5px 6px; text-align: center; white-space: nowrap; }
   tr:nth-child(even) td { background: #f9f9f9; }
   .footer { margin-top: 24px; font-size: 12px; color: #555; }

@@ -61,18 +61,10 @@ class DotacionAutoPedidoService
 
         $reglas = $this->resolverReglas($proyecto, $cargo, $genero, $empleado);
 
-        // Solo se genera pedido cuando el proyecto+cargo coincide con una de las reglas
-        // definidas. Si el cargo no está cubierto, no se crea nada (aunque el proyecto sí
-        // sea SYM/DIRECTV) — evita pedidos vacíos para cargos fuera de las reglas dadas.
         if (empty($reglas)) {
             return null;
         }
 
-        // Las líneas "SYM ADMINISTRATIVO" (kit administrativo, y el carnet/gorra que varias
-        // reglas de Tigo Express/Home toman prestados de ese mismo pool central) siempre se
-        // descuentan de la sede central. El resto de líneas sí tiene dotación repartida por
-        // sede y se descuenta de la sede del contrato. Una regla puede necesitar cualquiera de
-        // las dos, así que la sede se resuelve por línea, no una sola vez para todo el pedido.
         $sedeCentral = Sede::where('nombre', self::SEDE_CENTRAL_ADMINISTRATIVA)->value('id');
         if (!$sedeCentral) {
             Log::error('DotacionAutoPedidoService: no se encontró la sede central administrativa "' . self::SEDE_CENTRAL_ADMINISTRATIVA . '"; no se genera pedido automático para el contrato ' . $contrato->id . '.');
@@ -86,14 +78,12 @@ class DotacionAutoPedidoService
 
         if (!$sedeContrato) {
             Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}.");
-            // Sin sede de contrato y sin ninguna línea que pueda salir de la sede central, no
-            // hay nada que asignar — se omite el pedido en vez de crear uno vacío.
             if (!$tieneLineaAdministrativa) {
                 return null;
             }
         }
         if (!$tieneLineaNoAdministrativa) {
-            $sedeContrato = null; // no se necesita para ninguna línea, evita usarla por error
+            $sedeContrato = null; 
         }
 
         return DB::transaction(function () use ($contrato, $reglas, $sedeCentral, $sedeContrato) {
@@ -128,11 +118,6 @@ class DotacionAutoPedidoService
         });
     }
 
-    /**
-     * Completa (en memoria, sin persistir) las tallas del empleado que falten con las
-     * registradas en "Respuestas de Ingresos" (documento = cédula), igual que hace
-     * EmpleadoController::index() para la lista de empleados.
-     */
     private function completarTallasDesdeRespuestaIngreso(User $empleado): void
     {
         if ($empleado->talla_camisa && $empleado->talla_pantalon && $empleado->talla_zapatos) {
@@ -146,12 +131,6 @@ class DotacionAutoPedidoService
         $empleado->talla_zapatos  = $empleado->talla_zapatos  ?: $respuesta?->talla_zapatos;
     }
 
-    /**
-     * Busca el item de inventario para una línea de dotación, con lock para evitar
-     * condiciones de carrera con otros pedidos concurrentes. Si no existe, si la talla
-     * del empleado no está registrada, o si no hay stock suficiente, devuelve null y
-     * deja constancia en el log (esa línea simplemente se omite del pedido).
-     */
     private function buscarItemConStock(string $proyecto, int $sedeId, string $prenda, string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
     {
         $descripcion = "{$prenda} ({$proyecto}, {$genero}, sede_id {$sedeId})";

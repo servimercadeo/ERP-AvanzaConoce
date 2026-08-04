@@ -82,6 +82,7 @@ class ImportarContratosActivosCommand extends Command
             'sedes_vacias' => [],
             'sedes_sin_catalogo' => [],
             'centros_costo_no_encontrados' => [],
+            'empresas_no_encontradas' => [],
             'jefes_resueltos' => 0,
             'jefes_no_resueltos' => [],
             'jefes_a_promover' => [], // user_id => nombre
@@ -194,6 +195,7 @@ class ImportarContratosActivosCommand extends Command
         $fondoPensiones = trim($fila['nomfondo'] ?? '') ?: null;
         $cajaCompensacion = trim($fila['nomcajacom'] ?? '') ?: null;
         $tipoVinculacion = trim($fila['tipovinculacion'] ?? '') ?: null;
+        $empresaId = $this->resolverEmpresaId($fila['empresa'] ?? '', $reporte);
 
         if ($user) {
             $cambios = false;
@@ -211,6 +213,10 @@ class ImportarContratosActivosCommand extends Command
                     $user->{$campo} = $valor;
                     $cambios = true;
                 }
+            }
+            if ($empresaId && !$user->empresa_id) {
+                $user->empresa_id = $empresaId;
+                $cambios = true;
             }
             if ($cambios) {
                 $user->save();
@@ -244,6 +250,7 @@ class ImportarContratosActivosCommand extends Command
             'cargo' => $cargo,
             'tipo_vinculacion' => $tipoVinculacion,
             'empleador' => $empleador,
+            'empresa_id' => $empresaId,
             'eps' => $eps,
             'arl' => $arl,
             'fondo_pensiones' => $fondoPensiones,
@@ -410,6 +417,27 @@ class ImportarContratosActivosCommand extends Command
         return $anexos;
     }
 
+    /**
+     * Resuelve el id de `empresas` para el usuario (users.empresa_id), a partir del mismo
+     * texto "empresa" que EmpresaProyectoRules usa para validar el contrato. Así el select
+     * "Empresa" del módulo Empleados queda poblado igual que el contrato, en vez de quedar
+     * vacío como pasaba antes (el import solo tocaba `contratos.empresa`, nunca `users.empresa_id`).
+     */
+    private function resolverEmpresaId(string $raw, array &$reporte): ?int
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        $id = \App\Models\Empresa::whereRaw('UPPER(nombre) = ?', [mb_strtoupper($raw, 'UTF-8')])->value('id');
+        if (!$id) {
+            $reporte['empresas_no_encontradas'][$raw] = true;
+        }
+
+        return $id;
+    }
+
     private function normalizarEmpleador(string $raw): ?string
     {
         $raw = trim($raw);
@@ -499,6 +527,7 @@ class ImportarContratosActivosCommand extends Command
         $this->imprimirLista('Contratos con sede vacía en el CSV', $reporte['sedes_vacias']);
         $this->imprimirLista('Contratos con sede que no existe en el catálogo', $reporte['sedes_sin_catalogo']);
         $this->imprimirLista('Códigos de centro de costo no encontrados en el catálogo', $reporte['centros_costo_no_encontrados']);
+        $this->imprimirLista('Empresas sin coincidencia en el catálogo (users.empresa_id quedó vacío)', array_keys($reporte['empresas_no_encontradas']));
         $this->imprimirLista('Jefes inmediatos sin usuario coincidente', array_keys($reporte['jefes_no_resueltos']));
         $this->imprimirLista('Combinaciones empresa+proyecto que violan EmpresaProyectoRules', $reporte['empresa_proyecto_invalido']);
 
