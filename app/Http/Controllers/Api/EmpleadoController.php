@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contrato;
+use App\Models\Empresa;
 use App\Models\User;
+use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmpleadoController extends Controller
 {
@@ -207,6 +211,7 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
+            $this->validarEmpresaSegunProyecto($data, $empleado);
 
             // El registro existente vino de un import (p. ej. de contratos) y todavía no se
             // dio de alta manualmente aquí — esta es su alta real, así que se le generan
@@ -297,6 +302,8 @@ class EmpleadoController extends Controller
         } elseif (!array_key_exists('fotografia', $data) || $data['fotografia'] === null) {
             unset($data['fotografia']);
         }
+
+        $this->validarEmpresaSegunProyecto($data, $empleado);
 
         $empleado->update($data);
 
@@ -457,6 +464,32 @@ class EmpleadoController extends Controller
                 ];
             })
         );
+    }
+
+    /**
+     * El formulario de Empleado no tiene un campo "proyecto" propio — el proyecto
+     * (cliente_proyecto) vive en los Contratos. Por eso, para validar la empresa elegida aquí,
+     * se toma el cliente_proyecto del contrato más reciente del empleado (si tiene alguno) y se
+     * reutiliza la misma regla que ya bloquea combinaciones inválidas en Contratos.
+     */
+    private function validarEmpresaSegunProyecto(array $data, ?User $empleadoActual): void
+    {
+        $empresaId = $data['empresa_id'] ?? $empleadoActual?->empresa_id;
+        if (!$empresaId || !$empleadoActual) {
+            return;
+        }
+
+        $proyecto = Contrato::where('empleado_id', $empleadoActual->id)
+            ->orderByDesc('fecha_ingreso')
+            ->value('cliente_proyecto');
+        if (!$proyecto) {
+            return;
+        }
+
+        $empresaNombre = Empresa::find($empresaId)?->nombre;
+        if ($msg = EmpresaProyectoRules::validar($empresaNombre, $proyecto)) {
+            throw ValidationException::withMessages(['empresa_id' => $msg]);
+        }
     }
 
     private function normalizarNombres(array &$data): void
