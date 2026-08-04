@@ -246,7 +246,7 @@ class ContratoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
+        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']);
 
         // Anulados solo se muestran cuando se filtra explícitamente por ese estado
         if ($request->estado === 'Contrato anulado') {
@@ -446,7 +446,7 @@ class ContratoController extends Controller
             }
         }
 
-        $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional'])->toArray();
+        $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo'])->toArray();
         $contratoData['pedido_automatico'] = $pedidoAutomatico
             ? ['id' => $pedidoAutomatico->id, 'codigo' => $pedidoAutomatico->codigo, 'estado' => $pedidoAutomatico->estado]
             : null;
@@ -456,7 +456,7 @@ class ContratoController extends Controller
 
     public function show(Contrato $contrato)
     {
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']));
+        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']));
     }
 
     public function update(Request $request, Contrato $contrato)
@@ -537,7 +537,7 @@ class ContratoController extends Controller
                 }
             }
 
-            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional']);
+            return $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']);
         });
 
         // Sync campos del contrato al empleado

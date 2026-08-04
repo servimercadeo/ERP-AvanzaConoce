@@ -71,7 +71,7 @@ class DotacionAutoPedidoService
             return null;
         }
 
-        $sedeContrato = $contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null;
+        $sedeContrato = $contrato->sede_id ?: ($contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null);
 
         $tieneLineaNoAdministrativa = collect($reglas)->contains(fn ($r) => $r[0] !== 'SYM ADMINISTRATIVO');
         $tieneLineaAdministrativa   = collect($reglas)->contains(fn ($r) => $r[0] === 'SYM ADMINISTRATIVO');

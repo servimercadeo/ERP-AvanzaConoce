@@ -18,7 +18,7 @@ class EmpleadoController extends Controller
     public function index()
     {
         return response()->json(
-            User::with(['empresa', 'contratos' => function($q) {
+            User::with(['empresa', 'sedeCatalogo', 'contratos' => function($q) {
                 $q->orderBy('fecha_ingreso', 'desc');
             }])
                 ->whereNotNull('cedula')
@@ -229,7 +229,7 @@ class EmpleadoController extends Controller
                 app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
                 return response()->json([
-                    'empleado'     => $empleado->fresh()->load('empresa'),
+                    'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                     'credenciales' => [
                         'email'    => $empleado->email,
                         'password' => $plainPassword,
@@ -239,7 +239,7 @@ class EmpleadoController extends Controller
 
             $empleado->update($data);
             return response()->json([
-                'empleado'     => $empleado->fresh()->load('empresa'),
+                'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                 'credenciales' => [
                     'email'    => $empleado->email,
                     'password' => '(Ya registrado)',
@@ -259,7 +259,7 @@ class EmpleadoController extends Controller
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
         return response()->json([
-            'empleado'     => $empleado->load('empresa'),
+            'empleado'     => $empleado->load(['empresa', 'sedeCatalogo']),
             'credenciales' => [
                 'email'    => $empleado->email,
                 'password' => $plainPassword,
@@ -269,7 +269,7 @@ class EmpleadoController extends Controller
 
     public function show(User $empleado)
     {
-        return response()->json($empleado->load('empresa'));
+        return response()->json($empleado->load(['empresa', 'sedeCatalogo']));
     }
 
     public function update(Request $request, User $empleado)
@@ -309,7 +309,7 @@ class EmpleadoController extends Controller
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
 
-        return response()->json($empleado->fresh()->load('empresa'));
+        return response()->json($empleado->fresh()->load(['empresa', 'sedeCatalogo']));
     }
 
     public function updateTallas(Request $request, User $empleado)

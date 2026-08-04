@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSedeCatalogo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Contrato extends Model
 {
     use HasFactory;
+    use HasSedeCatalogo;
 
     protected $table = 'contratos';
 
@@ -18,6 +20,7 @@ class Contrato extends Model
         'tipo_vinculacion',
         'cargo',
         'sede',
+        'sede_id',
         'area_empresa',
         'jefe_inmediato',
         'jefe_inmediato_nombre',
