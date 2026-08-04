@@ -10,7 +10,7 @@ class ProyectoController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Proyecto::query();
+        $query = Proyecto::with('empresa');
 
         if ($request->search) {
             $query->where('nombre', 'like', "%{$request->search}%");
@@ -22,31 +22,33 @@ class ProyectoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nombre' => 'required|string|max:150|unique:proyectos,nombre',
-            'activo' => 'boolean',
+            'nombre'     => 'required|string|max:150|unique:proyectos,nombre',
+            'empresa_id' => 'nullable|exists:empresas,id',
+            'activo'     => 'boolean',
         ]);
         $data['activo'] = $data['activo'] ?? true;
 
         $proyecto = Proyecto::create($data);
 
-        return response()->json($proyecto, 201);
+        return response()->json($proyecto->load('empresa'), 201);
     }
 
     public function show(Proyecto $proyecto)
     {
-        return response()->json($proyecto);
+        return response()->json($proyecto->load('empresa'));
     }
 
     public function update(Request $request, Proyecto $proyecto)
     {
         $data = $request->validate([
-            'nombre' => 'required|string|max:150|unique:proyectos,nombre,' . $proyecto->id,
-            'activo' => 'boolean',
+            'nombre'     => 'required|string|max:150|unique:proyectos,nombre,' . $proyecto->id,
+            'empresa_id' => 'nullable|exists:empresas,id',
+            'activo'     => 'boolean',
         ]);
 
         $proyecto->update($data);
 
-        return response()->json($proyecto->fresh());
+        return response()->json($proyecto->fresh()->load('empresa'));
     }
 
     public function destroy(Proyecto $proyecto)
