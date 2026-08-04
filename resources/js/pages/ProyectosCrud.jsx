@@ -12,8 +12,9 @@ const POR_PAGINA = 15;
 const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /* ─── Modal de creación / edición ──────────────────────────────────── */
-function FormModal({ open, onClose, onSave, editTarget }) {
+function FormModal({ open, onClose, onSave, editTarget, empresas }) {
     const [nombre, setNombre] = useState("");
+    const [empresaId, setEmpresaId] = useState("");
     const [activo, setActivo] = useState(true);
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -21,6 +22,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     React.useEffect(() => {
         if (open) {
             setNombre(editTarget?.nombre ?? "");
+            setEmpresaId(editTarget?.empresa_id ?? "");
             setActivo(editTarget ? !!editTarget.activo : true);
             setError("");
         }
@@ -36,7 +38,11 @@ function FormModal({ open, onClose, onSave, editTarget }) {
         setSaving(true);
         setError("");
         try {
-            await onSave({ nombre: nombre.trim(), activo });
+            await onSave({
+                nombre: nombre.trim(),
+                empresa_id: empresaId || null,
+                activo,
+            });
             onClose();
         } catch (err) {
             setError(
@@ -73,6 +79,21 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                             placeholder="Ej. TIGO EXPRESS, DIRECTV CO…"
                         />
                         {error && <span style={S.err}>{error}</span>}
+                    </div>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Empresa</label>
+                        <select
+                            style={S.input}
+                            value={empresaId}
+                            onChange={(e) => setEmpresaId(e.target.value)}
+                        >
+                            <option value="">Sin asignar</option>
+                            {empresas.map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                    {emp.nombre}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     <label style={S.checkboxRow}>
                         <input
@@ -119,6 +140,11 @@ export default function ProyectosCrud() {
     const { data: proyectos = [], isLoading } = useQuery({
         queryKey: ["proyectos-admin"],
         queryFn: () => api.get("/proyectos").then((r) => r.data),
+    });
+
+    const { data: empresas = [] } = useQuery({
+        queryKey: ["empresas"],
+        queryFn: () => api.get("/empresas").then((r) => r.data),
     });
 
     const filtered = useMemo(() => {
@@ -221,6 +247,7 @@ export default function ProyectosCrud() {
                         <thead>
                             <tr>
                                 <th>Nombre</th>
+                                <th>Empresa</th>
                                 <th style={{ textAlign: "center" }}>Estado</th>
                                 <th style={{ textAlign: "center" }}>Acciones</th>
                             </tr>
@@ -229,6 +256,7 @@ export default function ProyectosCrud() {
                             {paginated.map((p) => (
                                 <tr key={p.id}>
                                     <td style={{ fontWeight: 700 }}>{p.nombre}</td>
+                                    <td>{p.empresa?.nombre ?? "—"}</td>
                                     <td style={{ textAlign: "center" }}>
                                         <span style={S.badge(!!p.activo)}>
                                             {p.activo ? "Activo" : "Inactivo"}
@@ -324,6 +352,7 @@ export default function ProyectosCrud() {
             <FormModal
                 open={modalOpen}
                 editTarget={editTarget}
+                empresas={empresas}
                 onClose={() => setModalOpen(false)}
                 onSave={handleSave}
             />
