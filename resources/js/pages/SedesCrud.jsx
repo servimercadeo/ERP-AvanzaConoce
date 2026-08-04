@@ -13,6 +13,12 @@ import {
     IconLoading,
 } from "../components/Icons";
 
+const normalizeSearch = (value) =>
+    String(value ?? "")
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[̀-ͯ]/g, "");
+
 const POR_PAGINA = 10;
 
 const EMPTY_FORM = {
@@ -445,10 +451,23 @@ export default function SedesCrud() {
     const filtered = useMemo(
         () =>
             sedes.filter((s) => {
-                const q = debouncedSearch.toLowerCase();
+                const q = normalizeSearch(debouncedSearch);
                 const matchQ =
-                    (s.nombre || "").toLowerCase().includes(q) ||
-                    (s.codigo_distribuidor || "").toLowerCase().includes(q);
+                    !q ||
+                    [
+                        s.nombre,
+                        s.codigo_distribuidor,
+                        s.codigo_instalador,
+                        s.ciudad_nombre,
+                        s.direccion,
+                        s.telefono,
+                        s.tipo_sede,
+                        s.estado,
+                        s.padre?.nombre,
+                        s.almacenista?.nombres,
+                        s.almacenista?.apellidos,
+                        s.almacenista?.name,
+                    ].some((field) => normalizeSearch(field).includes(q));
                 const matchSede =
                     filtroSede === "Todas" || String(s.id) === filtroSede;
                 const matchDepto =
@@ -664,11 +683,8 @@ export default function SedesCrud() {
                                 <th>Ciudad</th>
                                 <th>Nombre Sede</th>
                                 <th>Dirección Sede</th>
-                                <th>Teléfono</th>
                                 <th>Tipo sede</th>
-                                <th>Sede padre</th>
                                 <th>Estado</th>
-                                <th>Almacenista</th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
                                 </th>
@@ -697,14 +713,6 @@ export default function SedesCrud() {
                                     <td style={{ fontSize: "0.85rem" }}>
                                         {s.direccion || "—"}
                                     </td>
-                                    <td
-                                        style={{
-                                            fontFamily: "monospace",
-                                            color: "var(--text-muted)",
-                                        }}
-                                    >
-                                        {s.telefono || "—"}
-                                    </td>
                                     <td>
                                         <span
                                             style={S.badge(
@@ -719,7 +727,6 @@ export default function SedesCrud() {
                                             {s.tipo_sede}
                                         </span>
                                     </td>
-                                    <td>{s.padre?.nombre || "—"}</td>
                                     <td>
                                         <span
                                             style={S.badge(
@@ -733,11 +740,6 @@ export default function SedesCrud() {
                                         >
                                             {s.estado}
                                         </span>
-                                    </td>
-                                    <td style={{ fontSize: "0.85rem" }}>
-                                        {s.almacenista
-                                            ? `${s.almacenista.nombres || ""} ${s.almacenista.apellidos || s.almacenista.name}`
-                                            : "—"}
                                     </td>
                                     <td>
                                         <div style={S.actions}>
