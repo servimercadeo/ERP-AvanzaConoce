@@ -2565,8 +2565,15 @@ export default function ContratosCrud() {
                     .map((c) => String(c).trim())
             );
 
+            const empleadosPorCedula = new Map(
+                (empleados || [])
+                    .filter((e) => e.cedula)
+                    .map((e) => [String(e.cedula).trim(), e])
+            );
+
             let created = 0;
             let omitted = 0;
+            let noEncontrados = 0;
             const errors = [];
             for (const [index, payload] of payloads.entries()) {
                 const documento = payload.documento ? String(payload.documento).trim() : "";
@@ -2574,8 +2581,19 @@ export default function ContratosCrud() {
                     omitted += 1;
                     continue;
                 }
+
+                // No dejar que el backend cree el empleado automáticamente al importar:
+                // si la cédula no corresponde a un empleado ya existente, se omite.
+                const empleado = documento ? empleadosPorCedula.get(documento) : null;
+                if (!empleado) {
+                    noEncontrados += 1;
+                    errors.push(`Cédula ${documento || "sin documento"}: no existe como empleado en el sistema, no se creó el contrato.`);
+                    continue;
+                }
+
+                const payloadConEmpleado = { ...payload, empleado_id: empleado.id };
                 try {
-                    await api.post("/contratos", payload);
+                    await api.post("/contratos", payloadConEmpleado);
                     created += 1;
                     if (documento) cedulasExistentes.add(documento);
                 } catch (err) {
@@ -2595,7 +2613,8 @@ export default function ContratosCrud() {
             const resumen = [];
             if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} importado${created === 1 ? "" : "s"}`);
             if (omitted > 0) resumen.push(`${omitted} omitido${omitted === 1 ? "" : "s"} (ya existía un contrato con esa cédula)`);
-            if (errors.length) resumen.push(`${errors.length} con error`);
+            if (noEncontrados > 0) resumen.push(`${noEncontrados} sin crear (cédula no registrada como empleado)`);
+            if (errors.length - noEncontrados > 0) resumen.push(`${errors.length - noEncontrados} con error`);
             showToast(resumen.length ? resumen.join(", ") : "No se importó ningún contrato.");
             setImportOpen(false);
             setImportFile(null);

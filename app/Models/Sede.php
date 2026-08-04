@@ -39,6 +39,11 @@ class Sede extends Model
         return $this->belongsTo(Sede::class, 'id_sede_padre');
     }
 
+    public function ciudad()
+    {
+        return $this->belongsTo(Ciudad::class, 'id_ciudad');
+    }
+
     public function almacenista()
     {
         return $this->belongsTo(User::class, 'id_almacenista_mac');

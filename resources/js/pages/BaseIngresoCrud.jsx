@@ -3,7 +3,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
-import { IconEye, IconEdit, IconTrash, IconClose } from '../components/Icons';
+import { IconEye, IconEdit, IconTrash, IconClose, IconPhone } from '../components/Icons';
 
 const EMPTY_FORM = {
   candidato_id: '',
@@ -363,6 +363,30 @@ export default function BaseIngresoCrud() {
     }
   };
 
+  const handleCopyTelefono = async (telefono) => {
+    if (!telefono) {
+      showToast('Esta persona no tiene teléfono registrado', 'error');
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(telefono);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = telefono;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      showToast(`Teléfono copiado: ${telefono}`);
+    } catch {
+      showToast('No se pudo copiar el teléfono', 'error');
+    }
+  };
+
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
   const filteredData = useMemo(() =>
@@ -428,7 +452,7 @@ export default function BaseIngresoCrud() {
                 <th style={S.th}>Cargo</th>
                 <th style={S.th}>Empresa</th>
                 <th style={S.th}>Fecha ingreso</th>
-                <th style={S.th}>Salario básico</th>
+                <th style={S.th}>Jefe Inmediato</th>
                 <th style={S.th}>Estado</th>
                 <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
               </tr>
@@ -444,7 +468,7 @@ export default function BaseIngresoCrud() {
                     <td style={S.td}>{row.cargo}</td>
                     <td style={S.td}>{row.empresa}</td>
                     <td style={S.td}>{row.fecha_programacion_ingreso}</td>
-                    <td style={S.td}>{row.salario_basico ? `$${Number(row.salario_basico).toLocaleString()}` : '—'}</td>
+                    <td style={S.td}>{row.lider_inmediato || '—'}</td>
                     <td style={S.td}>
                       <span style={S.badge(ec.bg, ec.color)}>
                         {row.estado ? row.estado.charAt(0).toUpperCase() + row.estado.slice(1) : '—'}
@@ -453,6 +477,7 @@ export default function BaseIngresoCrud() {
                     <td style={{ ...S.td, textAlign: 'center' }}>
                       <div style={S.actions}>
                         <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver" onClick={() => handleOpenModal('view', row)}><IconEye size={15} /></button>
+                        <button style={S.actionBtn('#fff4e0', '#b8720a')} title="Copiar teléfono" onClick={() => handleCopyTelefono(row.telefono)}><IconPhone size={15} /></button>
                         <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}><IconEdit size={15} /></button>
                         <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => handleDelete(row.id)}><IconTrash size={15} /></button>
                       </div>
