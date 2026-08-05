@@ -14,6 +14,8 @@ class Sede extends Model
     protected $fillable = [
         'nombre',
         'id_ciudad',
+        'regional_id',
+        'proyecto_id',
         'direccion',
         'telefono',
         'estado',
@@ -32,6 +34,10 @@ class Sede extends Model
         'tipo_sede',
         'id_sede_padre',
         'sub_canal',
+        'supervisor',
+        'contacto_supervisor',
+        'lider_regional',
+        'contacto_lider_regional',
     ];
 
     public function padre()
@@ -42,6 +48,16 @@ class Sede extends Model
     public function ciudad()
     {
         return $this->belongsTo(Ciudad::class, 'id_ciudad');
+    }
+
+    public function regional()
+    {
+        return $this->belongsTo(Regional::class, 'regional_id');
+    }
+
+    public function proyecto()
+    {
+        return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 
     public function almacenista()
