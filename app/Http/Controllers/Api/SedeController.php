@@ -41,7 +41,7 @@ class SedeController extends Controller
         $sedes = $query->orderBy('sedes.created_at', 'desc')->get();
 
         // Cargar relaciones
-        $sedes->load(['padre', 'almacenista', 'secretaria', 'jefe']);
+        $sedes->load(['padre', 'almacenista', 'secretaria', 'jefe', 'regional', 'proyecto']);
 
         return response()->json($sedes);
     }
@@ -67,11 +67,19 @@ class SedeController extends Controller
         // Sedes (para sede padre)
         $sedes = Sede::select('id', 'nombre')->orderBy('nombre')->get();
 
+        // Regionales
+        $regionales = DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get();
+
+        // Proyectos
+        $proyectos = DB::table('proyectos')->select('id', 'nombre')->orderBy('nombre')->get();
+
         return response()->json([
             'users' => $users,
             'ciudades' => $ciudades,
             'sedes' => $sedes,
-            'tipos_sede' => ['Principal', 'Sucursal', 'Punto de Venta', 'Bodega', 'Oficina Administrativa'],
+            'regionales' => $regionales,
+            'proyectos' => $proyectos,
+            'tipos_sede' => ['Principal', 'Sucursal', 'Secundaria', 'Punto de Venta', 'Bodega', 'Oficina Administrativa'],
             'estados' => ['Activa', 'Inactiva', 'Cerrada'],
             'subcanales' => ['Retail', 'Corportivo', 'Directo', 'Online']
         ]);
@@ -80,19 +88,25 @@ class SedeController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nombre'              => 'required|string|max:250',
-            'id_ciudad'           => 'nullable|integer',
-            'direccion'           => 'nullable|string|max:250',
-            'telefono'            => 'nullable|string|max:50',
-            'estado'              => 'nullable|string|max:20',
-            'id_almacenista_mac'  => 'nullable|integer',
-            'id_secretaria_mac'   => 'nullable|integer',
-            'id_jefe_mac'         => 'nullable|integer',
-            'codigo_distribuidor' => 'nullable|string|max:30',
-            'codigo_instalador'   => 'nullable|string|max:30', // Código C.I
-            'tipo_sede'           => 'nullable|string|max:20',
-            'id_sede_padre'       => 'nullable|integer',
-            'sub_canal'           => 'nullable|string|max:50',
+            'nombre'                  => 'required|string|max:250',
+            'id_ciudad'               => 'nullable|integer',
+            'regional_id'             => 'nullable|integer',
+            'proyecto_id'             => 'nullable|integer',
+            'direccion'               => 'nullable|string|max:250',
+            'telefono'                => 'nullable|string|max:50',
+            'estado'                  => 'nullable|string|max:20',
+            'id_almacenista_mac'      => 'nullable|integer',
+            'id_secretaria_mac'       => 'nullable|integer',
+            'id_jefe_mac'             => 'nullable|integer',
+            'codigo_distribuidor'     => 'nullable|string|max:30', // Código PDV
+            'codigo_instalador'       => 'nullable|string|max:30', // Código C.I
+            'tipo_sede'               => 'nullable|string|max:20',
+            'id_sede_padre'           => 'nullable|integer',
+            'sub_canal'               => 'nullable|string|max:50',
+            'supervisor'              => 'nullable|string|max:150',
+            'contacto_supervisor'     => 'nullable|string|max:50',
+            'lider_regional'          => 'nullable|string|max:150',
+            'contacto_lider_regional' => 'nullable|string|max:50',
         ]);
 
         $sede = Sede::create($data);
@@ -102,7 +116,7 @@ class SedeController extends Controller
 
     public function show(Sede $sede)
     {
-        return response()->json($this->conCiudad($sede->load(['padre', 'almacenista', 'secretaria', 'jefe'])));
+        return response()->json($this->conCiudad($sede->load(['padre', 'almacenista', 'secretaria', 'jefe', 'regional'])));
     }
 
     /**
@@ -122,24 +136,30 @@ class SedeController extends Controller
     public function update(Request $request, Sede $sede)
     {
         $data = $request->validate([
-            'nombre'              => 'required|string|max:250',
-            'id_ciudad'           => 'nullable|integer',
-            'direccion'           => 'nullable|string|max:250',
-            'telefono'            => 'nullable|string|max:50',
-            'estado'              => 'nullable|string|max:20',
-            'id_almacenista_mac'  => 'nullable|integer',
-            'id_secretaria_mac'   => 'nullable|integer',
-            'id_jefe_mac'         => 'nullable|integer',
-            'codigo_distribuidor' => 'nullable|string|max:30',
-            'codigo_instalador'   => 'nullable|string|max:30', // Código C.I
-            'tipo_sede'           => 'nullable|string|max:20',
-            'id_sede_padre'       => 'nullable|integer',
-            'sub_canal'           => 'nullable|string|max:50',
+            'nombre'                  => 'required|string|max:250',
+            'id_ciudad'               => 'nullable|integer',
+            'regional_id'             => 'nullable|integer',
+            'proyecto_id'             => 'nullable|integer',
+            'direccion'               => 'nullable|string|max:250',
+            'telefono'                => 'nullable|string|max:50',
+            'estado'                  => 'nullable|string|max:20',
+            'id_almacenista_mac'      => 'nullable|integer',
+            'id_secretaria_mac'       => 'nullable|integer',
+            'id_jefe_mac'             => 'nullable|integer',
+            'codigo_distribuidor'     => 'nullable|string|max:30', // Código PDV
+            'codigo_instalador'       => 'nullable|string|max:30', // Código C.I
+            'tipo_sede'               => 'nullable|string|max:20',
+            'id_sede_padre'           => 'nullable|integer',
+            'sub_canal'               => 'nullable|string|max:50',
+            'supervisor'              => 'nullable|string|max:150',
+            'contacto_supervisor'     => 'nullable|string|max:50',
+            'lider_regional'          => 'nullable|string|max:150',
+            'contacto_lider_regional' => 'nullable|string|max:50',
         ]);
 
         $sede->update($data);
 
-        return response()->json($this->conCiudad($sede->fresh(['padre', 'almacenista', 'secretaria', 'jefe'])));
+        return response()->json($this->conCiudad($sede->fresh(['padre', 'almacenista', 'secretaria', 'jefe', 'regional', 'proyecto'])));
     }
 
     public function destroy(Sede $sede)

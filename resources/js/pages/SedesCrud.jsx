@@ -31,11 +31,17 @@ const EMPTY_FORM = {
     telefono: "",
     departamento: "",
     id_ciudad: "",
+    regional_id: "",
+    proyecto_id: "",
     tipo_sede: "Principal",
     id_sede_padre: "",
     id_almacenista_mac: "",
     id_secretaria_mac: "",
     id_jefe_mac: "",
+    supervisor: "",
+    contacto_supervisor: "",
+    lider_regional: "",
+    contacto_lider_regional: "",
 };
 
 function Field({
@@ -236,7 +242,7 @@ function Modal({
                                 {...fp}
                             />
                             <Field
-                                label="Codigo Distribuidor"
+                                label="Código PDV"
                                 k="codigo_distribuidor"
                                 uppercase
                                 {...fp}
@@ -339,6 +345,73 @@ function Modal({
                             />
                         </div>
                     </div>
+
+                    <div style={{ ...S.grid3, marginTop: 16 }}>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 16,
+                            }}
+                        >
+                            <Field
+                                label="Regional"
+                                k="regional_id"
+                                opts={options.regionales.map((r) => ({
+                                    value: r.id,
+                                    label: r.nombre,
+                                }))}
+                                {...fp}
+                            />
+                            <Field
+                                label="Proyecto"
+                                k="proyecto_id"
+                                opts={options.proyectos.map((p) => ({
+                                    value: p.id,
+                                    label: p.nombre,
+                                }))}
+                                {...fp}
+                            />
+                            <Field
+                                label="Supervisor"
+                                k="supervisor"
+                                uppercase
+                                {...fp}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 16,
+                            }}
+                        >
+                            <Field
+                                label="Contacto Supervisor"
+                                k="contacto_supervisor"
+                                {...fp}
+                            />
+                            <Field
+                                label="Líder Regional"
+                                k="lider_regional"
+                                uppercase
+                                {...fp}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 16,
+                            }}
+                        >
+                            <Field
+                                label="Contacto Líder Regional"
+                                k="contacto_lider_regional"
+                                {...fp}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div style={S.modalFooter}>
@@ -393,6 +466,8 @@ export default function SedesCrud() {
         users: [],
         ciudades: [],
         sedes: [],
+        regionales: [],
+        proyectos: [],
         tipos_sede: [],
         estados: [],
         subcanales: [],
@@ -459,6 +534,7 @@ export default function SedesCrud() {
                         s.codigo_distribuidor,
                         s.codigo_instalador,
                         s.ciudad_nombre,
+                        s.proyecto?.nombre,
                         s.direccion,
                         s.telefono,
                         s.tipo_sede,
@@ -682,6 +758,7 @@ export default function SedesCrud() {
                                 </th>
                                 <th>Ciudad</th>
                                 <th>Nombre Sede</th>
+                                <th>Proyecto</th>
                                 <th>Dirección Sede</th>
                                 <th>Tipo sede</th>
                                 <th>Estado</th>
@@ -709,6 +786,9 @@ export default function SedesCrud() {
                                         }}
                                     >
                                         {s.nombre}
+                                    </td>
+                                    <td style={{ fontSize: "0.85rem" }}>
+                                        {s.proyecto?.nombre || "—"}
                                     </td>
                                     <td style={{ fontSize: "0.85rem" }}>
                                         {s.direccion || "—"}
