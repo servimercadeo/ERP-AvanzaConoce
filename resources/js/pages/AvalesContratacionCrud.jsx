@@ -76,7 +76,12 @@ export default function AvalesContratacionCrud() {
     const [form, setForm] = useState({});
     const [pagina, setPagina] = useState(1);
     const [toast, setToast] = useState(null);
-    const [confirmDlg, setConfirmDlg] = useState({ open: false, title: '', msg: '', onConfirm: null });
+    const [confirmDlg, setConfirmDlg] = useState({
+        open: false,
+        title: "",
+        msg: "",
+        onConfirm: null,
+    });
     const POR_PAGINA = 10;
 
     const showToast = (msg, type = "success") => {
@@ -84,9 +89,15 @@ export default function AvalesContratacionCrud() {
         setTimeout(() => setToast(null), 3000);
     };
 
-    const showConfirm = (title, msg, onConfirm) => setConfirmDlg({ open: true, title, msg, onConfirm });
-    const handleConfirmOk = () => { const fn = confirmDlg.onConfirm; setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null }); fn?.(); };
-    const handleConfirmCancel = () => setConfirmDlg({ open: false, title: '', msg: '', onConfirm: null });
+    const showConfirm = (title, msg, onConfirm) =>
+        setConfirmDlg({ open: true, title, msg, onConfirm });
+    const handleConfirmOk = () => {
+        const fn = confirmDlg.onConfirm;
+        setConfirmDlg({ open: false, title: "", msg: "", onConfirm: null });
+        fn?.();
+    };
+    const handleConfirmCancel = () =>
+        setConfirmDlg({ open: false, title: "", msg: "", onConfirm: null });
 
     const qc = useQueryClient();
     const { data: _qData } = useQuery({
@@ -104,7 +115,9 @@ export default function AvalesContratacionCrud() {
         staleTime: 10 * 60 * 1000,
     });
     const tiposVinculacion = _qCatalogos?.tipos_vinculacion ?? [];
-    const empleadorOpts = (_qSeleccionCatalogos?.empleadores ?? []).map((e) => e.nombre);
+    const empleadorOpts = (_qSeleccionCatalogos?.empleadores ?? []).map(
+        (e) => e.nombre,
+    );
 
     useEffect(() => {
         if (_qData) {
@@ -199,7 +212,7 @@ export default function AvalesContratacionCrud() {
     const handleAlertToggle = (row) => {
         if (row.alerta_enviada || alertLoading === row.id) return;
         showConfirm(
-            'Enviar alerta de registro',
+            "Enviar alerta de registro",
             `¿Enviar alerta de registro al correo ${row.correo || "(sin correo)"}?`,
             async () => {
                 setAlertLoading(row.id);
@@ -207,7 +220,9 @@ export default function AvalesContratacionCrud() {
                     await api.post(`/base-ingresos/${row.id}/alerta`);
                     setData((prev) =>
                         prev.map((r) =>
-                            r.id === row.id ? { ...r, alerta_enviada: true } : r,
+                            r.id === row.id
+                                ? { ...r, alerta_enviada: true }
+                                : r,
                         ),
                     );
                     qc.invalidateQueries({ queryKey: ["base-ingresos"] });
@@ -809,12 +824,30 @@ export default function AvalesContratacionCrud() {
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>{confirmDlg.title}</span>
                         </div>
-                        <div style={{ padding: "24px 28px", fontFamily: "Nunito,sans-serif", fontSize: "0.95rem", color: "var(--text)", lineHeight: 1.55 }}>
+                        <div
+                            style={{
+                                padding: "24px 28px",
+                                fontFamily: "Nunito,sans-serif",
+                                fontSize: "0.95rem",
+                                color: "var(--text)",
+                                lineHeight: 1.55,
+                            }}
+                        >
                             {confirmDlg.msg}
                         </div>
                         <div style={S.modalFooter}>
-                            <button style={S.btnSecondary} onClick={handleConfirmCancel}>Cancelar</button>
-                            <button style={S.btnPrimary} onClick={handleConfirmOk}>Aceptar</button>
+                            <button
+                                style={S.btnSecondary}
+                                onClick={handleConfirmCancel}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                style={S.btnPrimary}
+                                onClick={handleConfirmOk}
+                            >
+                                Aceptar
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -914,7 +947,7 @@ function Field({
                     onChange={onChange(k)}
                     disabled={disabled}
                 >
-                    <option value="">-- Selecciona --</option>
+                    <option value="">-- Selecciona</option>
                     {opts.map((o) => (
                         <option key={o} value={o}>
                             {o.charAt(0).toUpperCase() + o.slice(1)}
