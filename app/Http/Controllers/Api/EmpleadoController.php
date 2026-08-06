@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class EmpleadoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         return response()->json(
             User::with(['empresa', 'sedeCatalogo', 'contratos' => function($q) {
@@ -23,7 +23,17 @@ class EmpleadoController extends Controller
             }])
                 ->whereNotNull('cedula')
                 ->where('cedula', '!=', '')
-                ->where('pendiente_alta', false)
+                // Por defecto solo se listan empleados ya dados de alta en este módulo.
+                // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
+                // a quienes aún no tienen la alta manual pero ya cuentan con un contrato
+                // (p. ej. importados en bloque vía ImportarContratosActivosCommand): basta con
+                // tener contrato para poder asignarles dotación, sin exigir la ficha completa.
+                ->where(function ($q) use ($request) {
+                    $q->where('pendiente_alta', false);
+                    if ($request->boolean('con_contrato')) {
+                        $q->orWhereHas('contratos');
+                    }
+                })
                 ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
                 ->orderByRaw('nombres IS NULL ASC, nombres ASC')
                 ->get()
