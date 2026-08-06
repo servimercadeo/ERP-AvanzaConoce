@@ -24,7 +24,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'user' => Auth::user()->only('id', 'name', 'email', 'rol'),
+            'user' => Auth::user()->only('id', 'name', 'email', 'rol', 'sede_id'),
         ]);
     }
 

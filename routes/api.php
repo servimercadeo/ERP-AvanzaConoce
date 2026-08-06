@@ -186,7 +186,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Preferencias personales de apariencia por usuario
     Route::get('/user/preferences',  [UserPreferenceController::class, 'show']);
     Route::post('/user/preferences', [UserPreferenceController::class, 'update']);
-    Route::get('/user', fn(Request $r) => $r->user()->only('id', 'name', 'email', 'rol'));
+    Route::get('/user', fn(Request $r) => $r->user()->only('id', 'name', 'email', 'rol', 'sede_id'));
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store']);
