@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAuth } from '../context/AuthContext';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 import { SearchableSelect } from '../components/SearchableSelect';
 
@@ -454,11 +455,15 @@ const PROYECTO_COLORS = {
 
 export default function ProductosDotacion() {
     const qc = useQueryClient();
+    const { user } = useAuth();
+    // Por defecto se filtra por la sede del usuario logueado; si no tiene sede
+    // anidada, se parte mostrando la dotación de todas las sedes.
+    const sedeUsuario = user?.sede_id ?? 'Todas';
     const [proyectoTab, setProyectoTab]   = useState('SYM TIGO EXPRESS');
     const [prendaFiltro, setPrendaFiltro] = useState('Todos');
     const [generoFiltro, setGeneroFiltro] = useState('Todos');
     const [tallaFiltro, setTallaFiltro]   = useState('Todos');
-    const [sedeFiltro, setSedeFiltro]     = useState('Todas');
+    const [sedeFiltro, setSedeFiltro]     = useState(sedeUsuario);
     const [search, setSearch]             = useState('');
     const [page, setPage]                 = useState(1);
     const [editItem, setEditItem]         = useState(null);
@@ -611,7 +616,7 @@ export default function ProductosDotacion() {
                 {proyectos.map(p => {
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro('Todas'); }}>
+                        <div key={p} className="stat-card" style={{ cursor: 'pointer', borderLeft: `4px solid ${c.border}` }} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro(sedeUsuario); }}>
                             <div className="stat-num" style={{ color: c.color }}>{stats.porProyecto[p] ?? 0}</div>
                             <div className="stat-label">{p}</div>
                         </div>
@@ -629,7 +634,7 @@ export default function ProductosDotacion() {
                     const active = proyectoTab === p;
                     const c = PROYECTO_COLORS[p];
                     return (
-                        <button key={p} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro('Todas'); }} style={{
+                        <button key={p} onClick={() => { setProyectoTab(p); setPrendaFiltro('Todos'); setGeneroFiltro('Todos'); setTallaFiltro('Todos'); setSedeFiltro(sedeUsuario); }} style={{
                             padding: '10px 22px', border: 'none', borderBottom: active ? `2.5px solid ${c.border}` : '2.5px solid transparent',
                             marginBottom: -2, background: 'transparent', fontWeight: active ? 800 : 600,
                             fontSize: '0.9rem', fontFamily: 'Nunito,sans-serif', color: active ? c.color : 'var(--text-muted)',
