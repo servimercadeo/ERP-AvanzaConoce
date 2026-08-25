@@ -24,6 +24,10 @@ const EmpleadoresCrud = lazy(() => import('./EmpleadoresCrud'));
 const EmpresasCrud = lazy(() => import('./EmpresasCrud'));
 const RegionalesCrud = lazy(() => import('./RegionalesCrud'));
 const ProyectosCrud = lazy(() => import('./ProyectosCrud'));
+const PedidosCrud = lazy(() => import('./PedidosCrud'));
+const TiposProductoCrud = lazy(() => import('./TiposProductoCrud'));
+const ClasesPedidoCrud = lazy(() => import('./ClasesPedidoCrud'));
+const ConceptosPedidoCrud = lazy(() => import('./ConceptosPedidoCrud'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -118,19 +122,12 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
       switch (submoduleId) {
         case 'pedidos':
           switch (archivoId) {
-            // case 'ver_crear_pedidos': return PedidosCrud;
+            case 'ver_crear_pedidos': return PedidosCrud;
             default: return null;
           }
         case 'compras':
           switch (archivoId) {
             // case 'ver_crear_orden': return OrdenCompraCrud;
-            default: return null;
-          }
-        case 'parametros':
-          switch (archivoId) {
-            // case 'clases_pedidos':    return ClasesPedidosCrud;
-            // case 'conceptos_pedidos': return ConceptosPedidosCrud;
-            // case 'responsables':      return ResponsablesCrud;
             default: return null;
           }
         default: return null;
@@ -245,6 +242,21 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
         case 'proyectos':
           switch (archivoId) {
             case 'proyectos_file': return ProyectosCrud;
+            default: return null;
+          }
+        case 'tipo_producto':
+          switch (archivoId) {
+            case 'tipo_producto_file': return TiposProductoCrud;
+            default: return null;
+          }
+        case 'clases_pedido':
+          switch (archivoId) {
+            case 'clases_pedido_file': return ClasesPedidoCrud;
+            default: return null;
+          }
+        case 'conceptos_pedido':
+          switch (archivoId) {
+            case 'conceptos_pedido_file': return ConceptosPedidoCrud;
             default: return null;
           }
         case 'par_generales':

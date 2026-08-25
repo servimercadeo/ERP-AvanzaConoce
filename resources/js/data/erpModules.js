@@ -230,7 +230,6 @@ export const ERP_MODULES = [
     color: '#e74c3c',
     desc: 'Gestión de proveedores y órdenes de compra.',
     submods: [
-      /*
       {
         id: 'pedidos',
         label: 'Pedidos',
@@ -240,6 +239,7 @@ export const ERP_MODULES = [
           { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
         ]
       },
+      /*
       {
         id: 'pedidos_internos',
         label: 'Pedidos Internos',
@@ -341,6 +341,33 @@ export const ERP_MODULES = [
         desc: 'Catálogo de proyectos',
         archivos: [
           { id: 'proyectos_file', label: 'Proyectos' },
+        ]
+      },
+      {
+        id: 'tipo_producto',
+        label: 'Tipo de Producto',
+        icon: 'productos',
+        desc: 'Catálogo de tipos de producto',
+        archivos: [
+          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
+        ]
+      },
+      {
+        id: 'clases_pedido',
+        label: 'Clases de Pedidos',
+        icon: 'pedidos',
+        desc: 'Catálogo de clases de pedido',
+        archivos: [
+          { id: 'clases_pedido_file', label: 'Clases de Pedidos' },
+        ]
+      },
+      {
+        id: 'conceptos_pedido',
+        label: 'Conceptos de Pedidos',
+        icon: 'config',
+        desc: 'Catálogo de conceptos de pedido',
+        archivos: [
+          { id: 'conceptos_pedido_file', label: 'Conceptos de Pedidos' },
         ]
       }
     ],

@@ -304,6 +304,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
         ->parameters(['proyectos' => 'proyecto']);
 
+    // Catálogo de tipos de producto (Pedidos y Compras > Parametros > Tipo de Producto)
+    Route::apiResource('tipos-producto', App\Http\Controllers\Api\TipoProductoController::class)
+        ->parameters(['tipos-producto' => 'tipoProducto']);
+
+    // Catálogo de clases de pedido (Pedidos y Compras > Parametros > Clases de Pedidos)
+    Route::apiResource('clases-pedido', App\Http\Controllers\Api\ClasePedidoController::class)
+        ->parameters(['clases-pedido' => 'clasePedido']);
+
+    // Catálogo de conceptos de pedido (Pedidos y Compras > Parametros > Conceptos de Pedidos)
+    Route::apiResource('conceptos-pedido', App\Http\Controllers\Api\ConceptoPedidoController::class)
+        ->parameters(['conceptos-pedido' => 'conceptoPedido']);
+
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
     Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
