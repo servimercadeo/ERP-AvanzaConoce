@@ -85,6 +85,30 @@ class User extends Authenticatable
         return $this->hasOne(UserPreference::class);
     }
 
+    /**
+     * Deriva automáticamente el rol (th/tic) a partir del cargo cada vez que
+     * este cambia. Si el cargo no coincide con ningún patrón conocido, el rol
+     * queda vacío (todavía no existen otros roles derivados de cargo). El rol
+     * 'admin' es una asignación manual y nunca se sobrescribe aquí.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if (!$user->isDirty('cargo') || $user->rol === 'admin') {
+                return;
+            }
+
+            $cargo = mb_strtoupper((string) $user->cargo);
+
+            if ($cargo !== '' && str_contains($cargo, 'TALENTO HUMANO')) {
+                $user->rol = 'th';
+            } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || str_contains($cargo, 'TIC'))) {
+                $user->rol = 'tic';
+            } else {
+                $user->rol = null;
+            }
+        });
+    }
 
     protected function casts(): array
     {
