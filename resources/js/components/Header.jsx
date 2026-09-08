@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IconFile, MODULE_ICONS, IconFolder } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, NavLink } from 'react-router-dom';
-import { ERP_MODULES } from '../data/erpModules';
+import { ERP_MODULES, canAccessModule } from '../data/erpModules';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -37,7 +37,7 @@ export default function Header() {
       </Link>
 
       <nav className={`nav ${isMenuOpen ? 'mobile-active' : ''}`}>
-        {ERP_MODULES.map(mod => (
+        {ERP_MODULES.filter(mod => canAccessModule(user, mod.id)).map(mod => (
           <div key={mod.id} className="nav-item">
             <NavLink className="nav-link" to={`/module/${mod.id}`}>
               {mod.icon && <span className="nav-icon">{React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 16 })}</span>}

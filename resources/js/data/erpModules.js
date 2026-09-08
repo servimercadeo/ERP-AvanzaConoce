@@ -1,3 +1,15 @@
+// Módulos restringidos por rol: id del módulo -> roles permitidos.
+// Un módulo que no aparezca aquí es visible para cualquier usuario autenticado.
+export const MODULE_ROLES = {
+  administrativo: ['admin', 'th', 'tic'],
+};
+
+export function canAccessModule(user, moduleId) {
+  const allowed = MODULE_ROLES[moduleId];
+  if (!allowed) return true;
+  return allowed.includes(user?.rol);
+}
+
 export const ERP_MODULES = [
   {
     id: 'sedes',

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { ERP_MODULES } from '../data/erpModules';
+import { useAuth } from '../context/AuthContext';
+import { ERP_MODULES, canAccessModule } from '../data/erpModules';
 import { MODULE_ICONS, IconFolder, IconUnderConstruction, IconLoading } from '../components/Icons';
 
 // ── Importa aquí los CRUD de cada archivo (carga diferida: cada uno se
@@ -284,6 +285,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
 
 export default function Submodule() {
   const { moduleId, submoduleId, archivoId } = useParams();
+  const { user } = useAuth();
   const mod = ERP_MODULES.find(m => m.id === moduleId);
   const sub = mod ? mod.submods.find(s => s.id === submoduleId) : null;
 
@@ -312,6 +314,10 @@ export default function Submodule() {
         </p>
       </Layout>
     );
+  }
+
+  if (!canAccessModule(user, mod.id)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   const archivos       = sub.archivos ?? [];

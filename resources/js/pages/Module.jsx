@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, Navigate } from "react-router-dom";
 import Layout from "../components/Layout";
-import { ERP_MODULES } from "../data/erpModules";
+import { useAuth } from "../context/AuthContext";
+import { ERP_MODULES, canAccessModule } from "../data/erpModules";
 import {
     MODULE_ICONS,
     IconFolder,
@@ -120,6 +121,7 @@ function resolveCrud(moduleId, archivoId) {
 
 export default function Module() {
     const { moduleId } = useParams();
+    const { user } = useAuth();
     const mod = ERP_MODULES.find((m) => m.id === moduleId);
 
     /* ── Estado: pestaña activa (null = vista de submódulos) ── */
@@ -149,6 +151,10 @@ export default function Module() {
                 </p>
             </Layout>
         );
+    }
+
+    if (!canAccessModule(user, mod.id)) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     const archivosDirectos = mod.archivos ?? [];

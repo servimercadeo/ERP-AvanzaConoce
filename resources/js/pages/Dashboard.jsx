@@ -1,7 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
-import { ERP_MODULES } from "../data/erpModules";
+import { ERP_MODULES, canAccessModule } from "../data/erpModules";
+import { useAuth } from "../context/AuthContext";
 import {
     MODULE_ICONS,
     IconFolder,
@@ -11,6 +12,9 @@ import {
 } from "../components/Icons";
 
 export default function Dashboard() {
+    const { user } = useAuth();
+    const modules = ERP_MODULES.filter((mod) => canAccessModule(user, mod.id));
+
     return (
         <Layout>
             <div className="home-hero">
@@ -56,7 +60,7 @@ export default function Dashboard() {
             </p>
 
             <div className="dashboard-modules-grid">
-                {ERP_MODULES.map((mod) => (
+                {modules.map((mod) => (
                     <Link
                         key={mod.id}
                         className="mod-card-simple"
