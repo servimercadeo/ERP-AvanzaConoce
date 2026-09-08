@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -16,12 +16,11 @@ import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../comp
 
 // --- Valores estáticos para los filtros ---
 const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras", "Completado", "Rechazado"];
-const SUBAGENTES_MOCK = ["Subagente Norte S.A.S.", "Subagente Sur Limitada", "Distribuciones Avanza", "Punto de Venta Centro", "Subagente Alianza Oriente"];
-
-// --- Listado inicial de pedidos (vacío: aún no hay persistencia real en backend) ---
-const INITIAL_PEDIDOS = [];
+const ALIADOS_MOCK = ["Aliado Norte S.A.S.", "Aliado Sur Limitada", "Distribuciones Avanza", "Punto de Venta Centro", "Aliado Alianza Oriente"];
 
 export default function PedidosCrud() {
+    const qc = useQueryClient();
+
     // --- Cargar datos dinámicos del backend si existen ---
     const { data: catalogos = {} } = useQuery({
         queryKey: ["catalogos"],
@@ -50,7 +49,13 @@ export default function PedidosCrud() {
         queryKey: ["tipos-producto"],
         queryFn: () => api.get("/tipos-producto").then((r) => r.data),
     });
-    const PRODUCTOS_CATALOGO = useMemo(() => tiposProductoData.map(t => t.nombre), [tiposProductoData]);
+    const CATEGORIAS_PRODUCTO = useMemo(
+        () => [...new Set(tiposProductoData.map(t => t.categoria).filter(Boolean))],
+        [tiposProductoData]
+    );
+    const productosPorCategoria = (categoria) => tiposProductoData
+        .filter(t => t.categoria === categoria)
+        .map(t => ({ id: t.id, nombre: t.nombre }));
 
     // --- Pedidos de Dotación enviados a Compras (datos reales del backend) ---
     const { data: pedidosDotacion = [] } = useQuery({
@@ -65,6 +70,114 @@ export default function PedidosCrud() {
 
     const [dotacionDetalle, setDotacionDetalle] = useState(null);
 
+    // --- Revisión manual de stock/traslado (pedidos "Enviar a compras", de Dotación o de oficina) ---
+    // revisionPedido: { id, codigo, origen: "dotacion" | "local" }
+    const [revisionPedido, setRevisionPedido] = useState(null);
+
+    const endpointItemBase = (itemId) => revisionPedido.origen === "dotacion"
+        ? `/pedido-automatico-items/${itemId}`
+        : `/pedido-compra-items/${itemId}`;
+
+    const normalizarItemRevision = (raw) => ({
+        item_id: raw.item_id,
+        titulo: raw.prenda ? `${raw.prenda} · ${raw.genero} · T:${raw.talla}` : raw.producto,
+        cantidad: raw.cantidad,
+        estado_revision: raw.estado_revision,
+        observacion: raw.observacion,
+        sede_pedido: raw.sede_pedido,
+        opciones: (raw.sedes_cercanas ?? raw.sedes_disponibles ?? []).map(o => ({
+            inventario_id: o.inventario_dotacion_id ?? o.inventario_producto_id,
+            sede_id: o.sede_id,
+            sede_nombre: o.sede_nombre,
+            cantidad: o.cantidad,
+        })),
+    });
+
+    const { data: revisionItems = [], isLoading: loadingRevision } = useQuery({
+        queryKey: ["stock-revision", revisionPedido?.origen, revisionPedido?.id],
+        queryFn: () => {
+            const url = revisionPedido.origen === "dotacion"
+                ? `/pedidos-automaticos/${revisionPedido.id}/stock-revision`
+                : `/pedidos-compra/${revisionPedido.id}/stock-revision`;
+            return api.get(url).then(r => r.data.map(normalizarItemRevision));
+        },
+        enabled: !!revisionPedido,
+    });
+    const invalidateRevision = () => {
+        qc.invalidateQueries({ queryKey: ["stock-revision", revisionPedido?.origen, revisionPedido?.id] });
+        qc.invalidateQueries({ queryKey: revisionPedido.origen === "dotacion" ? ["pedidos-automaticos"] : ["pedidos-compra"] });
+    };
+    const [accionandoItemId, setAccionandoItemId] = useState(null);
+
+    const [observaciones, setObservaciones] = useState({});
+    const [trasladoSede, setTrasladoSede] = useState({});
+
+    const handleMarcarStockLocal = async (itemId) => {
+        const observacion = (observaciones[itemId] || "").trim();
+        if (!observacion) {
+            showToast("Escribe una observación antes de aprobar por stock.", "error");
+            return;
+        }
+        setAccionandoItemId(itemId);
+        try {
+            await api.post(`${endpointItemBase(itemId)}/stock-local`, { observacion });
+            invalidateRevision();
+            showToast("Producto aprobado por stock.");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo actualizar.", "error");
+        } finally {
+            setAccionandoItemId(null);
+        }
+    };
+
+    const handleSolicitarTraslado = async (itemId, inventarioOrigenId, cantidad) => {
+        if (!window.confirm(`¿Solicitar el traslado de ${cantidad} unidad(es) hacia la sede pedida?`)) return;
+        setAccionandoItemId(itemId);
+        try {
+            const campoOrigen = revisionPedido.origen === "dotacion"
+                ? "inventario_dotacion_origen_id"
+                : "inventario_producto_origen_id";
+            await api.post(`${endpointItemBase(itemId)}/traslado`, {
+                [campoOrigen]: inventarioOrigenId,
+                cantidad,
+            });
+            invalidateRevision();
+            showToast("Traslado solicitado y stock movido.");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo solicitar el traslado.", "error");
+        } finally {
+            setAccionandoItemId(null);
+        }
+    };
+
+    const handleEnviarComprasItem = async (itemId) => {
+        if (!window.confirm("¿Confirmar que este producto no tiene stock en ningún lado y debe comprarse?")) return;
+        setAccionandoItemId(itemId);
+        try {
+            await api.post(`${endpointItemBase(itemId)}/enviar-compras`);
+            invalidateRevision();
+            showToast("Producto confirmado para compra.");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo actualizar.", "error");
+        } finally {
+            setAccionandoItemId(null);
+        }
+    };
+
+    const handleDeshacerRevision = async (itemId) => {
+        if (!window.confirm("¿Deshacer esta revisión? Si era un traslado, el stock vuelve a la sede de origen.")) return;
+        setAccionandoItemId(itemId);
+        try {
+            await api.post(`${endpointItemBase(itemId)}/deshacer-revision`);
+            invalidateRevision();
+            showToast("Revisión deshecha, puedes volver a evaluar el producto.");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo deshacer.", "error");
+        } finally {
+            setAccionandoItemId(null);
+        }
+    };
+
     // --- Adapta los pedidos reales de Dotación a la misma forma que usa la tabla ---
     const pedidosDotacionAdaptados = useMemo(
         () => pedidosDotacionCompras.map(p => ({
@@ -78,6 +191,12 @@ export default function PedidosCrud() {
             clase: "Pedido Interno",
             concepto: "REPOSICION",
             estado: "Enviado a compras",
+            recibido_pedidos: !!p.recibido_pedidos,
+            // El check solo se puede activar cuando la revisión de al menos una prenda
+            // concluyó que NO hay stock en ninguna sede ("Enviado a Compras"). Si todo se
+            // resolvió con stock propio o traslado, o aún falta revisar, se queda bloqueado
+            // (el backend además lo valida server-side, así que esto es solo la UI).
+            puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
             registra: "Módulo Dotación",
             items: (p.items ?? []).map(it => ({
                 producto: `${it.inventario?.prenda ?? "Prenda"} · ${it.inventario?.genero ?? ""} · T:${it.inventario?.talla ?? ""}`,
@@ -106,18 +225,34 @@ export default function PedidosCrud() {
     }, [selCatalogos]);
 
     const todosResponsablesOptions = useMemo(
-        () => [...new Set([...responsablesOptions, ...SUBAGENTES_MOCK])],
+        () => [...new Set([...responsablesOptions, ...ALIADOS_MOCK])],
         [responsablesOptions]
     );
 
-    // --- Estados del CRUD local ---
-    const [pedidos, setPedidos] = useState(INITIAL_PEDIDOS);
+    // --- Pedidos de insumos de oficina (datos reales del backend) ---
+    const { data: pedidos = [], isLoading: loadingPedidos } = useQuery({
+        queryKey: ["pedidos-compra"],
+        queryFn: () => api.get("/pedidos-compra").then((r) => r.data),
+    });
+    const invalidatePedidos = () => qc.invalidateQueries({ queryKey: ["pedidos-compra"] });
+
     const [selectedIds, setSelectedIds] = useState([]);
 
     // --- Listado combinado: pedidos locales + pedidos reales de Dotación enviados a compras ---
+    const pedidosLocalAdaptados = useMemo(
+        () => pedidos.map(p => ({
+            ...p,
+            // Mismo criterio que en Dotación: el check "Enviar a Compras" solo se
+            // habilita cuando la revisión de al menos un producto concluyó que no
+            // hay stock en ninguna sede (el backend también lo valida).
+            puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
+        })),
+        [pedidos]
+    );
+
     const pedidosCombinados = useMemo(
-        () => [...pedidosDotacionAdaptados, ...pedidos],
-        [pedidosDotacionAdaptados, pedidos]
+        () => [...pedidosDotacionAdaptados, ...pedidosLocalAdaptados],
+        [pedidosDotacionAdaptados, pedidosLocalAdaptados]
     );
     
     // --- Búsqueda y filtros ---
@@ -149,8 +284,19 @@ export default function PedidosCrud() {
     });
 
     // Formulario interno de items
+    const [itemCategoria, setItemCategoria] = useState("");
     const [itemProduct, setItemProduct] = useState("");
     const [itemQuantity, setItemQuantity] = useState(1);
+    const PRODUCTOS_CATALOGO = useMemo(
+        () => productosPorCategoria(itemCategoria),
+        [tiposProductoData, itemCategoria]
+    );
+
+    const handleCambiarItemCategoria = (categoria) => {
+        setItemCategoria(categoria);
+        const productos = productosPorCategoria(categoria);
+        setItemProduct(productos[0]?.id ?? "");
+    };
 
     // --- Notificaciones Toast ---
     const [toast, setToast] = useState(null);
@@ -230,27 +376,93 @@ export default function PedidosCrud() {
     const isAllSelected = seleccionablesFiltered.length > 0 && selectedIds.length === seleccionablesFiltered.length;
 
     // --- Eliminar Pedidos Seleccionados ---
-    const handleEliminarPedidos = () => {
+    const handleEliminarPedidos = async () => {
         if (selectedIds.length === 0) {
             showToast("Selecciona al menos un pedido para eliminar.", "error");
             return;
         }
 
-        if (window.confirm(`¿Estás seguro de eliminar los ${selectedIds.length} pedidos seleccionados?`)) {
-            setPedidos(prev => prev.filter(p => !selectedIds.includes(p.id)));
-            setSelectedIds([]);
-            setActiveTrazabilidadId(null);
+        if (!window.confirm(`¿Estás seguro de eliminar los ${selectedIds.length} pedidos seleccionados?`)) {
+            return;
+        }
+
+        const ids = [...selectedIds];
+        const resultados = await Promise.allSettled(
+            ids.map(id => api.delete(`/pedidos-compra/${id}`))
+        );
+        const fallidos = resultados.filter(r => r.status === "rejected").length;
+
+        invalidatePedidos();
+        setSelectedIds([]);
+        if (ids.includes(activeTrazabilidadId)) setActiveTrazabilidadId(null);
+
+        if (fallidos > 0) {
+            showToast(`${ids.length - fallidos} pedido(s) eliminados, ${fallidos} no se pudieron eliminar.`, "error");
+        } else {
             showToast("Pedidos eliminados correctamente.");
         }
     };
 
     // --- Eliminar un solo Pedido desde la fila ---
-    const handleEliminarUno = (pedido) => {
-        if (window.confirm(`¿Estás seguro de eliminar el pedido ${pedido.codigo}?`)) {
-            setPedidos(prev => prev.filter(p => p.id !== pedido.id));
+    const handleEliminarUno = async (pedido) => {
+        if (!window.confirm(`¿Estás seguro de eliminar el pedido ${pedido.codigo}?`)) {
+            return;
+        }
+        try {
+            await api.delete(`/pedidos-compra/${pedido.id}`);
+            invalidatePedidos();
             setSelectedIds(prev => prev.filter(id => id !== pedido.id));
             if (activeTrazabilidadId === pedido.id) setActiveTrazabilidadId(null);
             showToast(`Pedido ${pedido.codigo} eliminado.`);
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo eliminar el pedido.", "error");
+        }
+    };
+
+    // --- Marcar/Desmarcar "Enviar a Compras" desde la fila ---
+    const [enviandoCompraId, setEnviandoCompraId] = useState(null);
+
+    const handleEnviarCompras = async (pedido, marcar) => {
+        if (marcar && !pedido.puede_enviar_compras) {
+            showToast("Primero revisa el stock (botón ⇄): el check solo se activa si algún producto no tiene stock en ninguna sede.", "error");
+            return;
+        }
+        setEnviandoCompraId(pedido.id);
+        try {
+            await api.put(`/pedidos-compra/${pedido.id}`, {
+                estado: marcar ? "Enviado a compras" : "Pendiente Aprobación",
+                estado_compra: marcar ? "Cotizando" : null,
+            });
+            invalidatePedidos();
+            showToast(
+                marcar
+                    ? `Pedido ${pedido.codigo} enviado a Compras.`
+                    : `Pedido ${pedido.codigo} regresado a Pedidos.`
+            );
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo actualizar el pedido.", "error");
+        } finally {
+            setEnviandoCompraId(null);
+        }
+    };
+
+    // --- Marcar/Desmarcar recepción manual de un pedido de Dotación en Pedidos ---
+    const [recibiendoDotacionId, setRecibiendoDotacionId] = useState(null);
+
+    const handleToggleRecibidoDotacion = async (pedidoDotacion, marcar) => {
+        setRecibiendoDotacionId(pedidoDotacion.id);
+        try {
+            await api.put(`/pedidos-automaticos/${pedidoDotacion.id}/recibido-pedidos`, { recibido: marcar });
+            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+            showToast(
+                marcar
+                    ? `Pedido ${pedidoDotacion.codigo} recibido en Pedidos.`
+                    : `Pedido ${pedidoDotacion.codigo} marcado como no recibido.`
+            );
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo actualizar el pedido.", "error");
+        } finally {
+            setRecibiendoDotacionId(null);
         }
     };
 
@@ -296,7 +508,7 @@ export default function PedidosCrud() {
             estado: "Pendiente Aprobación",
             items: []
         });
-        setItemProduct(PRODUCTOS_CATALOGO[0]);
+        handleCambiarItemCategoria(CATEGORIAS_PRODUCTO[0] || "");
         setItemQuantity(1);
         setModalOpen(true);
     };
@@ -308,7 +520,7 @@ export default function PedidosCrud() {
             ...pedido,
             items: [...pedido.items]
         });
-        setItemProduct(PRODUCTOS_CATALOGO[0]);
+        handleCambiarItemCategoria(CATEGORIAS_PRODUCTO[0] || "");
         setItemQuantity(1);
         setModalOpen(true);
     };
@@ -318,7 +530,7 @@ export default function PedidosCrud() {
         setModalData(prev => ({
             ...prev,
             tipo_responsable: tipo,
-            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (SUBAGENTES_MOCK[0] || "")
+            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (ALIADOS_MOCK[0] || "")
         }));
     };
 
@@ -333,7 +545,10 @@ export default function PedidosCrud() {
             return;
         }
 
-        const existingIndex = modalData.items.findIndex(it => it.producto === itemProduct);
+        const tipoProductoId = Number(itemProduct);
+        const nombreProducto = tiposProductoData.find(t => t.id === tipoProductoId)?.nombre ?? "Producto";
+
+        const existingIndex = modalData.items.findIndex(it => it.tipo_producto_id === tipoProductoId);
         if (existingIndex > -1) {
             // Actualizar cantidad
             const updatedItems = [...modalData.items];
@@ -343,7 +558,7 @@ export default function PedidosCrud() {
             // Agregar nuevo
             setModalData(prev => ({
                 ...prev,
-                items: [...prev.items, { producto: itemProduct, cantidad: Number(itemQuantity) }]
+                items: [...prev.items, { tipo_producto_id: tipoProductoId, producto: nombreProducto, cantidad: Number(itemQuantity) }]
             }));
         }
         showToast("Producto agregado a la lista del pedido.", "info");
@@ -356,7 +571,9 @@ export default function PedidosCrud() {
     };
 
     // --- Guardar Formulario del Modal ---
-    const handleGuardarPedido = (e) => {
+    const [guardando, setGuardando] = useState(false);
+
+    const handleGuardarPedido = async (e) => {
         e.preventDefault();
 
         if (!modalData.sede) {
@@ -372,31 +589,40 @@ export default function PedidosCrud() {
             return;
         }
 
-        if (modalMode === "new") {
-            // Generar nuevo código e ID
-            const nextId = pedidos.length > 0 ? Math.max(...pedidos.map(p => p.id)) + 1 : 1;
-            const nextNumStr = String(nextId).padStart(3, '0');
-            const newPedido = {
-                ...modalData,
-                id: nextId,
-                codigo: `PED-${nextNumStr}`,
-                fecha_registro: new Date().toISOString().split('T')[0],
-                registra: "Sgallego" // Empleado logueado mockup
-            };
-            setPedidos(prev => [newPedido, ...prev]);
-            showToast(`Pedido ${newPedido.codigo} creado con éxito.`);
-        } else {
-            // Modificar existente
-            setPedidos(prev => prev.map(p => p.id === modalData.id ? modalData : p));
-            showToast(`Pedido ${modalData.codigo} actualizado con éxito.`);
-            if (activeTrazabilidadId === modalData.id) {
-                // Actualizar trazabilidad activa si corresponde
-                setActiveTrazabilidadId(null);
-                setTimeout(() => setActiveTrazabilidadId(modalData.id), 10);
-            }
-        }
+        const payload = {
+            tipo_responsable: modalData.tipo_responsable,
+            responsable: modalData.responsable,
+            sede: modalData.sede,
+            clase: modalData.clase,
+            concepto: modalData.concepto,
+            estado: modalData.estado,
+            items: modalData.items.map(({ tipo_producto_id, cantidad }) => ({
+                tipo_producto_id,
+                cantidad: Number(cantidad),
+            })),
+        };
 
-        setModalOpen(false);
+        setGuardando(true);
+        try {
+            if (modalMode === "new") {
+                const { data } = await api.post("/pedidos-compra", payload);
+                invalidatePedidos();
+                showToast(`Pedido ${data.codigo} creado con éxito.`);
+            } else {
+                const { data } = await api.put(`/pedidos-compra/${modalData.id}`, payload);
+                invalidatePedidos();
+                showToast(`Pedido ${data.codigo} actualizado con éxito.`);
+            }
+            setModalOpen(false);
+        } catch (err) {
+            const mensaje =
+                err?.response?.data?.message ??
+                Object.values(err?.response?.data?.errors ?? {})[0]?.[0] ??
+                "No se pudo guardar el pedido.";
+            showToast(mensaje, "error");
+        } finally {
+            setGuardando(false);
+        }
     };
 
     // --- Obtener colores de Badge según Estado ---
@@ -505,7 +731,12 @@ export default function PedidosCrud() {
 
             {/* --- Tabla de Resultados --- */}
             <div style={S.tableContainer}>
-                {filteredPedidos.length === 0 ? (
+                {loadingPedidos ? (
+                    <div style={S.emptyState}>
+                        <IconLoading size={32} />
+                        <p>Cargando pedidos…</p>
+                    </div>
+                ) : filteredPedidos.length === 0 ? (
                     <div style={S.emptyState}>
                         <IconEmptySearch size={48} />
                         <h3>No se encontraron pedidos</h3>
@@ -531,6 +762,7 @@ export default function PedidosCrud() {
                                 <th>Clase</th>
                                 <th>Concepto</th>
                                 <th>Estado</th>
+                                <th style={{ textAlign: 'center' }}>Enviar a Compras</th>
                                 <th>Registra</th>
                                 <th style={{ textAlign: 'center' }}>Acciones</th>
                             </tr>
@@ -595,6 +827,27 @@ export default function PedidosCrud() {
                                                 {p.estado}
                                             </span>
                                         </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            {p.origen === "dotacion" ? (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={p.recibido_pedidos}
+                                                    disabled={!p.puede_enviar_compras || recibiendoDotacionId === p._dotacionRaw.id}
+                                                    onChange={(e) => handleToggleRecibidoDotacion(p._dotacionRaw, e.target.checked)}
+                                                    style={S.checkbox}
+                                                    title={p.puede_enviar_compras ? "Marca para enviar este pedido a Compras" : "Primero revisa el stock (botón ⇄): el check solo se activa si alguna prenda no tiene stock en ninguna sede"}
+                                                />
+                                            ) : (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={p.estado === "Enviado a compras"}
+                                                    disabled={p.estado === "Completado" || enviandoCompraId === p.id || (!p.puede_enviar_compras && p.estado !== "Enviado a compras")}
+                                                    onChange={(e) => handleEnviarCompras(p, e.target.checked)}
+                                                    style={S.checkbox}
+                                                    title={p.puede_enviar_compras || p.estado === "Enviado a compras" ? "Enviar este pedido al módulo de Compras" : "Primero revisa el stock (botón ⇄): el check solo se activa si algún producto no tiene stock en ninguna sede"}
+                                                />
+                                            )}
+                                        </td>
                                         <td>{p.registra}</td>
                                         <td style={{ textAlign: 'center' }}>
                                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
@@ -605,6 +858,23 @@ export default function PedidosCrud() {
                                                 >
                                                     <IconEye size={14} />
                                                 </button>
+                                                {(p.origen === "dotacion" || p.estado !== "Completado") && (
+                                                    <button
+                                                        style={{
+                                                            ...S.actionIconBtn("#fef3c7", "#92400e"),
+                                                            fontWeight: 800,
+                                                            fontSize: "0.9rem",
+                                                        }}
+                                                        title="Revisar Stock / Traslado"
+                                                        onClick={() => setRevisionPedido(
+                                                            p.origen === "dotacion"
+                                                                ? { id: p._dotacionRaw.id, codigo: p.codigo, origen: "dotacion" }
+                                                                : { id: p.id, codigo: p.codigo, origen: "local" }
+                                                        )}
+                                                    >
+                                                        ⇄
+                                                    </button>
+                                                )}
                                                 {p.origen !== "dotacion" && (
                                                     <>
                                                         <button style={S.actionIconBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => handleAbrirEditar(p, "edit")}>
@@ -813,6 +1083,161 @@ export default function PedidosCrud() {
                 </div>
             )}
 
+            {/* --- Modal Revisión de Stock / Traslado (pedidos de Dotación) --- */}
+            {revisionPedido && (
+                <div style={S.overlay} onClick={() => setRevisionPedido(null)}>
+                    <div style={{ ...S.modal, maxWidth: 780 }} onClick={e => e.stopPropagation()}>
+                        <div style={S.modalHeader}>
+                            <span style={S.modalTitle}>
+                                Revisar Stock — Pedido {revisionPedido.codigo}
+                            </span>
+                            <button style={S.closeBtn} onClick={() => setRevisionPedido(null)}>
+                                <IconClose size={16} />
+                            </button>
+                        </div>
+                        <div style={S.modalBody}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 0 }}>
+                                Por cada prenda: confirma si hay stock en la sede pedida, pide un traslado desde una sede cercana con existencias, o —solo si no hay en ningún lado— envíala a Compras. Ninguna acción ocurre sola.
+                            </p>
+                            {loadingRevision ? (
+                                <div style={{ padding: '30px 0', textAlign: 'center' }}>
+                                    <IconLoading size={28} />
+                                </div>
+                            ) : (
+                                revisionItems.map(it => {
+                                    const resuelto = !!it.estado_revision;
+                                    const disabledAccion = accionandoItemId === it.item_id;
+                                    return (
+                                        <div key={it.item_id} style={S.revisionCard}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 800 }}>{it.titulo}</div>
+                                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                                        Cantidad solicitada: {it.cantidad} — Sede pedida: <strong>{it.sede_pedido.nombre ?? "—"}</strong> (stock actual: {it.sede_pedido.cantidad ?? 0})
+                                                    </div>
+                                                </div>
+                                                {resuelto && (
+                                                    <span style={{
+                                                        fontSize: "0.75rem", fontWeight: 800, padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap",
+                                                        background: it.estado_revision === "Enviado a Compras" ? "#fef3c7" : "#dcfce7",
+                                                        color: it.estado_revision === "Enviado a Compras" ? "#92400e" : "#15803d",
+                                                    }}>
+                                                        {it.estado_revision}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {resuelto && (
+                                                <>
+                                                    {it.observacion && (
+                                                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 10, fontStyle: 'italic' }}>
+                                                            Observación: {it.observacion}
+                                                        </div>
+                                                    )}
+                                                    <button
+                                                        style={{ ...S.btnSecondary, fontSize: '0.8rem', padding: '5px 12px', opacity: disabledAccion ? 0.5 : 1 }}
+                                                        disabled={disabledAccion}
+                                                        onClick={() => handleDeshacerRevision(it.item_id)}
+                                                    >
+                                                        Deshacer revisión
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {!resuelto && (
+                                                <>
+                                                    <div style={S.grid2}>
+                                                        {/* Opción 1: Aprobado por Stock (solo si de verdad alcanza en la sede pedida) */}
+                                                        {(() => {
+                                                            const hayStockPropio = (it.sede_pedido?.cantidad ?? 0) >= it.cantidad;
+                                                            const bloqueado = !hayStockPropio || disabledAccion;
+                                                            return (
+                                                                <div style={{ ...S.opcionCard, opacity: hayStockPropio ? 1 : 0.55 }}>
+                                                                    <div style={S.opcionTitulo}>Aprobado por Stock</div>
+                                                                    {!hayStockPropio && (
+                                                                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a33', marginBottom: 8 }}>
+                                                                            No hay stock suficiente en {it.sede_pedido?.nombre ?? "esta sede"} ({it.sede_pedido?.cantidad ?? 0} de {it.cantidad}). Usa un traslado o envía a Compras.
+                                                                        </div>
+                                                                    )}
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Observación (obligatoria)…"
+                                                                        style={{ ...S.input, marginBottom: 8 }}
+                                                                        value={observaciones[it.item_id] || ""}
+                                                                        disabled={!hayStockPropio}
+                                                                        onChange={e => setObservaciones(prev => ({ ...prev, [it.item_id]: e.target.value }))}
+                                                                    />
+                                                                    <button
+                                                                        style={{ ...S.btnRevisionAccion("#dcfce7", "#15803d"), width: "100%", opacity: bloqueado ? 0.4 : 1, cursor: bloqueado ? "not-allowed" : "pointer" }}
+                                                                        disabled={bloqueado}
+                                                                        onClick={() => handleMarcarStockLocal(it.item_id)}
+                                                                    >
+                                                                        Confirmar Aprobado por Stock
+                                                                    </button>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Opción 2: Aprobado por Traslado */}
+                                                        <div style={S.opcionCard}>
+                                                            <div style={S.opcionTitulo}>Aprobado por Traslado</div>
+                                                            {it.opciones.length === 0 ? (
+                                                                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                                                                    No hay otras sedes registradas para este producto.
+                                                                </p>
+                                                            ) : (
+                                                                <>
+                                                                    <select
+                                                                        style={{ ...S.select, marginBottom: 8 }}
+                                                                        value={trasladoSede[it.item_id] || ""}
+                                                                        onChange={e => setTrasladoSede(prev => ({ ...prev, [it.item_id]: e.target.value }))}
+                                                                    >
+                                                                        <option value="">Selecciona una sede…</option>
+                                                                        {it.opciones.map(s => (
+                                                                            <option
+                                                                                key={s.sede_id}
+                                                                                value={s.inventario_id ?? ""}
+                                                                                disabled={!s.inventario_id || s.cantidad < it.cantidad}
+                                                                            >
+                                                                                {s.sede_nombre} — stock: {s.cantidad}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <button
+                                                                        style={{ ...S.btnRevisionAccion("#e8f0ff", "#1a4fa8"), width: "100%", opacity: (!trasladoSede[it.item_id] || disabledAccion) ? 0.4 : 1 }}
+                                                                        disabled={!trasladoSede[it.item_id] || disabledAccion}
+                                                                        onClick={() => handleSolicitarTraslado(it.item_id, Number(trasladoSede[it.item_id]), it.cantidad)}
+                                                                    >
+                                                                        Confirmar Aprobado por Traslado
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ textAlign: 'center', marginTop: 10 }}>
+                                                        <button
+                                                            style={{ ...S.btnRevisionAccion("#fce8e8", "#a33"), opacity: disabledAccion ? 0.5 : 1 }}
+                                                            disabled={disabledAccion}
+                                                            onClick={() => handleEnviarComprasItem(it.item_id)}
+                                                        >
+                                                            No hay stock en ninguna sede — Enviar a Compras
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button style={S.btnSecondary} onClick={() => setRevisionPedido(null)}>Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* --- Modal Filtros de Búsqueda --- */}
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
@@ -980,11 +1405,11 @@ export default function PedidosCrud() {
                                                 <input 
                                                     type="radio" 
                                                     name="tipo_resp"
-                                                    checked={modalData.tipo_responsable === "Subagente"}
-                                                    onChange={() => handleTipoResponsableChange("Subagente")}
+                                                    checked={modalData.tipo_responsable === "Aliado"}
+                                                    onChange={() => handleTipoResponsableChange("Aliado")}
                                                     disabled={modalMode === "view"}
                                                 />
-                                                Subagente
+                                                Aliado
                                             </label>
                                         </div>
                                     </div>
@@ -1009,7 +1434,7 @@ export default function PedidosCrud() {
                                                 disabled={modalMode === "view"}
                                                 required
                                             >
-                                                {SUBAGENTES_MOCK.map(s => <option key={s} value={s}>{s}</option>)}
+                                                {ALIADOS_MOCK.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                         )}
                                     </div>
@@ -1024,10 +1449,18 @@ export default function PedidosCrud() {
 
                                 {modalMode !== "view" && (
                                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 16 }}>
+                                        <div style={{ ...S.formGroup, flex: 2 }}>
+                                            <label style={S.label}>Categoría</label>
+                                            <select style={S.select} value={itemCategoria} onChange={e => handleCambiarItemCategoria(e.target.value)}>
+                                                {CATEGORIAS_PRODUCTO.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
                                         <div style={{ ...S.formGroup, flex: 3 }}>
-                                            <label style={S.label}>Seleccionar Producto / Insumo</label>
+                                            <label style={S.label}>Tipo de Producto</label>
                                             <select style={S.select} value={itemProduct} onChange={e => setItemProduct(e.target.value)}>
-                                                {PRODUCTOS_CATALOGO.map(p => <option key={p} value={p}>{p}</option>)}
+                                                {PRODUCTOS_CATALOGO.length === 0
+                                                    ? <option value="">Sin productos en esta categoría</option>
+                                                    : PRODUCTOS_CATALOGO.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                                             </select>
                                         </div>
                                         <div style={{ ...S.formGroup, flex: 1 }}>
@@ -1102,12 +1535,12 @@ export default function PedidosCrud() {
 
                             {/* Footer */}
                             <div style={S.modalFooter}>
-                                <button type="button" style={S.btnSecondary} onClick={() => setModalOpen(false)}>
+                                <button type="button" style={S.btnSecondary} onClick={() => setModalOpen(false)} disabled={guardando}>
                                     {modalMode === "view" ? "Cerrar" : "Cancelar"}
                                 </button>
                                 {modalMode !== "view" && (
-                                    <button type="submit" style={S.btnPrimary}>
-                                        {modalMode === "new" ? "Crear Pedido" : "Guardar Cambios"}
+                                    <button type="submit" style={{ ...S.btnPrimary, opacity: guardando ? 0.6 : 1 }} disabled={guardando}>
+                                        {guardando ? "Guardando…" : (modalMode === "new" ? "Crear Pedido" : "Guardar Cambios")}
                                     </button>
                                 )}
                             </div>
@@ -1493,5 +1926,41 @@ const S = {
         fontWeight: "bold",
         fontSize: "1rem",
         cursor: "pointer"
-    }
+    },
+    revisionCard: {
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        padding: 14,
+        marginBottom: 12,
+        background: "var(--bg)"
+    },
+    opcionCard: {
+        border: "1.5px solid var(--border)",
+        borderRadius: "var(--radius-sm)",
+        padding: 12,
+        background: "var(--white)",
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0
+    },
+    opcionTitulo: {
+        fontSize: "0.8rem",
+        fontWeight: 800,
+        color: "var(--primary)",
+        marginBottom: 8,
+        textTransform: "uppercase",
+        letterSpacing: "0.03em"
+    },
+    btnRevisionAccion: (bg, color) => ({
+        background: bg,
+        color,
+        border: "none",
+        borderRadius: "var(--radius-sm)",
+        padding: "6px 12px",
+        fontSize: "0.82rem",
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: "Nunito, sans-serif",
+        whiteSpace: "nowrap"
+    })
 };

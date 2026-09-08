@@ -15,14 +15,18 @@ class TipoProductoController extends Controller
         if ($request->search) {
             $query->where('nombre', 'like', "%{$request->search}%");
         }
+        if ($request->categoria) {
+            $query->where('categoria', $request->categoria);
+        }
 
-        return response()->json($query->orderBy('nombre')->get());
+        return response()->json($query->orderBy('categoria')->orderBy('nombre')->get());
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'nombre'      => 'required|string|max:150|unique:tipos_producto,nombre',
+            'categoria'   => 'required|string|in:' . implode(',', TipoProducto::CATEGORIAS),
             'descripcion' => 'nullable|string|max:255',
         ]);
 
@@ -40,6 +44,7 @@ class TipoProductoController extends Controller
     {
         $data = $request->validate([
             'nombre'      => 'required|string|max:150|unique:tipos_producto,nombre,' . $tipoProducto->id,
+            'categoria'   => 'required|string|in:' . implode(',', TipoProducto::CATEGORIAS),
             'descripcion' => 'nullable|string|max:255',
         ]);
 

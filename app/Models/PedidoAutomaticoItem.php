@@ -12,6 +12,8 @@ class PedidoAutomaticoItem extends Model
         'pedido_automatico_id',
         'inventario_dotacion_id',
         'cantidad',
+        'estado_revision',
+        'observacion',
     ];
 
     protected $casts = [

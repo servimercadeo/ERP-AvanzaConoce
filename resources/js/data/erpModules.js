@@ -199,6 +199,51 @@ export const ERP_MODULES = [
           { id: 'cronograma',          label: 'Cronograma' },
         ]
       },
+      {
+        id: 'inv_activos',
+        label: 'Activos',
+        icon: 'productos',
+        desc: 'Inventario de activos por sede',
+        archivos: [
+          { id: 'inventario_activos', label: 'Inventario de Activos' },
+        ]
+      },
+      {
+        id: 'inv_materiales',
+        label: 'Materiales',
+        icon: 'productos',
+        desc: 'Inventario de materiales por sede',
+        archivos: [
+          { id: 'inventario_materiales', label: 'Inventario de Materiales' },
+        ]
+      },
+      {
+        id: 'inv_equipos',
+        label: 'Equipos',
+        icon: 'productos',
+        desc: 'Inventario de equipos por sede',
+        archivos: [
+          { id: 'inventario_equipos', label: 'Inventario de Equipos' },
+        ]
+      },
+      {
+        id: 'inv_epp',
+        label: 'EPP',
+        icon: 'productos',
+        desc: 'Inventario de elementos de protección personal por sede',
+        archivos: [
+          { id: 'inventario_epp', label: 'Inventario de EPP' },
+        ]
+      },
+      {
+        id: 'inv_herramientas',
+        label: 'Herramientas',
+        icon: 'productos',
+        desc: 'Inventario de herramientas por sede',
+        archivos: [
+          { id: 'inventario_herramientas', label: 'Inventario de Herramientas' },
+        ]
+      },
       /*
       {
         id: 'consultas',
@@ -237,6 +282,15 @@ export const ERP_MODULES = [
         desc: 'Gestión de pedidos',
         archivos: [
           { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
+        ]
+      },
+      {
+        id: 'compras',
+        label: 'Compras',
+        icon: 'compras',
+        desc: 'Seguimiento de pedidos enviados a compras',
+        archivos: [
+          { id: 'ver_compras', label: 'Compras' }
         ]
       },
       /*

@@ -16,12 +16,15 @@ class PedidoAutomatico extends Model
         'pedido_global_id',
         'empleado_id',
         'estado',
+        'recibido_pedidos',
+        'estado_compra',
         'fecha_pedido',
         'notas',
     ];
 
     protected $casts = [
-        'fecha_pedido' => 'date',
+        'fecha_pedido'     => 'date',
+        'recibido_pedidos' => 'boolean',
     ];
 
     public function empleado()

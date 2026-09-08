@@ -9,11 +9,14 @@ import {
 
 const POR_PAGINA = 15;
 
+const CATEGORIAS_PRODUCTO = ["Activos", "Materiales", "Equipos", "Dotación", "EPP", "Herramientas"];
+
 const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /* ─── Modal de creación / edición ──────────────────────────────────── */
 function FormModal({ open, onClose, onSave, editTarget }) {
     const [nombre, setNombre] = useState("");
+    const [categoria, setCategoria] = useState(CATEGORIAS_PRODUCTO[0]);
     const [descripcion, setDescripcion] = useState("");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -21,6 +24,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     React.useEffect(() => {
         if (open) {
             setNombre(editTarget?.nombre ?? "");
+            setCategoria(editTarget?.categoria ?? CATEGORIAS_PRODUCTO[0]);
             setDescripcion(editTarget?.descripcion ?? "");
             setError("");
         }
@@ -38,6 +42,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
         try {
             await onSave({
                 nombre: nombre.trim(),
+                categoria,
                 descripcion: descripcion.trim() || null,
             });
             onClose();
@@ -64,6 +69,12 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                     </button>
                 </div>
                 <div style={S.modalBody}>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Categoría *</label>
+                        <select style={S.input} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                            {CATEGORIAS_PRODUCTO.map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Nombre *</label>
                         <input
@@ -110,6 +121,7 @@ export default function TiposProductoCrud() {
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 280);
+    const [filtroCategoria, setFiltroCategoria] = useState("Todas");
     const [pagina, setPagina] = useState(1);
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
@@ -127,9 +139,12 @@ export default function TiposProductoCrud() {
 
     const filtered = useMemo(() => {
         const q = norm(debSearch);
-        if (!q) return tipos;
-        return tipos.filter((t) => norm(t.nombre ?? "").includes(q));
-    }, [tipos, debSearch]);
+        return tipos.filter((t) => {
+            if (filtroCategoria !== "Todas" && t.categoria !== filtroCategoria) return false;
+            if (q && !norm(t.nombre ?? "").includes(q)) return false;
+            return true;
+        });
+    }, [tipos, debSearch, filtroCategoria]);
 
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
     const paginated = filtered.slice(
@@ -204,6 +219,14 @@ export default function TiposProductoCrud() {
                         }}
                     />
                 </div>
+                <select
+                    style={S.selectFilter}
+                    value={filtroCategoria}
+                    onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1); }}
+                >
+                    <option value="Todas">Todas las categorías</option>
+                    {CATEGORIAS_PRODUCTO.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <button className="btn-primary" onClick={handleCreate}>
                     + Nuevo Tipo de Producto
                 </button>
@@ -224,6 +247,7 @@ export default function TiposProductoCrud() {
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th>Categoría</th>
                                 <th>Nombre</th>
                                 <th>Descripción</th>
                                 <th style={{ textAlign: "center" }}>Acciones</th>
@@ -232,6 +256,9 @@ export default function TiposProductoCrud() {
                         <tbody>
                             {paginated.map((t) => (
                                 <tr key={t.id}>
+                                    <td>
+                                        <span style={S.badgeCategoria}>{t.categoria || "—"}</span>
+                                    </td>
                                     <td style={{ fontWeight: 700 }}>{t.nombre}</td>
                                     <td>{t.descripcion || "—"}</td>
                                     <td>
@@ -342,8 +369,10 @@ const S = {
     searchWrap: { position: "relative", flex: 1, minWidth: 200, maxWidth: 420 },
     searchIcon: { position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", color: "var(--text-muted)", pointerEvents: "none" },
     searchInput: { width: "100%", padding: "9px 12px 9px 34px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", background: "var(--white)", color: "var(--text)", outline: "none" },
+    selectFilter: { padding: "9px 12px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.85rem", fontFamily: "Nunito,sans-serif", background: "var(--white)", color: "var(--text)", outline: "none", cursor: "pointer", minWidth: 160 },
     tableWrap: { background: "var(--white)", border: "1.5px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", overflowX: "auto" },
     actions: { display: "flex", gap: 6, justifyContent: "center" },
+    badgeCategoria: { background: "var(--primary-light)", color: "var(--primary-dark)", borderRadius: 20, padding: "3px 10px", fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap" },
     actionBtn: (bg, color) => ({ background: bg, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", color, transition: "opacity 0.15s", display: "inline-flex", alignItems: "center" }),
     empty: { padding: "60px 20px", textAlign: "center", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
     paginationBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },

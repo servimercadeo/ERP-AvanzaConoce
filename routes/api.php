@@ -316,6 +316,35 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('conceptos-pedido', App\Http\Controllers\Api\ConceptoPedidoController::class)
         ->parameters(['conceptos-pedido' => 'conceptoPedido']);
 
+    // Inventario por sede de las categorías de producto (Inventarios > Activos/Materiales/Equipos/EPP/Herramientas)
+    Route::get('inventario-productos/resumen', [App\Http\Controllers\Api\InventarioProductoController::class, 'resumen']);
+    Route::get('inventario-productos/sedes', [App\Http\Controllers\Api\InventarioProductoController::class, 'sedesDisponibles']);
+    Route::apiResource('inventario-productos', App\Http\Controllers\Api\InventarioProductoController::class)
+        ->except(['show'])
+        ->parameters(['inventario-productos' => 'inventarioProducto']);
+
+    // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)
+    Route::apiResource('pedidos-compra', App\Http\Controllers\Api\PedidoCompraController::class)
+        ->parameters(['pedidos-compra' => 'pedidoCompra']);
+
+    // Revisión manual de stock/traslado para pedidos de oficina (mismo criterio que
+    // Dotación, ahora contra inventario_productos)
+    Route::get('pedidos-compra/{pedidoCompra}/stock-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'stockPorPedido']);
+    Route::post('pedido-compra-items/{pedidoCompraItem}/stock-local', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'marcarStockLocal']);
+    Route::post('pedido-compra-items/{pedidoCompraItem}/traslado', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'solicitarTraslado']);
+    Route::post('pedido-compra-items/{pedidoCompraItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'enviarACompras']);
+    Route::post('pedido-compra-items/{pedidoCompraItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'deshacerRevision']);
+
+    // Revisión manual de stock/traslado para pedidos de Dotación "Enviar a compras"
+    // (Pedidos y Compras > Pedidos > Ver y Crear Pedidos, filas que vienen de Dotación)
+    Route::put('pedidos-automaticos/{pedidoAutomatico}/recibido-pedidos', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarRecibido']);
+    Route::put('pedidos-automaticos/{pedidoAutomatico}/estado-compra', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'actualizarEstadoCompra']);
+    Route::get('pedidos-automaticos/{pedidoAutomatico}/stock-revision', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'stockPorPedido']);
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/stock-local', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarStockLocal']);
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/traslado', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'solicitarTraslado']);
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'enviarACompras']);
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'deshacerRevision']);
+
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
     Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);

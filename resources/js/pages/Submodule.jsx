@@ -25,9 +25,15 @@ const EmpresasCrud = lazy(() => import('./EmpresasCrud'));
 const RegionalesCrud = lazy(() => import('./RegionalesCrud'));
 const ProyectosCrud = lazy(() => import('./ProyectosCrud'));
 const PedidosCrud = lazy(() => import('./PedidosCrud'));
+const ComprasCrud = lazy(() => import('./ComprasCrud'));
 const TiposProductoCrud = lazy(() => import('./TiposProductoCrud'));
 const ClasesPedidoCrud = lazy(() => import('./ClasesPedidoCrud'));
 const ConceptosPedidoCrud = lazy(() => import('./ConceptosPedidoCrud'));
+const InventarioActivosCrud = lazy(() => import('./InventarioActivosCrud'));
+const InventarioMaterialesCrud = lazy(() => import('./InventarioMaterialesCrud'));
+const InventarioEquiposCrud = lazy(() => import('./InventarioEquiposCrud'));
+const InventarioEppCrud = lazy(() => import('./InventarioEppCrud'));
+const InventarioHerramientasCrud = lazy(() => import('./InventarioHerramientasCrud'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -107,6 +113,31 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'cronograma':         return CronogramaDotacion;
             default: return null;
           }
+        case 'inv_activos':
+          switch (archivoId) {
+            case 'inventario_activos': return InventarioActivosCrud;
+            default: return null;
+          }
+        case 'inv_materiales':
+          switch (archivoId) {
+            case 'inventario_materiales': return InventarioMaterialesCrud;
+            default: return null;
+          }
+        case 'inv_equipos':
+          switch (archivoId) {
+            case 'inventario_equipos': return InventarioEquiposCrud;
+            default: return null;
+          }
+        case 'inv_epp':
+          switch (archivoId) {
+            case 'inventario_epp': return InventarioEppCrud;
+            default: return null;
+          }
+        case 'inv_herramientas':
+          switch (archivoId) {
+            case 'inventario_herramientas': return InventarioHerramientasCrud;
+            default: return null;
+          }
         case 'productos':
           switch (archivoId) {
             // case 'productos_file':         return ProductosCrud;
@@ -127,7 +158,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
           }
         case 'compras':
           switch (archivoId) {
-            // case 'ver_crear_orden': return OrdenCompraCrud;
+            case 'ver_compras': return ComprasCrud;
             default: return null;
           }
         default: return null;
