@@ -191,15 +191,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store']);
 
-    // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
-    Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
-    // CRUD completo de empleados
-    Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
-    Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
-    Route::apiResource('empleados', EmpleadoController::class);
+    // Módulo Administrativo: solo TIC, Talento Humano y admin.
+    Route::middleware('role:admin,th,tic')->group(function () {
+        // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
+        Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
+        // CRUD completo de empleados
+        Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
+        Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
+        Route::apiResource('empleados', EmpleadoController::class);
 
-    // CRUD completo de contratos
-    Route::apiResource('contratos', ContratoController::class);
+        // CRUD completo de contratos
+        Route::apiResource('contratos', ContratoController::class);
+    });
 
     // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato.
     // Parametros > Centros de Costos pide el listado completo (incl. inactivos) vía ?all=1.
@@ -304,6 +307,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
         ->parameters(['proyectos' => 'proyecto']);
 
+    // Catálogo de tipos de producto (Pedidos y Compras > Parametros > Tipo de Producto)
+    Route::apiResource('tipos-producto', App\Http\Controllers\Api\TipoProductoController::class)
+        ->parameters(['tipos-producto' => 'tipoProducto']);
+
+    // Catálogo de clases de pedido (Pedidos y Compras > Parametros > Clases de Pedidos)
+    Route::apiResource('clases-pedido', App\Http\Controllers\Api\ClasePedidoController::class)
+        ->parameters(['clases-pedido' => 'clasePedido']);
+
+    // Catálogo de conceptos de pedido (Pedidos y Compras > Parametros > Conceptos de Pedidos)
+    Route::apiResource('conceptos-pedido', App\Http\Controllers\Api\ConceptoPedidoController::class)
+        ->parameters(['conceptos-pedido' => 'conceptoPedido']);
+
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
     Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
@@ -335,6 +350,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('cronograma-dotacion', [CronogramaDotacionController::class, 'store']);
     Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update']);
     Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle']);
+
+    // Selección, candidatos, base de ingresos y documentos de contratación:
+    // solo TIC, Talento Humano y admin.
+    Route::middleware('role:admin,th,tic')->group(function () {
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
@@ -606,6 +625,8 @@ Route::middleware('auth:sanctum')->group(function () {
         $respuesta->delete();
         return response()->json(null, 204);
     });
+
+    }); // fin role:admin,th,tic
 });
 
 // Resuelve el token cifrado del link de carga de documentos

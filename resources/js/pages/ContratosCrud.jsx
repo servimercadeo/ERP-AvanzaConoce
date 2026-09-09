@@ -2310,8 +2310,13 @@ export default function ContratosCrud() {
         queryFn: () => api.get("/contratos").then((r) => r.data),
     });
     const { data: _qEmpleados } = useQuery({
-        queryKey: ["empleados"],
-        queryFn: () => api.get("/empleados").then((r) => r.data),
+        // Incluye también empleados con contrato pero sin alta manual todavía en
+        // el módulo Empleados: basta con tener contrato para asignarles dotación.
+        queryKey: ["empleados", { con_contrato: true }],
+        queryFn: () =>
+            api
+                .get("/empleados", { params: { con_contrato: 1 } })
+                .then((r) => r.data),
     });
     const { data: _qCatalogos } = useQuery({
         queryKey: ["catalogos"],
