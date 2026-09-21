@@ -35,7 +35,7 @@ class EmpresaController extends Controller
             'activo' => 'boolean',
         ]);
         $data['activo'] = $data['activo'] ?? true;
-        $data['pais'] = $data['pais'] ?: 'Colombia';
+        $data['pais'] = ($data['pais'] ?? null) ?: 'Colombia';
 
         $empresa = Empresa::create($data);
 

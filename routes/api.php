@@ -215,7 +215,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
-    Route::post('/users', [UserController::class, 'store']);
+    Route::post('/users', [UserController::class, 'store'])->middleware('role:admin');
 
     // Módulo Administrativo: solo TIC, Talento Humano y admin.
     Route::middleware('role:admin,th,tic')->group(function () {

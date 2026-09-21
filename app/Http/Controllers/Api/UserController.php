@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\SsoService;
 use App\Services\UserSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -48,9 +49,7 @@ class UserController extends Controller
      */
     public function recibirDeAvanzaconoce(Request $request)
     {
-        $secretRecibido = $request->header('X-ERP-Secret');
-
-        if ($secretRecibido !== config('sso.secret')) {
+        if (!SsoService::secretoValido($request->header('X-ERP-Secret'))) {
             return response()->json(['error' => 'No autorizado'], 401);
         }
 

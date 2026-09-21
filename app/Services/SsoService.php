@@ -20,6 +20,18 @@ class SsoService
     }
 
     /**
+     * Compara el secreto compartido (header X-ERP-Secret) contra SSO_SECRET. Un secreto
+     * vacío en la configuración nunca es válido: si SSO_SECRET no está definido, ninguna
+     * petición debe pasar (antes un header vacío "coincidía" con el secreto vacío).
+     */
+    public static function secretoValido(?string $recibido): bool
+    {
+        $esperado = (string) config('sso.secret');
+
+        return $esperado !== '' && is_string($recibido) && hash_equals($esperado, $recibido);
+    }
+
+    /**
      * Genera un token JWT para que AvanzaConoce envíe al ERP.
      * AvanzaConoce llama esto cuando el usuario hace clic en "Ir al ERP".
      */

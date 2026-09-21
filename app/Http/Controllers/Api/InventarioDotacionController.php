@@ -220,6 +220,11 @@ class InventarioDotacionController extends Controller
                     ])
                     ->all();
             });
+            // La caché guarda el catálogo COMPLETO (misma para todos); el filtro por empresa se
+            // aplica después, por usuario, para que nadie vea proyectos que no le corresponden.
+            $permitidos = $this->proyectosPermitidos($request->user());
+            $data = array_values(array_filter($data, fn ($fila) => in_array($fila->proyecto, $permitidos, true)));
+
             return response()->json($data);
         }
 

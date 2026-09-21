@@ -22,8 +22,13 @@ class SedeController extends Controller
 
         if ($request->search) {
             $s = $request->search;
-            $query->where('sedes.nombre', 'like', "%$s%")
+            // Agrupado: sin el closure, el orWhere se mezclaba con los filtros de estado/tipo/ciudad
+            // de abajo ("nombre LIKE x OR (codigo LIKE x AND estado = y)") y dejaba pasar sedes
+            // que no cumplían el filtro.
+            $query->where(function ($q) use ($s) {
+                $q->where('sedes.nombre', 'like', "%$s%")
                   ->orWhere('sedes.codigo_distribuidor', 'like', "%$s%");
+            });
         }
 
         if ($request->estado && $request->estado !== 'Todos') {

@@ -284,25 +284,10 @@ class EmpleadoController extends Controller
 
     public function update(Request $request, User $empleado)
     {
-        $userByEmail = null;
-        if ($request->email) {
-            $userByEmail = User::where('email', $request->email)->first();
-        }
-
-        $existingId = $empleado->id;
-        if ($userByEmail && $userByEmail->id !== $empleado->id) {
-            // Re-link contracts to userByEmail
-            \App\Models\Contrato::where('empleado_id', $empleado->id)
-                ->update(['empleado_id' => $userByEmail->id]);
-
-            // Delete the duplicate $empleado
-            $empleado->delete();
-            
-            $empleado = $userByEmail;
-            $existingId = $userByEmail->id;
-        }
-
-        $data = $request->validate($this->rules($existingId));
+        // Si el correo ya pertenece a OTRO usuario, Rule::unique (ignorando solo a este empleado)
+        // responde 422. Antes se "fusionaba": se borraba al empleado editado y se sobrescribía
+        // al otro, así que un error de tipeo en el correo eliminaba a una persona real.
+        $data = $request->validate($this->rules($empleado->id));
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);

@@ -55,9 +55,7 @@ class SsoController extends Controller
             'avanzaconoce_id' => 'required|integer',
         ]);
 
-        $secretRecibido = $request->header('X-ERP-Secret');
-
-        if ($secretRecibido !== config('sso.secret')) {
+        if (!SsoService::secretoValido($request->header('X-ERP-Secret'))) {
             return response()->json(['error' => 'No autorizado'], 401);
         }
 
