@@ -320,7 +320,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['conceptos-pedido' => 'conceptoPedido']);
 
     // Inventario de prendas de dotación
-    Route::get('inventario-dotacion/proyectos', fn () => response()->json(InventarioDotacionController::proyectosDotacion()));
+    Route::get('inventario-dotacion/proyectos', [InventarioDotacionController::class, 'proyectosDotacionUsuario']);
     Route::get('inventario-dotacion/sedes', [InventarioDotacionController::class, 'sedesDisponibles']);
     Route::get('inventario-dotacion/resumen', [InventarioDotacionController::class, 'resumen']);
     Route::get('inventario-dotacion/filtros', [InventarioDotacionController::class, 'filtros']);

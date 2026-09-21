@@ -16,7 +16,7 @@ const TALLAS_UNICA = ['N/A'];
 const ALL_TALLAS_ORDER = [...TALLAS_UNICA, ...TALLAS_ROPA, ...TALLAS_JEAN, ...TALLAS_TENIS.filter(t => !TALLAS_JEAN.includes(t))];
 
 const EMPTY_ITEM = { proyecto: 'SYM TIGO EXPRESS', sede_id: '', prenda: '', genero: 'Masculino', talla: 'M', precio: 0, cantidad: 0, stock_minimo: 0 };
-const EMPTY_BULK_ROW = () => ({ ...EMPTY_ITEM });
+const emptyItem = (proyectos) => ({ ...EMPTY_ITEM, proyecto: proyectos?.[0] ?? EMPTY_ITEM.proyecto });
 
 const fetchSedesPorProyecto = async (proyectos) => {
     const entries = await Promise.all(proyectos.map(async (p) => {
@@ -31,7 +31,7 @@ function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
     const isEdit = !!item?.id;
     const [form, setForm] = useState(isEdit
         ? { cantidad: item.cantidad, stock_minimo: item.stock_minimo, precio: item.precio ?? 0 }
-        : { ...EMPTY_ITEM });
+        : emptyItem(proyectos));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
@@ -163,12 +163,12 @@ function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
 
 // ─── Modal carga masiva ──────────────────────────────────────────────────────
 function BulkModal({ proyectos, sedesPorProyecto, onClose, onSaved }) {
-    const [rows, setRows] = useState([EMPTY_BULK_ROW()]);
+    const [rows, setRows] = useState([emptyItem(proyectos)]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
     const setRow = (idx, k, v) => setRows(rs => rs.map((r, i) => i === idx ? { ...r, [k]: v, ...(k === 'proyecto' ? { sede_id: '' } : {}) } : r));
-    const addRow = () => setRows(rs => [...rs, EMPTY_BULK_ROW()]);
+    const addRow = () => setRows(rs => [...rs, emptyItem(proyectos)]);
     const removeRow = (idx) => setRows(rs => rs.filter((_, i) => i !== idx));
 
     const handleSave = async () => {
@@ -503,6 +503,14 @@ export default function ProductosDotacion() {
         queryFn: () => api.get('/inventario-dotacion/proyectos').then(r => r.data),
         staleTime: 10 * 60 * 1000,
     });
+
+    // Si la pestaña activa no está entre las que la empresa del usuario puede ver
+    // (ej. el valor inicial por defecto), se cambia a la primera pestaña disponible.
+    useEffect(() => {
+        if (proyectos.length > 0 && !proyectos.includes(proyectoTab)) {
+            setProyectoTab(proyectos[0]);
+        }
+    }, [proyectos, proyectoTab]);
 
     const { data: sedesPorProyecto = {} } = useQuery({
         queryKey: ['sedes-por-proyecto-dotacion', proyectos],

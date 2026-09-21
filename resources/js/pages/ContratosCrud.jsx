@@ -2297,6 +2297,7 @@ export default function ContratosCrud() {
     const [viewOpen, setViewOpen] = useState(false);
     const [viewTarget, setViewTarget] = useState(null);
     const [toast, setToast] = useState(null);
+    const [empresaProyectoAlert, setEmpresaProyectoAlert] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
     const [importFile, setImportFile] = useState(null);
@@ -2521,7 +2522,15 @@ export default function ContratosCrud() {
             }
             setModalOpen(false);
         } catch (err) {
-            showToast("Error al guardar el contrato.");
+            const proyectoMsg = err?.response?.data?.errors?.cliente_proyecto?.[0];
+            if (proyectoMsg) {
+                setEmpresaProyectoAlert(proyectoMsg);
+            } else {
+                showToast(
+                    err?.response?.data?.message ?? "Error al guardar el contrato.",
+                );
+            }
+            throw err;
         }
     };
 
@@ -2911,6 +2920,13 @@ export default function ContratosCrud() {
                                                 onClick={() => {
                                                     setViewTarget(c);
                                                     setViewOpen(true);
+                                                    // La fila de la tabla puede estar desactualizada
+                                                    // (p. ej. justo tras editar otro campo en otra
+                                                    // pestaña); se refresca contra el servidor para
+                                                    // no mostrar datos obsoletos.
+                                                    api.get(`/contratos/${c.id}`)
+                                                        .then(({ data }) => setViewTarget(data))
+                                                        .catch(() => {});
                                                 }}
                                             >
                                                 <IconEye />
@@ -2924,6 +2940,12 @@ export default function ContratosCrud() {
                                                 onClick={() => {
                                                     setEditTarget(c);
                                                     setModalOpen(true);
+                                                    // Idem: se trae el contrato fresco del servidor
+                                                    // en vez de confiar en la fila cacheada en el
+                                                    // listado, para editar siempre sobre el dato real.
+                                                    api.get(`/contratos/${c.id}`)
+                                                        .then(({ data }) => setEditTarget(data))
+                                                        .catch(() => {});
                                                 }}
                                             >
                                                 <IconEdit />
@@ -3276,6 +3298,45 @@ export default function ContratosCrud() {
                     )
                 }
             />
+
+            {empresaProyectoAlert && (
+                <div style={S.overlay} onClick={() => setEmpresaProyectoAlert(null)}>
+                    <div
+                        style={{ ...S.modal, maxWidth: 460 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={S.modalHeaderGreen}>
+                            <span style={S.modalTitleWhite}>Actualiza el proyecto</span>
+                            <button
+                                style={S.closeBtnWhite}
+                                onClick={() => setEmpresaProyectoAlert(null)}
+                            >
+                                <IconClose size={14} />
+                            </button>
+                        </div>
+                        <div style={S.modalBody}>
+                            <p style={{ margin: 0 }}>
+                                Cada empresa solo puede asignarse a ciertos proyectos.
+                                Para guardar este cambio, actualiza también el campo{" "}
+                                <strong>Cliente / Proyecto</strong> (pestaña
+                                "Información Principal") para que coincida con la
+                                empresa seleccionada.
+                            </p>
+                            <p style={{ marginTop: 12, marginBottom: 0, color: "#64748b" }}>
+                                {empresaProyectoAlert}
+                            </p>
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button
+                                style={S.btnPrimary}
+                                onClick={() => setEmpresaProyectoAlert(null)}
+                            >
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Modal
                 open={viewOpen}

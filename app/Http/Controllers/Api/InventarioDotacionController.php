@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\InventarioDotacion;
 use App\Models\Proyecto;
+use App\Models\User;
+use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +19,57 @@ class InventarioDotacionController extends Controller
     public static function proyectosDotacion(): array
     {
         return array_keys(InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO);
+    }
+
+    /**
+     * Nombre de la empresa del usuario. `users.empresa_id` solo se puebla desde el módulo
+     * Empleados y muchos usuarios (creados/editados solo desde Contratos) lo tienen vacío, así
+     * que si falta se cae al campo `contratos.empresa` (texto libre) de su contrato vigente —
+     * que es donde el módulo de Contratos sí guarda este dato de forma confiable (ver
+     * Administrativo > Administración de Contratos, campo "Empresa").
+     */
+    private function empresaUsuario(?User $user): ?string
+    {
+        if (!$user) {
+            return null;
+        }
+
+        if ($user->empresa_id) {
+            return $user->empresa?->nombre;
+        }
+
+        return $user->contratos()
+            ->whereNotNull('empresa')
+            ->orderByRaw("estado_contrato = 'Activo' desc")
+            ->orderByDesc('fecha_ingreso')
+            ->value('empresa');
+    }
+
+    /**
+     * Tabs de dotación (claves de PROYECTO_DOTACION_A_PROYECTO) que el usuario puede ver/gestionar,
+     * según la empresa a la que pertenece (misma regla que EmpresaProyectoRules usa para
+     * contratos/empleados: SYM ve TIGO EXPRESS/TIGO HOME/ADMINISTRATIVO, Servimercadeo ve DIRECTV).
+     * Si el usuario no tiene empresa asignada, o su empresa no está sujeta a la regla, ve todas.
+     */
+    private function proyectosPermitidos(?User $user): array
+    {
+        $todas = self::proyectosDotacion();
+
+        $proyectosEmpresa = EmpresaProyectoRules::proyectosPermitidos($this->empresaUsuario($user));
+        if ($proyectosEmpresa === null) {
+            return $todas;
+        }
+
+        return array_values(array_filter(
+            $todas,
+            fn ($tab) => in_array(InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$tab] ?? null, $proyectosEmpresa, true)
+        ));
+    }
+
+    /** Tabs visibles para el usuario logueado (usado por GET inventario-dotacion/proyectos). */
+    public function proyectosDotacionUsuario(Request $request)
+    {
+        return response()->json($this->proyectosPermitidos($request->user()));
     }
 
     private function sedeIdsValidasParaProyecto(string $proyectoDotacion): array
@@ -39,6 +92,10 @@ class InventarioDotacionController extends Controller
         $request->validate([
             'proyecto' => 'required|in:' . implode(',', self::proyectosDotacion()),
         ]);
+
+        if (!in_array($request->proyecto, $this->proyectosPermitidos($request->user()), true)) {
+            return response()->json([]);
+        }
 
         $nombreProyecto = InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$request->proyecto] ?? null;
         $proyecto = $nombreProyecto ? Proyecto::where('nombre', $nombreProyecto)->first() : null;
@@ -68,6 +125,7 @@ class InventarioDotacionController extends Controller
     private function filtrarInventario(Request $request)
     {
         $query = InventarioDotacion::with('sede:id,nombre')
+            ->whereIn('proyecto', $this->proyectosPermitidos($request->user()))
             ->orderBy('proyecto')
             ->orderBy('prenda')
             ->orderBy('genero')
@@ -176,9 +234,10 @@ class InventarioDotacionController extends Controller
     }
 
     /** Totales por proyecto y conteo de items en stock bajo/crítico, para las tarjetas de stats. */
-    public function resumen()
+    public function resumen(Request $request)
     {
         $filas = InventarioDotacion::selectRaw('proyecto, SUM(cantidad) as total, SUM(CASE WHEN stock_minimo > 0 AND cantidad <= stock_minimo THEN 1 ELSE 0 END) as bajo_stock')
+            ->whereIn('proyecto', $this->proyectosPermitidos($request->user()))
             ->groupBy('proyecto')
             ->get();
 
@@ -195,6 +254,7 @@ class InventarioDotacionController extends Controller
     public function filtros(Request $request)
     {
         $base = fn () => InventarioDotacion::query()
+            ->whereIn('proyecto', $this->proyectosPermitidos($request->user()))
             ->when($request->filled('proyecto') && $request->proyecto !== 'Todos', fn ($q) => $q->where('proyecto', $request->proyecto))
             ->when($request->filled('sede_id') && $request->sede_id !== 'Todas', fn ($q) => $q->where('sede_id', $request->sede_id));
 
@@ -206,6 +266,16 @@ class InventarioDotacionController extends Controller
             ->distinct()->pluck('talla');
 
         return response()->json(['prendas' => $prendas, 'tallas' => $tallas]);
+    }
+
+    /** Mensaje de error si el usuario no puede gestionar ese proyecto de dotación, o null si sí puede. */
+    private function validarProyectoPermitido(?User $user, string $proyecto): ?string
+    {
+        if (!in_array($proyecto, $this->proyectosPermitidos($user), true)) {
+            return "No tiene permiso para gestionar el proyecto \"{$proyecto}\".";
+        }
+
+        return null;
     }
 
     public function store(Request $request)
@@ -220,6 +290,10 @@ class InventarioDotacionController extends Controller
             'cantidad'     => 'required|integer|min:0',
             'stock_minimo' => 'nullable|integer|min:0',
         ]);
+
+        if ($error = $this->validarProyectoPermitido($request->user(), $data['proyecto'])) {
+            return response()->json(['message' => $error], 403);
+        }
 
         if ($error = $this->validarSedeParaProyecto($data['sede_id'] ?? null, $data['proyecto'])) {
             return response()->json(['message' => $error], 422);
@@ -259,6 +333,9 @@ class InventarioDotacionController extends Controller
         ]);
 
         foreach ($request->items as $item) {
+            if ($error = $this->validarProyectoPermitido($request->user(), $item['proyecto'])) {
+                return response()->json(['message' => $error], 403);
+            }
             if ($error = $this->validarSedeParaProyecto($item['sede_id'] ?? null, $item['proyecto'])) {
                 return response()->json(['message' => $error], 422);
             }
@@ -302,6 +379,9 @@ class InventarioDotacionController extends Controller
         ]);
 
         foreach ($request->items as $item) {
+            if ($error = $this->validarProyectoPermitido($request->user(), $item['proyecto'])) {
+                return response()->json(['message' => $error], 403);
+            }
             if ($error = $this->validarSedeParaProyecto($item['sede_id'] ?? null, $item['proyecto'])) {
                 return response()->json(['message' => $error], 422);
             }
@@ -343,6 +423,10 @@ class InventarioDotacionController extends Controller
 
     public function update(Request $request, InventarioDotacion $inventarioDotacion)
     {
+        if ($error = $this->validarProyectoPermitido($request->user(), $inventarioDotacion->proyecto)) {
+            return response()->json(['message' => $error], 403);
+        }
+
         $data = $request->validate([
             'sede_id'      => 'nullable|integer|exists:sedes,id',
             'cantidad'     => 'required|integer|min:0',
@@ -365,8 +449,12 @@ class InventarioDotacionController extends Controller
         return response()->json($inventarioDotacion);
     }
 
-    public function destroy(InventarioDotacion $inventarioDotacion)
+    public function destroy(Request $request, InventarioDotacion $inventarioDotacion)
     {
+        if ($error = $this->validarProyectoPermitido($request->user(), $inventarioDotacion->proyecto)) {
+            return response()->json(['message' => $error], 403);
+        }
+
         $inventarioDotacion->delete();
         $this->olvidarCacheFlat();
         return response()->json(null, 204);

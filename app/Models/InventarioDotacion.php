@@ -19,7 +19,7 @@ class InventarioDotacion extends Model
     public const PROYECTO_DOTACION_A_PROYECTO = [
         'SYM TIGO EXPRESS'   => 'TIGO EXPRESS',
         'SYM TIGO HOME'      => 'TIGO HOME',
-        'SYM ADMINISTRATIVO' => 'ADMINISTRATIVO',
+        'SYM ADMINISTRATIVO' => 'ADMINISTRACION',
         'DIRECTV'            => 'DIRECTV CO',
     ];
 

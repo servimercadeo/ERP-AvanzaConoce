@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\CentroCostoCatalogo;
 use App\Models\Contrato;
+use App\Models\Empresa;
 use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use App\Services\EmpresaProyectoRules;
@@ -169,6 +170,21 @@ class ContratoController extends Controller
      * códigos repetidos dentro del mismo contrato, y exige que la suma de porcentajes no supere
      * 100%. Devuelve los items resueltos (con el nombre oficial del catálogo) listos para crear.
      */
+    /**
+     * Resuelve el id de `empresas` a partir del texto libre `contratos.empresa`, para
+     * mantener `users.empresa_id` sincronizado con la empresa del contrato vigente (lo usan,
+     * entre otros, los módulos de Empleados y el filtro por empresa del inventario de dotación).
+     */
+    private function resolverEmpresaId(?string $nombreEmpresa): ?int
+    {
+        if (!$nombreEmpresa) {
+            return null;
+        }
+
+        return Empresa::whereRaw('UPPER(TRIM(nombre)) = ?', [mb_strtoupper(trim($nombreEmpresa), 'UTF-8')])
+            ->value('id');
+    }
+
     private function validarYResolverCentrosCosto(array $items): array
     {
         if (empty($items)) {
@@ -432,6 +448,7 @@ class ContratoController extends Controller
                 'tipo_vinculacion'  => $contrato->tipo_vinculacion,
                 'empleador'         => $contrato->empleador,
                 'jefe_inmediato'    => $contrato->jefe_inmediato,
+                'empresa_id'        => $this->resolverEmpresaId($contrato->empresa),
             ]);
         }
 
@@ -554,6 +571,7 @@ class ContratoController extends Controller
                 'tipo_vinculacion'  => $result->tipo_vinculacion,
                 'empleador'         => $result->empleador,
                 'jefe_inmediato'    => $result->jefe_inmediato,
+                'empresa_id'        => $this->resolverEmpresaId($result->empresa),
             ]);
         }
 

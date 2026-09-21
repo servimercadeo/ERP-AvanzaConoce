@@ -26,17 +26,32 @@ class EmpresaProyectoRules
             return null;
         }
 
-        $empresaKey = mb_strtoupper(trim($empresa), 'UTF-8');
-        if (!isset(self::REGLAS[$empresaKey])) {
+        $permitidos = self::proyectosPermitidos($empresa);
+        if ($permitidos === null) {
             return null;
         }
 
         $proyectoKey = mb_strtoupper(trim($proyecto), 'UTF-8');
-        if (in_array($proyectoKey, self::REGLAS[$empresaKey], true)) {
+        if (in_array($proyectoKey, $permitidos, true)) {
             return null;
         }
 
-        $permitidos = implode(', ', self::REGLAS[$empresaKey]);
-        return "El proyecto \"{$proyecto}\" no es válido para la empresa \"{$empresa}\". Proyectos permitidos: {$permitidos}.";
+        $lista = implode(', ', $permitidos);
+        return "El proyecto \"{$proyecto}\" no es válido para la empresa \"{$empresa}\". Proyectos permitidos: {$lista}.";
+    }
+
+    /**
+     * Proyectos (nombre exacto de `proyectos`) permitidos para la empresa dada, o null si la
+     * empresa no está sujeta a esta regla (o no se indicó empresa) y por tanto no hay
+     * restricción: debe interpretarse como "todos los proyectos".
+     */
+    public static function proyectosPermitidos(?string $empresa): ?array
+    {
+        if (!$empresa) {
+            return null;
+        }
+
+        $empresaKey = mb_strtoupper(trim($empresa), 'UTF-8');
+        return self::REGLAS[$empresaKey] ?? null;
     }
 }
