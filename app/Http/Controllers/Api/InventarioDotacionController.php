@@ -98,7 +98,8 @@ class InventarioDotacionController extends Controller
             $query->where(fn ($q) => $q
                 ->where('prenda', 'like', $texto)
                 ->orWhere('genero', 'like', $texto)
-                ->orWhere('talla', 'like', $texto));
+                ->orWhere('talla', 'like', $texto)
+                ->orWhereHas('sede', fn ($q2) => $q2->where('nombre', 'like', $texto)));
         }
 
         return $query;

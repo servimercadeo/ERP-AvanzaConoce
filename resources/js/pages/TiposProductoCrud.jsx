@@ -9,14 +9,12 @@ import {
 
 const POR_PAGINA = 15;
 
-const CATEGORIAS_PRODUCTO = ["Activos", "Materiales", "Equipos", "Dotación", "EPP", "Herramientas"];
-
 const norm = (s = "") => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /* ─── Modal de creación / edición ──────────────────────────────────── */
-function FormModal({ open, onClose, onSave, editTarget }) {
+function FormModal({ open, onClose, onSave, editTarget, categoriasOpciones }) {
     const [nombre, setNombre] = useState("");
-    const [categoria, setCategoria] = useState(CATEGORIAS_PRODUCTO[0]);
+    const [categoria, setCategoria] = useState("");
     const [descripcion, setDescripcion] = useState("");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -24,11 +22,11 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     React.useEffect(() => {
         if (open) {
             setNombre(editTarget?.nombre ?? "");
-            setCategoria(editTarget?.categoria ?? CATEGORIAS_PRODUCTO[0]);
+            setCategoria(editTarget?.categoria ?? categoriasOpciones[0] ?? "");
             setDescripcion(editTarget?.descripcion ?? "");
             setError("");
         }
-    }, [open, editTarget]);
+    }, [open, editTarget, categoriasOpciones]);
 
     if (!open) return null;
 
@@ -72,7 +70,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                     <div style={S.formGroup}>
                         <label style={S.label}>Categoría *</label>
                         <select style={S.input} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                            {CATEGORIAS_PRODUCTO.map((c) => <option key={c} value={c}>{c}</option>)}
+                            {categoriasOpciones.map((c) => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
                     <div style={S.formGroup}>
@@ -136,6 +134,13 @@ export default function TiposProductoCrud() {
         queryKey: ["tipos-producto-admin"],
         queryFn: () => api.get("/tipos-producto").then((r) => r.data),
     });
+
+    const { data: categorias = [] } = useQuery({
+        queryKey: ["categorias-producto"],
+        queryFn: () => api.get("/categorias-producto").then((r) => r.data),
+        staleTime: 5 * 60 * 1000,
+    });
+    const categoriasOpciones = useMemo(() => categorias.map((c) => c.nombre), [categorias]);
 
     const filtered = useMemo(() => {
         const q = norm(debSearch);
@@ -225,7 +230,7 @@ export default function TiposProductoCrud() {
                     onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1); }}
                 >
                     <option value="Todas">Todas las categorías</option>
-                    {CATEGORIAS_PRODUCTO.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {categoriasOpciones.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <button className="btn-primary" onClick={handleCreate}>
                     + Nuevo Tipo de Producto
@@ -351,6 +356,7 @@ export default function TiposProductoCrud() {
             <FormModal
                 open={modalOpen}
                 editTarget={editTarget}
+                categoriasOpciones={categoriasOpciones}
                 onClose={() => setModalOpen(false)}
                 onSave={handleSave}
             />

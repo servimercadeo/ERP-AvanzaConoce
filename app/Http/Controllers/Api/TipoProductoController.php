@@ -26,7 +26,7 @@ class TipoProductoController extends Controller
     {
         $data = $request->validate([
             'nombre'      => 'required|string|max:150|unique:tipos_producto,nombre',
-            'categoria'   => 'required|string|in:' . implode(',', TipoProducto::CATEGORIAS),
+            'categoria'   => 'required|string|exists:categorias_producto,nombre',
             'descripcion' => 'nullable|string|max:255',
         ]);
 
@@ -44,7 +44,7 @@ class TipoProductoController extends Controller
     {
         $data = $request->validate([
             'nombre'      => 'required|string|max:150|unique:tipos_producto,nombre,' . $tipoProducto->id,
-            'categoria'   => 'required|string|in:' . implode(',', TipoProducto::CATEGORIAS),
+            'categoria'   => 'required|string|exists:categorias_producto,nombre',
             'descripcion' => 'nullable|string|max:255',
         ]);
 

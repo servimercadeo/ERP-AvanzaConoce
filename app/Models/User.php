@@ -86,6 +86,29 @@ class User extends Authenticatable
     }
 
     /**
+     * `email` suele quedar con el correo autogenerado "{cedula}@avanzaconoce.com" cuando
+     * no se registró un correo real al crear el contrato (ver ContratoController::store).
+     * En ese caso se busca el correo real en respuestas_ingresos / candidatos (igual que
+     * EmpleadoController::index() para mostrarlo en el listado). Si tampoco existe ahí,
+     * se devuelve null en vez del placeholder: no es una casilla real, no tiene sentido
+     * enviarle nada.
+     */
+    public function resolverEmailReal(): ?string
+    {
+        if (!$this->email) {
+            return null;
+        }
+
+        $cedula = $this->cedula ?? '';
+        if (!$cedula || !str_starts_with($this->email, $cedula . '@')) {
+            return $this->email;
+        }
+
+        return \App\Models\RespuestaIngreso::where('documento', $cedula)->value('correo')
+            ?? \Illuminate\Support\Facades\DB::table('candidatos')->where('identificacion', $cedula)->value('correo');
+    }
+
+    /**
      * Deriva automáticamente el rol (th/tic) a partir del cargo cada vez que
      * este cambia. Si el cargo no coincide con ningún patrón conocido, el rol
      * queda vacío (todavía no existen otros roles derivados de cargo). El rol

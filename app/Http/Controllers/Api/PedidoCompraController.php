@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PedidoCompra;
 use App\Models\TipoProducto;
+use App\Services\ActaPedidoCompraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,8 +14,50 @@ class PedidoCompraController extends Controller
     public function index()
     {
         return response()->json(
-            PedidoCompra::with('items')->orderBy('id', 'desc')->get()
+            PedidoCompra::with(['items.tipoProducto:id,nombre,categoria', 'asignadoA:id,name'])->orderBy('id', 'desc')->get()
         );
+    }
+
+    /**
+     * Asignación de Pedidos: quién queda a cargo de GESTIONAR este pedido (cotizar,
+     * comprar, hacer seguimiento) — no confundir con `responsable`, que es quién lo
+     * pidió. Solo se puede asignar una vez que la revisión de stock dejó al menos un
+     * producto listo para entregar (aprobado por stock o por traslado): antes de eso no
+     * hay nada que gestionar todavía. Al asignar a alguien por primera vez (o al
+     * reasignar), justo ahí se envía el Acta de Entrega consolidada al responsable del
+     * pedido con lo que ya quedó aprobado. Mandar `asignado_a_user_id: null` desasigna
+     * el pedido sin enviar nada.
+     */
+    public function asignar(Request $request, PedidoCompra $pedidoCompra)
+    {
+        $data = $request->validate([
+            'asignado_a_user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $nuevoAsignado = $data['asignado_a_user_id'] ?? null;
+
+        if ($nuevoAsignado) {
+            $tieneItemListo = $pedidoCompra->items()
+                ->whereIn('estado_revision', ['Aprobado por Stock', 'Traslado Aprobado'])
+                ->exists();
+
+            if (!$tieneItemListo) {
+                return response()->json([
+                    'message' => 'Primero revisa el stock de este pedido: todavía no tiene productos listos para entregar.',
+                ], 422);
+            }
+        }
+
+        $pedidoCompra->update(['asignado_a_user_id' => $nuevoAsignado]);
+
+        $acta = $nuevoAsignado
+            ? app(ActaPedidoCompraService::class)->enviarEntregaConsolidada($pedidoCompra->fresh(), $request->user()?->name ?? 'Sistema')
+            : null;
+
+        return response()->json(array_merge(
+            $pedidoCompra->fresh()->load(['items', 'asignadoA:id,name'])->toArray(),
+            ['acta' => $acta]
+        ));
     }
 
     public function store(Request $request)

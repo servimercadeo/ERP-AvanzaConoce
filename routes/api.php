@@ -186,7 +186,33 @@ Route::middleware('auth:sanctum')->group(function () {
     // Preferencias personales de apariencia por usuario
     Route::get('/user/preferences',  [UserPreferenceController::class, 'show']);
     Route::post('/user/preferences', [UserPreferenceController::class, 'update']);
-    Route::get('/user', fn(Request $r) => $r->user()->only('id', 'name', 'email', 'rol', 'sede_id'));
+    // "permisos_denegados" viaja con el usuario para que el frontend arme su propio menú
+    // sin una segunda petición: son las excepciones explícitas (módulo/submódulo) que se
+    // le ocultan a su rol desde el módulo Permisos. "admin" nunca tiene nada denegado.
+    // Catálogo simple de personas para asignar (Asignación de Pedidos / Asignación de
+    // Inventario): cualquier usuario activo del ERP, sin datos sensibles.
+    Route::get('/usuarios-catalogo', function () {
+        return response()->json(
+            App\Models\User::where('activo', true)
+                ->whereNotNull('name')->where('name', '!=', '')
+                ->orderBy('name')
+                ->get(['id', 'name', 'cargo'])
+        );
+    });
+
+    Route::get('/user', function (Request $r) {
+        $u = $r->user();
+        $rol = $u->rol;
+
+        return array_merge(
+            $u->only('id', 'name', 'email', 'rol', 'sede_id'),
+            [
+                'permisos_denegados' => (!$rol || $rol === 'admin')
+                    ? []
+                    : App\Models\PermisoDenegado::where('rol', $rol)->get(['modulo_id', 'submodulo_id']),
+            ]
+        );
+    });
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store']);
@@ -311,6 +337,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('tipos-producto', App\Http\Controllers\Api\TipoProductoController::class)
         ->parameters(['tipos-producto' => 'tipoProducto']);
 
+    // Catálogo de categorías de producto (Parametros > Categoría del Producto). Crear una
+    // categoría nueva aquí genera automáticamente su propio submódulo en Inventarios.
+    Route::apiResource('categorias-producto', App\Http\Controllers\Api\CategoriaProductoController::class)
+        ->parameters(['categorias-producto' => 'categoriaProducto']);
+
     // Catálogo de clases de pedido (Pedidos y Compras > Parametros > Clases de Pedidos)
     Route::apiResource('clases-pedido', App\Http\Controllers\Api\ClasePedidoController::class)
         ->parameters(['clases-pedido' => 'clasePedido']);
@@ -319,16 +350,50 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('conceptos-pedido', App\Http\Controllers\Api\ConceptoPedidoController::class)
         ->parameters(['conceptos-pedido' => 'conceptoPedido']);
 
+    // Catálogo de proveedores (Parametros > Proveedores)
+    Route::apiResource('proveedores', App\Http\Controllers\Api\ProveedorController::class)
+        ->parameters(['proveedores' => 'proveedor']);
+
+    // Catálogo de formas de pago (Parametros > Formas de Pago)
+    Route::apiResource('formas-pago', App\Http\Controllers\Api\FormaPagoController::class)
+        ->parameters(['formas-pago' => 'formaPago']);
+
+    // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
+    Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
+    Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);
+    Route::get('ordenes-compra/{ordenCompra}/pdf', [App\Http\Controllers\Api\OrdenCompraController::class, 'pdf']);
+    Route::apiResource('ordenes-compra', App\Http\Controllers\Api\OrdenCompraController::class)
+        ->parameters(['ordenes-compra' => 'ordenCompra'])
+        ->only(['index', 'show', 'store', 'destroy']);
+
     // Inventario por sede de las categorías de producto (Inventarios > Activos/Materiales/Equipos/EPP/Herramientas)
     Route::get('inventario-productos/resumen', [App\Http\Controllers\Api\InventarioProductoController::class, 'resumen']);
     Route::get('inventario-productos/sedes', [App\Http\Controllers\Api\InventarioProductoController::class, 'sedesDisponibles']);
+    Route::post('inventario-productos/importar', [App\Http\Controllers\Api\InventarioProductoController::class, 'importar']);
     Route::apiResource('inventario-productos', App\Http\Controllers\Api\InventarioProductoController::class)
         ->except(['show'])
         ->parameters(['inventario-productos' => 'inventarioProducto']);
 
+    // Asignación de Inventario: custodia de una unidad/cantidad por un empleado.
+    Route::apiResource('asignaciones-inventario', App\Http\Controllers\Api\AsignacionInventarioController::class)
+        ->only(['index', 'store'])
+        ->parameters(['asignaciones-inventario' => 'asignacionInventario']);
+    Route::post('asignaciones-inventario/{asignacionInventario}/devolver', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'devolver']);
+    Route::post('asignaciones-inventario/{asignacionInventario}/acta-entrega', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'actaEntrega']);
+
+    // Módulo Permisos: qué rol ve qué módulo/submódulo. Solo admin administra la matriz
+    // completa (el resto de usuarios solo recibe lo suyo, ya incluido en /user).
+    Route::middleware('role:admin')->group(function () {
+        Route::get('permisos', [App\Http\Controllers\Api\PermisoController::class, 'index']);
+        Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync']);
+    });
+
     // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)
     Route::apiResource('pedidos-compra', App\Http\Controllers\Api\PedidoCompraController::class)
         ->parameters(['pedidos-compra' => 'pedidoCompra']);
+
+    // Asignación de Pedidos: quién queda a cargo de gestionar cada pedido.
+    Route::patch('pedidos-compra/{pedidoCompra}/asignar', [App\Http\Controllers\Api\PedidoCompraController::class, 'asignar']);
 
     // Revisión manual de stock/traslado para pedidos de oficina (mismo criterio que
     // Dotación, ahora contra inventario_productos)
@@ -337,6 +402,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('pedido-compra-items/{pedidoCompraItem}/traslado', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'solicitarTraslado']);
     Route::post('pedido-compra-items/{pedidoCompraItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'enviarACompras']);
     Route::post('pedido-compra-items/{pedidoCompraItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'deshacerRevision']);
+    // El Acta de Entrega ya no tiene endpoint propio: se dispara sola al asignar el
+    // pedido a alguien en Asignación de Pedidos (ver PedidoCompraController::asignar()).
+    // acta-traslado abajo es solo para REENVIAR el acta de un traslado ya aprobado.
+    Route::post('pedido-compra-items/{pedidoCompraItem}/acta-traslado', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'actaTraslado']);
+
+    // Aprobación de Traslado (Inventario General): un traslado pedido en la revisión de
+    // stock de arriba queda "Pendiente Aprobación" hasta que se apruebe o rechace aquí;
+    // al aprobar recién se mueve el stock de verdad y se manda el Acta de Traslado.
+    Route::get('traslados-producto', [App\Http\Controllers\Api\TrasladoProductoController::class, 'index']);
+    Route::post('traslados-producto/{trasladoProducto}/aprobar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'aprobar']);
+    Route::post('traslados-producto/{trasladoProducto}/rechazar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'rechazar']);
 
     // Revisión manual de stock/traslado para pedidos de Dotación "Enviar a compras"
     // (Pedidos y Compras > Pedidos > Ver y Crear Pedidos, filas que vienen de Dotación)

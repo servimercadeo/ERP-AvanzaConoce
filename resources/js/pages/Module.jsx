@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
-import { ERP_MODULES, canAccessModule } from "../data/erpModules";
+import { canAccessModule, canAccessSubmodule, SUBMODULO_RAIZ } from "../data/erpModules";
+import { useErpModules } from "../hooks/useErpModules";
 import {
     MODULE_ICONS,
     IconFolder,
@@ -122,7 +123,8 @@ function resolveCrud(moduleId, archivoId) {
 export default function Module() {
     const { moduleId } = useParams();
     const { user } = useAuth();
-    const mod = ERP_MODULES.find((m) => m.id === moduleId);
+    const erpModules = useErpModules();
+    const mod = erpModules.find((m) => m.id === moduleId);
 
     /* ── Estado: pestaña activa (null = vista de submódulos) ── */
     const tieneArchivos = (mod?.archivos?.length ?? 0) > 0;
@@ -132,9 +134,10 @@ export default function Module() {
 
     /* ── Auto-selección: cuando cambia de módulo, abrir el 1er archivo ── */
     useEffect(() => {
-        const currentMod = ERP_MODULES.find((m) => m.id === moduleId);
+        const currentMod = erpModules.find((m) => m.id === moduleId);
         const primerArchivo = currentMod?.archivos?.[0]?.id ?? null;
         setTabActiva(primerArchivo);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [moduleId]);
 
     if (!mod) {
@@ -157,7 +160,12 @@ export default function Module() {
         return <Navigate to="/dashboard" replace />;
     }
 
-    const archivosDirectos = mod.archivos ?? [];
+    // Los archivos propios del módulo (sin submódulo, ej. "Empleados" en
+    // Administrativo) se gatean como un bloque aparte (SUBMODULO_RAIZ): puede que el
+    // módulo sea visible por tener un submódulo permitido, pero sus archivos propios
+    // estén denegados puntualmente.
+    const propiosVisibles = tieneArchivos && canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ);
+    const archivosDirectos = propiosVisibles ? (mod.archivos ?? []) : [];
     const archivoActual = archivosDirectos.find((a) => a.id === tabActiva);
     const CrudComponent = tabActiva ? resolveCrud(moduleId, tabActiva) : null;
 
@@ -352,11 +360,13 @@ export default function Module() {
                 {/* ══════════════════════════════════════════════════════
             SECCIÓN 2 — Submódulos como tarjetas (si los hay y NO hay archivos directos)
         ══════════════════════════════════════════════════════ */}
-                {mod.submods && mod.submods.length > 0 && !tieneArchivos && (
+                {mod.submods && mod.submods.length > 0 && !propiosVisibles && (
                     <div style={{ marginTop: 36 }}>
                         <p className="section-title">Submódulos</p>
                         <div className="mod-subgrid" id="submod-grid">
-                            {mod.submods.map((sub) => (
+                            {mod.submods
+                                .filter((sub) => canAccessSubmodule(user, mod.id, sub.id))
+                                .map((sub) => (
                                 <Link
                                     key={sub.id}
                                     className="submod-card"

@@ -15,12 +15,16 @@ class TrasladoProducto extends Model
         'sede_destino_id',
         'producto',
         'cantidad',
+        'seriales',
         'estado',
         'solicitado_por',
+        'aprobado_por',
+        'aprobado_en',
     ];
 
     protected $casts = [
-        'cantidad' => 'integer',
+        'cantidad'    => 'integer',
+        'aprobado_en' => 'datetime',
     ];
 
     public function pedido()

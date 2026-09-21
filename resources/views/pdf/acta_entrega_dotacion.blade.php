@@ -39,6 +39,7 @@
         table.items td.item { text-align: center; width: 30px; }
         table.items td.cantidad { text-align: center; width: 60px; }
         table.items td.tipo { text-align: center; width: 90px; }
+        table.items td.serial, table.items th.serial { text-align: center; width: 90px; }
 
         .manifiesta { font-weight: bold; font-size: 10px; margin: 14px 0 6px; }
         ul.condiciones { margin: 0 0 18px; padding-left: 16px; }
@@ -111,7 +112,10 @@
         <tr>
             <th class="item">Item</th>
             <th>Producto</th>
-            <th class="tipo">Tipo</th>
+            <th class="tipo">{{ $columnaExtra ?? 'Tipo' }}</th>
+            @if($mostrarColumnaSerial ?? false)
+                <th class="serial">Serial</th>
+            @endif
             <th class="cantidad">Cantidad</th>
         </tr>
         @foreach ($items as $i => $it)
@@ -119,6 +123,9 @@
                 <td class="item">{{ $i + 1 }}</td>
                 <td>{{ $it['producto'] }}</td>
                 <td class="tipo">{{ $it['tipo'] }}</td>
+                @if($mostrarColumnaSerial ?? false)
+                    <td class="serial">{{ $it['serial'] ?? '—' }}</td>
+                @endif
                 <td class="cantidad">{{ $it['cantidad'] }}</td>
             </tr>
         @endforeach
@@ -127,6 +134,9 @@
                 <td class="item">{{ $i + 1 }}</td>
                 <td>&nbsp;</td>
                 <td class="tipo">&nbsp;</td>
+                @if($mostrarColumnaSerial ?? false)
+                    <td class="serial">&nbsp;</td>
+                @endif
                 <td class="cantidad">&nbsp;</td>
             </tr>
         @endfor

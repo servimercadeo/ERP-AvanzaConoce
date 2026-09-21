@@ -24,6 +24,7 @@ class PedidoCompra extends Model
         'estado',
         'estado_compra',
         'registra',
+        'asignado_a_user_id',
     ];
 
     protected $casts = [
@@ -33,6 +34,11 @@ class PedidoCompra extends Model
     public function items()
     {
         return $this->hasMany(PedidoCompraItem::class);
+    }
+
+    public function asignadoA()
+    {
+        return $this->belongsTo(User::class, 'asignado_a_user_id');
     }
 
     public static function generarCodigo(): string

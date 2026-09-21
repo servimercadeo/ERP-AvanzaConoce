@@ -1,13 +1,32 @@
-// Módulos restringidos por rol: id del módulo -> roles permitidos.
-// Un módulo que no aparezca aquí es visible para cualquier usuario autenticado.
-export const MODULE_ROLES = {
-  administrativo: ['admin', 'th', 'tic'],
-};
+// Sentinel de submodulo_id para los archivos que cuelgan directo de un módulo, fuera de
+// cualquier submódulo (ej. "Empleados" dentro de "Administrativo").
+export const SUBMODULO_RAIZ = '_modulo';
 
+// Acceso por módulo/submódulo: lista de DENEGACIÓN administrada desde el módulo Permisos
+// (ver `user.permisos_denegados`, que llega con la sesión). Por defecto todo es visible;
+// una fila en `permisos_denegados` es la excepción que lo oculta para ese rol. "admin"
+// siempre tiene acceso total (nunca llega con nada denegado).
+export function canAccessSubmodule(user, moduleId, submoduleId) {
+  if (!user) return false;
+  if (user.rol === 'admin') return true;
+  const denegados = user.permisos_denegados ?? [];
+  return !denegados.some((p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId);
+}
+
+// Un módulo es visible si al menos uno de sus submódulos (o sus archivos propios, bajo
+// el sentinel SUBMODULO_RAIZ) lo es. Un módulo sin nada que gatear (sin submods ni
+// archivos propios) se muestra siempre.
 export function canAccessModule(user, moduleId) {
-  const allowed = MODULE_ROLES[moduleId];
-  if (!allowed) return true;
-  return allowed.includes(user?.rol);
+  const mod = ERP_MODULES.find((m) => m.id === moduleId);
+  if (!mod) return false;
+
+  const objetivos = [
+    ...(mod.submods ?? []).map((s) => s.id),
+    ...((mod.archivos?.length ?? 0) > 0 ? [SUBMODULO_RAIZ] : []),
+  ];
+  if (objetivos.length === 0) return true;
+
+  return objetivos.some((submoduleId) => canAccessSubmodule(user, moduleId, submoduleId));
 }
 
 export const ERP_MODULES = [
@@ -256,6 +275,25 @@ export const ERP_MODULES = [
           { id: 'inventario_herramientas', label: 'Inventario de Herramientas' },
         ]
       },
+      {
+        id: 'inv_general',
+        label: 'Inventario General',
+        icon: 'productos',
+        desc: 'Todo el inventario de productos por sede, filtrable por sede y categoría',
+        archivos: [
+          { id: 'inventario_general', label: 'Inventario General' },
+          { id: 'aprobacion_traslado_file', label: 'Aprobación de Traslado' },
+        ]
+      },
+      {
+        id: 'asignacion_inventario',
+        label: 'Asignación de Inventario',
+        icon: 'productos',
+        desc: 'Custodia de productos y equipos por empleado',
+        archivos: [
+          { id: 'asignacion_inventario_file', label: 'Asignación de Inventario' },
+        ]
+      },
       /*
       {
         id: 'consultas',
@@ -302,7 +340,17 @@ export const ERP_MODULES = [
         icon: 'compras',
         desc: 'Seguimiento de pedidos enviados a compras',
         archivos: [
-          { id: 'ver_compras', label: 'Compras' }
+          { id: 'ver_compras', label: 'Compras' },
+          { id: 'ver_crear_orden_compra', label: 'Ver y Crear Orden de Compra' }
+        ]
+      },
+      {
+        id: 'asignacion_pedidos',
+        label: 'Asignación de Pedidos',
+        icon: 'pedidos',
+        desc: 'Asignar quién gestiona cada pedido',
+        archivos: [
+          { id: 'asignacion_pedidos_file', label: 'Asignación de Pedidos' }
         ]
       },
       /*
@@ -434,6 +482,43 @@ export const ERP_MODULES = [
         desc: 'Catálogo de conceptos de pedido',
         archivos: [
           { id: 'conceptos_pedido_file', label: 'Conceptos de Pedidos' },
+        ]
+      },
+      {
+        id: 'categoria_producto',
+        label: 'Categoría del Producto',
+        icon: 'productos',
+        desc: 'Catálogo de categorías de producto. Crear una nueva genera su propio módulo en Inventarios',
+        archivos: [
+          { id: 'categoria_producto_file', label: 'Categoría del Producto' },
+        ]
+      },
+      {
+        id: 'proveedores',
+        label: 'Proveedores',
+        icon: 'empresas_cat',
+        desc: 'Catálogo de proveedores',
+        archivos: [
+          { id: 'proveedores_file', label: 'Proveedores' },
+        ]
+      }
+    ],
+    archivos: []
+  },
+  {
+    id: 'permisos',
+    label: 'Permisos',
+    icon: 'permisos',
+    color: '#6b21a8',
+    desc: 'Qué rol puede ver cada módulo y submódulo del sistema.',
+    submods: [
+      {
+        id: 'roles_permisos',
+        label: 'Roles y Permisos',
+        icon: 'permisos',
+        desc: 'Visibilidad de módulos y submódulos por rol',
+        archivos: [
+          { id: 'permisos_file', label: 'Roles y Permisos' },
         ]
       }
     ],

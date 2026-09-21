@@ -11,6 +11,7 @@ class InventarioProducto extends Model
     protected $fillable = [
         'tipo_producto_id',
         'sede_id',
+        'talla',
         'precio',
         'cantidad',
         'stock_minimo',
@@ -30,5 +31,15 @@ class InventarioProducto extends Model
     public function sede()
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function series()
+    {
+        return $this->hasMany(InventarioProductoSerie::class);
+    }
+
+    public function asignaciones()
+    {
+        return $this->hasMany(AsignacionInventario::class);
     }
 }

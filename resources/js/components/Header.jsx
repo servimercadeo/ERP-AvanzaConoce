@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { IconFile, MODULE_ICONS, IconFolder } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, NavLink } from 'react-router-dom';
-import { ERP_MODULES, canAccessModule } from '../data/erpModules';
+import { canAccessModule, canAccessSubmodule, SUBMODULO_RAIZ } from '../data/erpModules';
+import { useErpModules } from '../hooks/useErpModules';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const erpModules = useErpModules();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -37,7 +39,7 @@ export default function Header() {
       </Link>
 
       <nav className={`nav ${isMenuOpen ? 'mobile-active' : ''}`}>
-        {ERP_MODULES.filter(mod => canAccessModule(user, mod.id)).map(mod => (
+        {erpModules.filter(mod => canAccessModule(user, mod.id)).map(mod => (
           <div key={mod.id} className="nav-item">
             <NavLink className="nav-link" to={`/module/${mod.id}`}>
               {mod.icon && <span className="nav-icon">{React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 16 })}</span>}
@@ -47,7 +49,7 @@ export default function Header() {
             {(mod.submods?.length > 0 || mod.archivos?.length > 0) && (
               <div className="dropdown">
                 {mod.submods?.length > 0 ? (
-                  mod.submods.map(sub => (
+                  mod.submods.filter(sub => canAccessSubmodule(user, mod.id, sub.id)).map(sub => (
                     <div key={sub.id} className="dropdown-nested">
                       <Link to={`/module/${mod.id}/submodule/${sub.id}`}>
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
@@ -69,7 +71,7 @@ export default function Header() {
                     </div>
                   ))
                 ) : (
-                  mod.archivos?.map(archivo => (
+                  canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ) && mod.archivos?.map(archivo => (
                     <Link key={archivo.id} to={`/module/${mod.id}`}>
                       <span className="sub-icon"><IconFile size={14} /></span>
                       <span>{archivo.label}</span>

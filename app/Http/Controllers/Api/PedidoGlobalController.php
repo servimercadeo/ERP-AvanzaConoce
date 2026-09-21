@@ -7,7 +7,6 @@ use App\Mail\ActaEntregaDotacionMail;
 use App\Models\PedidoAutomatico;
 use App\Models\PedidoGlobal;
 use App\Models\Regional;
-use App\Models\RespuestaIngreso;
 use App\Models\User;
 use App\Services\ActaEntregaDotacionService;
 use Illuminate\Http\Request;
@@ -123,7 +122,7 @@ class PedidoGlobalController extends Controller
             $nombreEmpleado = $empleado
                 ? trim("{$empleado->nombres} {$empleado->apellidos}") ?: $empleado->name
                 : '—';
-            $correo = $this->resolverEmailReal($empleado);
+            $correo = $empleado?->resolverEmailReal();
 
             if (!$empleado || !$correo) {
                 $motivo = "El empleado del pedido {$pedido->codigo} no tiene correo real registrado.";
@@ -149,28 +148,10 @@ class PedidoGlobalController extends Controller
 
         return $resumen;
     }
-
-    /**
-     * users.email suele quedar con el correo autogenerado "{cedula}@avanzaconoce.com" cuando
-     * no se registró un correo real al crear el contrato (ver ContratoController::store). En
-     * ese caso, igual que hace EmpleadoController::index() para mostrarlo en el listado, se
-     * busca el correo real en respuestas_ingresos / candidatos. Si tampoco existe ahí, se
-     * devuelve null en vez del placeholder (no es una casilla real, no tiene sentido enviarle).
-     */
-    private function resolverEmailReal(?User $empleado): ?string
-    {
-        if (!$empleado || !$empleado->email) {
-            return null;
-        }
-
-        $cedula = $empleado->cedula ?? '';
-        if (!$cedula || !str_starts_with($empleado->email, $cedula . '@')) {
-            return $empleado->email;
-        }
-
-        return RespuestaIngreso::where('documento', $cedula)->value('correo')
-            ?? DB::table('candidatos')->where('identificacion', $cedula)->value('correo');
-    }
+    // El correo "real" (con el workaround del placeholder {cedula}@avanzaconoce.com)
+    // ahora vive en User::resolverEmailReal() — lo usan tanto este controlador como el
+    // de Pedidos de oficina (RevisionStockPedidoCompraController), así la regla de
+    // negocio queda en un solo sitio.
 
     public function destroy(PedidoGlobal $pedidoGlobal)
     {

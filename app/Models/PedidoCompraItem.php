@@ -15,6 +15,8 @@ class PedidoCompraItem extends Model
         'cantidad',
         'estado_revision',
         'observacion',
+        'seriales',
+        'orden_compra_id',
     ];
 
     public function pedido()
@@ -25,5 +27,10 @@ class PedidoCompraItem extends Model
     public function tipoProducto()
     {
         return $this->belongsTo(TipoProducto::class);
+    }
+
+    public function ordenCompra()
+    {
+        return $this->belongsTo(OrdenCompra::class);
     }
 }

@@ -8,6 +8,4 @@ class TipoProducto extends Model
 {
     protected $table = 'tipos_producto';
     protected $fillable = ['nombre', 'categoria', 'descripcion'];
-
-    public const CATEGORIAS = ['Activos', 'Materiales', 'Equipos', 'Dotación', 'EPP', 'Herramientas'];
 }

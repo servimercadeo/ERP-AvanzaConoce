@@ -111,6 +111,38 @@ export default function PedidosCrud() {
 
     const [observaciones, setObservaciones] = useState({});
     const [trasladoSede, setTrasladoSede] = useState({});
+    // Seriales elegidos por item al aprobar por stock (solo aplica si el producto tiene
+    // seriales registrados en la sede pedida) — { [item_id]: string[] }
+    const [seriesElegidas, setSeriesElegidas] = useState({});
+    const toggleSerie = (itemId, serial, maxElegibles) => {
+        setSeriesElegidas(prev => {
+            const actuales = prev[itemId] || [];
+            if (actuales.includes(serial)) {
+                return { ...prev, [itemId]: actuales.filter(s => s !== serial) };
+            }
+            if (actuales.length >= maxElegibles) return prev;
+            return { ...prev, [itemId]: [...actuales, serial] };
+        });
+    };
+
+    // Reenvío manual del Acta de Traslado de un producto YA APROBADO en Inventario
+    // General > Aprobación de Traslado (por si el correo se perdió). El envío
+    // automático ocurre una sola vez, al aprobar el traslado allá, no aquí. La Acta de
+    // Entrega tampoco se envía desde aquí: se dispara sola, consolidada por pedido, al
+    // asignar el pedido a alguien en Asignación de Pedidos.
+    const enviarActaTraslado = async (itemId) => {
+        if (revisionPedido.origen === "dotacion") return;
+        try {
+            const { data } = await api.post(`/pedido-compra-items/${itemId}/acta-traslado`);
+            if (data.enviada) {
+                showToast(`Acta de traslado enviada a ${data.destinatario}.`);
+            } else {
+                showToast(`No se pudo enviar el acta por correo: ${data.motivo}`, "error");
+            }
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo enviar el acta.", "error");
+        }
+    };
 
     const handleMarcarStockLocal = async (itemId) => {
         const observacion = (observaciones[itemId] || "").trim();
@@ -120,7 +152,10 @@ export default function PedidosCrud() {
         }
         setAccionandoItemId(itemId);
         try {
-            await api.post(`${endpointItemBase(itemId)}/stock-local`, { observacion });
+            await api.post(`${endpointItemBase(itemId)}/stock-local`, {
+                observacion,
+                seriales: seriesElegidas[itemId] || [],
+            });
             invalidateRevision();
             showToast("Producto aprobado por stock.");
         } catch (err) {
@@ -142,7 +177,12 @@ export default function PedidosCrud() {
                 cantidad,
             });
             invalidateRevision();
-            showToast("Traslado solicitado y stock movido.");
+            showToast(
+                revisionPedido.origen === "dotacion"
+                    ? "Traslado solicitado y stock movido. Enviando el acta de traslado por correo…"
+                    : "Traslado solicitado. Queda pendiente de aprobación en Inventario General antes de mover el stock y enviar el acta."
+            );
+            if (revisionPedido.origen === "dotacion") enviarActaTraslado(itemId);
         } catch (err) {
             showToast(err?.response?.data?.message ?? "No se pudo solicitar el traslado.", "error");
         } finally {
@@ -240,13 +280,19 @@ export default function PedidosCrud() {
 
     // --- Listado combinado: pedidos locales + pedidos reales de Dotación enviados a compras ---
     const pedidosLocalAdaptados = useMemo(
-        () => pedidos.map(p => ({
-            ...p,
-            // Mismo criterio que en Dotación: el check "Enviar a Compras" solo se
-            // habilita cuando la revisión de al menos un producto concluyó que no
-            // hay stock en ninguna sede (el backend también lo valida).
-            puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
-        })),
+        () => pedidos.map(p => {
+            const categorias = [...new Set((p.items ?? []).map(it => it.tipo_producto?.categoria).filter(Boolean))];
+            return {
+                ...p,
+                // Mismo criterio que en Dotación: el check "Enviar a Compras" solo se
+                // habilita cuando la revisión de al menos un producto concluyó que no
+                // hay stock en ninguna sede (el backend también lo valida).
+                puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
+                // Categoría de los productos del pedido, para mostrarla bajo el código
+                // (si trae productos de varias categorías, se marca como "Mixto").
+                categoria: categorias.length === 1 ? categorias[0] : (categorias.length > 1 ? "Mixto" : null),
+            };
+        }),
         [pedidos]
     );
 
@@ -789,9 +835,13 @@ export default function PedidosCrud() {
                                         </td>
                                         <td style={{ fontWeight: 800, fontFamily: "monospace" }}>
                                             {p.codigo}
-                                            {p.origen === "dotacion" && (
+                                            {p.origen === "dotacion" ? (
                                                 <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#6b21a8", letterSpacing: "0.04em", marginTop: 2 }}>
                                                     DOTACIÓN
+                                                </div>
+                                            ) : p.categoria && (
+                                                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#0f766e", letterSpacing: "0.04em", marginTop: 2 }}>
+                                                    {p.categoria.toUpperCase()}
                                                 </div>
                                             )}
                                         </td>
@@ -1119,10 +1169,10 @@ export default function PedidosCrud() {
                                                 {resuelto && (
                                                     <span style={{
                                                         fontSize: "0.75rem", fontWeight: 800, padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap",
-                                                        background: it.estado_revision === "Enviado a Compras" ? "#fef3c7" : "#dcfce7",
-                                                        color: it.estado_revision === "Enviado a Compras" ? "#92400e" : "#15803d",
+                                                        background: it.estado_revision === "Traslado Solicitado" ? "#fef3c7" : (it.estado_revision === "Enviado a Compras" ? "#fef3c7" : "#dcfce7"),
+                                                        color: it.estado_revision === "Traslado Solicitado" ? "#92400e" : (it.estado_revision === "Enviado a Compras" ? "#92400e" : "#15803d"),
                                                     }}>
-                                                        {it.estado_revision}
+                                                        {it.estado_revision === "Traslado Solicitado" ? "Traslado: pendiente de aprobación" : it.estado_revision}
                                                     </span>
                                                 )}
                                             </div>
@@ -1134,13 +1184,28 @@ export default function PedidosCrud() {
                                                             Observación: {it.observacion}
                                                         </div>
                                                     )}
-                                                    <button
-                                                        style={{ ...S.btnSecondary, fontSize: '0.8rem', padding: '5px 12px', opacity: disabledAccion ? 0.5 : 1 }}
-                                                        disabled={disabledAccion}
-                                                        onClick={() => handleDeshacerRevision(it.item_id)}
-                                                    >
-                                                        Deshacer revisión
-                                                    </button>
+                                                    {revisionPedido.origen !== "dotacion" && it.estado_revision === "Traslado Solicitado" && (
+                                                        <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: 10 }}>
+                                                            Falta que lo aprueben en Inventario General &gt; Aprobación de Traslado: ahí se mueve el stock y se manda el acta.
+                                                        </div>
+                                                    )}
+                                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                        {revisionPedido.origen !== "dotacion" && it.estado_revision === "Traslado Aprobado" && (
+                                                            <button
+                                                                style={{ ...S.btnSecondary, fontSize: '0.8rem', padding: '5px 12px' }}
+                                                                onClick={() => enviarActaTraslado(it.item_id)}
+                                                            >
+                                                                Reenviar acta de traslado por correo
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            style={{ ...S.btnSecondary, fontSize: '0.8rem', padding: '5px 12px', opacity: disabledAccion ? 0.5 : 1 }}
+                                                            disabled={disabledAccion}
+                                                            onClick={() => handleDeshacerRevision(it.item_id)}
+                                                        >
+                                                            Deshacer revisión
+                                                        </button>
+                                                    </div>
                                                 </>
                                             )}
 
@@ -1150,13 +1215,37 @@ export default function PedidosCrud() {
                                                         {/* Opción 1: Aprobado por Stock (solo si de verdad alcanza en la sede pedida) */}
                                                         {(() => {
                                                             const hayStockPropio = (it.sede_pedido?.cantidad ?? 0) >= it.cantidad;
-                                                            const bloqueado = !hayStockPropio || disabledAccion;
+                                                            const seriesDisponibles = it.sede_pedido?.series ?? [];
+                                                            const esSerializado = seriesDisponibles.length > 0;
+                                                            const esperados = Math.min(it.cantidad, seriesDisponibles.length);
+                                                            const elegidos = seriesElegidas[it.item_id] || [];
+                                                            const faltanSeries = esSerializado && elegidos.length !== esperados;
+                                                            const bloqueado = !hayStockPropio || disabledAccion || faltanSeries;
                                                             return (
                                                                 <div style={{ ...S.opcionCard, opacity: hayStockPropio ? 1 : 0.55 }}>
                                                                     <div style={S.opcionTitulo}>Aprobado por Stock</div>
                                                                     {!hayStockPropio && (
                                                                         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a33', marginBottom: 8 }}>
                                                                             No hay stock suficiente en {it.sede_pedido?.nombre ?? "esta sede"} ({it.sede_pedido?.cantidad ?? 0} de {it.cantidad}). Usa un traslado o envía a Compras.
+                                                                        </div>
+                                                                    )}
+                                                                    {hayStockPropio && esSerializado && (
+                                                                        <div style={{ marginBottom: 8 }}>
+                                                                            <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 4 }}>
+                                                                                Elige {esperados} serial(es) ({elegidos.length}/{esperados}):
+                                                                            </div>
+                                                                            <div style={{ maxHeight: 110, overflowY: 'auto', border: '1.5px solid var(--border)', borderRadius: 6, padding: 6 }}>
+                                                                                {seriesDisponibles.map(serial => (
+                                                                                    <label key={serial} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', padding: '2px 0', cursor: 'pointer', fontFamily: 'monospace' }}>
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={elegidos.includes(serial)}
+                                                                                            onChange={() => toggleSerie(it.item_id, serial, esperados)}
+                                                                                        />
+                                                                                        {serial}
+                                                                                    </label>
+                                                                                ))}
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                     <input
@@ -1221,7 +1310,7 @@ export default function PedidosCrud() {
                                                             disabled={disabledAccion}
                                                             onClick={() => handleEnviarComprasItem(it.item_id)}
                                                         >
-                                                            No hay stock en ninguna sede — Enviar a Compras
+                                                            Enviar a Compras (cuando se requiere elemento nuevo)
                                                         </button>
                                                     </div>
                                                 </>
