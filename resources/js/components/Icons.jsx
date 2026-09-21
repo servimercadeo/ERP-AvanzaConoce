@@ -599,6 +599,7 @@ export const MODULE_ICONS = {
   parametros:              IconParametros,
   usuarios:                IconUsuarios,
   liquidacion_comisiones:  IconLiquidacion,
+  permisos:                IconLock,
 
   /* submodules */
   subagentes:              IconSubagentes,

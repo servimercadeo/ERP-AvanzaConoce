@@ -2,7 +2,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { ERP_MODULES, canAccessModule } from '../data/erpModules';
+import { canAccessModule, canAccessSubmodule } from '../data/erpModules';
+import { useErpModules } from '../hooks/useErpModules';
 import { MODULE_ICONS, IconFolder, IconUnderConstruction, IconLoading } from '../components/Icons';
 
 // ── Importa aquí los CRUD de cada archivo (carga diferida: cada uno se
@@ -26,9 +27,24 @@ const EmpresasCrud = lazy(() => import('./EmpresasCrud'));
 const RegionalesCrud = lazy(() => import('./RegionalesCrud'));
 const ProyectosCrud = lazy(() => import('./ProyectosCrud'));
 const PedidosCrud = lazy(() => import('./PedidosCrud'));
+const ComprasCrud = lazy(() => import('./ComprasCrud'));
+const OrdenCompraCrud = lazy(() => import('./OrdenCompraCrud'));
 const TiposProductoCrud = lazy(() => import('./TiposProductoCrud'));
 const ClasesPedidoCrud = lazy(() => import('./ClasesPedidoCrud'));
 const ConceptosPedidoCrud = lazy(() => import('./ConceptosPedidoCrud'));
+const InventarioActivosCrud = lazy(() => import('./InventarioActivosCrud'));
+const InventarioMaterialesCrud = lazy(() => import('./InventarioMaterialesCrud'));
+const InventarioEquiposCrud = lazy(() => import('./InventarioEquiposCrud'));
+const InventarioEppCrud = lazy(() => import('./InventarioEppCrud'));
+const InventarioHerramientasCrud = lazy(() => import('./InventarioHerramientasCrud'));
+const InventarioGeneralCrud = lazy(() => import('./InventarioGeneralCrud'));
+const InventarioCategoriaCrud = lazy(() => import('./InventarioCategoriaCrud'));
+const PermisosCrud = lazy(() => import('./PermisosCrud'));
+const AsignacionPedidosCrud = lazy(() => import('./AsignacionPedidosCrud'));
+const AsignacionInventarioCrud = lazy(() => import('./AsignacionInventarioCrud'));
+const AprobacionTrasladoCrud = lazy(() => import('./AprobacionTrasladoCrud'));
+const CategoriaProductoCrud = lazy(() => import('./CategoriaProductoCrud'));
+const ProveedoresCrud = lazy(() => import('./ProveedoresCrud'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -45,7 +61,7 @@ const ConceptosPedidoCrud = lazy(() => import('./ConceptosPedidoCrud'));
  * Retorna el componente CRUD o null.
  * Descomenta / agrega cases a medida que construyas cada CRUD.
  */
-function resolveSubCrud(moduleId, submoduleId, archivoId) {
+function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
   switch (moduleId) {
 
     /* ── ADMINISTRATIVO ─────────────────────────────────── */
@@ -108,6 +124,42 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'cronograma':         return CronogramaDotacion;
             default: return null;
           }
+        case 'inv_activos':
+          switch (archivoId) {
+            case 'inventario_activos': return InventarioActivosCrud;
+            default: return null;
+          }
+        case 'inv_materiales':
+          switch (archivoId) {
+            case 'inventario_materiales': return InventarioMaterialesCrud;
+            default: return null;
+          }
+        case 'inv_equipos':
+          switch (archivoId) {
+            case 'inventario_equipos': return InventarioEquiposCrud;
+            default: return null;
+          }
+        case 'inv_epp':
+          switch (archivoId) {
+            case 'inventario_epp': return InventarioEppCrud;
+            default: return null;
+          }
+        case 'inv_herramientas':
+          switch (archivoId) {
+            case 'inventario_herramientas': return InventarioHerramientasCrud;
+            default: return null;
+          }
+        case 'inv_general':
+          switch (archivoId) {
+            case 'inventario_general': return InventarioGeneralCrud;
+            case 'aprobacion_traslado_file': return AprobacionTrasladoCrud;
+            default: return null;
+          }
+        case 'asignacion_inventario':
+          switch (archivoId) {
+            case 'asignacion_inventario_file': return AsignacionInventarioCrud;
+            default: return null;
+          }
         case 'productos':
           switch (archivoId) {
             // case 'productos_file':         return ProductosCrud;
@@ -115,7 +167,14 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             // case 'tipo_producto':          return TipoProductoCrud;
             default: return null;
           }
-        default: return null;
+        default:
+          // Submódulo generado automáticamente por una categoría nueva creada en
+          // Parametros > Categoría del Producto (ver useErpModules.js): mismo
+          // componente genérico que Activos/Materiales/etc., apuntando a su categoría.
+          if (sub?.categoriaDinamica && archivoId === sub.archivos?.[0]?.id) {
+            return InventarioCategoriaCrud;
+          }
+          return null;
       }
 
     /* ── PEDIDOS Y COMPRAS ──────────────────────────────── */
@@ -128,7 +187,13 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
           }
         case 'compras':
           switch (archivoId) {
-            // case 'ver_crear_orden': return OrdenCompraCrud;
+            case 'ver_compras': return ComprasCrud;
+            case 'ver_crear_orden_compra': return OrdenCompraCrud;
+            default: return null;
+          }
+        case 'asignacion_pedidos':
+          switch (archivoId) {
+            case 'asignacion_pedidos_file': return AsignacionPedidosCrud;
             default: return null;
           }
         default: return null;
@@ -260,6 +325,16 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
             case 'conceptos_pedido_file': return ConceptosPedidoCrud;
             default: return null;
           }
+        case 'categoria_producto':
+          switch (archivoId) {
+            case 'categoria_producto_file': return CategoriaProductoCrud;
+            default: return null;
+          }
+        case 'proveedores':
+          switch (archivoId) {
+            case 'proveedores_file': return ProveedoresCrud;
+            default: return null;
+          }
         case 'par_generales':
         case 'par_administrativos':
         case 'par_comerciales_tecnicos':
@@ -276,6 +351,17 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
         default: return null;
       }
 
+    /* ── PERMISOS ───────────────────────────────────────── */
+    case 'permisos':
+      switch (submoduleId) {
+        case 'roles_permisos':
+          switch (archivoId) {
+            case 'permisos_file': return PermisosCrud;
+            default: return null;
+          }
+        default: return null;
+      }
+
     default:
       return null;
   }
@@ -286,7 +372,8 @@ function resolveSubCrud(moduleId, submoduleId, archivoId) {
 export default function Submodule() {
   const { moduleId, submoduleId, archivoId } = useParams();
   const { user } = useAuth();
-  const mod = ERP_MODULES.find(m => m.id === moduleId);
+  const erpModules = useErpModules();
+  const mod = erpModules.find(m => m.id === moduleId);
   const sub = mod ? mod.submods.find(s => s.id === submoduleId) : null;
 
   /* Pestaña activa: por defecto la primera */
@@ -316,13 +403,13 @@ export default function Submodule() {
     );
   }
 
-  if (!canAccessModule(user, mod.id)) {
+  if (!canAccessModule(user, mod.id) || !canAccessSubmodule(user, mod.id, sub.id)) {
     return <Navigate to="/dashboard" replace />;
   }
 
   const archivos       = sub.archivos ?? [];
   const archivoActual  = archivos.find(a => a.id === tabActiva);
-  const CrudComponent  = tabActiva ? resolveSubCrud(moduleId, submoduleId, tabActiva) : null;
+  const CrudComponent  = tabActiva ? resolveSubCrud(moduleId, submoduleId, tabActiva, sub) : null;
 
   return (
     <Layout>
@@ -397,7 +484,7 @@ export default function Submodule() {
                 </p>
               </div>
               <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
-                <CrudComponent />
+                <CrudComponent categoria={sub.categoriaDinamica} />
               </Suspense>
             </>
           ) : (
