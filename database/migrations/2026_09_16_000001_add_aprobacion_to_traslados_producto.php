@@ -24,7 +24,7 @@ return new class extends Migration
             }
         });
 
-        DB::statement("ALTER TABLE traslados_producto MODIFY estado VARCHAR(30) NOT NULL DEFAULT 'Pendiente Aprobación'");
+        DB::statement("ALTER TABLE `" . DB::getTablePrefix() . "traslados_producto` MODIFY estado VARCHAR(30) NOT NULL DEFAULT 'Pendiente Aprobación'");
     }
 
     public function down(): void
@@ -38,6 +38,6 @@ return new class extends Migration
             }
         });
 
-        DB::statement("ALTER TABLE traslados_producto MODIFY estado VARCHAR(30) NOT NULL DEFAULT 'Completado'");
+        DB::statement("ALTER TABLE `" . DB::getTablePrefix() . "traslados_producto` MODIFY estado VARCHAR(30) NOT NULL DEFAULT 'Completado'");
     }
 };

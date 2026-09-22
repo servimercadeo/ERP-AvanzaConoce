@@ -7,11 +7,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE inventario_dotacion ALTER COLUMN proyecto SET DEFAULT 'SYM ADMINISTRATIVO'");
+        $prefix = DB::getTablePrefix();
+        DB::statement("ALTER TABLE `{$prefix}inventario_dotacion` ALTER COLUMN proyecto SET DEFAULT 'SYM ADMINISTRATIVO'");
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE inventario_dotacion ALTER COLUMN proyecto SET DEFAULT 'TIGO EXPRESS'");
+        $prefix = DB::getTablePrefix();
+        DB::statement("ALTER TABLE `{$prefix}inventario_dotacion` ALTER COLUMN proyecto SET DEFAULT 'TIGO EXPRESS'");
     }
 };
