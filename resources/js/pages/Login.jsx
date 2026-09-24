@@ -1,20 +1,40 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+
+// Códigos que SsoController envía en ?sso_error= cuando rechaza el acceso desde AvanzaConoce.
+const SSO_ERRORES = {
+    sin_acceso:
+        "Aún no tienes acceso a este ERP. Solicita a tu administrador que cree tu usuario.",
+    token_invalido:
+        "El enlace de acceso desde AvanzaConoce es inválido o expiró. Vuelve a intentarlo desde AvanzaConoce.",
+    token_ausente:
+        "No se recibió el enlace de acceso desde AvanzaConoce. Vuelve a intentarlo desde AvanzaConoce.",
+};
 
 export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [step, setStep] = useState("email");
     const [email, setEmail] = useState("");
     const [userName, setUserName] = useState("");
     const [password, setPassword] = useState("");
-    const [error, setError] = useState(null);
+    const [error, setError] = useState(
+        () => SSO_ERRORES[searchParams.get("sso_error")] ?? null,
+    );
     const [loading, setLoading] = useState(false);
 
     const passwordRef = useRef(null);
+
+    // Limpiamos ?sso_error de la URL para que el mensaje no reaparezca al recargar.
+    useEffect(() => {
+        if (searchParams.has("sso_error")) {
+            setSearchParams({}, { replace: true });
+        }
+    }, []);
 
     useEffect(() => {
         if (step === "password" && passwordRef.current) {

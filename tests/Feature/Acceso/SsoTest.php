@@ -44,13 +44,21 @@ class SsoTest extends TestCase
 
     public function test_login_sso_rechaza_token_ausente_invalido_o_de_usuario_inactivo(): void
     {
-        $this->get('/sso/login')->assertRedirect('/');
-        $this->get('/sso/login?token=basura')->assertRedirect('/');
+        $this->get('/sso/login')->assertRedirect('/login?sso_error=token_ausente');
+        $this->get('/sso/login?token=basura')->assertRedirect('/login?sso_error=token_invalido');
         $this->assertGuest();
 
         $this->usuario('th', ['email' => 'inactivo@test.co', 'activo' => false]);
         $token = app(SsoService::class)->generarToken('inactivo@test.co', 9);
-        $this->get('/sso/login?token=' . $token)->assertRedirect('/');
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/login?sso_error=sin_acceso');
+        $this->assertGuest();
+    }
+
+    public function test_login_sso_de_usuario_no_creado_en_el_erp_indica_sin_acceso(): void
+    {
+        $token = app(SsoService::class)->generarToken('nuevo@test.co', 11);
+
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/login?sso_error=sin_acceso');
         $this->assertGuest();
     }
 
@@ -59,7 +67,7 @@ class SsoTest extends TestCase
         $this->usuario('th', ['email' => 'falso@test.co']);
         $malo = JWT::encode(['email' => 'falso@test.co', 'exp' => time() + 60], 'otro-secreto-completamente-distinto-1234', 'HS256');
 
-        $this->get('/sso/login?token=' . $malo)->assertRedirect('/');
+        $this->get('/sso/login?token=' . $malo)->assertRedirect('/login?sso_error=token_invalido');
         $this->assertGuest();
     }
 
@@ -68,7 +76,7 @@ class SsoTest extends TestCase
         $this->usuario('th', ['email' => 'viejo@test.co']);
         $expirado = JWT::encode(['email' => 'viejo@test.co', 'exp' => time() - 10], self::SECRETO, 'HS256');
 
-        $this->get('/sso/login?token=' . $expirado)->assertRedirect('/');
+        $this->get('/sso/login?token=' . $expirado)->assertRedirect('/login?sso_error=token_invalido');
         $this->assertGuest();
     }
 
