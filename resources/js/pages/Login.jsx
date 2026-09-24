@@ -6,7 +6,7 @@ import api from "../api/axios";
 // Códigos que SsoController envía en ?sso_error= cuando rechaza el acceso desde AvanzaConoce.
 const SSO_ERRORES = {
     sin_acceso:
-        "Aún no tienes acceso a este ERP. Solicita a tu administrador que cree tu usuario.",
+        "Aún no tienes acceso a este ERP. Solicita acceso a tu administrador.",
     token_invalido:
         "El enlace de acceso desde AvanzaConoce es inválido o expiró. Vuelve a intentarlo desde AvanzaConoce.",
     token_ausente:
