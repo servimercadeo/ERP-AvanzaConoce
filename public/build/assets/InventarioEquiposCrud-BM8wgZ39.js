@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-query-qy_ppomC.js";import o from"./InventarioCategoriaCrud-VuzkK3CF.js";import"./app-CGNBNwwJ.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-B-jc0xGc.js";function u(){return r.jsx(o,{categoria:"Equipos"})}export{u as default};
