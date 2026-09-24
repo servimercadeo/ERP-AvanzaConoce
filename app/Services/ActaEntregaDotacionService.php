@@ -49,17 +49,13 @@ class ActaEntregaDotacionService
     /**
      * "SERVIMERCADEO" o "SYM" según la empresa del contrato que originó el pedido
      * (con reglas.empresa registrada en pedidos_automaticos->contrato), o la empresa
-     * actual del empleado si el pedido no tiene contrato asociado. Sin dato, se asume
-     * SERVIMERCADEO (comportamiento previo, cuando el texto estaba fijo).
+     * actual del empleado si el pedido no tiene contrato asociado. Mismo criterio que
+     * el resto de actas del sistema, ver EmpresaLetterheadResolver.
      */
     public function resolverEmpresa(PedidoAutomatico $pedido): string
     {
         $nombre = $pedido->contrato?->empresa ?: $pedido->empleado?->empresa?->nombre;
 
-        if (!$nombre) {
-            return 'SERVIMERCADEO';
-        }
-
-        return str_contains(mb_strtoupper($nombre, 'UTF-8'), 'SERVICIOS') ? 'SYM' : 'SERVIMERCADEO';
+        return EmpresaLetterheadResolver::resolver($nombre);
     }
 }

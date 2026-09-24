@@ -5,8 +5,6 @@ import { ERP_MODULES, SUBMODULO_RAIZ } from "../data/erpModules";
 import { MODULE_ICONS, IconFolder, IconLoading } from "../components/Icons";
 
 const ROLES = [
-    { value: "gestor", label: "Gestor" },
-    { value: "consultor", label: "Consultor" },
     { value: "th", label: "Talento Humano" },
     { value: "tic", label: "TIC / Sistemas" },
 ];

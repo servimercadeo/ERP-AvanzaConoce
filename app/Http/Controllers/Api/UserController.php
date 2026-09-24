@@ -25,7 +25,7 @@ class UserController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => ['required', Password::min(8)],
-            'rol'      => 'sometimes|in:admin,gestor,consultor',
+            'rol'      => 'sometimes|in:admin,gestor,consultor,th,tic',
         ]);
 
         $usuario = $this->sync->crearEnErpYSincronizar($data);

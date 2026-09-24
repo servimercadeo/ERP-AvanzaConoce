@@ -6,6 +6,7 @@ import {
     PresetFiltersDropdown,
 } from "../components/SearchableSelect";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import {
     IconSearch,
     IconEye,
@@ -639,8 +640,13 @@ function Modal({
     empresasOpts = [],
     centrosCostoCatalogo = [],
     readOnly = false,
+    restringirVistaSensible = false,
     onFotografiaUpdated,
 }) {
+    // Solo aplica en modo "Ver" (nunca al crear/editar, que ya requiere permiso de
+    // Contratos aparte): oculta salario, seguridad social, costos/anexos y datos
+    // médicos para roles sin acceso a esa información.
+    const ocultarSensible = readOnly && restringirVistaSensible;
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
@@ -1202,13 +1208,16 @@ function Modal({
                 )}
 
                 <div className="tab-bar" style={S.tabBar}>
-                    {[
-                        ["principal",         "Información Principal"],
-                        ["seguridad",         "Seguridad Social"],
-                        ["costos",            "Costos y Anexos"],
-                        ["Seguimiento_medico","Seguimiento Médico"],
-                        ["doc_medicos",       "Documentos Médicos"],
-                    ].map(([key, lbl]) => (
+                    {(ocultarSensible
+                        ? [["principal", "Información Principal"]]
+                        : [
+                            ["principal",         "Información Principal"],
+                            ["seguridad",         "Seguridad Social"],
+                            ["costos",            "Costos y Anexos"],
+                            ["Seguimiento_medico","Seguimiento Médico"],
+                            ["doc_medicos",       "Documentos Médicos"],
+                        ]
+                    ).map(([key, lbl]) => (
                         <button
                             key={key}
                             style={activeTab === key ? S.tabActive : S.tab}
@@ -1326,21 +1335,23 @@ function Modal({
                                 />
                                 <div />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
-                                <Field
-                                    label="Salario"
-                                    k="salario"
-                                    type="number"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Auxilio Transp. Legal"
-                                    k="auxilio_transporte_legal"
-                                    type="number"
-                                    {...fp}
-                                />
-                                <div />
-                            </div>
+                            {!ocultarSensible && (
+                                <div style={{ ...S.grid3, marginTop: 16 }}>
+                                    <Field
+                                        label="Salario"
+                                        k="salario"
+                                        type="number"
+                                        {...fp}
+                                    />
+                                    <Field
+                                        label="Auxilio Transp. Legal"
+                                        k="auxilio_transporte_legal"
+                                        type="number"
+                                        {...fp}
+                                    />
+                                    <div />
+                                </div>
+                            )}
                             <div style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Empleador"
@@ -2291,6 +2302,11 @@ function Modal({
 
 export default function ContratosCrud() {
     const qc = useQueryClient();
+    // Salario, seguridad social, costos/anexos y datos médicos son sensibles: solo
+    // Talento Humano (y admin) los ve en "Ver Contrato". Los demás roles (gestor,
+    // consultor, tic) solo ven una pestaña reducida de información personal.
+    const { user } = useAuth();
+    const puedeVerInfoSensible = user?.rol === "th" || user?.rol === "admin";
     const [contratos, setContratos] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -2843,7 +2859,6 @@ export default function ContratosCrud() {
                                 <th>Sede</th>
                                 <th>Tipo</th>
                                 <th>Ingreso</th>
-                                <th>Salario</th>
                                 <th>Estado</th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
@@ -2904,9 +2919,6 @@ export default function ContratosCrud() {
                                     </td>
                                     <td>{c.tipo_contrato}</td>
                                     <td>{dateOnly(c.fecha_ingreso)}</td>
-                                    <td>
-                                        ${Number(c.salario).toLocaleString()}
-                                    </td>
                                     <td>
                                         <span
                                             style={S.badge(
@@ -3374,6 +3386,7 @@ export default function ContratosCrud() {
                 empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
+                restringirVistaSensible={!puedeVerInfoSensible}
                 onFotografiaUpdated={(empleadoId, fotografia) =>
                     setEmpleados((prev) =>
                         prev.map((e) =>

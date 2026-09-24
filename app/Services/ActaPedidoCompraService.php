@@ -47,8 +47,9 @@ class ActaPedidoCompraService
         }
 
         try {
-            $pdf = $this->generarEntregaConsolidada($pedido, $items, $creadoPor);
-            Mail::to($correo)->send(new ActaEntregaPedidoMail($pedido->responsable, $pedido->codigo, 'SERVIMERCADEO', $pdf));
+            $empresa = $this->resolverEmpresa($usuario);
+            $pdf = $this->generarEntregaConsolidada($pedido, $items, $creadoPor, $empresa);
+            Mail::to($correo)->send(new ActaEntregaPedidoMail($pedido->responsable, $pedido->codigo, $empresa, $pdf));
 
             return ['enviada' => true, 'destinatario' => $correo];
         } catch (\Throwable $e) {
@@ -66,12 +67,12 @@ class ActaPedidoCompraService
      * el formato ("Acta de Entrega de Elementos") es genérico, no menciona dotación en
      * el cuerpo, así que sirve tal cual.
      */
-    public function generarEntregaConsolidada(PedidoCompra $pedido, Collection $items, string $creadoPor): string
+    public function generarEntregaConsolidada(PedidoCompra $pedido, Collection $items, string $creadoPor, ?string $empresa = null): string
     {
         $sede = $pedido->sedeCatalogo?->nombre ?: $pedido->sede;
 
         $data = [
-            'empresa'        => 'SERVIMERCADEO',
+            'empresa'        => $empresa ?? $this->resolverEmpresa(User::where('name', $pedido->responsable)->first()),
             'entregaNumero'  => $pedido->codigo,
             'solicitadoPor'  => $pedido->registra ?: $creadoPor,
             'fechaRegistro'  => optional($pedido->fecha_registro)->format('d/m/Y') ?? '—',
@@ -104,12 +105,12 @@ class ActaPedidoCompraService
      * sedes de dotación y no generan documento), así que esta plantilla es nueva, pero
      * respeta la misma línea de diseño (colores, tipografía, estructura de encabezado).
      */
-    public function generarTraslado(PedidoCompraItem $item, TrasladoProducto $traslado, string $creadoPor): string
+    public function generarTraslado(PedidoCompraItem $item, TrasladoProducto $traslado, string $creadoPor, ?string $empresa = null): string
     {
         $pedido = $item->pedido;
 
         $data = [
-            'empresa'         => 'SERVIMERCADEO',
+            'empresa'         => $empresa ?? $this->resolverEmpresa(User::where('name', $pedido->responsable)->first()),
             'trasladoNumero'  => $pedido->codigo . '-T' . $traslado->id,
             'fechaTraslado'   => optional($traslado->created_at)->format('d/m/Y') ?? now()->format('d/m/Y'),
             'sedeOrigen'      => $traslado->origen?->sede?->nombre ?? '—',
@@ -150,8 +151,9 @@ class ActaPedidoCompraService
         }
 
         try {
-            $pdf = $this->generarTraslado($item, $traslado, $creadoPor);
-            Mail::to($correo)->send(new ActaTrasladoPedidoMail($pedido->responsable, $pedido->codigo, 'SERVIMERCADEO', $pdf));
+            $empresa = $this->resolverEmpresa($usuario);
+            $pdf = $this->generarTraslado($item, $traslado, $creadoPor, $empresa);
+            Mail::to($correo)->send(new ActaTrasladoPedidoMail($pedido->responsable, $pedido->codigo, $empresa, $pdf));
 
             return ['enviada' => true, 'destinatario' => $correo];
         } catch (\Throwable $e) {
@@ -159,5 +161,15 @@ class ActaPedidoCompraService
 
             return ['enviada' => false, 'motivo' => 'Ocurrió un error enviando el correo.'];
         }
+    }
+
+    /**
+     * "SERVIMERCADEO" o "SYM" según la empresa del `responsable` del pedido (mismo
+     * criterio que Dotación, ver EmpresaLetterheadResolver) — se resuelve por el
+     * usuario real (columna `empresa_id`), no por texto libre.
+     */
+    private function resolverEmpresa(?User $usuario): string
+    {
+        return EmpresaLetterheadResolver::resolver($usuario?->empresa?->nombre);
     }
 }
