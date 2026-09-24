@@ -74,7 +74,7 @@ class SsoTest extends TestCase
     public function test_token_expirado_se_rechaza(): void
     {
         $this->usuario('th', ['email' => 'viejo@test.co']);
-        $expirado = JWT::encode(['email' => 'viejo@test.co', 'exp' => time() - 10], self::SECRETO, 'HS256');
+        $expirado = JWT::encode(['email' => 'viejo@test.co', 'exp' => time() - 120], self::SECRETO, 'HS256');
 
         $this->get('/sso/login?token=' . $expirado)->assertRedirect('/login?sso_error=token_invalido');
         $this->assertGuest();
