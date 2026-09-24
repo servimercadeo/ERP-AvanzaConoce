@@ -160,7 +160,7 @@ const matchOpt = (val, opts) => {
     return opts.find((o) => norm(o) === nVal) ?? null;
 };
 
-const toForm = (emp) => ({
+const toForm = (emp, catalogs = {}) => ({
     ...EMPTY_FORM,
     ...emp,
     tiene_cert_alturas: emp.tiene_cert_alturas ? "Sí" : "No",
@@ -177,10 +177,20 @@ const toForm = (emp) => ({
     talla_pantalon:emp.talla_pantalon ?? "",
     talla_zapatos: emp.talla_zapatos ?? "",
     // Normalizar campos de select para que coincidan exactamente con las opciones
+    // (mismo criterio que handleSelectCand, aplicado también al abrir un empleado existente)
     genero:            matchOpt(emp.genero,           GENEROS)    ?? emp.genero ?? "",
     estado_civil:      matchOpt(emp.estado_civil,     EST_CIVIL)  ?? emp.estado_civil ?? "",
     nivel_escolaridad: matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ?? emp.nivel_escolaridad ?? "",
     estrato:           matchOpt(emp.estrato,          ESTRATOS)   ?? emp.estrato ?? "PD",
+    rh:                matchOpt(emp.rh,                catalogs.tipos_rh)         ?? emp.rh ?? "",
+    eps:               matchOpt(emp.eps,               catalogs.eps)              ?? emp.eps ?? "",
+    arl:               matchOpt(emp.arl,               catalogs.arls)             ?? emp.arl ?? "",
+    fondo_pensiones:   matchOpt(emp.fondo_pensiones,   catalogs.pensiones)        ?? emp.fondo_pensiones ?? "",
+    caja_compensacion: matchOpt(emp.caja_compensacion, catalogs.cajas)            ?? emp.caja_compensacion ?? "",
+    cargo:             matchOpt(emp.cargo,             catalogs.cargos)           ?? emp.cargo ?? "",
+    sede:              matchOpt(emp.sede,              catalogs.sedes)            ?? emp.sede ?? "",
+    tipo_vinculacion:  matchOpt(emp.tipo_vinculacion,  catalogs.tipos_vinculacion) ?? emp.tipo_vinculacion ?? "",
+    tipo_funcionario:  matchOpt(emp.tipo_funcionario,  catalogs.tipos_funcionario) ?? emp.tipo_funcionario ?? "",
 });
 
 const toApi = (form) => ({
@@ -1877,7 +1887,7 @@ export default function EmpleadosCrud() {
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 onSave={handleSave}
-                initial={editTarget ? toForm(editTarget) : EMPTY_FORM}
+                initial={editTarget ? toForm(editTarget, catalogs) : EMPTY_FORM}
                 title={
                     editTarget ? "Editar empleado" : "Registrar nuevo empleado"
                 }
@@ -1891,7 +1901,7 @@ export default function EmpleadosCrud() {
                 open={viewOpen}
                 onClose={() => setViewOpen(false)}
                 onSave={() => {}}
-                initial={viewTarget ? toForm(viewTarget) : EMPTY_FORM}
+                initial={viewTarget ? toForm(viewTarget, catalogs) : EMPTY_FORM}
                 title="Ver empleado"
                 empresas={empresas}
                 catalogs={catalogs}

@@ -30,6 +30,20 @@ const TIPOS_CONTRATO = [
 ];
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
+
+// Normaliza un valor para que coincida con las opciones del <select> (ignora mayúsculas, tildes y espacios)
+const matchOpt = (val, opts) => {
+    if (!val || !opts?.length) return null;
+    const norm = (s) =>
+        String(s).toLowerCase()
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .trim();
+    const nVal = norm(val);
+    const isObjOpts = typeof opts[0] === "object";
+    const found = opts.find((o) => norm(isObjOpts ? o.label ?? o.value : o) === nVal);
+    if (!found) return null;
+    return isObjOpts ? found.value : found;
+};
 const TODAY = new Date().toISOString().split("T")[0];
 const CUR_YEAR = new Date().getFullYear();
 const YEAR_OPTS = Array.from(
@@ -667,6 +681,16 @@ function Modal({
                 fecha_vinculacion_caja: dateOnly(
                     initial.fecha_vinculacion_caja,
                 ),
+                // Normalizar campos de select para que coincidan exactamente con las opciones
+                // (el valor guardado puede diferir en mayúsculas/tildes del catálogo actual)
+                cargo:              matchOpt(initial.cargo,              catalogs.cargos)             ?? initial.cargo              ?? "",
+                sede:               matchOpt(initial.sede,               catalogs.sedes)              ?? initial.sede               ?? "",
+                tipo_contrato:      matchOpt(initial.tipo_contrato,      TIPOS_CONTRATO)              ?? initial.tipo_contrato      ?? "",
+                estado_contrato:    matchOpt(initial.estado_contrato,    ESTADOS_CONTRATO)            ?? initial.estado_contrato    ?? "",
+                tipo_vinculacion:   matchOpt(initial.tipo_vinculacion,   catalogs.tipos_vinculacion)  ?? initial.tipo_vinculacion   ?? "",
+                arl:                matchOpt(initial.arl,                catalogs.arls)               ?? initial.arl                ?? "",
+                caja_compensacion:  matchOpt(initial.caja_compensacion,  catalogs.cajas)              ?? initial.caja_compensacion  ?? "",
+                cliente_proyecto:   matchOpt(initial.cliente_proyecto,   proyectoOpts)                ?? initial.cliente_proyecto   ?? "",
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
                 seguimiento_fecha_cierre: dateOnly(
