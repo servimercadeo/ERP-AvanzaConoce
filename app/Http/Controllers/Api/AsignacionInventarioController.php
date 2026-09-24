@@ -8,6 +8,7 @@ use App\Models\AsignacionInventario;
 use App\Models\InventarioProducto;
 use App\Models\InventarioProductoSerie;
 use App\Services\ActaAsignacionInventarioService;
+use App\Services\EmpresaLetterheadResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -132,7 +133,7 @@ class AsignacionInventarioController extends Controller
      */
     public function actaEntrega(Request $request, AsignacionInventario $asignacionInventario)
     {
-        $asignacionInventario->loadMissing(['user', 'inventarioProducto.tipoProducto', 'inventarioProducto.sede']);
+        $asignacionInventario->loadMissing(['user.empresa', 'inventarioProducto.tipoProducto', 'inventarioProducto.sede']);
         $correo = $asignacionInventario->user?->resolverEmailReal();
 
         if (!$correo) {
@@ -152,7 +153,7 @@ class AsignacionInventarioController extends Controller
             Mail::to($correo)->send(new ActaAsignacionInventarioMail(
                 $asignacionInventario->user->name,
                 $referencia,
-                'SERVIMERCADEO',
+                EmpresaLetterheadResolver::resolver($asignacionInventario->user?->empresa?->nombre),
                 $pdf,
             ));
 

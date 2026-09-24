@@ -18,7 +18,7 @@ class ActaAsignacionInventarioService
         $sede = $inv?->sede?->nombre;
 
         $data = [
-            'empresa'        => 'SERVIMERCADEO',
+            'empresa'        => EmpresaLetterheadResolver::resolver($asignacion->user?->empresa?->nombre),
             'entregaNumero'  => 'ASIG-' . str_pad((string) $asignacion->id, 4, '0', STR_PAD_LEFT),
             'solicitadoPor'  => $asignacion->asignado_por ?: $creadoPor,
             'fechaRegistro'  => optional($asignacion->fecha_asignacion)->format('d/m/Y') ?? '—',

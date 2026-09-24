@@ -27,8 +27,8 @@
         <env name="DB_HOST" value="127.0.0.1" force="true"/>
         <env name="DB_PORT" value="3306" force="true"/>
         <env name="DB_DATABASE" value="erp_avanzaconoce_test" force="true"/>
-        <env name="DB_USERNAME" value="root" force="true"/>
-        <env name="DB_PASSWORD" value="" force="true"/>
+        <!-- DB_USERNAME/DB_PASSWORD se heredan del .env local (no se hardcodean aquí para
+             no meter la contraseña real en un archivo versionado) -->
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
