@@ -2279,8 +2279,9 @@ function Modal({
 export default function ContratosCrud() {
     const qc = useQueryClient();
     // Salario, seguridad social, costos/anexos y datos médicos son sensibles: solo
-    // Talento Humano (y admin) los ve en "Ver Contrato". Los demás roles (gestor,
-    // consultor, tic) solo ven una pestaña reducida de información personal.
+    // Talento Humano (y admin) los ve en "Ver Contrato". Los demás roles (tic,
+    // operaciones, financiera, supervisores, general) solo ven una versión sin
+    // salario ni auxilio de transporte.
     const { user } = useAuth();
     const puedeVerInfoSensible = user?.rol === "th" || user?.rol === "admin";
     const [contratos, setContratos] = useState([]);

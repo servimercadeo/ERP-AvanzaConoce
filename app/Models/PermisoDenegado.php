@@ -10,5 +10,5 @@ class PermisoDenegado extends Model
 
     protected $fillable = ['rol', 'modulo_id', 'submodulo_id'];
 
-    public const ROLES_GESTIONABLES = ['gestor', 'consultor', 'th', 'tic'];
+    public const ROLES_GESTIONABLES = ['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'];
 }

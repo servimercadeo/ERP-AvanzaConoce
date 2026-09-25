@@ -17,6 +17,7 @@ class PedidoCompra extends Model
         'fecha_registro',
         'tipo_responsable',
         'responsable',
+        'empresa_id',
         'sede',
         'sede_id',
         'clase',
@@ -39,6 +40,18 @@ class PedidoCompra extends Model
     public function asignadoA()
     {
         return $this->belongsTo(User::class, 'asignado_a_user_id');
+    }
+
+    /**
+     * Empresa del EMPLEADO para quien se creó el pedido (resuelta y guardada una sola
+     * vez al crear el pedido, ver PedidoCompraController::store()) — snapshot, no una
+     * relación en vivo: si el empleado cambia de empresa después, este pedido histórico
+     * no debe cambiar. De aquí sale la trazabilidad hacia la Orden de Compra y el Acta
+     * de Entrega.
+     */
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class);
     }
 
     public static function generarCodigo(): string

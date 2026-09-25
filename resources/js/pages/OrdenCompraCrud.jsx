@@ -47,6 +47,7 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
                                         <div style={{ fontWeight: 700 }}>{p.producto}</div>
                                         <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
                                             Pedido {p.pedido_codigo} · {p.sede} · cantidad: {p.cantidad}
+                                            {p.empresa ? ` · ${p.empresa}` : ""}
                                         </div>
                                     </div>
                                 </label>
@@ -99,6 +100,7 @@ function VerOrdenModal({ orden, onClose, onImprimir, imprimiendo }) {
                             <tr>
                                 <th>Producto</th>
                                 <th>Categoría</th>
+                                <th>Empresa</th>
                                 <th>Cant.</th>
                                 <th>Precio Unit.</th>
                                 <th>IVA %</th>
@@ -110,6 +112,7 @@ function VerOrdenModal({ orden, onClose, onImprimir, imprimiendo }) {
                                 <tr key={it.id}>
                                     <td>{it.producto}</td>
                                     <td>{it.categoria ?? "—"}</td>
+                                    <td>{it.empresa?.nombre ?? "—"}</td>
                                     <td>{it.cantidad}</td>
                                     <td>{money(it.precio_unitario)}</td>
                                     <td>{it.iva_porcentaje}%</td>
@@ -400,6 +403,7 @@ export default function OrdenCompraCrud() {
                                     <tr>
                                         <th>Producto</th>
                                         <th>Pedido</th>
+                                        <th>Empresa</th>
                                         <th>Cant.</th>
                                         <th style={{ minWidth: 110 }}>Precio Unit.</th>
                                         <th style={{ minWidth: 80 }}>IVA %</th>
@@ -416,6 +420,7 @@ export default function OrdenCompraCrud() {
                                             <tr key={it.id}>
                                                 <td style={{ fontWeight: 600 }}>{it.producto}</td>
                                                 <td style={{ color: "var(--text-muted)" }}>{it.pedido_codigo}</td>
+                                                <td style={{ color: "var(--text-muted)" }}>{it.empresa ?? "—"}</td>
                                                 <td>{it.cantidad}</td>
                                                 <td>
                                                     <input

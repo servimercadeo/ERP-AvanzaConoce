@@ -22,7 +22,7 @@ class OrdenCompraController extends Controller
     public function index()
     {
         return response()->json(
-            OrdenCompra::with(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items'])
+            OrdenCompra::with(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items.empresa:id,nombre'])
                 ->orderBy('id', 'desc')
                 ->get()
         );
@@ -31,7 +31,7 @@ class OrdenCompraController extends Controller
     public function show(OrdenCompra $ordenCompra)
     {
         return response()->json(
-            $ordenCompra->load(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items'])
+            $ordenCompra->load(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items.empresa:id,nombre'])
         );
     }
 
@@ -47,6 +47,7 @@ class OrdenCompraController extends Controller
         $ordenCompra->load([
             'proveedor',
             'sede.ciudad',
+            'items.empresa',
             'items.pedidoCompraItem.pedido.sedeCatalogo.ciudad',
         ]);
 
@@ -70,6 +71,7 @@ class OrdenCompraController extends Controller
             $grupos[count($grupos) - 1]['items'][] = [
                 'num'             => $i + 1,
                 'producto'        => $item->producto,
+                'empresa'         => $item->empresa?->nombre,
                 'cantidad'        => $item->cantidad,
                 'precio_unitario' => $item->precio_unitario,
                 'subtotal'        => $item->subtotal,
@@ -123,7 +125,7 @@ class OrdenCompraController extends Controller
      */
     public function itemsPendientes(Request $request)
     {
-        $query = PedidoCompraItem::with(['tipoProducto', 'pedido:id,codigo,sede,sede_id'])
+        $query = PedidoCompraItem::with(['tipoProducto', 'pedido:id,codigo,sede,sede_id,empresa_id', 'pedido.empresa:id,nombre'])
             ->where('estado_revision', 'Enviado a Compras')
             ->whereNull('orden_compra_id');
 
@@ -140,6 +142,7 @@ class OrdenCompraController extends Controller
                 'categoria'        => $it->tipoProducto?->categoria,
                 'tipo_producto_id' => $it->tipo_producto_id,
                 'cantidad'         => $it->cantidad,
+                'empresa'          => $it->pedido?->empresa?->nombre,
             ])
         );
     }
@@ -170,7 +173,7 @@ class OrdenCompraController extends Controller
             return DB::transaction(function () use ($data, $request) {
                 $proveedor = Proveedor::findOrFail($data['proveedor_id']);
 
-                $pedidoItems = PedidoCompraItem::with('tipoProducto')
+                $pedidoItems = PedidoCompraItem::with(['tipoProducto', 'pedido:id,empresa_id'])
                     ->whereIn('id', collect($data['items'])->pluck('pedido_compra_item_id'))
                     ->lockForUpdate()
                     ->get()
@@ -202,6 +205,7 @@ class OrdenCompraController extends Controller
                         'tipo_producto_id'      => $pedidoItem->tipo_producto_id,
                         'producto'              => $pedidoItem->tipoProducto?->nombre ?? $pedidoItem->producto,
                         'categoria'             => $pedidoItem->tipoProducto?->categoria,
+                        'empresa_id'            => $pedidoItem->pedido?->empresa_id,
                         'cantidad'              => $cantidad,
                         'precio_unitario'       => $itemData['precio_unitario'],
                         'iva_porcentaje'        => $itemData['iva_porcentaje'],
@@ -236,7 +240,7 @@ class OrdenCompraController extends Controller
                 PedidoCompraItem::whereIn('id', collect($itemsParaCrear)->pluck('pedido_compra_item_id'))
                     ->update(['orden_compra_id' => $orden->id]);
 
-                return response()->json($orden->fresh()->load(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items']), 201);
+                return response()->json($orden->fresh()->load(['sede:id,nombre', 'empresa:id,nombre', 'proveedor:id,nit,nombre,naturaleza', 'formaPago:id,nombre', 'items.empresa:id,nombre']), 201);
             });
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

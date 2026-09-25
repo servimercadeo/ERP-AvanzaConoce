@@ -458,15 +458,6 @@ export const ERP_MODULES = [
         ]
       },
       {
-        id: 'tipo_producto',
-        label: 'Tipo de Producto',
-        icon: 'productos',
-        desc: 'Catálogo de tipos de producto',
-        archivos: [
-          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
-        ]
-      },
-      {
         id: 'clases_pedido',
         label: 'Clases de Pedidos',
         icon: 'pedidos',
@@ -494,6 +485,15 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'tipo_producto',
+        label: 'Tipo de Producto',
+        icon: 'productos',
+        desc: 'Catálogo de tipos de producto',
+        archivos: [
+          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
+        ]
+      },
+      {
         id: 'proveedores',
         label: 'Proveedores',
         icon: 'empresas_cat',
@@ -503,7 +503,9 @@ export const ERP_MODULES = [
         ]
       }
     ],
-    archivos: []
+    archivos: [
+      { id: 'ver_y_crear_parametros', label: 'Ver y Crear Parametros' },
+    ]
   },
   {
     id: 'permisos',

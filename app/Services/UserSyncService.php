@@ -19,7 +19,7 @@ class UserSyncService
             'name'     => $datos['name'],
             'email'    => $datos['email'],
             'password' => Hash::make($datos['password']),
-            'rol'      => $datos['rol'] ?? 'consultor',
+            'rol'      => $datos['rol'] ?? 'general',
             'activo'   => true,
         ]);
 

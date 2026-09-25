@@ -47,7 +47,7 @@ class ActaPedidoCompraService
         }
 
         try {
-            $empresa = $this->resolverEmpresa($usuario);
+            $empresa = $this->resolverEmpresa($pedido);
             $pdf = $this->generarEntregaConsolidada($pedido, $items, $creadoPor, $empresa);
             Mail::to($correo)->send(new ActaEntregaPedidoMail($pedido->responsable, $pedido->codigo, $empresa, $pdf));
 
@@ -72,7 +72,7 @@ class ActaPedidoCompraService
         $sede = $pedido->sedeCatalogo?->nombre ?: $pedido->sede;
 
         $data = [
-            'empresa'        => $empresa ?? $this->resolverEmpresa(User::where('name', $pedido->responsable)->first()),
+            'empresa'        => $empresa ?? $this->resolverEmpresa($pedido),
             'entregaNumero'  => $pedido->codigo,
             'solicitadoPor'  => $pedido->registra ?: $creadoPor,
             'fechaRegistro'  => optional($pedido->fecha_registro)->format('d/m/Y') ?? '—',
@@ -110,7 +110,7 @@ class ActaPedidoCompraService
         $pedido = $item->pedido;
 
         $data = [
-            'empresa'         => $empresa ?? $this->resolverEmpresa(User::where('name', $pedido->responsable)->first()),
+            'empresa'         => $empresa ?? $this->resolverEmpresa($pedido),
             'trasladoNumero'  => $pedido->codigo . '-T' . $traslado->id,
             'fechaTraslado'   => optional($traslado->created_at)->format('d/m/Y') ?? now()->format('d/m/Y'),
             'sedeOrigen'      => $traslado->origen?->sede?->nombre ?? '—',
@@ -151,7 +151,7 @@ class ActaPedidoCompraService
         }
 
         try {
-            $empresa = $this->resolverEmpresa($usuario);
+            $empresa = $this->resolverEmpresa($pedido);
             $pdf = $this->generarTraslado($item, $traslado, $creadoPor, $empresa);
             Mail::to($correo)->send(new ActaTrasladoPedidoMail($pedido->responsable, $pedido->codigo, $empresa, $pdf));
 
@@ -164,12 +164,21 @@ class ActaPedidoCompraService
     }
 
     /**
-     * "SERVIMERCADEO" o "SYM" según la empresa del `responsable` del pedido (mismo
-     * criterio que Dotación, ver EmpresaLetterheadResolver) — se resuelve por el
-     * usuario real (columna `empresa_id`), no por texto libre.
+     * "SERVIMERCADEO" o "SYM" para el acta, según la empresa del pedido — se usa el
+     * snapshot guardado al CREAR el pedido (`pedidos_compra.empresa_id`, ver
+     * PedidoCompraController::store()), no una búsqueda en vivo: así, si el empleado
+     * cambia de empresa después, este pedido histórico no cambia de encabezado. Los
+     * pedidos de antes de este snapshot (o de un "Aliado" sin usuario real) se caen al
+     * criterio anterior, resolviendo por el usuario actual del responsable.
      */
-    private function resolverEmpresa(?User $usuario): string
+    private function resolverEmpresa(PedidoCompra $pedido): string
     {
+        if ($pedido->empresa_id) {
+            return EmpresaLetterheadResolver::resolver($pedido->empresa?->nombre);
+        }
+
+        $usuario = User::where('name', $pedido->responsable)->first();
+
         return EmpresaLetterheadResolver::resolver($usuario?->empresa?->nombre);
     }
 }

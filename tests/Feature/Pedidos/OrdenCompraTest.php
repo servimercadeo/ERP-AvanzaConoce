@@ -23,7 +23,7 @@ class OrdenCompraTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actuarComo('consultor', ['name' => 'Comprador']);
+        $this->actuarComo('general', ['name' => 'Comprador']);
         $this->sede = $this->sede('SEDE COMPRAS');
         $this->proveedor = DB::table('proveedores')->insertGetId([
             'nit' => (string) random_int(100000000, 999999999), 'naturaleza' => 'JURIDICA',

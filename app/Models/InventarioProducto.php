@@ -12,6 +12,7 @@ class InventarioProducto extends Model
         'tipo_producto_id',
         'sede_id',
         'talla',
+        'empresa_id',
         'precio',
         'cantidad',
         'stock_minimo',
@@ -31,6 +32,11 @@ class InventarioProducto extends Model
     public function sede()
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class);
     }
 
     public function series()

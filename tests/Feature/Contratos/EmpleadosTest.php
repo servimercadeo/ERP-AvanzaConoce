@@ -75,7 +75,7 @@ class EmpleadosTest extends TestCase
 
     public function test_dar_de_alta_un_empleado_importado_le_genera_credenciales_nuevas(): void
     {
-        $pendiente = $this->usuario('consultor', ['cedula' => '4001', 'email' => 'carlos@test.co']);
+        $pendiente = $this->usuario('general', ['cedula' => '4001', 'email' => 'carlos@test.co']);
         $pendiente->forceFill(['pendiente_alta' => true, 'activo' => false])->saveQuietly();
 
         $r = $this->postJson('/api/empleados', $this->payload())->assertCreated();
@@ -94,7 +94,7 @@ class EmpleadosTest extends TestCase
      */
     public function test_editar_con_el_correo_de_otro_empleado_no_borra_ni_sobrescribe_a_nadie(): void
     {
-        $otro = $this->usuario('consultor', ['email' => 'ocupado@test.co', 'cedula' => '9999', 'name' => 'OTRO EMPLEADO']);
+        $otro = $this->usuario('general', ['email' => 'ocupado@test.co', 'cedula' => '9999', 'name' => 'OTRO EMPLEADO']);
         $editando = $this->postJson('/api/empleados', $this->payload())->json('empleado.id');
 
         $this->putJson("/api/empleados/$editando", $this->payload(['email' => 'ocupado@test.co']))
@@ -118,7 +118,7 @@ class EmpleadosTest extends TestCase
 
     public function test_actualizar_tallas_tambien_actualiza_las_respuestas_del_formulario(): void
     {
-        $emp = $this->usuario('consultor', ['cedula' => '4002']);
+        $emp = $this->usuario('general', ['cedula' => '4002']);
         RespuestaIngreso::create([
             'documento' => '4002', 'nombres' => 'X', 'apellidos' => 'Y', 'fecha_nacimiento' => '1990-01-01', 'lugar_nacimiento' => 'P',
             'estado_civil' => 'S', 'numero_hijos' => '0', 'rh' => 'O+', 'nivel_escolaridad' => 'B', 'profesion' => 'N', 'ciudad' => 'P',
@@ -136,7 +136,7 @@ class EmpleadosTest extends TestCase
 
     public function test_fotografia_debe_ser_una_imagen_de_maximo_5mb(): void
     {
-        $emp = $this->usuario('consultor');
+        $emp = $this->usuario('general');
 
         $this->postJson("/api/empleados/{$emp->id}/fotografia", ['fotografia' => UploadedFile::fake()->create('a.pdf', 10, 'application/pdf')])
             ->assertStatus(422)->assertJsonValidationErrors('fotografia');
@@ -149,7 +149,7 @@ class EmpleadosTest extends TestCase
 
     public function test_busqueda_de_empleados_con_contrato_para_pedidos(): void
     {
-        $emp = $this->usuario('consultor', ['nombres' => 'ZULEIMA', 'apellidos' => 'UNICA', 'name' => 'ZULEIMA UNICA', 'cedula' => '4003']);
+        $emp = $this->usuario('general', ['nombres' => 'ZULEIMA', 'apellidos' => 'UNICA', 'name' => 'ZULEIMA UNICA', 'cedula' => '4003']);
         DB::table('contratos')->insert([
             'empleado_id' => $emp->id, 'completado' => true, 'estado_contrato' => 'Activo', 'created_at' => now(), 'updated_at' => now(),
         ]);

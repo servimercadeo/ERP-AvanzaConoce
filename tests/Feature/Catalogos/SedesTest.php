@@ -13,7 +13,7 @@ class SedesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
     }
 
     public function test_crear_editar_y_eliminar_sede(): void

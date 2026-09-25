@@ -20,7 +20,7 @@ class InventarioProductoTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->sede = $this->sede();
         $this->tipo = $this->tipoProducto(null, 'Equipos');
     }

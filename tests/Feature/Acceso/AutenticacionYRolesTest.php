@@ -65,7 +65,7 @@ class AutenticacionYRolesTest extends TestCase
     #[DataProvider('rutasSoloTalentoHumanoTic')]
     public function test_modulo_administrativo_y_seleccion_niegan_a_otros_roles(string $ruta): void
     {
-        foreach (['consultor', 'gestor'] as $rol) {
+        foreach (['operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
             $this->actuarComo($rol);
             $this->getJson($ruta)->assertForbidden();
         }
@@ -94,7 +94,7 @@ class AutenticacionYRolesTest extends TestCase
 
     public function test_usuario_sin_rol_asignado_no_entra_a_modulos_restringidos(): void
     {
-        $u = $this->usuario('consultor');
+        $u = $this->usuario('general');
         $u->forceFill(['rol' => null])->saveQuietly();
         $this->actingAs($u->fresh());
 
@@ -119,7 +119,7 @@ class AutenticacionYRolesTest extends TestCase
     public function test_solo_admin_puede_crear_usuarios(): void
     {
         Http::fake();
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
 
         $this->postJson('/api/users', [
             'name' => 'Intruso', 'email' => 'intruso@test.co', 'password' => 'Password123', 'rol' => 'admin',
@@ -135,10 +135,10 @@ class AutenticacionYRolesTest extends TestCase
         $this->actuarComo('admin');
 
         $this->postJson('/api/users', [
-            'name' => 'Nuevo Usuario', 'email' => 'nuevo@test.co', 'password' => 'Password123', 'rol' => 'gestor',
+            'name' => 'Nuevo Usuario', 'email' => 'nuevo@test.co', 'password' => 'Password123', 'rol' => 'operaciones',
         ])->assertCreated()->assertJsonPath('user.avanzaconoce_id', 777);
 
-        $this->assertDatabaseHas('users', ['email' => 'nuevo@test.co', 'rol' => 'gestor']);
+        $this->assertDatabaseHas('users', ['email' => 'nuevo@test.co', 'rol' => 'operaciones']);
         Http::assertSent(fn ($r) => $r->url() === 'https://avanza.test/api/erp/users'
             && $r->hasHeader('X-ERP-Secret', 'secreto-test'));
     }
@@ -146,7 +146,7 @@ class AutenticacionYRolesTest extends TestCase
     public function test_crear_usuario_valida_correo_unico_y_password_minima(): void
     {
         Http::fake();
-        $this->usuario('consultor', ['email' => 'repetido@test.co']);
+        $this->usuario('general', ['email' => 'repetido@test.co']);
         $this->actuarComo('admin');
 
         $this->postJson('/api/users', ['name' => 'X', 'email' => 'repetido@test.co', 'password' => 'Password123'])

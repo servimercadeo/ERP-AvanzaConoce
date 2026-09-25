@@ -227,7 +227,7 @@ class EmpleadoController extends Controller
             // dio de alta manualmente aquí — esta es su alta real, así que se le generan
             // credenciales nuevas en vez de tratarlo como una simple actualización.
             if ($empleado->pendiente_alta) {
-                $data['rol']            = $data['rol'] ?? 'consultor';
+                $data['rol']            = $data['rol'] ?? 'general';
                 $data['activo']         = true;
                 $data['pendiente_alta'] = false;
 
@@ -257,7 +257,7 @@ class EmpleadoController extends Controller
             ], 201);
         }
 
-        $data['rol']    = $data['rol'] ?? 'consultor';
+        $data['rol']    = $data['rol'] ?? 'general';
         $data['activo'] = true;
 
         // Contraseña temporal de 10 caracteres: 2 mayúsculas + 5 minúsculas + 3 dígitos

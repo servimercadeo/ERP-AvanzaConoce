@@ -7,11 +7,11 @@ import { IconEdit, IconTrash, IconClose, IconEmptySearch, IconSearch, IconLoadin
 const POR_PAGINA = 10;
 
 /* ─── Modal agregar / editar ──────────────────────────────────────────── */
-function ItemModal({ item, tiposProducto, sedes, esGeneral, onClose, onSave, saving, errorMsg }) {
+function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, onSave, saving, errorMsg }) {
     const isEdit = !!item;
     const [form, setForm] = useState(item
-        ? { tipo_producto_id: item.tipo_producto_id, sede_id: item.sede_id, talla: item.talla ?? "", cantidad: item.cantidad }
-        : { tipo_producto_id: tiposProducto[0]?.id ?? "", sede_id: sedes[0]?.id ?? "", talla: "", cantidad: 0 });
+        ? { tipo_producto_id: item.tipo_producto_id, sede_id: item.sede_id, talla: item.talla ?? "", empresa_id: item.empresa_id ?? "", cantidad: item.cantidad }
+        : { tipo_producto_id: tiposProducto[0]?.id ?? "", sede_id: sedes[0]?.id ?? "", talla: "", empresa_id: "", cantidad: 0 });
 
     // "Serializado" es un check ad-hoc de esta carga (no una propiedad del producto):
     // al marcarlo, se piden tantos inputs de serial como indique "Cantidad". Al crear,
@@ -97,6 +97,13 @@ function ItemModal({ item, tiposProducto, sedes, esGeneral, onClose, onSave, sav
                                 disabled={isEdit}
                                 placeholder="Solo si el producto la necesita, ej. 40, M, L…"
                             />
+                        </div>
+                        <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
+                            <label style={S.label}>Empresa (Propiedad)</label>
+                            <select style={S.input} value={form.empresa_id} onChange={set("empresa_id")} disabled={isEdit}>
+                                <option value="">Sin especificar</option>
+                                {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                            </select>
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>{isEdit ? "Cantidad" : "Cantidad a agregar"}</label>
@@ -465,6 +472,14 @@ export default function InventarioCategoriaCrud({ categoria }) {
         staleTime: 10 * 60 * 1000,
     });
 
+    // Empresa "dueña"/que compró el item (Servimercadeo, SYM, etc.) — trazabilidad de
+    // propiedad, independiente de la sede donde físicamente está el producto.
+    const { data: empresas = [] } = useQuery({
+        queryKey: ["empresas"],
+        queryFn: () => api.get("/empresas").then((r) => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+
     // Para el filtro "Categoría" del modo general: todas las categorías del catálogo
     // (incluidas las nuevas creadas en Parametros), menos Dotación.
     const { data: categoriasProductoRaw = [] } = useQuery({
@@ -498,6 +513,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                 tipo_producto_id: Number(form.tipo_producto_id),
                 sede_id: Number(form.sede_id),
                 talla: form.talla || "",
+                empresa_id: form.empresa_id ? Number(form.empresa_id) : null,
                 cantidad: Number(form.cantidad) || 0,
                 ...(form.series !== undefined ? { series: form.series } : {}),
             };
@@ -549,6 +565,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                 ...(esGeneral ? { Categoría: i.categoria } : {}),
                 Producto: i.producto,
                 Talla: i.talla || "—",
+                Empresa: i.empresa || "—",
                 Sede: i.sede,
             };
             const series = i.series ?? [];
@@ -686,6 +703,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                                 {esGeneral && <th>Categoría</th>}
                                 <th>Producto</th>
                                 <th style={{ textAlign: "center" }}>Talla</th>
+                                <th>Empresa</th>
                                 <th>Sede</th>
                                 <th style={{ textAlign: "center" }}>Cantidad</th>
                                 <th style={{ textAlign: "center" }}>Seriales</th>
@@ -699,6 +717,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                                         {esGeneral && <td style={{ color: "var(--text-muted)" }}>{item.categoria}</td>}
                                         <td style={{ fontWeight: 700 }}>{item.producto}</td>
                                         <td style={{ textAlign: "center", color: "var(--text-muted)" }}>{item.talla || "—"}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{item.empresa || "—"}</td>
                                         <td style={{ color: "var(--text-muted)" }}>{item.sede}</td>
                                         <td style={{ textAlign: "center", fontWeight: 800, fontSize: "0.96rem" }}>{item.cantidad}</td>
                                         <td style={{ textAlign: "center" }}>
@@ -762,6 +781,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                 <ItemModal
                     tiposProducto={tiposProducto}
                     sedes={sedes}
+                    empresas={empresas}
                     esGeneral={esGeneral}
                     onClose={() => { setAddOpen(false); setFormError(""); }}
                     onSave={handleGuardar}
@@ -774,6 +794,7 @@ export default function InventarioCategoriaCrud({ categoria }) {
                     item={editItem}
                     tiposProducto={tiposProducto}
                     sedes={sedes}
+                    empresas={empresas}
                     esGeneral={esGeneral}
                     onClose={() => { setEditItem(null); setFormError(""); }}
                     onSave={handleGuardar}

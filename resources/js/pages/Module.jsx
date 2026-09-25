@@ -12,6 +12,7 @@ import {
 
 // ── Importa aquí los CRUD de cada módulo ─────────────────────────────────
 import EmpleadosCrud from "./EmpleadosCrud";
+import VerYCrearParametrosCrud from "./VerYCrearParametrosCrud";
 // import VehiculosCrud           from './VehiculosCrud';          // Administrativo
 import SedesCrud from "./SedesCrud"; // Sedes
 // import RelacionCrud            from './RelacionCrud';           // Sedes
@@ -98,7 +99,8 @@ function resolveCrud(moduleId, archivoId) {
         /* ── PARÁMETROS ─────────────────────────────────────────── */
         case "parametros":
             switch (archivoId) {
-                // case 'tipo_productos': return TipoProductosCrud;
+                case "ver_y_crear_parametros":
+                    return VerYCrearParametrosCrud;
                 default:
                     return null;
             }

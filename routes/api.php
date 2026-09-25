@@ -358,6 +358,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('formas-pago', App\Http\Controllers\Api\FormaPagoController::class)
         ->parameters(['formas-pago' => 'formaPago']);
 
+    // Tipos de Parámetro genéricos, creados libremente desde Parametros > Ver y Crear
+    // Parametros (igual que Categoría del Producto, pero sin generar submódulos aparte).
+    Route::apiResource('tipos-parametro', App\Http\Controllers\Api\TipoParametroController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['tipos-parametro' => 'tipoParametro']);
+
+    // Valores dentro de cada Tipo de Parámetro genérico.
+    Route::apiResource('valores-parametro', App\Http\Controllers\Api\ValorParametroController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['valores-parametro' => 'valorParametro']);
+
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);

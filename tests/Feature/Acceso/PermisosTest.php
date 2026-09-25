@@ -13,7 +13,7 @@ class PermisosTest extends TestCase
 
     public function test_solo_admin_ve_y_edita_la_matriz(): void
     {
-        foreach (['th', 'tic', 'gestor', 'consultor'] as $rol) {
+        foreach (['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
             $this->actuarComo($rol);
             $this->getJson('/api/permisos')->assertForbidden();
             $this->putJson('/api/permisos', ['denegados' => []])->assertForbidden();
@@ -30,9 +30,9 @@ class PermisosTest extends TestCase
         $this->actuarComo('admin');
 
         $this->putJson('/api/permisos', ['denegados' => [
-            ['rol' => 'gestor', 'modulo_id' => 'inventarios', 'submodulo_id' => 'dotacion'],
-            ['rol' => 'gestor', 'modulo_id' => 'inventarios', 'submodulo_id' => 'dotacion'],
-            ['rol' => 'consultor', 'modulo_id' => 'parametros', 'submodulo_id' => 'empresas'],
+            ['rol' => 'operaciones', 'modulo_id' => 'inventarios', 'submodulo_id' => 'dotacion'],
+            ['rol' => 'operaciones', 'modulo_id' => 'inventarios', 'submodulo_id' => 'dotacion'],
+            ['rol' => 'general', 'modulo_id' => 'parametros', 'submodulo_id' => 'empresas'],
         ]])->assertOk()->assertJsonCount(2);
 
         $this->assertDatabaseMissing('permisos_denegados', ['rol' => 'th', 'modulo_id' => 'sedes']);
