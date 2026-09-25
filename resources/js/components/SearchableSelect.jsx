@@ -74,15 +74,13 @@ export function SearchableSelect({
     const panelRef = useRef(null);
     // Rastrea si el usuario está escribiendo activamente
     const isTyping = useRef(false);
-    const prevValue = useRef(value);
 
-    // Solo sincronizar query desde afuera si el value cambia externamente
-    // (no cuando el usuario está escribiendo)
+    // Sincroniza el texto con el value (o con las opciones, si llegan después del value),
+    // salvo mientras el usuario está escribiendo.
     useEffect(() => {
-        if (!isTyping.current && value !== prevValue.current) {
+        if (!isTyping.current) {
             setQuery(getLabel(value));
         }
-        prevValue.current = value;
     }, [value, options]);
 
     // Clic fuera cierra el dropdown

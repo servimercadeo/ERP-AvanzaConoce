@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-query-qy_ppomC.js";import t from"./InventarioCategoriaCrud-D8Tdtwu8.js";import"./app-BAfFnTJS.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-BRA6sWEr.js";function s(){return r.jsx(t,{categoria:"Materiales"})}export{s as default};
