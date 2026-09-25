@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { IconEdit, IconTrash, IconClose, IconEmptySearch, IconSearch, IconLoading } from "../components/Icons";
+import { SearchableSelect } from "../components/SearchableSelect";
 
 const POR_PAGINA = 10;
 
@@ -83,9 +84,13 @@ function ItemModal({ item, tiposProducto, sedes, esGeneral, onClose, onSave, sav
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Sede *</label>
-                            <select style={S.input} value={form.sede_id} onChange={set("sede_id")} disabled={isEdit}>
-                                {sedes.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                            </select>
+                            <SearchableSelect
+                                value={form.sede_id}
+                                onChange={(v) => setForm((f) => ({ ...f, sede_id: v }))}
+                                options={sedes.map((s) => ({ value: s.id, label: s.nombre }))}
+                                defaultValue=""
+                                disabled={isEdit}
+                            />
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Talla (opcional)</label>
@@ -627,10 +632,12 @@ export default function InventarioCategoriaCrud({ categoria }) {
             <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
                 <div style={{ maxWidth: 320, flex: 1, minWidth: 220 }}>
                     <label style={{ ...S.label, display: "block", marginBottom: 4 }}>Sede</label>
-                    <select style={S.input} value={sedeFiltro} onChange={(e) => setSedeFiltro(e.target.value)}>
-                        <option value="Todas">Todas las sedes</option>
-                        {sedes.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                    </select>
+                    <SearchableSelect
+                        value={sedeFiltro}
+                        onChange={setSedeFiltro}
+                        defaultValue="Todas"
+                        options={[{ value: "Todas", label: "Todas las sedes" }, ...sedes.map((s) => ({ value: s.id, label: s.nombre }))]}
+                    />
                 </div>
                 {esGeneral && (
                     <div style={{ maxWidth: 320, flex: 1, minWidth: 220 }}>
@@ -685,7 +692,6 @@ export default function InventarioCategoriaCrud({ categoria }) {
                             <tr>
                                 {esGeneral && <th>Categoría</th>}
                                 <th>Producto</th>
-                                <th style={{ textAlign: "center" }}>Talla</th>
                                 <th>Sede</th>
                                 <th style={{ textAlign: "center" }}>Cantidad</th>
                                 <th style={{ textAlign: "center" }}>Seriales</th>
@@ -698,7 +704,6 @@ export default function InventarioCategoriaCrud({ categoria }) {
                                     <tr key={item.id}>
                                         {esGeneral && <td style={{ color: "var(--text-muted)" }}>{item.categoria}</td>}
                                         <td style={{ fontWeight: 700 }}>{item.producto}</td>
-                                        <td style={{ textAlign: "center", color: "var(--text-muted)" }}>{item.talla || "—"}</td>
                                         <td style={{ color: "var(--text-muted)" }}>{item.sede}</td>
                                         <td style={{ textAlign: "center", fontWeight: 800, fontSize: "0.96rem" }}>{item.cantidad}</td>
                                         <td style={{ textAlign: "center" }}>
