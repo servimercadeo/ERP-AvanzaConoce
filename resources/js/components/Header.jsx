@@ -11,6 +11,15 @@ export default function Header() {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  // En el menú móvil el submenú de un módulo no se muestra desplegado de una:
+  // se abre por acordeón (un módulo a la vez) al tocarlo. En escritorio esto no
+  // aplica — ahí el submenú sigue abriendo por :hover vía CSS.
+  const [openModuleId, setOpenModuleId] = useState(null);
+
+  const closeMobileMenu = () => {
+    setIsMenuOpen(false);
+    setOpenModuleId(null);
+  };
 
   const handleLogout = async () => {
     try {
@@ -22,7 +31,7 @@ export default function Header() {
 
   return (
     <header className="header">
-      <div className="header-mobile-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+      <div className="header-mobile-toggle" onClick={() => (isMenuOpen ? closeMobileMenu() : setIsMenuOpen(true))}>
         <span></span>
         <span></span>
         <span></span>
@@ -39,19 +48,36 @@ export default function Header() {
       </Link>
 
       <nav className={`nav ${isMenuOpen ? 'mobile-active' : ''}`}>
-        {erpModules.filter(mod => canAccessModule(user, mod.id)).map(mod => (
-          <div key={mod.id} className="nav-item">
-            <NavLink className="nav-link" to={`/module/${mod.id}`}>
+        {erpModules.filter(mod => canAccessModule(user, mod.id)).map(mod => {
+          const hasChildren = mod.submods?.length > 0 || mod.archivos?.length > 0;
+          const isOpenMobile = isMenuOpen && openModuleId === mod.id;
+          return (
+          <div key={mod.id} className={`nav-item ${isOpenMobile ? 'dropdown-open' : ''}`}>
+            <NavLink
+              className="nav-link"
+              to={`/module/${mod.id}`}
+              onClick={(e) => {
+                // En el menú móvil (drawer), un módulo con submenú se abre/cierra
+                // por acordeón en vez de navegar de una — así solo hay un nivel
+                // desplegado a la vez y no se amontonan todos los módulos.
+                if (isMenuOpen && hasChildren) {
+                  e.preventDefault();
+                  setOpenModuleId(openModuleId === mod.id ? null : mod.id);
+                } else {
+                  closeMobileMenu();
+                }
+              }}
+            >
               {mod.icon && <span className="nav-icon">{React.createElement(MODULE_ICONS[mod.icon] ?? IconFolder, { size: 16 })}</span>}
               <span>{mod.label}</span>
-              {(mod.submods?.length > 0 || mod.archivos?.length > 0) && <span className="arrow">▾</span>}
+              {hasChildren && <span className="arrow">▾</span>}
             </NavLink>
-            {(mod.submods?.length > 0 || mod.archivos?.length > 0) && (
+            {hasChildren && (
               <div className="dropdown">
                 {mod.submods?.length > 0 ? (
                   mod.submods.filter(sub => canAccessSubmodule(user, mod.id, sub.id)).map(sub => (
                     <div key={sub.id} className="dropdown-nested">
-                      <Link to={`/module/${mod.id}/submodule/${sub.id}`}>
+                      <Link to={`/module/${mod.id}/submodule/${sub.id}`} onClick={closeMobileMenu}>
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                           {sub.icon && <span className="sub-icon">{React.createElement(MODULE_ICONS[sub.icon] ?? IconFolder, { size: 14 })}</span>}
                           <span>{sub.label}</span>
@@ -61,7 +87,7 @@ export default function Header() {
                       {sub.archivos?.length > 0 && (
                         <div className="sub-dropdown">
                           {sub.archivos.map(archivo => (
-                            <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}/file/${archivo.id}`}>
+                            <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}/file/${archivo.id}`} onClick={closeMobileMenu}>
                               <span className="sub-icon"><IconFile size={14} /></span>
                               <span>{archivo.label}</span>
                             </Link>
@@ -72,7 +98,7 @@ export default function Header() {
                   ))
                 ) : (
                   canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ) && mod.archivos?.map(archivo => (
-                    <Link key={archivo.id} to={`/module/${mod.id}`}>
+                    <Link key={archivo.id} to={`/module/${mod.id}`} onClick={closeMobileMenu}>
                       <span className="sub-icon"><IconFile size={14} /></span>
                       <span>{archivo.label}</span>
                     </Link>
@@ -81,7 +107,8 @@ export default function Header() {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="header-right">
