@@ -702,8 +702,8 @@ body {
 
 /* ── MODULE PAGE ── */
 .mod-subgrid {
-    display: flex;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 20px;
     padding: 10px 4px 20px;
 }
@@ -722,8 +722,6 @@ body {
     color: var(--text);
     transition: all 0.22s ease;
     box-shadow: var(--shadow);
-    min-width: 220px;
-    flex: 0 0 auto;
 }
 
 .submod-card:hover {

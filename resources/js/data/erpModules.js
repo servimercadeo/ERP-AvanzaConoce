@@ -88,6 +88,15 @@ export const ERP_MODULES = [
     desc: 'Gestión administrativa.',
     submods: [
       {
+        id: 'empleados',
+        label: 'Empleados',
+        icon: 'usuarios',
+        desc: 'Gestión completa de empleados',
+        archivos: [
+          { id: 'empleados_file', label: 'Empleados' },
+        ]
+      },
+      {
         id: 'seleccion',
         label: 'Selección',
         icon: 'usuarios',
@@ -160,7 +169,6 @@ export const ERP_MODULES = [
       */
     ],
     archivos: [
-      { id: 'empleados', label: 'Empleados' },
       // { id: 'importar_codigos_directv', label: 'Importar Códigos DirecTv a Empleados' },
       // { id: 'importar_empleados', label: 'Importar Empleados' },
       // { id: 'vehiculos', label: 'Vehículos' },
