@@ -671,6 +671,13 @@ function Modal({
         value: r.id,
         label: r.nombre,
     }));
+    const jefeOpts = (empleados || [])
+        .map((e) => {
+            const nombre = `${e.nombres ?? ""} ${e.apellidos ?? ""}`.trim();
+            if (!nombre) return null;
+            return e.email ? `${nombre} - ${e.email}` : nombre;
+        })
+        .filter(Boolean);
     const totalPorcentajeCC = (form.centros_costos || []).reduce(
         (s, cc) => s + (parseFloat(cc.porcentaje) || 0),
         0,
@@ -696,6 +703,10 @@ function Modal({
                 tipo_vinculacion:   matchOpt(initial.tipo_vinculacion,   catalogs.tipos_vinculacion)  ?? initial.tipo_vinculacion   ?? "",
                 arl:                matchOpt(initial.arl,                catalogs.arls)               ?? initial.arl                ?? "",
                 caja_compensacion:  matchOpt(initial.caja_compensacion,  catalogs.cajas)              ?? initial.caja_compensacion  ?? "",
+                lps_afiliado:       matchOpt(initial.lps_afiliado,       catalogs.eps)                ?? initial.lps_afiliado       ?? "",
+                fondo_pensiones:    matchOpt(initial.fondo_pensiones,    catalogs.pensiones)          ?? initial.fondo_pensiones    ?? "",
+                fondo_cesantias:    matchOpt(initial.fondo_cesantias,    catalogs.cesantias)          ?? initial.fondo_cesantias    ?? "",
+                jefe_inmediato:     matchOpt(initial.jefe_inmediato,     jefeOpts)                    ?? initial.jefe_inmediato     ?? "",
                 cliente_proyecto:   matchOpt(initial.cliente_proyecto,   proyectoOpts)                ?? initial.cliente_proyecto   ?? "",
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
@@ -1311,6 +1322,7 @@ function Modal({
                                 <Field
                                     label="Jefe Inmediato"
                                     k="jefe_inmediato"
+                                    opts={jefeOpts}
                                     {...fp}
                                 />
                                 <Field
@@ -1414,6 +1426,7 @@ function Modal({
                                 <Field
                                     label="EPS (LPS Afiliado)"
                                     k="lps_afiliado"
+                                    opts={catalogs.eps}
                                     {...fp}
                                 />
                                 <Field
@@ -1443,11 +1456,13 @@ function Modal({
                                 <Field
                                     label="Fondo Pensiones"
                                     k="fondo_pensiones"
+                                    opts={catalogs.pensiones}
                                     {...fp}
                                 />
                                 <Field
                                     label="Fondo Cesantías"
                                     k="fondo_cesantias"
+                                    opts={catalogs.cesantias}
                                     {...fp}
                                 />
                                 <div />
@@ -1531,6 +1546,7 @@ function Modal({
                                         <Field
                                             label="EPS"
                                             k="lps_afiliado"
+                                            opts={catalogs.eps}
                                             {...fp}
                                         />
                                         <Field
@@ -2329,6 +2345,7 @@ export default function ContratosCrud() {
         cajas: [],
         bancos: [],
         pensiones: [],
+        cesantias: [],
         tipos_vinculacion: [],
         regionales: [],
     });

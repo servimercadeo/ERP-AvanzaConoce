@@ -9,6 +9,12 @@ export const SUBMODULO_RAIZ = '_modulo';
 export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user) return false;
   if (user.rol === 'admin') return true;
+  // Usuarios sin rol asignado (aún no clasificados): acceso general por defecto,
+  // pero sin Administrativo (datos de contratación/empleados) ni Permisos
+  // (gestión de roles), mientras se les asigna su rol definitivo.
+  if (!user.rol && (moduleId === 'administrativo' || moduleId === 'permisos')) {
+    return false;
+  }
   const denegados = user.permisos_denegados ?? [];
   return !denegados.some((p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId);
 }
