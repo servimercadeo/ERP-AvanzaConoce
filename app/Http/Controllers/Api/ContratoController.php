@@ -262,7 +262,9 @@ class ContratoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Contrato::with(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']);
+        // `empleado.sedeCatalogo` (no solo `empleado`): el accessor `sede` de User
+        // (HasSedeCatalogo) dispara una consulta por fila si no viene precargado.
+        $query = Contrato::with(['empleado.sedeCatalogo', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']);
 
         // Anulados solo se muestran cuando se filtra explícitamente por ese estado
         if ($request->estado === 'Contrato anulado') {
@@ -310,12 +312,18 @@ class ContratoController extends Controller
                 });
         }
 
-        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula) {
+        // Fotos de candidatos que faltan en `users.fotografia`, resueltas en bloque (sin N+1)
+        $cedulasSinFoto = $contratos->filter(fn($c) => $c->empleado && !$c->empleado->fotografia)
+            ->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
+        $fotoPorCedula = !empty($cedulasSinFoto)
+            ? DB::table('candidatos')->whereIn('identificacion', $cedulasSinFoto)
+                ->whereNotNull('fotografia')->pluck('fotografia', 'identificacion')
+            : collect();
+
+        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula, $fotoPorCedula) {
             $cedula = $contrato->empleado?->cedula;
             if ($contrato->empleado && !$contrato->empleado->fotografia) {
-                $foto = DB::table('candidatos')
-                    ->where('identificacion', $cedula)
-                    ->value('fotografia');
+                $foto = $fotoPorCedula->get($cedula);
                 if ($foto) {
                     $contrato->empleado->fotografia = $foto;
                 }

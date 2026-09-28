@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contrato;
 use App\Models\Empresa;
+use App\Models\RespuestaIngreso;
 use App\Models\User;
 use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -17,166 +19,177 @@ class EmpleadoController extends Controller
 {
     public function index(Request $request)
     {
+        $users = User::with([
+                'empresa',
+                'sedeCatalogo',
+                'contratos' => function($q) {
+                    $q->orderBy('fecha_ingreso', 'desc');
+                },
+                // Cada Contrato resuelve su atributo `sede` contra este catálogo (ver
+                // HasSedeCatalogo); sin precargarlo aquí, se dispara una consulta por
+                // cada contrato al serializar la respuesta (N+1 severo con cientos de
+                // empleados).
+                'contratos.sedeCatalogo',
+            ])
+            ->whereNotNull('cedula')
+            ->where('cedula', '!=', '')
+            // Por defecto solo se listan empleados ya dados de alta en este módulo.
+            // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
+            // a quienes aún no tienen la alta manual pero ya cuentan con un contrato
+            // (p. ej. importados en bloque vía ImportarContratosActivosCommand): basta con
+            // tener contrato para poder asignarles dotación, sin exigir la ficha completa.
+            ->where(function ($q) use ($request) {
+                $q->where('pendiente_alta', false);
+                if ($request->boolean('con_contrato')) {
+                    $q->orWhereHas('contratos');
+                }
+            })
+            ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
+            ->orderByRaw('nombres IS NULL ASC, nombres ASC')
+            ->get();
+
+        $cedulas = $users->pluck('cedula')->filter()->unique()->values()->toArray();
+
+        // Todo lo que sigue reemplaza ~14 consultas POR EMPLEADO (N+1) por un puñado de
+        // consultas en bloque (whereIn) resueltas una sola vez para toda la lista, y luego
+        // se resuelve cada empleado en memoria. Con cientos de empleados esto es la
+        // diferencia entre miles de queries y una decena.
+
+        $respuestasPorCedula = RespuestaIngreso::whereIn('documento', $cedulas)
+            ->orderBy('id')
+            ->get()
+            ->unique('documento')
+            ->keyBy('documento');
+
+        $candidatosPorCedula = DB::table('candidatos')
+            ->whereIn('identificacion', $cedulas)
+            ->orderBy('id')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $ciudadCandidatoPorCedula = DB::table('candidatos')
+            ->join('ciudades', 'candidatos.ciudad_id', '=', 'ciudades.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->orderBy('candidatos.id')
+            ->select('candidatos.identificacion', 'ciudades.nombre as ciudad')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $baseIngresosPorCedula = DB::table('base_ingresos')
+            ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->select('candidatos.identificacion', 'base_ingresos.ciudad', 'base_ingresos.salario_basico', 'base_ingresos.created_at')
+            ->get()
+            ->groupBy('identificacion');
+
+        $empresaPorCedula = DB::table('candidatos')
+            ->join('requisiciones', 'candidatos.requisicion_id', '=', 'requisiciones.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->whereNotNull('requisiciones.empresa_id')
+            ->orderBy('candidatos.id')
+            ->select('candidatos.identificacion', 'requisiciones.empresa_id')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
+
         return response()->json(
-            User::with(['empresa', 'sedeCatalogo', 'contratos' => function($q) {
-                $q->orderBy('fecha_ingreso', 'desc');
-            }])
-                ->whereNotNull('cedula')
-                ->where('cedula', '!=', '')
-                // Por defecto solo se listan empleados ya dados de alta en este módulo.
-                // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
-                // a quienes aún no tienen la alta manual pero ya cuentan con un contrato
-                // (p. ej. importados en bloque vía ImportarContratosActivosCommand): basta con
-                // tener contrato para poder asignarles dotación, sin exigir la ficha completa.
-                ->where(function ($q) use ($request) {
-                    $q->where('pendiente_alta', false);
-                    if ($request->boolean('con_contrato')) {
-                        $q->orWhereHas('contratos');
-                    }
-                })
-                ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
-                ->orderByRaw('nombres IS NULL ASC, nombres ASC')
-                ->get()
-                ->map(function($user) {
-                    // 1. Buscar en respuestas_ingresos
-                    $ciudad = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
-                        ->where('documento', $user->cedula)
-                        ->value('ciudad');
+            $users->map(function ($user) use (
+                $respuestasPorCedula, $candidatosPorCedula, $ciudadCandidatoPorCedula,
+                $baseIngresosPorCedula, $empresaPorCedula, $generosValidos
+            ) {
+                $cedula = $user->cedula ?? '';
+                $respuesta = $respuestasPorCedula->get($cedula);
+                $candidato = $candidatosPorCedula->get($cedula);
+                $baseIngresoRows = $baseIngresosPorCedula->get($cedula);
 
-                    // 2. Buscar en candidatos (usando ciudad_id)
-                    if (!$ciudad) {
-                        $ciudad = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->join('ciudades', 'candidatos.ciudad_id', '=', 'ciudades.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->value('ciudades.nombre');
-                    }
+                // 1. respuestas_ingresos → 2. candidatos (join ciudades) → 3. base_ingresos
+                $user->ciudad = $respuesta?->ciudad
+                    ?: $ciudadCandidatoPorCedula->get($cedula)?->ciudad
+                    ?: $baseIngresoRows?->first()?->ciudad;
 
-                    // 3. Buscar en base_ingresos
-                    if (!$ciudad) {
-                        $ciudad = \Illuminate\Support\Facades\DB::table('base_ingresos')
-                            ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->value('base_ingresos.ciudad');
-                    }
+                // Género: usar users.genero si es un valor reconocido; si no, el de candidatos
+                if (!in_array($user->genero, $generosValidos)) {
+                    $user->genero = $candidato?->genero;
+                }
 
-                    $user->ciudad = $ciudad;
+                // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
+                // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
+                // candidatos (fuente antigua, previa a que el campo se moviera aquí).
+                if (!$user->fotografia) {
+                    $user->fotografia = $respuesta?->fotografia ?: $candidato?->fotografia;
+                }
+                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
+                $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
+                $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
+                $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
+                if ($respuesta) {
+                    $user->estado_civil         = $user->estado_civil         ?: $respuesta->estado_civil;
+                    $user->nivel_escolaridad    = $user->nivel_escolaridad    ?: $respuesta->nivel_escolaridad;
+                    $user->estrato              = $user->estrato              ?: $respuesta->estrato;
+                    $user->barrio               = $user->barrio               ?: $respuesta->barrio;
+                    $user->numero_hijos         = $user->numero_hijos         ?: $respuesta->numero_hijos;
+                    $user->rh                   = $user->rh                   ?: $respuesta->rh;
+                    $user->fecha_nacimiento     = $user->fecha_nacimiento     ?: $respuesta->fecha_nacimiento;
+                    $user->lugar_nacimiento     = $user->lugar_nacimiento     ?: $respuesta->lugar_nacimiento;
+                    $user->direccion_residencia = $user->direccion_residencia ?: $respuesta->direccion;
+                    $user->contacto_emergencia_nombre     = $user->contacto_emergencia_nombre     ?: $respuesta->emergencia_nombre;
+                    $user->contacto_emergencia_telefono   = $user->contacto_emergencia_telefono   ?: $respuesta->emergencia_telefono;
+                    $user->contacto_emergencia_parentesco = $user->contacto_emergencia_parentesco ?: $respuesta->emergencia_parentesco;
+                    $user->eps             = $user->eps             ?: $respuesta->eps;
+                    $user->fondo_pensiones = $user->fondo_pensiones ?: $respuesta->afp;
+                }
 
-                    // Género: usar users.genero si es un valor reconocido; si no, buscar en candidatos
-                    $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
-                    if (!in_array($user->genero, $generosValidos)) {
-                        $user->genero = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->where('identificacion', $user->cedula)
-                            ->value('genero');
-                    }
+                // fecha_expedicion desde candidatos
+                if (!$user->fecha_expedicion) {
+                    $user->fecha_expedicion = $candidato?->fecha_expedicion;
+                }
 
-                    // Datos desde respuestas_ingresos: tallas, profesión y datos personales nulos
-                    $respuesta = \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first();
+                // Móvil: si está vacío o es el placeholder por defecto
+                if (!$user->movil || $user->movil === '0000000000') {
+                    $celular = $respuesta?->celular ?? $candidato?->celular;
+                    if ($celular) $user->movil = $celular;
+                }
 
-                    // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
-                    // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
-                    // candidatos (fuente antigua, previa a que el campo se moviera aquí).
-                    if (!$user->fotografia) {
-                        $user->fotografia = $respuesta?->fotografia
-                            ?: \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('fotografia');
-                    }
-                    $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
-                    $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
-                    $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
-                    $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
-                    if ($respuesta) {
-                        $user->estado_civil         = $user->estado_civil         ?: $respuesta->estado_civil;
-                        $user->nivel_escolaridad    = $user->nivel_escolaridad    ?: $respuesta->nivel_escolaridad;
-                        $user->estrato              = $user->estrato              ?: $respuesta->estrato;
-                        $user->barrio               = $user->barrio               ?: $respuesta->barrio;
-                        $user->numero_hijos         = $user->numero_hijos         ?: $respuesta->numero_hijos;
-                        $user->rh                   = $user->rh                   ?: $respuesta->rh;
-                        $user->fecha_nacimiento     = $user->fecha_nacimiento     ?: $respuesta->fecha_nacimiento;
-                        $user->lugar_nacimiento     = $user->lugar_nacimiento     ?: $respuesta->lugar_nacimiento;
-                        $user->direccion_residencia = $user->direccion_residencia ?: $respuesta->direccion;
-                        $user->contacto_emergencia_nombre     = $user->contacto_emergencia_nombre     ?: $respuesta->emergencia_nombre;
-                        $user->contacto_emergencia_telefono   = $user->contacto_emergencia_telefono   ?: $respuesta->emergencia_telefono;
-                        $user->contacto_emergencia_parentesco = $user->contacto_emergencia_parentesco ?: $respuesta->emergencia_parentesco;
-                        $user->eps             = $user->eps             ?: $respuesta->eps;
-                        $user->fondo_pensiones = $user->fondo_pensiones ?: $respuesta->afp;
-                    }
-                    // fecha_expedicion desde candidatos
-                    if (!$user->fecha_expedicion) {
-                        $user->fecha_expedicion = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->where('identificacion', $user->cedula)
-                            ->value('fecha_expedicion');
-                    }
+                // Email: si parece auto-generado (cedula@dominio)
+                if ($cedula && $user->email && str_starts_with($user->email, $cedula . '@')) {
+                    $realEmail = $respuesta?->correo ?? $candidato?->correo;
+                    if ($realEmail) $user->email = $realEmail;
+                }
 
-                    // Móvil: si está vacío o es el placeholder por defecto
-                    if (!$user->movil || $user->movil === '0000000000') {
-                        $celular = $respuesta?->celular
-                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('celular');
-                        if ($celular) $user->movil = $celular;
-                    }
+                // Caja Compensación: desde contratos (ya cargados y ordenados por fecha_ingreso
+                // desc vía el eager load de arriba, no hace falta volver a consultar) → candidatos
+                if (!$user->caja_compensacion) {
+                    $contratoConCaja = $user->contratos->first(fn($c) => !is_null($c->caja_compensacion));
+                    $caja = $contratoConCaja?->caja_compensacion ?: $candidato?->caja_compensacion;
+                    if ($caja) $user->caja_compensacion = $caja;
+                }
 
-                    // Email: si parece auto-generado (cedula@dominio)
-                    $cedula = $user->cedula ?? '';
-                    if ($cedula && $user->email && str_starts_with($user->email, $cedula . '@')) {
-                        $realEmail = $respuesta?->correo
-                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $cedula)
-                                ->value('correo');
-                        if ($realEmail) $user->email = $realEmail;
-                    }
+                // Empresa: desde requisicion del candidato si no tiene empresa_id
+                if (!$user->empresa_id) {
+                    $empresaId = $empresaPorCedula->get($cedula)?->empresa_id;
+                    if ($empresaId) $user->empresa_id = $empresaId;
+                }
 
-                    // Caja Compensación: desde contratos → candidatos
-                    if (!$user->caja_compensacion) {
-                        $caja = \Illuminate\Support\Facades\DB::table('contratos')
-                            ->where('empleado_id', $user->id)
-                            ->whereNotNull('caja_compensacion')
-                            ->orderByDesc('fecha_ingreso')
-                            ->value('caja_compensacion');
-                        if (!$caja) {
-                            $caja = \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('caja_compensacion');
-                        }
-                        if ($caja) $user->caja_compensacion = $caja;
+                // Ingresos: si nulo, buscar en contratos (ya cargados) → base_ingresos (más
+                // reciente) → candidatos
+                if (is_null($user->ingresos) || $user->ingresos == 0) {
+                    $contratoConSalario = $user->contratos->first(fn($c) => !is_null($c->salario));
+                    $salario = $contratoConSalario?->salario;
+                    if (!$salario && $baseIngresoRows) {
+                        $salario = $baseIngresoRows->whereNotNull('salario_basico')
+                            ->sortByDesc('created_at')
+                            ->first()?->salario_basico;
                     }
+                    if (!$salario) $salario = $candidato?->salario_basico;
+                    if ($salario) $user->ingresos = $salario;
+                }
 
-                    // Empresa: desde requisicion del candidato si no tiene empresa_id
-                    if (!$user->empresa_id) {
-                        $empresaId = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->join('requisiciones', 'candidatos.requisicion_id', '=', 'requisiciones.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->whereNotNull('requisiciones.empresa_id')
-                            ->value('requisiciones.empresa_id');
-                        if ($empresaId) $user->empresa_id = $empresaId;
-                    }
-
-                    // Ingresos: si nulo, buscar en contratos → base_ingresos → candidatos
-                    if (is_null($user->ingresos) || $user->ingresos == 0) {
-                        $salario = \Illuminate\Support\Facades\DB::table('contratos')
-                            ->where('empleado_id', $user->id)
-                            ->whereNotNull('salario')
-                            ->orderByDesc('fecha_ingreso')
-                            ->value('salario');
-                        if (!$salario) {
-                            $salario = \Illuminate\Support\Facades\DB::table('base_ingresos')
-                                ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
-                                ->where('candidatos.identificacion', $user->cedula)
-                                ->whereNotNull('base_ingresos.salario_basico')
-                                ->orderByDesc('base_ingresos.created_at')
-                                ->value('base_ingresos.salario_basico');
-                        }
-                        if (!$salario) {
-                            $salario = \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('salario_basico');
-                        }
-                        if ($salario) $user->ingresos = $salario;
-                    }
-
-                    return $user;
-                })
+                return $user;
+            })
         );
     }
 
