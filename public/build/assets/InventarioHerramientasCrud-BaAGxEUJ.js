@@ -1,1 +1,0 @@
-import{j as r}from"./vendor-query-qy_ppomC.js";import t from"./InventarioCategoriaCrud-BO85sdqQ.js";import"./app-B4Cyt3fy.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-th0-_vfM.js";import"./SearchableSelect-BuBDGCn2.js";function u(){return r.jsx(t,{categoria:"Herramientas"})}export{u as default};
