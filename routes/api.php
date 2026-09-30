@@ -392,6 +392,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('asignaciones-inventario/{asignacionInventario}/devolver', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'devolver']);
     Route::post('asignaciones-inventario/{asignacionInventario}/acta-entrega', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'actaEntrega']);
 
+    // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
+    // cargadas por importación masiva desde el Excel de origen del proveedor.
+    Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar']);
+    Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
+        ->only(['index', 'destroy'])
+        ->parameters(['work-orders' => 'workOrder']);
+
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Solo admin administra la matriz
     // completa (el resto de usuarios solo recibe lo suyo, ya incluido en /user).
     Route::middleware('role:admin')->group(function () {

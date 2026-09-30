@@ -294,6 +294,24 @@ export const ERP_MODULES = [
           { id: 'asignacion_inventario_file', label: 'Asignación de Inventario' },
         ]
       },
+      {
+        id: 'inventario_empleado',
+        label: 'Inventario de Empleado',
+        icon: 'productos',
+        desc: 'Elige un empleado y consulta qué tiene asignado actualmente',
+        archivos: [
+          { id: 'inventario_empleado_file', label: 'Inventario de Empleado' },
+        ]
+      },
+      {
+        id: 'work_orders',
+        label: 'Work Orders',
+        icon: 'productos',
+        desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
+        archivos: [
+          { id: 'work_orders_file', label: 'Work Orders' },
+        ]
+      },
       /*
       {
         id: 'consultas',
