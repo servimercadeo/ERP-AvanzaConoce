@@ -217,9 +217,15 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
 }
 
 function buildAnexoFromExcelRow(row) {
-    const tipo = resolveValue(row, ["auxilio", "tipo_auxilio", "tipo de auxilio", "anexo_auxilio"]);
-    const valor = parseNumeric(resolveValue(row, ["valor_auxilio", "valor de auxilio", "total_auxilio"]));
-    const fecha = normalizeDate(resolveValue(row, ["fecha_auxilio", "fecha de auxilio", "fecha_entrega_firma"]));
+    // El auxilio de transporte legal es un campo del contrato, no un anexo: sin excluirlo,
+    // la coincidencia por substring de "auxilio" tomaría esa columna (p. ej. "auxiliot" o
+    // "Auxilio Transporte Legal") como tipo de auxilio cuando la columna de anexo está vacía.
+    const anexoRow = Object.fromEntries(
+        Object.entries(row).filter(([key]) => !/^auxilio(de)?t/.test(normalizeCompact(key))),
+    );
+    const tipo = resolveValue(anexoRow, ["auxilio", "tipo_auxilio", "tipo de auxilio", "anexo_auxilio"]);
+    const valor = parseNumeric(resolveValue(anexoRow, ["valor_auxilio", "valor de auxilio", "total_auxilio"]));
+    const fecha = normalizeDate(resolveValue(anexoRow, ["fecha_auxilio", "fecha de auxilio", "fecha_entrega_firma"]));
 
     if (!tipo && !valor) return null;
 

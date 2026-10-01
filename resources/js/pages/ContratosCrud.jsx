@@ -17,6 +17,7 @@ import {
     IconLoading,
 } from "../components/Icons";
 import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
+import { exportarContratosExcel } from "../utils/contratosExport";
 
 const POR_PAGINA = 5;
 
@@ -2361,6 +2362,7 @@ export default function ContratosCrud() {
     const [importFileName, setImportFileName] = useState("");
     const [importing, setImporting] = useState(false);
     const [importError, setImportError] = useState("");
+    const [exporting, setExporting] = useState(false);
     const [pagina, setPagina] = useState(1);
 
     const { data: _qContratos } = useQuery({
@@ -2604,6 +2606,21 @@ export default function ContratosCrud() {
         setFiltroFondoPensiones("Todos");
     };
 
+    // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
+    // la página actual. Las columnas sensibles solo salen para quien puede verlas.
+    const handleExportExcel = async () => {
+        if (!filtered.length) return;
+        setExporting(true);
+        try {
+            await exportarContratosExcel(filtered, { incluirSensible: puedeVerInfoSensible });
+            showToast(`Excel exportado (${filtered.length} contrato${filtered.length === 1 ? "" : "s"}).`);
+        } catch {
+            showToast("No se pudo generar el Excel.");
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const handleImportExcel = async () => {
         if (!importFile) {
             setImportError("Selecciona un archivo Excel válido (.xlsx o .xls).");
@@ -2825,6 +2842,23 @@ export default function ContratosCrud() {
                     />
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                        style={{
+                            border: "1px solid var(--border)",
+                            background: "var(--white)",
+                            color: "var(--text)",
+                            padding: "9px 14px",
+                            borderRadius: "var(--radius-sm)",
+                            fontWeight: 700,
+                            cursor: exporting || loading || !filtered.length ? "not-allowed" : "pointer",
+                            opacity: exporting || loading || !filtered.length ? 0.6 : 1,
+                        }}
+                        onClick={handleExportExcel}
+                        disabled={exporting || loading || !filtered.length}
+                        title="Exporta los contratos que coinciden con la búsqueda y los filtros activos"
+                    >
+                        {exporting ? "Exportando…" : "Exportar Excel"}
+                    </button>
                     <button
                         style={{
                             border: "1px solid var(--border)",

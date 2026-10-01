@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
 import api from "../api/axios";
+import { exportarEmpleadosExcel } from "../utils/empleadosExport";
 import {
     IconSearch,
     IconEye,
@@ -1309,6 +1310,7 @@ export default function EmpleadosCrud() {
     const [credencialesOpen, setCredencialesOpen] = useState(false);
     const [pagina, setPagina] = useState(1);
     const [sedesActivas, setSedesActivas] = useState([]);
+    const [exporting, setExporting] = useState(false);
 
     const { data: _qEmpresas,  isLoading: _le } = useQuery({ queryKey: ['empresas'],  queryFn: () => api.get('/empresas').then(r => r.data) });
     const { data: _qCatalogos, isLoading: _lc } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
@@ -1463,6 +1465,21 @@ export default function EmpleadosCrud() {
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
+    };
+
+    // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
+    // la página actual.
+    const handleExportExcel = async () => {
+        if (!filtered.length) return;
+        setExporting(true);
+        try {
+            await exportarEmpleadosExcel(filtered);
+            showToast(`Excel exportado (${filtered.length} empleado${filtered.length === 1 ? "" : "s"}).`);
+        } catch {
+            showToast("No se pudo generar el Excel.");
+        } finally {
+            setExporting(false);
+        }
     };
 
     const clearFilters = () => {
@@ -1630,9 +1647,23 @@ export default function EmpleadosCrud() {
                         { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
                     ]} />
                 </div>
-                <button className="btn-primary" onClick={openCreate}>
-                    + Nuevo empleado
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                        style={{
+                            ...S.filterBtn,
+                            cursor: exporting || loading || !filtered.length ? "not-allowed" : "pointer",
+                            opacity: exporting || loading || !filtered.length ? 0.6 : 1,
+                        }}
+                        onClick={handleExportExcel}
+                        disabled={exporting || loading || !filtered.length}
+                        title="Exporta los empleados que coinciden con la búsqueda y los filtros activos"
+                    >
+                        {exporting ? "Exportando…" : "Exportar Excel"}
+                    </button>
+                    <button className="btn-primary" onClick={openCreate}>
+                        + Nuevo empleado
+                    </button>
+                </div>
             </div>
 
             {/* Tabla */}
