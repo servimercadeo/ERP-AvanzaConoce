@@ -222,6 +222,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin,th,tic')->group(function () {
         // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
         Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
+        // Importación masiva de datos personales desde Excel, por cédula (solo rellena
+        // campos vacíos, nunca pisa un dato ya existente).
+        Route::post('empleados/importar-datos-personales', [EmpleadoController::class, 'importarDatosPersonales']);
         // CRUD completo de empleados
         Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
         Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);

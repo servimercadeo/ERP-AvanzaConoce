@@ -361,6 +361,115 @@ class EmpleadoController extends Controller
         ]);
     }
 
+    /**
+     * Importación masiva de datos personales desde Excel, buscando por cédula.
+     * Regla de seguridad (no negociable, pisar datos de empleados reales rompería
+     * información real): por cada campo, solo se escribe si el valor actual en BD
+     * está vacío/NULL (o, solo para `genero`, si vale el placeholder 'No especificado'
+     * que deja el alta automática). Un campo que ya tiene dato se deja intacto y se
+     * reporta como omitido, nunca se sobreescribe.
+     */
+    public function importarDatosPersonales(Request $request)
+    {
+        // Solo se valida que `filas` sea un array no vacío; una fila puntual mal
+        // formada (sin cédula, no es objeto, etc.) se descarta más abajo fila por
+        // fila, no se rechaza todo el lote por un solo registro raro. `validate()`
+        // también descarta cualquier campo sin regla declarada, así que los datos
+        // reales se toman del input crudo y se validan campo por campo más abajo.
+        $request->validate([
+            'filas' => 'required|array|min:1|max:2000',
+        ]);
+        $filas = $request->input('filas', []);
+
+        $camposPermitidos = [
+            'fecha_expedicion', 'genero', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
+            'estado_civil', 'nivel_escolaridad', 'profesion', 'numero_hijos', 'rh', 'movil',
+            'direccion_residencia', 'barrio', 'estrato', 'banco', 'tipo_cuenta', 'cuenta_bancaria',
+            'talla_camisa', 'talla_pantalon', 'talla_zapatos',
+            'contacto_emergencia_nombre', 'contacto_emergencia_telefono', 'contacto_emergencia_parentesco',
+        ];
+
+        $resumen = [
+            'actualizados'   => 0,
+            'sin_cambios'    => 0,
+            'no_encontrados' => [],
+            'detalle'        => [],
+        ];
+
+        DB::transaction(function () use ($filas, $camposPermitidos, &$resumen) {
+            foreach ($filas as $fila) {
+                if (!is_array($fila)) continue;
+                $cedula = trim((string) ($fila['cedula'] ?? ''));
+                if ($cedula === '') continue;
+
+                $user = User::where('cedula', $cedula)->first();
+                if (!$user) {
+                    $resumen['no_encontrados'][] = $cedula;
+                    continue;
+                }
+
+                $actualizadosFila = [];
+                $omitidosFila = [];
+
+                foreach ($camposPermitidos as $campo) {
+                    if (!array_key_exists($campo, $fila)) continue;
+                    $valor = $fila[$campo];
+                    $valor = is_string($valor) ? trim($valor) : $valor;
+                    if ($valor === null || $valor === '') continue;
+
+                    if ($campo === 'genero') {
+                        $generoUpper = mb_strtoupper((string) $valor, 'UTF-8');
+                        if ($generoUpper === 'MASCULINO') {
+                            $valor = 'Masculino';
+                        } elseif ($generoUpper === 'FEMENINO') {
+                            $valor = 'Femenino';
+                        } else {
+                            continue; // valor de genero no reconocido: se omite este campo (sigue con los demás)
+                        }
+                    }
+                    if ($campo === 'numero_hijos') {
+                        if (!is_numeric($valor)) continue;
+                        $valor = (int) $valor;
+                        if ($valor < 0 || $valor > 20) continue;
+                    }
+                    if (in_array($campo, ['fecha_nacimiento', 'fecha_expedicion'], true)) {
+                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor)) continue;
+                        $year = (int) substr((string) $valor, 0, 4);
+                        if ($year < 1920 || $year > (int) date('Y')) continue;
+                    }
+
+                    $actual = $user->{$campo};
+                    $vacioActual = $actual === null || $actual === ''
+                        || ($campo === 'genero' && $actual === 'No especificado');
+
+                    if (!$vacioActual) {
+                        $omitidosFila[] = $campo;
+                        continue;
+                    }
+
+                    $user->{$campo} = $valor;
+                    $actualizadosFila[] = $campo;
+                }
+
+                if (!empty($actualizadosFila)) {
+                    $user->save();
+                    $resumen['actualizados']++;
+                } else {
+                    $resumen['sin_cambios']++;
+                }
+
+                $resumen['detalle'][] = [
+                    'cedula'               => $cedula,
+                    'nombre'               => trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')),
+                    'campos_actualizados'  => $actualizadosFila,
+                    'campos_omitidos'      => $omitidosFila,
+                ];
+            }
+        });
+
+        return response()->json($resumen);
+    }
+
     public function destroy(User $empleado)
     {
         $empleado->delete();
