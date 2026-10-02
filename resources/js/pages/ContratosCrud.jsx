@@ -18,6 +18,12 @@ import {
 } from "../components/Icons";
 import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
 import { exportarContratosExcel } from "../utils/contratosExport";
+import {
+    COLUMNAS_IMPORTABLES as COLUMNAS_COMPLETAR_DATOS,
+    descargarPlantillaImportacion as descargarPlantillaCompletarDatos,
+    parsearArchivoImportacion as parsearArchivoCompletarDatos,
+} from "../utils/contratosImportDatos";
+import ImportExcelModal from "../components/ImportExcelModal";
 
 const POR_PAGINA = 5;
 
@@ -2358,6 +2364,7 @@ export default function ContratosCrud() {
     const [empresaProyectoAlert, setEmpresaProyectoAlert] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
+    const [completarDatosOpen, setCompletarDatosOpen] = useState(false);
     const [importFile, setImportFile] = useState(null);
     const [importFileName, setImportFileName] = useState("");
     const [importing, setImporting] = useState(false);
@@ -2877,6 +2884,21 @@ export default function ContratosCrud() {
                         }}
                     >
                         Importar Excel
+                    </button>
+                    <button
+                        style={{
+                            border: "1px solid var(--border)",
+                            background: "var(--white)",
+                            color: "var(--text)",
+                            padding: "9px 14px",
+                            borderRadius: "var(--radius-sm)",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                        onClick={() => setCompletarDatosOpen(true)}
+                        title="Completa campos vacíos de contratos existentes desde Excel, buscando por Documento. Nunca sobrescribe datos existentes ni crea contratos nuevos."
+                    >
+                        Completar Datos (Excel)
                     </button>
                     <button
                         className="btn-primary"
@@ -3447,6 +3469,31 @@ export default function ContratosCrud() {
                         ),
                     )
                 }
+            />
+
+            <ImportExcelModal
+                open={completarDatosOpen}
+                onClose={() => setCompletarDatosOpen(false)}
+                onImported={() => qc.invalidateQueries({ queryKey: ["contratos"] })}
+                titulo="Completar datos de contratos desde Excel"
+                descripcion={
+                    <>
+                        Busca el contrato más reciente de cada empleado por{" "}
+                        <strong>Documento</strong> (cédula) y rellena los
+                        campos que traiga el archivo.{" "}
+                        <strong>
+                            Nunca sobrescribe un dato que el contrato ya
+                            tenga guardado
+                        </strong>{" "}
+                        ni crea contratos nuevos: si una celda corresponde a
+                        un campo que ya tiene valor, esa celda se ignora y
+                        queda reportada al final.
+                    </>
+                }
+                columnas={COLUMNAS_COMPLETAR_DATOS}
+                descargarPlantilla={descargarPlantillaCompletarDatos}
+                parsearArchivo={parsearArchivoCompletarDatos}
+                endpoint="/contratos/importar-datos-faltantes"
             />
         </div>
     );

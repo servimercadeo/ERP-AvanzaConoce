@@ -368,6 +368,13 @@ class EmpleadoController extends Controller
      * está vacío/NULL (o, solo para `genero`, si vale el placeholder 'No especificado'
      * que deja el alta automática). Un campo que ya tiene dato se deja intacto y se
      * reporta como omitido, nunca se sobreescribe.
+     *
+     * Si la cédula encontrada está `pendiente_alta` (creada como cascarón por el import
+     * de Contratos, nunca dada de alta aquí), este import también completa su alta —
+     * igual que al editarla manualmente en store() — para que deje de estar invisible en
+     * el módulo de Empleados. Esto sí genera credenciales nuevas, que se devuelven en el
+     * detalle de cada fila porque no hay otra forma de recuperarlas después (la
+     * contraseña se guarda ya hasheada).
      */
     public function importarDatosPersonales(Request $request)
     {
@@ -381,22 +388,57 @@ class EmpleadoController extends Controller
         ]);
         $filas = $request->input('filas', []);
 
+        // NO incluye: cargo (User::booted() deriva `rol` de él al guardarlo — demasiado
+        // riesgoso para una carga masiva sin revisión caso por caso), estado_empleado,
+        // email, ingresos, empresa_id (cada uno con su propio flujo dedicado). Los campos
+        // de Contrato (tipo/estado de contrato, fechas, cliente_proyecto, etc.) los cubre
+        // ContratoController@importarDatosFaltantes, no este método.
         $camposPermitidos = [
+            'nombres', 'apellidos',
             'fecha_expedicion', 'genero', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
             'estado_civil', 'nivel_escolaridad', 'profesion', 'numero_hijos', 'rh', 'movil',
-            'direccion_residencia', 'barrio', 'estrato', 'banco', 'tipo_cuenta', 'cuenta_bancaria',
+            'direccion_residencia', 'barrio', 'estrato',
+            'tipo_funcionario', 'tipo_vinculacion', 'sede', 'empleador',
+            'jefe_inmediato', 'jefe_inmediato_correo', 'codigo_directv',
+            'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
+            'banco', 'tipo_cuenta', 'cuenta_bancaria',
             'talla_camisa', 'talla_pantalon', 'talla_zapatos',
+            'licencia_carro', 'licencia_carro_vence', 'licencia_moto', 'licencia_moto_vence',
+            'tiene_cert_alturas', 'cert_alturas_vence',
             'contacto_emergencia_nombre', 'contacto_emergencia_telefono', 'contacto_emergencia_parentesco',
+            'observaciones_medicas', 'alergias', 'comentarios',
+        ];
+        $camposFecha = [
+            'fecha_expedicion', 'fecha_nacimiento',
+            'licencia_carro_vence', 'licencia_moto_vence', 'cert_alturas_vence',
+        ];
+        // Límite real de cada columna varchar en `users` (ver migraciones). Un valor más
+        // largo rompería el UPDATE completo del lote con un 500 (columna varchar no
+        // trunca, lanza SQLSTATE 22001) — mejor omitir solo ese campo, igual que un valor
+        // inválido, que perder las 2000 filas por una celda demasiado larga.
+        $longitudesMaximas = [
+            'nombres' => 100, 'apellidos' => 100, 'genero' => 30, 'lugar_nacimiento' => 100,
+            'raza' => 50, 'estado_civil' => 30, 'nivel_escolaridad' => 50, 'profesion' => 150,
+            'rh' => 5, 'movil' => 20, 'direccion_residencia' => 200, 'barrio' => 100, 'estrato' => 5,
+            'tipo_funcionario' => 80, 'tipo_vinculacion' => 30, 'sede' => 100, 'empleador' => 150,
+            'jefe_inmediato' => 150, 'jefe_inmediato_correo' => 180, 'codigo_directv' => 50,
+            'eps' => 100, 'arl' => 100, 'fondo_pensiones' => 100, 'caja_compensacion' => 100,
+            'banco' => 100, 'tipo_cuenta' => 30, 'cuenta_bancaria' => 30,
+            'talla_camisa' => 20, 'talla_pantalon' => 20, 'talla_zapatos' => 20,
+            'licencia_carro' => 50, 'licencia_moto' => 50,
+            'contacto_emergencia_nombre' => 150, 'contacto_emergencia_telefono' => 20,
+            'contacto_emergencia_parentesco' => 80,
         ];
 
         $resumen = [
             'actualizados'   => 0,
+            'dados_de_alta'  => 0,
             'sin_cambios'    => 0,
             'no_encontrados' => [],
             'detalle'        => [],
         ];
 
-        DB::transaction(function () use ($filas, $camposPermitidos, &$resumen) {
+        DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
             foreach ($filas as $fila) {
                 if (!is_array($fila)) continue;
                 $cedula = trim((string) ($fila['cedula'] ?? ''));
@@ -416,6 +458,7 @@ class EmpleadoController extends Controller
                     $valor = $fila[$campo];
                     $valor = is_string($valor) ? trim($valor) : $valor;
                     if ($valor === null || $valor === '') continue;
+                    if (isset($longitudesMaximas[$campo]) && mb_strlen((string) $valor) > $longitudesMaximas[$campo]) continue;
 
                     if ($campo === 'genero') {
                         $generoUpper = mb_strtoupper((string) $valor, 'UTF-8');
@@ -432,10 +475,11 @@ class EmpleadoController extends Controller
                         $valor = (int) $valor;
                         if ($valor < 0 || $valor > 20) continue;
                     }
-                    if (in_array($campo, ['fecha_nacimiento', 'fecha_expedicion'], true)) {
+                    if ($campo === 'tiene_cert_alturas' && !is_bool($valor)) continue;
+                    if (in_array($campo, $camposFecha, true)) {
                         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor)) continue;
                         $year = (int) substr((string) $valor, 0, 4);
-                        if ($year < 1920 || $year > (int) date('Y')) continue;
+                        if ($year < 1920 || $year > (int) date('Y') + 10) continue;
                     }
 
                     $actual = $user->{$campo};
@@ -451,9 +495,42 @@ class EmpleadoController extends Controller
                     $actualizadosFila[] = $campo;
                 }
 
-                if (!empty($actualizadosFila)) {
+                // Esta cédula vino de un alta automática (p. ej. import de Contratos, que
+                // crea un User "cascarón" para poder enlazar el contrato) y nunca se
+                // completó su alta real en este módulo — por eso no aparecía en la lista de
+                // Empleados aunque sus datos sí existieran. El import también la completa
+                // aquí, con la misma lógica que store() al editar manualmente: no tiene
+                // sentido rellenarle los datos y dejarlo igual de invisible.
+                $seDioDeAlta = false;
+                $credenciales = null;
+                if ($user->pendiente_alta) {
+                    $user->rol            = $user->rol ?: 'consultor';
+                    $user->activo         = true;
+                    $user->pendiente_alta = false;
+                    $plainPassword = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
+                    $user->password = Hash::make($plainPassword);
+                    $credenciales = ['email' => $user->email, 'password' => $plainPassword];
+                    $seDioDeAlta = true;
+                }
+
+                $huboDatosNuevos = !empty($actualizadosFila);
+
+                if ($huboDatosNuevos || $seDioDeAlta) {
+                    // `name` no se deriva solo al guardar (a diferencia de `rol`, que sí
+                    // tiene un hook en User::booted() para `cargo`) — si se acaban de
+                    // rellenar nombres/apellidos, se recalcula aquí para no dejarlo
+                    // desincronizado con lo que se ve en el resto del sistema.
+                    if (in_array('nombres', $actualizadosFila, true) || in_array('apellidos', $actualizadosFila, true)) {
+                        $user->name = trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? ''));
+                    }
                     $user->save();
-                    $resumen['actualizados']++;
+                    if ($seDioDeAlta) {
+                        app(\App\Services\EmpleadoSyncService::class)->syncFromUser($user);
+                        $resumen['dados_de_alta']++;
+                    }
+                    if ($huboDatosNuevos) {
+                        $resumen['actualizados']++;
+                    }
                 } else {
                     $resumen['sin_cambios']++;
                 }
@@ -463,6 +540,8 @@ class EmpleadoController extends Controller
                     'nombre'               => trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')),
                     'campos_actualizados'  => $actualizadosFila,
                     'campos_omitidos'      => $omitidosFila,
+                    'dado_de_alta'         => $seDioDeAlta,
+                    'credenciales'         => $credenciales,
                 ];
             }
         });

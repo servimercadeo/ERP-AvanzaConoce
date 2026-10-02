@@ -230,6 +230,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
         Route::apiResource('empleados', EmpleadoController::class);
 
+        // Rellenar datos faltantes de contratos desde Excel, por documento/cédula (solo
+        // rellena campos vacíos, nunca pisa un dato ya existente; nunca crea contratos).
+        Route::post('contratos/importar-datos-faltantes', [ContratoController::class, 'importarDatosFaltantes']);
         // CRUD completo de contratos
         Route::apiResource('contratos', ContratoController::class);
     });

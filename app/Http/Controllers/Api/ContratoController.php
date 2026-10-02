@@ -9,6 +9,7 @@ use App\Models\Contrato;
 use App\Models\Empresa;
 use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
+use App\Models\User;
 use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -590,6 +591,117 @@ class ContratoController extends Controller
     {
         $contrato->delete();
         return response()->json(null, 204);
+    }
+
+    /**
+     * Rellenar datos faltantes de contratos desde Excel, buscando por Documento (cédula)
+     * del empleado y actualizando su contrato más reciente.
+     *
+     * Regla de seguridad (no negociable, igual que en
+     * EmpleadoController@importarDatosPersonales): por cada campo, solo se escribe si el
+     * valor actual en BD está vacío/NULL. Un campo que ya tiene dato se deja intacto y se
+     * reporta como omitido, nunca se sobreescribe. Distinto del "Importar Excel" que ya
+     * existe (crea contratos nuevos): este nunca crea nada, solo completa.
+     */
+    public function importarDatosFaltantes(Request $request)
+    {
+        // Solo se valida la forma del lote; cada fila se valida/descarta puntualmente más
+        // abajo (ver EmpleadoController@importarDatosPersonales para el porqué de no usar
+        // `filas.*.campo` aquí: validate() descarta cualquier campo sin regla declarada).
+        $request->validate([
+            'filas' => 'required|array|min:1|max:2000',
+        ]);
+        $filas = $request->input('filas', []);
+
+        $camposPermitidos = [
+            'cargo', 'sede', 'area_empresa', 'jefe_inmediato', 'jefe_inmediato_correo',
+            'tipo_vinculacion', 'arl', 'fecha_vinculacion_arl', 'lps_afiliado',
+            'fecha_vinculacion_lps', 'caja_compensacion', 'fecha_vinculacion_caja',
+            'fondo_pensiones', 'fondo_cesantias', 'empleador', 'cliente_proyecto',
+        ];
+        $camposFecha = ['fecha_vinculacion_arl', 'fecha_vinculacion_lps', 'fecha_vinculacion_caja'];
+        // Límite real de cada columna varchar en `contratos` (ver migraciones). Un valor
+        // más largo rompería el UPDATE completo del lote con un 500 — mejor omitir solo
+        // ese campo que perder las 2000 filas por una celda demasiado larga.
+        $longitudesMaximas = [
+            'cargo' => 100, 'sede' => 100, 'area_empresa' => 100,
+            'jefe_inmediato' => 150, 'jefe_inmediato_correo' => 180, 'tipo_vinculacion' => 30,
+            'arl' => 100, 'lps_afiliado' => 100, 'caja_compensacion' => 100,
+            'fondo_pensiones' => 100, 'fondo_cesantias' => 100,
+            'empleador' => 150, 'cliente_proyecto' => 150,
+        ];
+
+        $resumen = [
+            'actualizados'   => 0,
+            'sin_cambios'    => 0,
+            'no_encontrados' => [],
+            'detalle'        => [],
+        ];
+
+        DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
+            foreach ($filas as $fila) {
+                if (!is_array($fila)) continue;
+                $documento = trim((string) ($fila['documento'] ?? ''));
+                if ($documento === '') continue;
+
+                $empleado = User::where('cedula', $documento)->first();
+                $contrato = $empleado
+                    ? Contrato::where('empleado_id', $empleado->id)
+                        ->orderByDesc('fecha_ingreso')
+                        ->orderByDesc('id')
+                        ->first()
+                    : null;
+
+                if (!$contrato) {
+                    $resumen['no_encontrados'][] = $documento;
+                    continue;
+                }
+
+                $actualizadosFila = [];
+                $omitidosFila = [];
+
+                foreach ($camposPermitidos as $campo) {
+                    if (!array_key_exists($campo, $fila)) continue;
+                    $valor = $fila[$campo];
+                    $valor = is_string($valor) ? trim($valor) : $valor;
+                    if ($valor === null || $valor === '') continue;
+                    if (isset($longitudesMaximas[$campo]) && mb_strlen((string) $valor) > $longitudesMaximas[$campo]) continue;
+
+                    if (in_array($campo, $camposFecha, true)) {
+                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor)) continue;
+                        $year = (int) substr((string) $valor, 0, 4);
+                        if ($year < 1950 || $year > (int) date('Y') + 1) continue;
+                    }
+
+                    $actual = $contrato->{$campo};
+                    $vacioActual = $actual === null || $actual === '';
+
+                    if (!$vacioActual) {
+                        $omitidosFila[] = $campo;
+                        continue;
+                    }
+
+                    $contrato->{$campo} = $valor;
+                    $actualizadosFila[] = $campo;
+                }
+
+                if (!empty($actualizadosFila)) {
+                    $contrato->save();
+                    $resumen['actualizados']++;
+                } else {
+                    $resumen['sin_cambios']++;
+                }
+
+                $resumen['detalle'][] = [
+                    'documento'           => $documento,
+                    'nombre'              => trim(($empleado->nombres ?? '') . ' ' . ($empleado->apellidos ?? '')),
+                    'campos_actualizados' => $actualizadosFila,
+                    'campos_omitidos'     => $omitidosFila,
+                ];
+            }
+        });
+
+        return response()->json($resumen);
     }
 
 }
