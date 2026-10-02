@@ -1,7 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
-import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import {
+    SearchableSelect,
+    PresetFiltersDropdown,
+} from "../components/SearchableSelect";
 import api from "../api/axios";
 import { exportarEmpleadosExcel } from "../utils/empleadosExport";
 import {
@@ -14,7 +17,6 @@ import {
     IconSearch,
     IconEye,
     IconEdit,
-
     IconClose,
     IconEmptySearch,
     IconLoading,
@@ -160,9 +162,12 @@ const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 const matchOpt = (val, opts) => {
     if (!val || !opts?.length) return null;
     const norm = (s) =>
-        String(s).toLowerCase()
-            .normalize("NFD").replace(/[̀-ͯ]/g, "")
-            .replace(/\/[a-z]$/, "").trim();
+        String(s)
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .replace(/\/[a-z]$/, "")
+            .trim();
     const nVal = norm(val);
     return opts.find((o) => norm(o) === nVal) ?? null;
 };
@@ -172,32 +177,48 @@ const toForm = (emp, catalogs = {}) => ({
     ...emp,
     tiene_cert_alturas: emp.tiene_cert_alturas ? "Sí" : "No",
     empresa_id: emp.empresa_id ?? "",
-    fecha_nacimiento:     dateOnly(emp.fecha_nacimiento),
-    fecha_expedicion:     dateOnly(emp.fecha_expedicion),
+    fecha_nacimiento: dateOnly(emp.fecha_nacimiento),
+    fecha_expedicion: dateOnly(emp.fecha_expedicion),
     licencia_carro_vence: dateOnly(emp.licencia_carro_vence),
-    licencia_moto_vence:  dateOnly(emp.licencia_moto_vence),
-    cert_alturas_vence:   dateOnly(emp.cert_alturas_vence),
-    ingresos:      emp.ingresos ?? "",
-    numero_hijos:  emp.numero_hijos != null ? String(emp.numero_hijos) : "",
-    profesion:     emp.profesion ?? "",
-    talla_camisa:  emp.talla_camisa ?? "",
-    talla_pantalon:emp.talla_pantalon ?? "",
+    licencia_moto_vence: dateOnly(emp.licencia_moto_vence),
+    cert_alturas_vence: dateOnly(emp.cert_alturas_vence),
+    ingresos: emp.ingresos ?? "",
+    numero_hijos: emp.numero_hijos != null ? String(emp.numero_hijos) : "",
+    profesion: emp.profesion ?? "",
+    talla_camisa: emp.talla_camisa ?? "",
+    talla_pantalon: emp.talla_pantalon ?? "",
     talla_zapatos: emp.talla_zapatos ?? "",
     // Normalizar campos de select para que coincidan exactamente con las opciones
     // (mismo criterio que handleSelectCand, aplicado también al abrir un empleado existente)
-    genero:            matchOpt(emp.genero,           GENEROS)    ?? emp.genero ?? "",
-    estado_civil:      matchOpt(emp.estado_civil,     EST_CIVIL)  ?? emp.estado_civil ?? "",
-    nivel_escolaridad: matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ?? emp.nivel_escolaridad ?? "",
-    estrato:           matchOpt(emp.estrato,          ESTRATOS)   ?? emp.estrato ?? "PD",
-    rh:                matchOpt(emp.rh,                catalogs.tipos_rh)         ?? emp.rh ?? "",
-    eps:               matchOpt(emp.eps,               catalogs.eps)              ?? emp.eps ?? "",
-    arl:               matchOpt(emp.arl,               catalogs.arls)             ?? emp.arl ?? "",
-    fondo_pensiones:   matchOpt(emp.fondo_pensiones,   catalogs.pensiones)        ?? emp.fondo_pensiones ?? "",
-    caja_compensacion: matchOpt(emp.caja_compensacion, catalogs.cajas)            ?? emp.caja_compensacion ?? "",
-    cargo:             matchOpt(emp.cargo,             catalogs.cargos)           ?? emp.cargo ?? "",
-    sede:              matchOpt(emp.sede,              catalogs.sedes)            ?? emp.sede ?? "",
-    tipo_vinculacion:  matchOpt(emp.tipo_vinculacion,  catalogs.tipos_vinculacion) ?? emp.tipo_vinculacion ?? "",
-    tipo_funcionario:  matchOpt(emp.tipo_funcionario,  catalogs.tipos_funcionario) ?? emp.tipo_funcionario ?? "",
+    genero: matchOpt(emp.genero, GENEROS) ?? emp.genero ?? "",
+    estado_civil:
+        matchOpt(emp.estado_civil, EST_CIVIL) ?? emp.estado_civil ?? "",
+    nivel_escolaridad:
+        matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ??
+        emp.nivel_escolaridad ??
+        "",
+    estrato: matchOpt(emp.estrato, ESTRATOS) ?? emp.estrato ?? "PD",
+    rh: matchOpt(emp.rh, catalogs.tipos_rh) ?? emp.rh ?? "",
+    eps: matchOpt(emp.eps, catalogs.eps) ?? emp.eps ?? "",
+    arl: matchOpt(emp.arl, catalogs.arls) ?? emp.arl ?? "",
+    fondo_pensiones:
+        matchOpt(emp.fondo_pensiones, catalogs.pensiones) ??
+        emp.fondo_pensiones ??
+        "",
+    caja_compensacion:
+        matchOpt(emp.caja_compensacion, catalogs.cajas) ??
+        emp.caja_compensacion ??
+        "",
+    cargo: matchOpt(emp.cargo, catalogs.cargos) ?? emp.cargo ?? "",
+    sede: matchOpt(emp.sede, catalogs.sedes) ?? emp.sede ?? "",
+    tipo_vinculacion:
+        matchOpt(emp.tipo_vinculacion, catalogs.tipos_vinculacion) ??
+        emp.tipo_vinculacion ??
+        "",
+    tipo_funcionario:
+        matchOpt(emp.tipo_funcionario, catalogs.tipos_funcionario) ??
+        emp.tipo_funcionario ??
+        "",
 });
 
 const toApi = (form) => ({
@@ -357,18 +378,19 @@ function Field({
 
 /* ─── Selector de contratado (espejo de CandidatoSelector en Contratos) ── */
 function ContratadoSelector({ onSelect }) {
-    const [query, setQuery]       = useState("");
-    const [open, setOpen]         = useState(false);
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [results, setResults]   = useState([]);
-    const [loading, setLoading]   = useState(false);
-    const wrapRef                 = useRef(null);
-    const hasFocused              = useRef(false);
-    const debouncedQ              = useDebounce(query, 350);
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const wrapRef = useRef(null);
+    const hasFocused = useRef(false);
+    const debouncedQ = useDebounce(query, 350);
 
     useEffect(() => {
         const h = (e) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+            if (wrapRef.current && !wrapRef.current.contains(e.target))
+                setOpen(false);
         };
         document.addEventListener("mousedown", h);
         return () => document.removeEventListener("mousedown", h);
@@ -377,7 +399,10 @@ function ContratadoSelector({ onSelect }) {
     const loadInitial = () => {
         setLoading(true);
         api.get("/empleados/candidatos-listos")
-            .then((r) => { setResults(r.data); setOpen(true); })
+            .then((r) => {
+                setResults(r.data);
+                setOpen(true);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     };
@@ -392,10 +417,18 @@ function ContratadoSelector({ onSelect }) {
 
     useEffect(() => {
         if (!hasFocused.current) return;
-        if (!debouncedQ) { loadInitial(); return; }
+        if (!debouncedQ) {
+            loadInitial();
+            return;
+        }
         setLoading(true);
-        api.get("/empleados/candidatos-listos", { params: { search: debouncedQ } })
-            .then((r) => { setResults(r.data); setOpen(true); })
+        api.get("/empleados/candidatos-listos", {
+            params: { search: debouncedQ },
+        })
+            .then((r) => {
+                setResults(r.data);
+                setOpen(true);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, [debouncedQ]);
@@ -412,92 +445,226 @@ function ContratadoSelector({ onSelect }) {
     return (
         <div ref={wrapRef} style={{ width: "100%" }}>
             {selected ? (
-                <div style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    background: "#e8f8f5", border: "2px solid var(--primary)",
-                    borderRadius: 10, padding: "14px 18px",
-                }}>
-                    <div style={{
-                        width: 46, height: 46, borderRadius: "50%",
-                        background: "var(--primary)", color: "#fff",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
-                        overflow: "hidden", position: "relative",
-                    }}>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        background: "#e8f8f5",
+                        border: "2px solid var(--primary)",
+                        borderRadius: 10,
+                        padding: "14px 18px",
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 46,
+                            height: 46,
+                            borderRadius: "50%",
+                            background: "var(--primary)",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 800,
+                            fontSize: "1.2rem",
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            position: "relative",
+                        }}
+                    >
                         {(selected.nombres || "?").charAt(0).toUpperCase()}
                         {selected.fotografia && (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            <img
+                                src={`/storage/${selected.fotografia}`}
+                                alt=""
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                }}
+                            />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--primary-dark)", fontFamily: "'Poppins',sans-serif" }}>
+                        <div
+                            style={{
+                                fontWeight: 800,
+                                fontSize: "1rem",
+                                color: "var(--primary-dark)",
+                                fontFamily: "'Poppins',sans-serif",
+                            }}
+                        >
                             {selected.nombres} {selected.apellidos}
                         </div>
-                        <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
-                            CC: {selected.cedula}{selected.cargo ? ` · ${selected.cargo}` : ""}{selected.empresa_nombre ? ` · ${selected.empresa_nombre}` : ""}
+                        <div
+                            style={{
+                                fontSize: "0.82rem",
+                                color: "var(--text-muted)",
+                                fontFamily: "Nunito,sans-serif",
+                            }}
+                        >
+                            CC: {selected.cedula}
+                            {selected.cargo ? ` · ${selected.cargo}` : ""}
+                            {selected.empresa_nombre
+                                ? ` · ${selected.empresa_nombre}`
+                                : ""}
                         </div>
                     </div>
                     <button
-                        onClick={() => { setSelected(null); onSelect(null); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem", padding: 4 }}
+                        onClick={() => {
+                            setSelected(null);
+                            onSelect(null);
+                        }}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            fontSize: "1.1rem",
+                            padding: 4,
+                        }}
                         title="Cambiar selección"
-                    >✕</button>
+                    >
+                        ✕
+                    </button>
                 </div>
             ) : (
                 <div style={{ position: "relative" }}>
                     <input
                         style={{
-                            ...S.input, fontSize: "1rem", padding: "12px 14px",
-                            border: "2px solid var(--border)", borderRadius: 10,
+                            ...S.input,
+                            fontSize: "1rem",
+                            padding: "12px 14px",
+                            border: "2px solid var(--border)",
+                            borderRadius: 10,
                         }}
                         placeholder="Buscar por nombre o cédula…"
                         value={query}
-                        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                        onChange={(e) => {
+                            setQuery(e.target.value);
+                            setOpen(true);
+                        }}
                         onFocus={handleFocus}
                         autoFocus
                     />
                     {loading && (
-                        <div style={{ padding: "8px 14px", fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div
+                            style={{
+                                padding: "8px 14px",
+                                fontSize: "0.85rem",
+                                color: "var(--text-muted)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                            }}
+                        >
                             <IconLoading size={14} /> Buscando…
                         </div>
                     )}
                     {open && results.length > 0 && (
-                        <div style={{
-                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                            background: "var(--white)", border: "1.5px solid var(--border)",
-                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
-                            zIndex: 3000, maxHeight: 280, overflowY: "auto",
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                background: "var(--white)",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                                zIndex: 3000,
+                                maxHeight: 280,
+                                overflowY: "auto",
+                            }}
+                        >
                             {results.map((c) => (
                                 <div
                                     key={c.user_id ?? c.cedula}
                                     onMouseDown={() => handlePick(c)}
                                     style={{
-                                        padding: "10px 16px", cursor: "pointer",
+                                        padding: "10px 16px",
+                                        cursor: "pointer",
                                         borderBottom: "1px solid var(--border)",
-                                        display: "flex", alignItems: "center", gap: 12,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
                                     }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = "#f0f9f7"}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = "var(--white)"}
+                                    onMouseEnter={(e) =>
+                                        (e.currentTarget.style.background =
+                                            "#f0f9f7")
+                                    }
+                                    onMouseLeave={(e) =>
+                                        (e.currentTarget.style.background =
+                                            "var(--white)")
+                                    }
                                 >
-                                    <div style={{
-                                        width: 34, height: 34, borderRadius: "50%",
-                                        background: "var(--primary)", color: "#fff",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
-                                        overflow: "hidden", position: "relative",
-                                    }}>
-                                        {(c.nombres || "?").charAt(0).toUpperCase()}
+                                    <div
+                                        style={{
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: "50%",
+                                            background: "var(--primary)",
+                                            color: "#fff",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontWeight: 800,
+                                            fontSize: "0.9rem",
+                                            flexShrink: 0,
+                                            overflow: "hidden",
+                                            position: "relative",
+                                        }}
+                                    >
+                                        {(c.nombres || "?")
+                                            .charAt(0)
+                                            .toUpperCase()}
                                         {c.fotografia && (
-                                            <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                            <img
+                                                src={`/storage/${c.fotografia}`}
+                                                alt=""
+                                                style={{
+                                                    position: "absolute",
+                                                    inset: 0,
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                    borderRadius: "50%",
+                                                }}
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display =
+                                                        "none";
+                                                }}
+                                            />
                                         )}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
+                                        <div
+                                            style={{
+                                                fontWeight: 700,
+                                                fontSize: "0.9rem",
+                                                color: "var(--text)",
+                                            }}
+                                        >
                                             {c.nombres} {c.apellidos}
                                         </div>
-                                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                                            CC {c.cedula}{c.cargo ? ` · ${c.cargo}` : ""}{c.empresa_nombre ? ` · ${c.empresa_nombre}` : ""}
+                                        <div
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                            }}
+                                        >
+                                            CC {c.cedula}
+                                            {c.cargo ? ` · ${c.cargo}` : ""}
+                                            {c.empresa_nombre
+                                                ? ` · ${c.empresa_nombre}`
+                                                : ""}
                                         </div>
                                     </div>
                                 </div>
@@ -505,13 +672,22 @@ function ContratadoSelector({ onSelect }) {
                         </div>
                     )}
                     {open && !loading && query && results.length === 0 && (
-                        <div style={{
-                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                            background: "var(--white)", border: "1.5px solid var(--border)",
-                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
-                            zIndex: 3000, padding: "14px 16px",
-                            color: "var(--text-muted)", fontSize: "0.88rem",
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                background: "var(--white)",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                                zIndex: 3000,
+                                padding: "14px 16px",
+                                color: "var(--text-muted)",
+                                fontSize: "0.88rem",
+                            }}
+                        >
                             Sin resultados
                         </div>
                     )}
@@ -559,49 +735,84 @@ function Modal({
                 return;
             }
         }
-        const v = (val, fallback) => (val != null && val !== "") ? val : fallback;
+        const v = (val, fallback) =>
+            val != null && val !== "" ? val : fallback;
         setForm((f) => ({
             ...f,
             // Identificación
-            cedula:           v(c.cedula,           f.cedula),
-            nombres:          v(c.nombres,          f.nombres),
-            apellidos:        v(c.apellidos,        f.apellidos),
-            email:            v(c.email,            f.email),
-            movil:            v(c.movil,            f.movil),
+            cedula: v(c.cedula, f.cedula),
+            nombres: v(c.nombres, f.nombres),
+            apellidos: v(c.apellidos, f.apellidos),
+            email: v(c.email, f.email),
+            movil: v(c.movil, f.movil),
             fecha_expedicion: v(c.fecha_expedicion, f.fecha_expedicion),
             // Datos personales
-            genero:                     v(matchOpt(c.genero, GENEROS),                            f.genero),
-            fecha_nacimiento:           v(c.fecha_nacimiento,                                     f.fecha_nacimiento),
-            lugar_nacimiento:           v(c.lugar_nacimiento,                                     f.lugar_nacimiento),
-            estado_civil:               v(matchOpt(c.estado_civil, EST_CIVIL),                    f.estado_civil),
-            nivel_escolaridad:          v(matchOpt(c.nivel_escolaridad, ESCOLARIDAD),             f.nivel_escolaridad),
-            profesion:                  v(c.profesion,                                            f.profesion),
-            direccion_residencia:       v(c.direccion_residencia,                                 f.direccion_residencia),
-            estrato:                    v(matchOpt(c.estrato, ESTRATOS),                          f.estrato),
-            barrio:                     v(c.barrio,                                               f.barrio),
-            numero_hijos:               v(c.numero_hijos != null ? String(c.numero_hijos) : null, f.numero_hijos),
-            rh:                         v(matchOpt(c.rh, catalogs.tipos_rh),                      f.rh),
-            talla_camisa:               v(c.talla_camisa,                                         f.talla_camisa),
-            talla_pantalon:             v(c.talla_pantalon,                                       f.talla_pantalon),
-            talla_zapatos:              v(c.talla_zapatos,                                        f.talla_zapatos),
+            genero: v(matchOpt(c.genero, GENEROS), f.genero),
+            fecha_nacimiento: v(c.fecha_nacimiento, f.fecha_nacimiento),
+            lugar_nacimiento: v(c.lugar_nacimiento, f.lugar_nacimiento),
+            estado_civil: v(
+                matchOpt(c.estado_civil, EST_CIVIL),
+                f.estado_civil,
+            ),
+            nivel_escolaridad: v(
+                matchOpt(c.nivel_escolaridad, ESCOLARIDAD),
+                f.nivel_escolaridad,
+            ),
+            profesion: v(c.profesion, f.profesion),
+            direccion_residencia: v(
+                c.direccion_residencia,
+                f.direccion_residencia,
+            ),
+            estrato: v(matchOpt(c.estrato, ESTRATOS), f.estrato),
+            barrio: v(c.barrio, f.barrio),
+            numero_hijos: v(
+                c.numero_hijos != null ? String(c.numero_hijos) : null,
+                f.numero_hijos,
+            ),
+            rh: v(matchOpt(c.rh, catalogs.tipos_rh), f.rh),
+            talla_camisa: v(c.talla_camisa, f.talla_camisa),
+            talla_pantalon: v(c.talla_pantalon, f.talla_pantalon),
+            talla_zapatos: v(c.talla_zapatos, f.talla_zapatos),
             // Seguridad social
-            eps:               v(matchOpt(c.eps, catalogs.eps),                                   f.eps),
-            arl:               v(matchOpt(c.arl, catalogs.arls),                                  f.arl),
-            fondo_pensiones:   v(matchOpt(c.fondo_pensiones, catalogs.pensiones),                 f.fondo_pensiones),
-            caja_compensacion: v(matchOpt(c.caja_compensacion, catalogs.cajas),                   f.caja_compensacion),
+            eps: v(matchOpt(c.eps, catalogs.eps), f.eps),
+            arl: v(matchOpt(c.arl, catalogs.arls), f.arl),
+            fondo_pensiones: v(
+                matchOpt(c.fondo_pensiones, catalogs.pensiones),
+                f.fondo_pensiones,
+            ),
+            caja_compensacion: v(
+                matchOpt(c.caja_compensacion, catalogs.cajas),
+                f.caja_compensacion,
+            ),
             // Datos laborales
-            cargo:             v(matchOpt(c.cargo, catalogs.cargos),                              f.cargo),
-            sede:              v(matchOpt(c.sede, catalogs.sedes),                                f.sede),
-            tipo_vinculacion:  v(matchOpt(c.tipo_vinculacion, catalogs.tipos_vinculacion) ?? c.tipo_vinculacion, f.tipo_vinculacion),
-            tipo_funcionario:  v(matchOpt(c.tipo_funcionario, catalogs.tipos_funcionario),        f.tipo_funcionario),
-            empleador:         v(c.empleador,                                                     f.empleador),
-            jefe_inmediato:    v(c.jefe_inmediato,                                                f.jefe_inmediato),
-            empresa_id:        v(c.empresa_id,                                                    f.empresa_id),
-            ingresos:          v(c.ingresos,                                                      f.ingresos),
+            cargo: v(matchOpt(c.cargo, catalogs.cargos), f.cargo),
+            sede: v(matchOpt(c.sede, catalogs.sedes), f.sede),
+            tipo_vinculacion: v(
+                matchOpt(c.tipo_vinculacion, catalogs.tipos_vinculacion) ??
+                    c.tipo_vinculacion,
+                f.tipo_vinculacion,
+            ),
+            tipo_funcionario: v(
+                matchOpt(c.tipo_funcionario, catalogs.tipos_funcionario),
+                f.tipo_funcionario,
+            ),
+            empleador: v(c.empleador, f.empleador),
+            jefe_inmediato: v(c.jefe_inmediato, f.jefe_inmediato),
+            empresa_id: v(c.empresa_id, f.empresa_id),
+            ingresos: v(c.ingresos, f.ingresos),
             // Contacto de emergencia
-            contacto_emergencia_nombre:      v(c.contacto_emergencia_nombre,      f.contacto_emergencia_nombre),
-            contacto_emergencia_telefono:    v(c.contacto_emergencia_telefono,    f.contacto_emergencia_telefono),
-            contacto_emergencia_parentesco:  v(c.contacto_emergencia_parentesco,  f.contacto_emergencia_parentesco),
+            contacto_emergencia_nombre: v(
+                c.contacto_emergencia_nombre,
+                f.contacto_emergencia_nombre,
+            ),
+            contacto_emergencia_telefono: v(
+                c.contacto_emergencia_telefono,
+                f.contacto_emergencia_telefono,
+            ),
+            contacto_emergencia_parentesco: v(
+                c.contacto_emergencia_parentesco,
+                f.contacto_emergencia_parentesco,
+            ),
         }));
     };
 
@@ -671,16 +882,24 @@ function Modal({
 
                 {/* Selector de contratado prominente solo en modo crear */}
                 {isCreate && (
-                    <div style={{
-                        padding: "20px 28px 0",
-                        borderBottom: "2px solid var(--border)",
-                        background: "var(--bg)",
-                    }}>
-                        <div style={{
-                            fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.07em",
-                            color: "var(--primary)", fontFamily: "'Poppins',sans-serif",
-                            textTransform: "uppercase", marginBottom: 8,
-                        }}>
+                    <div
+                        style={{
+                            padding: "20px 28px 0",
+                            borderBottom: "2px solid var(--border)",
+                            background: "var(--bg)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: "0.72rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.07em",
+                                color: "var(--primary)",
+                                fontFamily: "'Poppins',sans-serif",
+                                textTransform: "uppercase",
+                                marginBottom: 8,
+                            }}
+                        >
                             Autocompletar desde usuario con contrato
                         </div>
                         <div style={{ paddingBottom: 20 }}>
@@ -728,37 +947,113 @@ function Modal({
                                     {...fp}
                                 />
                                 {/* Campo foto */}
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                    <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
-                                        Fotografía
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 4,
+                                    }}
+                                >
+                                    <label
+                                        style={{
+                                            fontSize: "0.75rem",
+                                            fontWeight: 700,
+                                            color: "var(--text-muted)",
+                                            fontFamily: "Nunito,sans-serif",
+                                        }}
+                                    >
+                                        Fotografía del empleado
                                     </label>
-                                    <label style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        padding: "6px 10px",
-                                        border: "1.5px dashed var(--border)",
-                                        borderRadius: "var(--radius-sm, 8px)",
-                                        cursor: readOnly ? "not-allowed" : "pointer",
-                                        background: "var(--white)",
-                                        overflow: "hidden",
-                                    }}>
+                                    <label
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 10,
+                                            padding: "6px 10px",
+                                            border: "1.5px dashed var(--border)",
+                                            borderRadius:
+                                                "var(--radius-sm, 8px)",
+                                            cursor: readOnly
+                                                ? "not-allowed"
+                                                : "pointer",
+                                            background: "var(--white)",
+                                            overflow: "hidden",
+                                        }}
+                                    >
                                         {fotografiaFile ? (
-                                            <img src={URL.createObjectURL(fotografiaFile)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                            <img
+                                                src={URL.createObjectURL(
+                                                    fotografiaFile,
+                                                )}
+                                                alt=""
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: "50%",
+                                                    objectFit: "cover",
+                                                    flexShrink: 0,
+                                                }}
+                                            />
                                         ) : form.fotografia ? (
-                                            <img src={`/storage/${form.fotografia}`} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                            <img
+                                                src={`/storage/${form.fotografia}`}
+                                                alt=""
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: "50%",
+                                                    objectFit: "cover",
+                                                    flexShrink: 0,
+                                                }}
+                                            />
                                         ) : (
-                                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0 }}>
-                                                {(form.nombres || "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: "50%",
+                                                    background:
+                                                        "var(--primary)",
+                                                    color: "#fff",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    fontWeight: 800,
+                                                    fontSize: "0.9rem",
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                {(form.nombres || "?")
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                             </div>
                                         )}
-                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {fotografiaFile ? fotografiaFile.name : (form.fotografia ? "Cambiar foto" : "Subir foto…")}
+                                        <span
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                                fontFamily: "Nunito,sans-serif",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {fotografiaFile
+                                                ? fotografiaFile.name
+                                                : form.fotografia
+                                                  ? "Cambiar foto"
+                                                  : "Subir foto…"}
                                         </span>
                                         <input
                                             type="file"
                                             accept="image/*"
                                             disabled={readOnly}
                                             style={{ display: "none" }}
-                                            onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                            onChange={(e) =>
+                                                setFotografiaFile(
+                                                    e.target.files[0] || null,
+                                                )
+                                            }
                                         />
                                     </label>
                                 </div>
@@ -802,7 +1097,8 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <div /><div />
+                                <div />
+                                <div />
                             </div>
 
                             {/* Fila 3 – Estado civil, escolaridad, profesión */}
@@ -837,7 +1133,8 @@ function Modal({
                                     span={2}
                                     {...fp}
                                 />
-                                <div /><div />
+                                <div />
+                                <div />
                             </div>
 
                             <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -894,13 +1191,23 @@ function Modal({
                             </div>
 
                             {/* Tallas / Dotación */}
-                            <div style={S.sectionHeader}>
-                                TALLAS / DOTACIÓN
-                            </div>
+                            <div style={S.sectionHeader}>TALLAS / DOTACIÓN</div>
                             <div style={{ ...S.grid4, marginTop: 12 }}>
-                                <Field label="Talla Camisa" k="talla_camisa" {...fp} />
-                                <Field label="Talla Pantalón" k="talla_pantalon" {...fp} />
-                                <Field label="Talla Zapatos" k="talla_zapatos" {...fp} />
+                                <Field
+                                    label="Talla Camisa"
+                                    k="talla_camisa"
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Talla Pantalón"
+                                    k="talla_pantalon"
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Talla Zapatos"
+                                    k="talla_zapatos"
+                                    {...fp}
+                                />
                                 <div />
                             </div>
 
@@ -1320,18 +1627,41 @@ export default function EmpleadosCrud() {
     const [importOpen, setImportOpen] = useState(false);
     const queryClient = useQueryClient();
 
-    const { data: _qEmpresas,  isLoading: _le } = useQuery({ queryKey: ['empresas'],  queryFn: () => api.get('/empresas').then(r => r.data) });
-    const { data: _qCatalogos, isLoading: _lc } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
-    const { data: _qSedes,     isLoading: _ls } = useQuery({ queryKey: ['sedes'],     queryFn: () => api.get('/sedes').then(r => r.data) });
-    const { data: _qEmpleados, isLoading: _lem }= useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
+    const { data: _qEmpresas, isLoading: _le } = useQuery({
+        queryKey: ["empresas"],
+        queryFn: () => api.get("/empresas").then((r) => r.data),
+    });
+    const { data: _qCatalogos, isLoading: _lc } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+    });
+    const { data: _qSedes, isLoading: _ls } = useQuery({
+        queryKey: ["sedes"],
+        queryFn: () => api.get("/sedes").then((r) => r.data),
+    });
+    const { data: _qEmpleados, isLoading: _lem } = useQuery({
+        queryKey: ["empleados"],
+        queryFn: () => api.get("/empleados").then((r) => r.data),
+    });
     const loading = _lem;
 
-    useEffect(() => { if (_qEmpresas)  setEmpresas(_qEmpresas); },  [_qEmpresas]);
-    useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
     useEffect(() => {
-        if (_qSedes) setSedesActivas((Array.isArray(_qSedes) ? _qSedes : []).filter(s => s.estado === 'Activa'));
+        if (_qEmpresas) setEmpresas(_qEmpresas);
+    }, [_qEmpresas]);
+    useEffect(() => {
+        if (_qCatalogos) setCatalogs(_qCatalogos);
+    }, [_qCatalogos]);
+    useEffect(() => {
+        if (_qSedes)
+            setSedesActivas(
+                (Array.isArray(_qSedes) ? _qSedes : []).filter(
+                    (s) => s.estado === "Activa",
+                ),
+            );
     }, [_qSedes]);
-    useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
+    useEffect(() => {
+        if (_qEmpleados) setEmpleados(_qEmpleados);
+    }, [_qEmpleados]);
 
     React.useEffect(() => {
         const anyOpen =
@@ -1341,15 +1671,15 @@ export default function EmpleadosCrud() {
             credencialesOpen ||
             importOpen;
         if (anyOpen) {
-            document.documentElement.style.overflowY = 'hidden';
-            document.body.style.overflowY = 'hidden';
+            document.documentElement.style.overflowY = "hidden";
+            document.body.style.overflowY = "hidden";
         } else {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         }
         return () => {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         };
     }, [modalOpen, filterOpen, viewOpen, credencialesOpen, importOpen]);
 
@@ -1463,10 +1793,13 @@ export default function EmpleadosCrud() {
         (e) => e.estado_empleado === "Activo",
     ).length;
     // Sedes activas que tienen al menos un empleado asignado
-    const sedesConEmpleado = new Set(empleados.map((e) => e.sede).filter(Boolean));
-    const numSedes = sedesActivas.length > 0
-        ? sedesActivas.filter((s) => sedesConEmpleado.has(s.nombre)).length
-        : sedesConEmpleado.size;
+    const sedesConEmpleado = new Set(
+        empleados.map((e) => e.sede).filter(Boolean),
+    );
+    const numSedes =
+        sedesActivas.length > 0
+            ? sedesActivas.filter((s) => sedesConEmpleado.has(s.nombre)).length
+            : sedesConEmpleado.size;
     const numEmp = [
         ...new Set(empleados.map((e) => e.empresa_id).filter(Boolean)),
     ].length;
@@ -1483,7 +1816,9 @@ export default function EmpleadosCrud() {
         setExporting(true);
         try {
             await exportarEmpleadosExcel(filtered);
-            showToast(`Excel exportado (${filtered.length} empleado${filtered.length === 1 ? "" : "s"}).`);
+            showToast(
+                `Excel exportado (${filtered.length} empleado${filtered.length === 1 ? "" : "s"}).`,
+            );
         } catch {
             showToast("No se pudo generar el Excel.");
         } finally {
@@ -1645,23 +1980,77 @@ export default function EmpleadosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown presets={[
-                        { label: "Empleados activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
-                        { label: "En vacaciones", apply: () => { clearFilters(); setFiltroEstado("Vacaciones"); } },
-                        { label: "Incapacitados", apply: () => { clearFilters(); setFiltroEstado("Incapacitado"); } },
-                        { label: "Contratistas", apply: () => { clearFilters(); setFiltroVinc("Contratista"); } },
-                        { label: "Aprendices SENA", apply: () => { clearFilters(); setFiltroVinc("Aprendiz SENA"); } },
-                        { label: "Técnicos", apply: () => { clearFilters(); setFiltroTipoFunc("TÉCNICO"); } },
-                        { label: "Vendedores", apply: () => { clearFilters(); setFiltroTipoFunc("VENDEDOR"); } },
-                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                    ]} />
+                    <PresetFiltersDropdown
+                        presets={[
+                            {
+                                label: "Empleados activos",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Activo");
+                                },
+                            },
+                            {
+                                label: "En vacaciones",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Vacaciones");
+                                },
+                            },
+                            {
+                                label: "Incapacitados",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroEstado("Incapacitado");
+                                },
+                            },
+                            {
+                                label: "Contratistas",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroVinc("Contratista");
+                                },
+                            },
+                            {
+                                label: "Aprendices SENA",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroVinc("Aprendiz SENA");
+                                },
+                            },
+                            {
+                                label: "Técnicos",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroTipoFunc("TÉCNICO");
+                                },
+                            },
+                            {
+                                label: "Vendedores",
+                                apply: () => {
+                                    clearFilters();
+                                    setFiltroTipoFunc("VENDEDOR");
+                                },
+                            },
+                            {
+                                label: "Limpiar filtros",
+                                apply: () => clearFilters(),
+                                clear: true,
+                            },
+                        ]}
+                    />
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button
                         style={{
                             ...S.filterBtn,
-                            cursor: exporting || loading || !filtered.length ? "not-allowed" : "pointer",
-                            opacity: exporting || loading || !filtered.length ? 0.6 : 1,
+                            cursor:
+                                exporting || loading || !filtered.length
+                                    ? "not-allowed"
+                                    : "pointer",
+                            opacity:
+                                exporting || loading || !filtered.length
+                                    ? 0.6
+                                    : 1,
                         }}
                         onClick={handleExportExcel}
                         disabled={exporting || loading || !filtered.length}
@@ -1719,14 +2108,35 @@ export default function EmpleadosCrud() {
                                 <tr key={emp.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={{ ...S.avatar, position: "relative" }}>
-                                                {((emp.nombres || emp.name) ?? "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    ...S.avatar,
+                                                    position: "relative",
+                                                }}
+                                            >
+                                                {(
+                                                    (emp.nombres || emp.name) ??
+                                                    "?"
+                                                )
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                                 {emp.fotografia && (
                                                     <img
                                                         src={`/storage/${emp.fotografia}`}
                                                         alt=""
-                                                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                                                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                                        style={{
+                                                            position:
+                                                                "absolute",
+                                                            inset: 0,
+                                                            width: "100%",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            borderRadius: "50%",
+                                                        }}
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display =
+                                                                "none";
+                                                        }}
                                                     />
                                                 )}
                                             </div>
@@ -1976,19 +2386,19 @@ export default function EmpleadosCrud() {
                         Busca cada empleado por <strong>Cédula</strong> y
                         rellena los campos que traiga el archivo.{" "}
                         <strong>
-                            Nunca sobrescribe un dato que el empleado ya
-                            tenga guardado
+                            Nunca sobrescribe un dato que el empleado ya tenga
+                            guardado
                         </strong>
-                        : si una celda corresponde a un campo que ya tiene
-                        valor en el sistema, esa celda se ignora y queda
-                        reportada al final.{" "}
+                        : si una celda corresponde a un campo que ya tiene valor
+                        en el sistema, esa celda se ignora y queda reportada al
+                        final.{" "}
                         <strong>
                             Si la cédula está pendiente de alta, también la
                             completa
                         </strong>
-                        : queda visible en esta lista, con usuario y
-                        contraseña nuevos (se muestran al terminar, cópialos
-                        porque no se pueden volver a ver después).
+                        : queda visible en esta lista, con usuario y contraseña
+                        nuevos (se muestran al terminar, cópialos porque no se
+                        pueden volver a ver después).
                     </>
                 }
                 columnas={COLUMNAS_IMPORTABLES}
@@ -2029,7 +2439,10 @@ export default function EmpleadosCrud() {
                                         value={filtroCiudad}
                                         onChange={setFiltroCiudad}
                                         defaultValue="Todas"
-                                        options={catalogs.ciudades.map((c) => ({ label: c, value: c }))}
+                                        options={catalogs.ciudades.map((c) => ({
+                                            label: c,
+                                            value: c,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2038,7 +2451,10 @@ export default function EmpleadosCrud() {
                                         value={filtroSede}
                                         onChange={setFiltroSede}
                                         defaultValue="Todas"
-                                        options={catalogs.sedes.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.sedes.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2047,25 +2463,36 @@ export default function EmpleadosCrud() {
                                         value={filtroEmpresa}
                                         onChange={setFiltroEmpresa}
                                         defaultValue="Todas"
-                                        options={empresas.map((e) => ({ label: e.nombre, value: e.id }))}
+                                        options={empresas.map((e) => ({
+                                            label: e.nombre,
+                                            value: e.id,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo Vinculación</label>
+                                    <label style={S.label}>
+                                        Tipo Vinculación
+                                    </label>
                                     <SearchableSelect
                                         value={filtroVinc}
                                         onChange={setFiltroVinc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_vinculacion.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_vinculacion.map(
+                                            (v) => ({ label: v, value: v }),
+                                        )}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo Funcionario</label>
+                                    <label style={S.label}>
+                                        Tipo Funcionario
+                                    </label>
                                     <SearchableSelect
                                         value={filtroTipoFunc}
                                         onChange={setFiltroTipoFunc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_funcionario.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_funcionario.map(
+                                            (v) => ({ label: v, value: v }),
+                                        )}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2074,7 +2501,10 @@ export default function EmpleadosCrud() {
                                         value={filtroCargo}
                                         onChange={setFiltroCargo}
                                         defaultValue="Todos"
-                                        options={catalogs.cargos.map((c) => ({ label: c, value: c }))}
+                                        options={catalogs.cargos.map((c) => ({
+                                            label: c,
+                                            value: c,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2083,7 +2513,10 @@ export default function EmpleadosCrud() {
                                         value={filtroEps}
                                         onChange={setFiltroEps}
                                         defaultValue="Todas"
-                                        options={catalogs.eps.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.eps.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2092,16 +2525,24 @@ export default function EmpleadosCrud() {
                                         value={filtroArl}
                                         onChange={setFiltroArl}
                                         defaultValue="Todas"
-                                        options={catalogs.arls.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.arls.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Fondo de Pensiones</label>
+                                    <label style={S.label}>
+                                        Fondo de Pensiones
+                                    </label>
                                     <SearchableSelect
                                         value={filtroPensiones}
                                         onChange={setFiltroPensiones}
                                         defaultValue="Todas"
-                                        options={PENSIONES.map((v) => ({ label: v, value: v }))}
+                                        options={PENSIONES.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2110,7 +2551,10 @@ export default function EmpleadosCrud() {
                                         value={filtroRH}
                                         onChange={setFiltroRH}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_rh.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_rh.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2119,7 +2563,10 @@ export default function EmpleadosCrud() {
                                         value={filtroEstado}
                                         onChange={setFiltroEstado}
                                         defaultValue="Todos"
-                                        options={ESTADOS_EMP.map((s) => ({ label: s, value: s }))}
+                                        options={ESTADOS_EMP.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
