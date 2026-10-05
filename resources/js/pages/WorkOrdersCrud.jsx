@@ -30,8 +30,13 @@ const normalizeHeader = (s) =>
  * tildes/mayúsculas, así que aquí las claves van sin tildes.
  */
 const IMPORT_HEADER_MAP = {
-    "numero de orden de trabajo": "numero_wo",
+    // "Nº de cliente" en el archivo de origen viene mal nombrada: en realidad es donde
+    // vive el número real de la orden de trabajo (confirmado por el usuario contra su
+    // archivo real, columna AI). "Número de orden de trabajo" (columna AM) es otro campo
+    // distinto, no el que se usa como llave.
+    "n de cliente": "numero_wo",
     "numero de wo": "numero_wo", // alias por si otro export usa este nombre más corto
+    "n de wo de ibs": "numero_wo_ibs",
     "n de item": "numero_item",
     "estado": "estado",
     "fecha de estado de orden de trabajo": "fecha_estado",
@@ -59,7 +64,7 @@ const IMPORT_HEADER_MAP = {
 };
 
 const CAMPOS_PLANTILLA = [
-    "Número de orden de trabajo", "N° de item", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
+    "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
     "Proveedor", "Cuadrilla/Técnico Responsable", "CEDULA", "NOMBRE TH", "MODALIDAD", "perimetro",
     "Departamento", "Municipio", "Barrio", "Dirección",
     "Fecha de creación", "Fecha de vencimiento", "Fecha de finalización", "Inicio agendado",
@@ -186,9 +191,10 @@ function ImportModal({ onClose, onImported }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: 0 }}>
-                        Se leen las columnas más relevantes del archivo de origen (el resto se ignora): <strong>Número de orden de trabajo</strong> (obligatorio),
-                        <strong> N° de item</strong> (identifica cada material/línea del mismo WO), Estado, Fechas, Servicio, Proveedor, Cuadrilla/Técnico Responsable, CEDULA,
-                        NOMBRE TH, MODALIDAD, perímetro, ubicación, Aging y Descripción de IBS.
+                        Se leen las columnas más relevantes del archivo de origen (el resto se ignora): <strong>Nº de cliente</strong> (obligatorio — es donde
+                        realmente está el número de WO en este archivo, aunque el título de la columna diga "cliente"),
+                        <strong> N° de item</strong> (identifica cada material/línea del mismo WO), <strong>N° de WO de IBS</strong> (otro número de referencia, se guarda aparte),
+                        Estado, Fechas, Servicio, Proveedor, Cuadrilla/Técnico Responsable, CEDULA, NOMBRE TH, MODALIDAD, perímetro, ubicación, Aging y Descripción de IBS.
                         {" "}Un mismo WO puede traer varias filas (una por ítem) — todas se guardan. Si una fila con el mismo WO + ítem ya existe, se actualiza; si no, se crea.
                     </p>
                     <button style={{ ...S.btnSecondary, marginBottom: 14 }} onClick={handleDescargarPlantilla}>
@@ -282,6 +288,7 @@ const SECCIONES_DETALLE = [
         campos: [
             ["numero_wo", "N° de orden de trabajo"],
             ["numero_item", "N° de ítem"],
+            ["numero_wo_ibs", "N° de WO de IBS"],
             ["estado", "Estado"],
             ["fecha_estado", "Fecha de estado"],
         ],
@@ -445,7 +452,7 @@ export default function WorkOrdersCrud() {
                     <span style={S.searchIcon}><IconSearch size={15} /></span>
                     <input
                         style={S.searchInput}
-                        placeholder="Buscar por WO, técnico, municipio o descripción…"
+                        placeholder="Buscar por WO, WO IBS, técnico, municipio o descripción…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
@@ -477,6 +484,7 @@ export default function WorkOrdersCrud() {
                             <tr>
                                 <th>N° WO</th>
                                 <th>Ítem</th>
+                                <th>N° WO IBS</th>
                                 <th>Estado</th>
                                 <th>Servicio</th>
                                 <th>Proveedor</th>
@@ -484,8 +492,8 @@ export default function WorkOrdersCrud() {
                                 <th>Perímetro</th>
                                 <th>Municipio</th>
                                 <th>Departamento</th>
-                                <th>Fecha creación</th>
-                                <th>Fecha vencimiento</th>
+                                <th>Fecha de atención</th>
+                                <th>Fecha de finalización</th>
                                 <th>Aging</th>
                                 <th style={{ textAlign: "center" }}>Acciones</th>
                             </tr>
@@ -495,6 +503,7 @@ export default function WorkOrdersCrud() {
                                 <tr key={w.id}>
                                     <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{w.numero_wo_ibs || "—"}</td>
                                     <td>{w.estado || "—"}</td>
                                     <td>{w.servicio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.proveedor || "—"}</td>
@@ -502,8 +511,8 @@ export default function WorkOrdersCrud() {
                                     <td>{w.perimetro || "—"}</td>
                                     <td>{w.municipio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.departamento || "—"}</td>
-                                    <td>{w.fecha_creacion || "—"}</td>
-                                    <td>{w.fecha_vencimiento || "—"}</td>
+                                    <td>{w.fecha_estado || "—"}</td>
+                                    <td>{w.fecha_finalizacion || "—"}</td>
                                     <td style={{ textAlign: "center" }}>{w.aging ?? "—"}</td>
                                     <td style={{ textAlign: "center" }}>
                                         <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>

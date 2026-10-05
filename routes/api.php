@@ -404,6 +404,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('permisos', [App\Http\Controllers\Api\PermisoController::class, 'index']);
         Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync']);
+
+        // Auditoría del Sistema (Permisos > Auditoría): solo admin puede ver el rastro.
+        Route::get('auditoria', [App\Http\Controllers\Api\AuditoriaController::class, 'index']);
+        Route::get('auditoria/procesos', [App\Http\Controllers\Api\AuditoriaController::class, 'procesos']);
     });
 
     // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)

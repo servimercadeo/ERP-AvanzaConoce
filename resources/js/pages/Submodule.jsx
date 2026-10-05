@@ -40,6 +40,7 @@ const InventarioHerramientasCrud = lazy(() => import('./InventarioHerramientasCr
 const InventarioGeneralCrud = lazy(() => import('./InventarioGeneralCrud'));
 const InventarioCategoriaCrud = lazy(() => import('./InventarioCategoriaCrud'));
 const PermisosCrud = lazy(() => import('./PermisosCrud'));
+const AuditoriaCrud = lazy(() => import('./AuditoriaCrud'));
 const AsignacionPedidosCrud = lazy(() => import('./AsignacionPedidosCrud'));
 const AsignacionInventarioCrud = lazy(() => import('./AsignacionInventarioCrud'));
 const InventarioEmpleadoCrud = lazy(() => import('./InventarioEmpleadoCrud'));
@@ -369,6 +370,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'roles_permisos':
           switch (archivoId) {
             case 'permisos_file': return PermisosCrud;
+            default: return null;
+          }
+        case 'auditoria':
+          switch (archivoId) {
+            case 'auditoria_file': return AuditoriaCrud;
             default: return null;
           }
         default: return null;

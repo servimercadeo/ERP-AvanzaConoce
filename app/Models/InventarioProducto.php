@@ -2,11 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 
 class InventarioProducto extends Model
 {
+    use RegistraAuditoria;
+
     protected $table = 'inventario_productos';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Inventario';
+    }
+
+    public function auditoriaNombreRegistro(): string
+    {
+        return $this->tipoProducto?->nombre ?? ('#' . $this->id);
+    }
 
     protected $fillable = [
         'tipo_producto_id',

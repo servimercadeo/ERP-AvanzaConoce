@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasSedeCatalogo;
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,8 +11,20 @@ class Contrato extends Model
 {
     use HasFactory;
     use HasSedeCatalogo;
+    use RegistraAuditoria;
 
     protected $table = 'contratos';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Contratos';
+    }
+
+    public function auditoriaNombreRegistro(): string
+    {
+        $nombre = trim(($this->empleado?->nombres ?? '') . ' ' . ($this->empleado?->apellidos ?? ''));
+        return $nombre !== '' ? $nombre : ($this->empleado?->name ?? ('#' . $this->id));
+    }
 
     protected $fillable = [
         'id_macaw',

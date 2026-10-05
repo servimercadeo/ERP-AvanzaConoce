@@ -2,11 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 
 class Candidato extends Model
 {
+    use RegistraAuditoria;
+
     protected $table = 'candidatos';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Selección';
+    }
+
+    public function auditoriaNombreRegistro(): string
+    {
+        return $this->nombres ?: ('#' . $this->id);
+    }
 
     protected $fillable = [
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',

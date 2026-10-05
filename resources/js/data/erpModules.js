@@ -540,6 +540,15 @@ export const ERP_MODULES = [
         archivos: [
           { id: 'permisos_file', label: 'Roles y Permisos' },
         ]
+      },
+      {
+        id: 'auditoria',
+        label: 'Auditoría',
+        icon: 'permisos',
+        desc: 'Rastro de quién creó, editó o eliminó qué en el sistema',
+        archivos: [
+          { id: 'auditoria_file', label: 'Auditoría del Sistema' },
+        ]
       }
     ],
     archivos: []

@@ -3,14 +3,21 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasSedeCatalogo;
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class PedidoCompra extends Model
 {
     use HasSedeCatalogo;
+    use RegistraAuditoria;
 
     protected $table = 'pedidos_compra';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Pedidos';
+    }
 
     protected $fillable = [
         'codigo',

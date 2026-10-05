@@ -18,6 +18,7 @@ class WorkOrderController extends Controller
             $q = $request->search;
             $query->where(function ($w) use ($q) {
                 $w->where('numero_wo', 'like', "%{$q}%")
+                    ->orWhere('numero_wo_ibs', 'like', "%{$q}%")
                     ->orWhere('nombre_tecnico', 'like', "%{$q}%")
                     ->orWhere('cedula_tecnico', 'like', "%{$q}%")
                     ->orWhere('municipio', 'like', "%{$q}%")
@@ -77,6 +78,9 @@ class WorkOrderController extends Controller
                 // Vacío en vez de null: NULL no deduplica bien en el índice único de MySQL
                 // (cada NULL cuenta como distinto), y la mayoría de WOs solo traen una fila.
                 'numero_item' => trim((string) ($fila['numero_item'] ?? '')),
+                'numero_wo_ibs' => isset($fila['numero_wo_ibs']) && trim((string) $fila['numero_wo_ibs']) !== ''
+                    ? trim((string) $fila['numero_wo_ibs'])
+                    : null,
             ];
 
             foreach ($camposTexto as $campo) {

@@ -2,15 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 
 class WorkOrder extends Model
 {
+    use RegistraAuditoria;
+
     protected $table = 'work_orders';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Work Orders';
+    }
 
     protected $fillable = [
         'numero_wo',
         'numero_item',
+        'numero_wo_ibs',
         'estado',
         'fecha_estado',
         'servicio',
