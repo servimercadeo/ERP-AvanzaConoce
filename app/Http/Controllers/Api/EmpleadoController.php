@@ -8,6 +8,7 @@ use App\Models\Empresa;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
 use App\Services\EmpresaProyectoRules;
+use App\Services\ImportacionExcelValidador;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -435,13 +436,14 @@ class EmpleadoController extends Controller
             'dados_de_alta'  => 0,
             'sin_cambios'    => 0,
             'no_encontrados' => [],
+            'sin_contrato'   => [],
             'detalle'        => [],
         ];
 
         DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
             foreach ($filas as $fila) {
-                if (!is_array($fila)) continue;
-                $cedula = trim((string) ($fila['cedula'] ?? ''));
+                if (!is_array($fila) || !is_scalar($fila['cedula'] ?? null)) continue;
+                $cedula = trim((string) $fila['cedula']);
                 if ($cedula === '') continue;
 
                 $user = User::where('cedula', $cedula)->first();
@@ -449,44 +451,34 @@ class EmpleadoController extends Controller
                     $resumen['no_encontrados'][] = $cedula;
                     continue;
                 }
+                // Proceso: primero se crea el contrato (Contratos) y después se completa el
+                // empleado aquí, que es donde se entregan credenciales. Sin contrato vigente
+                // no se toca nada.
+                if (!$user->contratos()->where('completado', true)->exists()) {
+                    $resumen['sin_contrato'][] = $cedula;
+                    continue;
+                }
 
                 $actualizadosFila = [];
                 $omitidosFila = [];
+                // Celdas con un valor que no se pudo aceptar (fecha imposible, sede que no
+                // existe, etc.): se omiten y se reportan, para que quien importa sepa qué
+                // corregir en vez de que el dato desaparezca en silencio.
+                $invalidosFila = [];
 
                 foreach ($camposPermitidos as $campo) {
                     if (!array_key_exists($campo, $fila)) continue;
                     $valor = $fila[$campo];
                     $valor = is_string($valor) ? trim($valor) : $valor;
                     if ($valor === null || $valor === '') continue;
-                    if (isset($longitudesMaximas[$campo]) && mb_strlen((string) $valor) > $longitudesMaximas[$campo]) continue;
 
-                    if ($campo === 'genero') {
-                        $generoUpper = mb_strtoupper((string) $valor, 'UTF-8');
-                        if ($generoUpper === 'MASCULINO') {
-                            $valor = 'Masculino';
-                        } elseif ($generoUpper === 'FEMENINO') {
-                            $valor = 'Femenino';
-                        } else {
-                            continue; // valor de genero no reconocido: se omite este campo (sigue con los demás)
-                        }
-                    }
-                    if ($campo === 'numero_hijos') {
-                        if (!is_numeric($valor)) continue;
-                        $valor = (int) $valor;
-                        if ($valor < 0 || $valor > 20) continue;
-                    }
-                    if ($campo === 'tiene_cert_alturas' && !is_bool($valor)) continue;
-                    if (in_array($campo, $camposFecha, true)) {
-                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor)) continue;
-                        $year = (int) substr((string) $valor, 0, 4);
-                        if ($year < 1920 || $year > (int) date('Y') + 10) continue;
+                    $valor = $this->valorImportable($campo, $valor, $camposFecha, $longitudesMaximas);
+                    if ($valor === null) {
+                        $invalidosFila[] = $campo;
+                        continue;
                     }
 
-                    $actual = $user->{$campo};
-                    $vacioActual = $actual === null || $actual === ''
-                        || ($campo === 'genero' && $actual === 'No especificado');
-
-                    if (!$vacioActual) {
+                    if (!$this->campoSinDato($campo, $user->{$campo})) {
                         $omitidosFila[] = $campo;
                         continue;
                     }
@@ -504,7 +496,9 @@ class EmpleadoController extends Controller
                 $seDioDeAlta = false;
                 $credenciales = null;
                 if ($user->pendiente_alta) {
-                    $user->rol            = $user->rol ?: 'consultor';
+                    // Mismo rol por defecto que store(): 'consultor' ya no existe en el ENUM
+                    // de `users.rol` y MySQL estricto tumbaría todo el lote.
+                    $user->rol            = $user->rol ?: 'general';
                     $user->activo         = true;
                     $user->pendiente_alta = false;
                     $plainPassword = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
@@ -540,6 +534,7 @@ class EmpleadoController extends Controller
                     'nombre'               => trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')),
                     'campos_actualizados'  => $actualizadosFila,
                     'campos_omitidos'      => $omitidosFila,
+                    'campos_invalidos'     => $invalidosFila,
                     'dado_de_alta'         => $seDioDeAlta,
                     'credenciales'         => $credenciales,
                 ];
@@ -547,6 +542,69 @@ class EmpleadoController extends Controller
         });
 
         return response()->json($resumen);
+    }
+
+    /**
+     * Valor de una celda del import ya validado y normalizado igual que lo deja el
+     * formulario, o null si no es aceptable.
+     */
+    private function valorImportable(string $campo, mixed $valor, array $camposFecha, array $longitudesMaximas): mixed
+    {
+        if ($campo === 'tiene_cert_alturas') {
+            return is_bool($valor) ? $valor : null;
+        }
+        if (!is_scalar($valor) || is_bool($valor)) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if (isset($longitudesMaximas[$campo]) && mb_strlen($valor) > $longitudesMaximas[$campo]) {
+            return null;
+        }
+
+        if (in_array($campo, $camposFecha, true)) {
+            return ImportacionExcelValidador::fecha($valor, 1920, (int) date('Y') + 10);
+        }
+
+        switch ($campo) {
+            case 'genero':
+                $generos = [
+                    'MASCULINO' => 'Masculino', 'M' => 'Masculino', 'FEMENINO' => 'Femenino', 'F' => 'Femenino',
+                    'OTRO' => 'Otro', 'NO BINARIO' => 'No binario', 'PREFIERO NO DECIR' => 'Prefiero no decir',
+                ];
+                return $generos[mb_strtoupper($valor, 'UTF-8')] ?? null;
+            case 'numero_hijos':
+                return preg_match('/^\d{1,2}$/', $valor) && (int) $valor <= 20 ? (int) $valor : null;
+            case 'jefe_inmediato_correo':
+                return ImportacionExcelValidador::correo($valor);
+            case 'sede':
+                return ImportacionExcelValidador::sede($valor);
+        }
+
+        // Mismos campos que normalizarNombres() pone en mayúsculas al guardar desde el
+        // formulario: sin esto, los filtros de la lista verían "Sura" y "SURA" como dos EPS.
+        if (in_array($campo, ['nombres', 'apellidos', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'], true)) {
+            return mb_strtoupper($valor, 'UTF-8');
+        }
+
+        return $valor;
+    }
+
+    /**
+     * El campo del empleado no tiene un dato real: vacío, o con el valor de relleno que
+     * deja el alta automática desde Contratos (ContratoController@store).
+     */
+    private function campoSinDato(string $campo, mixed $actual): bool
+    {
+        if ($actual === null || $actual === '') {
+            return true;
+        }
+
+        return match ($campo) {
+            'genero' => $actual === 'No especificado',
+            'movil' => (bool) preg_match('/^0+$/', (string) $actual),
+            'eps', 'arl' => mb_strtoupper(trim((string) $actual), 'UTF-8') === 'SIN ASIGNAR',
+            default => false,
+        };
     }
 
     public function destroy(User $empleado)

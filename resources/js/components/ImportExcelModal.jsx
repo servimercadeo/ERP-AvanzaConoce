@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import api from "../api/axios";
 import { IconClose } from "./Icons";
+import { descargarExcel, fechaArchivo } from "../utils/excelExport";
 
 /* ─── Importar datos desde Excel (genérico, por cédula/documento/etc.) ──
    Nunca sobrescribe un campo que el registro ya tenga guardado: el backend
@@ -34,22 +35,42 @@ export default function ImportExcelModal({
     const tituloDeCampo = (campo) =>
         columnas.find((c) => c.campo === campo)?.titulo ?? campo;
     // Solo el import de Empleados puede completar altas pendientes (ver
-    // EmpleadoController@importarDatosPersonales); el de Contratos no manda este campo.
+    // EmpleadoController@importarDatosPersonales); otros endpoints no mandan este campo.
     const tieneAlta = result != null && result.dados_de_alta !== undefined;
+    const filasConInvalidos = (result?.detalle ?? []).filter((d) => d.campos_invalidos?.length);
+    const conCredenciales = (result?.detalle ?? []).filter((d) => d.credenciales);
 
     const copiarCredenciales = async () => {
-        const lineas = (result?.detalle ?? [])
-            .filter((d) => d.credenciales)
-            .map((d) => `${d.nombre} (${d[columnaClave.campo]}): ${d.credenciales.email} / ${d.credenciales.password}`);
+        const lineas = conCredenciales.map(
+            (d) => `${d.nombre} (${d[columnaClave.campo]}): ${d.credenciales.email} / ${d.credenciales.password}`,
+        );
         try {
             await navigator.clipboard.writeText(lineas.join("\n"));
             setCredencialesCopiadas(true);
             setTimeout(() => setCredencialesCopiadas(false), 2500);
         } catch {
-            // Clipboard puede fallar por permisos del navegador; las credenciales siguen
-            // visibles en la tabla de detalle para copiarlas a mano.
+            // Clipboard no existe fuera de HTTPS y puede fallar por permisos del navegador;
+            // queda "Descargar credenciales" y la tabla de detalle para copiarlas a mano.
         }
     };
+
+    // Respaldo de "Copiar": la contraseña no se puede volver a consultar después.
+    const descargarCredenciales = () =>
+        descargarExcel(
+            [
+                {
+                    nombre: "Credenciales",
+                    columnas: [
+                        { titulo: columnaClave.titulo, tipo: "texto", ancho: 14, valor: (d) => d[columnaClave.campo] },
+                        { titulo: "Nombre", tipo: "texto", ancho: 32, valor: (d) => d.nombre },
+                        { titulo: "Usuario (email)", tipo: "texto", ancho: 32, valor: (d) => d.credenciales.email },
+                        { titulo: "Contraseña temporal", tipo: "texto", ancho: 20, valor: (d) => d.credenciales.password },
+                    ],
+                    filas: conCredenciales,
+                },
+            ],
+            `Credenciales_Importacion_${fechaArchivo()}.xlsx`,
+        );
 
     const reset = () => {
         setStep("select");
@@ -277,11 +298,49 @@ export default function ImportExcelModal({
                                         usuario y contraseña nuevos. Cópialos ahora — la
                                         contraseña no se puede volver a mostrar después.
                                     </p>
-                                    <button style={S.btnSecondary} onClick={copiarCredenciales}>
-                                        {credencialesCopiadas
-                                            ? "✓ Copiado"
-                                            : "Copiar credenciales"}
-                                    </button>
+                                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                        <button style={S.btnSecondary} onClick={copiarCredenciales}>
+                                            {credencialesCopiadas
+                                                ? "✓ Copiado"
+                                                : "Copiar credenciales"}
+                                        </button>
+                                        <button style={S.btnSecondary} onClick={descargarCredenciales}>
+                                            Descargar credenciales
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {filasConInvalidos.length > 0 && (
+                                <div style={S.warnBox}>
+                                    <p style={S.warnTitle}>
+                                        ⚠ {filasConInvalidos.length} fila(s) con valores
+                                        inválidos que no se cargaron (fecha inexistente,
+                                        sede que no está en el catálogo, correo mal escrito,
+                                        etc.). Corrígelos en el archivo y vuelve a importarlo:
+                                    </p>
+                                    <p style={S.warnText}>
+                                        {filasConInvalidos
+                                            .slice(0, 10)
+                                            .map(
+                                                (d) =>
+                                                    `${d[columnaClave.campo]}: ${d.campos_invalidos.map(tituloDeCampo).join(", ")}`,
+                                            )
+                                            .join(" · ")}
+                                        {filasConInvalidos.length > 10 &&
+                                            ` · … y ${filasConInvalidos.length - 10} más (ver detalle).`}
+                                    </p>
+                                </div>
+                            )}
+                            {result.sin_contrato?.length > 0 && (
+                                <div style={S.notFoundBox}>
+                                    <p style={S.notFoundTitle}>
+                                        Sin contrato registrado (no se tocó nada; crea
+                                        primero su contrato en Ver y Crear Contratos
+                                        &gt; Importar Excel):
+                                    </p>
+                                    <p style={S.notFoundText}>
+                                        {result.sin_contrato.join(", ")}
+                                    </p>
                                 </div>
                             )}
                             {result.no_encontrados.length > 0 && (
@@ -306,6 +365,7 @@ export default function ImportExcelModal({
                                                 <th>Nombre</th>
                                                 <th>Actualizados</th>
                                                 <th>Omitidos (ya tenían dato)</th>
+                                                <th>Inválidos (no se cargaron)</th>
                                                 {tieneAlta && <th>Credenciales nuevas</th>}
                                             </tr>
                                         </thead>
@@ -321,6 +381,11 @@ export default function ImportExcelModal({
                                                     </td>
                                                     <td>
                                                         {d.campos_omitidos
+                                                            .map(tituloDeCampo)
+                                                            .join(", ") || "—"}
+                                                    </td>
+                                                    <td style={d.campos_invalidos?.length ? { color: "#a33", fontWeight: 600 } : undefined}>
+                                                        {(d.campos_invalidos ?? [])
                                                             .map(tituloDeCampo)
                                                             .join(", ") || "—"}
                                                     </td>

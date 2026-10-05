@@ -16,8 +16,8 @@ import { crearDescargaPlantilla, crearParser } from "./excelImport.js";
  *     dinero / una relación que requeriría resolver el nombre a un id — cada uno con
  *     su propio flujo dedicado, no un campo de ficha suelto.
  *   - Tipo de Contrato, Estado Contrato, Fecha de Ingreso, Fecha de Retiro, Cliente
- *     Proyecto: viven en Contrato, no en el empleado — eso lo cubre el botón
- *     "Completar Datos (Excel)" del módulo Contratos (contratosImportDatos.js).
+ *     Proyecto: viven en Contrato, no en el empleado — eso lo cubre "Importar Excel"
+ *     del módulo Contratos (contratosImport.js).
  *   - Cantidad de Contratos, Fecha de Registro: columnas calculadas, no hay nada que
  *     escribir.
  *   - Ciudad: la exporta EmpleadoController@index como repliegue para mostrarla

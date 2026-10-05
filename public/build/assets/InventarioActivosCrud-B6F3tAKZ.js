@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-query-qy_ppomC.js";import t from"./InventarioCategoriaCrud-qNWF28iN.js";import"./app-7afbUIb1.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-Dz9-BgEN.js";import"./SearchableSelect-BuBDGCn2.js";function u(){return r.jsx(t,{categoria:"Activos"})}export{u as default};

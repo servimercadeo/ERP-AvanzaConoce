@@ -4,7 +4,7 @@ import { descargarExcel, fechaArchivo } from "./excelExport.js";
  * Motor genérico para "rellenar datos faltantes desde Excel" (Empleados, Contratos, …).
  * Cada módulo define su propia lista de columnas importables (título visible + nombre
  * de campo del backend) y usa `crearParser`/`crearDescargaPlantilla` para obtener las
- * funciones concretas — ver empleadosImport.js y contratosImportDatos.js.
+ * funciones concretas — ver empleadosImport.js.
  *
  * El contrato de cada columna es: { titulo, campo, requerido?, tipo? }.
  * `tipo: "fecha"` activa la decodificación segura de fechas de Excel (ver más abajo).
@@ -57,6 +57,13 @@ function normalizarFecha(valorCrudo, XLSX) {
         return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
     }
     return texto || null;
+}
+
+// Cédula/documento como texto limpio: "1.007.845.261" o "1 007 845 261" (separadores de
+// miles que Excel o quien digita agregan) se buscarían en BD tal cual y nunca coincidirían.
+export function normalizarClave(valorCrudo) {
+    const texto = String(valorCrudo ?? "").trim();
+    return /^\d{1,3}([.,\s]\d{3})+$/.test(texto) ? texto.replace(/[.,\s]/g, "") : texto;
 }
 
 /** Descarga una plantilla .xlsx vacía con exactamente las columnas dadas. */
@@ -130,7 +137,7 @@ export function crearParser(columnas) {
 
         const filas = [];
         filasCrudas.forEach((filaCruda) => {
-            const clave = String(filaCruda[columnaClaveEncabezado] ?? "").trim();
+            const clave = normalizarClave(filaCruda[columnaClaveEncabezado]);
             if (!clave) return;
 
             const fila = { [columnaClave.campo]: clave };

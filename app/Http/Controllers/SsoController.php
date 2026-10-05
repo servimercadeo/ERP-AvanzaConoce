@@ -29,7 +29,8 @@ class SsoController extends Controller
             return redirect('/login?sso_error=token_invalido');
         }
 
-        $usuario = User::where('email', $payload->email)->where('activo', true)->first();
+        // Pendiente de alta = creado desde Contratos, aún sin alta en Empleados: sin acceso.
+        $usuario = User::where('email', $payload->email)->where('activo', true)->where('pendiente_alta', false)->first();
 
         if (!$usuario) {
             // El usuario existe en AvanzaConoce pero aún no fue creado (o está inactivo) en el ERP.

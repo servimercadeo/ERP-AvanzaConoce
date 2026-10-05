@@ -16,16 +16,20 @@ import {
     IconEmptySearch,
     IconLoading,
 } from "../components/Icons";
-import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
+import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "../utils/contratosImport";
 import { exportarContratosExcel } from "../utils/contratosExport";
-import {
-    COLUMNAS_IMPORTABLES as COLUMNAS_COMPLETAR_DATOS,
-    descargarPlantillaImportacion as descargarPlantillaCompletarDatos,
-    parsearArchivoImportacion as parsearArchivoCompletarDatos,
-} from "../utils/contratosImportDatos";
-import ImportExcelModal from "../components/ImportExcelModal";
 
 const POR_PAGINA = 5;
+
+// Nombre de columna (como en "Exportar Excel") de los campos que reporta la importación.
+const CAMPOS_IMPORT_LABEL = {
+    cargo: "Cargo", sede: "Sede", area_empresa: "Área Empresa", jefe_inmediato: "Jefe Inmediato",
+    jefe_inmediato_correo: "Correo del Jefe", tipo_vinculacion: "Tipo de Vinculación", arl: "ARL",
+    fecha_vinculacion_arl: "Fecha Vinculación ARL", lps_afiliado: "EPS", fecha_vinculacion_lps: "Fecha Vinculación EPS",
+    caja_compensacion: "Caja de Compensación", fecha_vinculacion_caja: "Fecha Vinculación Caja",
+    fondo_pensiones: "Fondo de Pensiones", fondo_cesantias: "Fondo de Cesantías", empleador: "Empleador",
+    cliente_proyecto: "Cliente Proyecto",
+};
 
 const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Traslado", "No ingreso"];
 const TIPOS_CONTRATO = [
@@ -2365,7 +2369,6 @@ export default function ContratosCrud() {
     const [empresaProyectoAlert, setEmpresaProyectoAlert] = useState(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
-    const [completarDatosOpen, setCompletarDatosOpen] = useState(false);
     const [importFile, setImportFile] = useState(null);
     const [importFileName, setImportFileName] = useState("");
     const [importing, setImporting] = useState(false);
@@ -2668,29 +2671,46 @@ export default function ContratosCrud() {
             );
 
             let created = 0;
-            let omitted = 0;
-            let noEncontrados = 0;
+            let nuevosPendientes = 0;
             const errors = [];
-            for (const [index, payload] of payloads.entries()) {
+            // Cédulas que ya tienen contrato: no se crea otro, se rellenan los campos vacíos
+            // de su contrato vigente (nunca se sobrescribe un dato existente).
+            const paraCompletar = [];
+            for (const [index, rawPayload] of payloads.entries()) {
+                const { correo_jefe_invalido: correoJefeInvalido, ...payload } = rawPayload;
                 const documento = payload.documento ? String(payload.documento).trim() : "";
+                if (correoJefeInvalido) {
+                    errors.push(`Cédula ${documento}: el correo del jefe "${correoJefeInvalido}" no es válido y no se cargó (el resto del contrato sí).`);
+                }
                 if (documento && cedulasExistentes.has(documento)) {
-                    omitted += 1;
+                    paraCompletar.push(filaParaCompletarContrato(payload));
                     continue;
                 }
 
-                // No dejar que el backend cree el empleado automáticamente al importar:
-                // si la cédula no corresponde a un empleado ya existente, se omite.
-                const empleado = documento ? empleadosPorCedula.get(documento) : null;
-                if (!empleado) {
-                    noEncontrados += 1;
-                    errors.push(`Cédula ${documento || "sin documento"}: no existe como empleado en el sistema, no se creó el contrato.`);
+                // Proceso: el contrato va primero. Si la cédula aún no es empleado, el backend
+                // la crea "pendiente de alta" (sin credenciales); después Empleados > Importar
+                // Excel completa su ficha y le da el alta. Para crearla hacen falta los nombres.
+                if (!documento) {
+                    errors.push(`Contrato ${index + 1}: no tiene Documento (cédula), no se creó.`);
+                    continue;
+                }
+                const empleado = empleadosPorCedula.get(documento);
+                if (!empleado && (!payload.nombres || !payload.apellidos)) {
+                    errors.push(`Cédula ${documento}: no es empleado todavía y le faltan Nombres o Apellidos para crearlo; no se creó el contrato.`);
                     continue;
                 }
 
-                const payloadConEmpleado = { ...payload, empleado_id: empleado.id };
+                const { regional_no_encontrada: regionalNoEncontrada, ...payloadLimpio } = payload;
+                if (regionalNoEncontrada) {
+                    errors.push(`Cédula ${documento}: la regional "${regionalNoEncontrada}" no existe en el catálogo, no se creó el contrato.`);
+                    continue;
+                }
+
+                const payloadConEmpleado = empleado ? { ...payloadLimpio, empleado_id: empleado.id } : payloadLimpio;
                 try {
                     await api.post("/contratos", payloadConEmpleado);
                     created += 1;
+                    if (!empleado) nuevosPendientes += 1;
                     if (documento) cedulasExistentes.add(documento);
                 } catch (err) {
                     const message = err?.response?.data?.message || err?.message || "Error desconocido";
@@ -2699,19 +2719,51 @@ export default function ContratosCrud() {
                 }
             }
 
+            let completados = 0;
+            let sinCambios = 0;
+            const etiqueta = (campo) => CAMPOS_IMPORT_LABEL[campo] ?? campo;
+            // El endpoint acepta hasta 2000 filas por petición.
+            for (let i = 0; i < paraCompletar.length; i += 500) {
+                try {
+                    const { data } = await api.post("/contratos/importar-datos-faltantes", {
+                        filas: paraCompletar.slice(i, i + 500),
+                    });
+                    completados += data.actualizados;
+                    sinCambios += data.sin_cambios;
+                    data.no_encontrados.forEach((doc) =>
+                        errors.push(`Cédula ${doc}: no se encontró su contrato vigente para completarlo.`),
+                    );
+                    data.detalle
+                        .filter((d) => d.campos_invalidos?.length)
+                        .forEach((d) =>
+                            errors.push(
+                                `Cédula ${d.documento}: valores inválidos que no se cargaron (${d.campos_invalidos.map(etiqueta).join(", ")}).`,
+                            ),
+                        );
+                } catch (err) {
+                    errors.push(
+                        `No se pudieron completar ${Math.min(500, paraCompletar.length - i)} contrato(s) existentes: ${err?.response?.data?.message || err?.message || "Error desconocido"}`,
+                    );
+                }
+            }
+
             qc.invalidateQueries({ queryKey: ["contratos"] });
             qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
 
-            if (errors.length && created === 0 && omitted === 0) {
-                throw new Error(errors.join(" \n"));
-            }
-
             const resumen = [];
-            if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} importado${created === 1 ? "" : "s"}`);
-            if (omitted > 0) resumen.push(`${omitted} omitido${omitted === 1 ? "" : "s"} (ya existía un contrato con esa cédula)`);
-            if (noEncontrados > 0) resumen.push(`${noEncontrados} sin crear (cédula no registrada como empleado)`);
-            if (errors.length - noEncontrados > 0) resumen.push(`${errors.length - noEncontrados} con error`);
-            showToast(resumen.length ? resumen.join(", ") : "No se importó ningún contrato.");
+            if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} creado${created === 1 ? "" : "s"}`);
+            if (completados > 0) resumen.push(`${completados} existente${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"} (solo campos vacíos)`);
+            if (sinCambios > 0) resumen.push(`${sinCambios} existente${sinCambios === 1 ? "" : "s"} sin cambios (ya tenían todo)`);
+            if (nuevosPendientes > 0) resumen.push(`${nuevosPendientes} empleado${nuevosPendientes === 1 ? "" : "s"} nuevo${nuevosPendientes === 1 ? "" : "s"} pendiente${nuevosPendientes === 1 ? "" : "s"} de alta (complétalos en Empleados > Importar Excel para entregar credenciales)`);
+            const textoResumen = resumen.length ? resumen.join(", ") : "No se importó ningún contrato.";
+
+            // Con errores el modal queda abierto mostrándolos: un aviso de 3 segundos no
+            // alcanza para saber qué filas corregir.
+            if (errors.length) {
+                setImportError(`${textoResumen}.\n\n${errors.length} fila(s) con problemas:\n• ${errors.join("\n• ")}`);
+                return;
+            }
+            showToast(textoResumen);
             setImportOpen(false);
             setImportFile(null);
             setImportFileName("");
@@ -2885,21 +2937,6 @@ export default function ContratosCrud() {
                         }}
                     >
                         Importar Excel
-                    </button>
-                    <button
-                        style={{
-                            border: "1px solid var(--border)",
-                            background: "var(--white)",
-                            color: "var(--text)",
-                            padding: "9px 14px",
-                            borderRadius: "var(--radius-sm)",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                        onClick={() => setCompletarDatosOpen(true)}
-                        title="Completa campos vacíos de contratos existentes desde Excel, buscando por Documento. Nunca sobrescribe datos existentes ni crea contratos nuevos."
-                    >
-                        Completar Datos (Excel)
                     </button>
                     <button
                         className="btn-primary"
@@ -3083,8 +3120,18 @@ export default function ContratosCrud() {
                         </div>
                         <div style={{ padding: 24 }}>
                             <p style={{ margin: "0 0 12px", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                                Sube un archivo con las columnas de contrato. El sistema intentará mapear encabezados como cédula, nombres, apellidos, cargo, sede, fecha de ingreso, tipo de contrato, salario y proyecto.
+                                Sube un archivo con las columnas de contrato (el mismo formato de «Exportar Excel»: Documento, Cargo, Sede, Tipo de Contrato, Fecha de Ingreso, Salario, EPS, ARL, Centro de Costos, etc.). Este es el primer paso: después se completan los empleados en Empleados &gt; Importar Excel, que es donde reciben sus credenciales.
                             </p>
+                            <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text-muted)", lineHeight: 1.6, fontSize: "0.88rem" }}>
+                                <li>
+                                    <strong>Sin contrato:</strong> se crea el contrato completo, con sus anexos (una fila por auxilio).
+                                    Si la persona aún no es empleado, queda creada como <em>pendiente de alta</em> (sin acceso al sistema); para eso el archivo debe traer Nombres y Apellidos.
+                                </li>
+                                <li>
+                                    <strong>Ya tiene contrato:</strong> solo se rellenan los campos vacíos de su contrato vigente.
+                                    Nunca se sobrescribe un dato existente, y salario, fechas de ingreso/retiro, estado, tipo de contrato y centros de costo no se modifican.
+                                </li>
+                            </ul>
                             <label
                                 style={{
                                     display: "flex",
@@ -3113,7 +3160,7 @@ export default function ContratosCrud() {
                                 {importFileName || "Seleccionar archivo Excel"}
                             </label>
                             {importError && (
-                                <div style={{ ...S.err, marginTop: 12, whiteSpace: "pre-wrap" }}>
+                                <div style={{ ...S.err, marginTop: 12, whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto" }}>
                                     {importError}
                                 </div>
                             )}
@@ -3472,30 +3519,6 @@ export default function ContratosCrud() {
                 }
             />
 
-            <ImportExcelModal
-                open={completarDatosOpen}
-                onClose={() => setCompletarDatosOpen(false)}
-                onImported={() => qc.invalidateQueries({ queryKey: ["contratos"] })}
-                titulo="Completar datos de contratos desde Excel"
-                descripcion={
-                    <>
-                        Busca el contrato más reciente de cada empleado por{" "}
-                        <strong>Documento</strong> (cédula) y rellena los
-                        campos que traiga el archivo.{" "}
-                        <strong>
-                            Nunca sobrescribe un dato que el contrato ya
-                            tenga guardado
-                        </strong>{" "}
-                        ni crea contratos nuevos: si una celda corresponde a
-                        un campo que ya tiene valor, esa celda se ignora y
-                        queda reportada al final.
-                    </>
-                }
-                columnas={COLUMNAS_COMPLETAR_DATOS}
-                descargarPlantilla={descargarPlantillaCompletarDatos}
-                parsearArchivo={parsearArchivoCompletarDatos}
-                endpoint="/contratos/importar-datos-faltantes"
-            />
         </div>
     );
 }

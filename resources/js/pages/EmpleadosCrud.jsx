@@ -2383,8 +2383,13 @@ export default function EmpleadosCrud() {
                 titulo="Importar datos personales desde Excel"
                 descripcion={
                     <>
-                        Busca cada empleado por <strong>Cédula</strong> y
-                        rellena los campos que traiga el archivo.{" "}
+                        <strong>
+                            Solo acepta cédulas que ya tienen contrato
+                        </strong>{" "}
+                        (el contrato se crea primero, en Ver y Crear Contratos
+                        &gt; Importar Excel). Busca cada empleado por{" "}
+                        <strong>Cédula</strong> y rellena los campos que traiga
+                        el archivo.{" "}
                         <strong>
                             Nunca sobrescribe un dato que el empleado ya tenga
                             guardado

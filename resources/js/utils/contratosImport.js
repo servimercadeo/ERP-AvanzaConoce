@@ -32,16 +32,23 @@ function resolveValue(row, aliases) {
         compact: normalizeCompact(key),
     }));
 
+    let columnaExiste = aliases.some((alias) => Object.prototype.hasOwnProperty.call(row, alias));
     for (const alias of aliases) {
         const aliasKey = normalizeKey(alias);
         const match = keys.find((item) => item.normalized === aliasKey);
         if (match) {
+            columnaExiste = true;
             const value = row[match.original];
             if (value !== undefined && value !== null && String(value).trim() !== "") {
                 return value;
             }
         }
     }
+
+    // La columna está en el archivo pero esta fila la trae vacía: el campo va vacío. Buscar
+    // una columna "parecida" aquí tomaba datos de otra (p. ej. con "Correo del Jefe" vacío,
+    // se llevaba el correo del empleado o el nombre del jefe).
+    if (columnaExiste) return null;
 
     // Encabezados de Excel truncados por el ancho de columna (ej. "tipodecontrat"
     // en vez de "tipodecontrato"): coincide por substring en ambas direcciones,
@@ -51,10 +58,14 @@ function resolveValue(row, aliases) {
     for (const alias of aliases) {
         const aliasCompact = normalizeCompact(alias);
         if (aliasCompact.length < 5) continue;
+        // Un encabezado truncado es un PREFIJO del alias ("tipodecontrat" → "tipodecontrato").
+        // Con `includes` en esa dirección, una columna "Empresa" coincidía con el alias
+        // "areaempresa" y, si faltaba "Área Empresa", el nombre de la empresa terminaba
+        // guardado como área.
         const candidates = keys.filter(
             (item) =>
                 item.compact.length >= 5 &&
-                (item.compact.includes(aliasCompact) || aliasCompact.includes(item.compact)),
+                (item.compact.includes(aliasCompact) || aliasCompact.startsWith(item.compact)),
         );
         if (!candidates.length) continue;
         candidates.sort(
@@ -155,15 +166,29 @@ function normalizeEstado(value) {
 
 function parseNumeric(value) {
     if (!value && value !== 0) return "";
-    if (typeof value === "number") return value;
-    const text = String(value).trim().replace(/[^0-9,.-]/g, "");
+    if (typeof value === "number") return Number.isFinite(value) ? value : "";
+    let text = String(value).trim().replace(/[^0-9,.-]/g, "");
     if (!text) return "";
-    return Number(text.replace(/,/g, ""));
+    // Formato colombiano: punto de miles y coma decimal ("3.500.000" o "1.423.500,50").
+    // Antes "3.500.000" daba NaN y el salario se perdía en silencio.
+    if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) {
+        text = text.replace(/\./g, "").replace(",", ".");
+    } else {
+        text = text.replace(/,/g, "");
+    }
+    const num = Number(text);
+    return Number.isFinite(num) ? num : "";
+}
+
+function normalizeDocumento(value) {
+    if (value === null || value === undefined) return value;
+    const text = String(value).trim();
+    return /^\d{1,3}([.,\s]\d{3})+$/.test(text) ? text.replace(/[.,\s]/g, "") : text;
 }
 
 export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
     const payload = {
-        documento: resolveValue(row, ["documento", "cedula", "cedemp", "identificacion", "cc", "nit"]),
+        documento: normalizeDocumento(resolveValue(row, ["documento", "cedula", "cedemp", "identificacion", "cc", "nit"])),
         nombres: normalizeText(resolveValue(row, ["nombres", "nombre", "nomemp", "primer nombre", "primer_nombre"])),
         apellidos: normalizeText(resolveValue(row, ["apellidos", "apellido", "apeemp", "apellidos y nombres", "primer apellido", "primer_apellido"])),
         correo: resolveValue(row, ["correo", "email", "emaemp", "correo electronico", "correo_electronico"]),
@@ -171,8 +196,9 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
         sede: resolveValue(row, ["sede", "ciudad sede", "ciudad_sede"]),
         area_empresa: resolveValue(row, ["area_empresa", "area empresa", "areaempr", "area"]),
         jefe_inmediato: resolveValue(row, ["jefe_inmediato", "jefe inmediato", "jefeinme"]),
+        jefe_inmediato_correo: resolveValue(row, ["jefe_inmediato_correo", "correo del jefe", "correo jefe", "correo jefe inmediato"]),
         fecha_ingreso: normalizeDate(resolveValue(row, ["fecha_ingreso", "fecha de ingreso", "fecha_de_ingreso", "fechaingreso", "fechaing"])),
-        fecha_retiro: "",
+        fecha_retiro: normalizeDate(resolveValue(row, ["fecha_retiro", "fecha de retiro", "fecharetiro", "fecharet"])),
         tipo_contrato: normalizeContratoType(resolveValue(row, ["tipo_contrato", "tipo de contrato", "tipocontrato", "tipodecor", "tipodecontrato"])),
         tipo_vinculacion: resolveValue(row, ["tipo_vinculacion", "tipo de vinculacion", "vinculacion", "tipovinc"]),
         estado_contrato: normalizeEstado(resolveValue(row, ["estado_contrato", "estado", "estado contrato", "estadocor", "estadocontrato"])),
@@ -192,6 +218,18 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
         regional_id: resolveValue(row, ["regional_id", "regional", "regionalid"]),
     };
 
+    // Un correo del jefe mal escrito no debe impedir crear el contrato (el backend lo
+    // rechazaría con 422): se omite y se deja en `correo_jefe_invalido` para reportarlo.
+    if (isFilled(payload.jefe_inmediato_correo)) {
+        const correo = String(payload.jefe_inmediato_correo).trim().toLowerCase();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+            payload.jefe_inmediato_correo = correo;
+        } else {
+            payload.correo_jefe_invalido = String(payload.jefe_inmediato_correo).trim();
+            payload.jefe_inmediato_correo = "";
+        }
+    }
+
     if (payload.regional_id && catalogs?.regionales?.length) {
         const match = catalogs.regionales.find((item) =>
             String(item.nombre).toLowerCase() === String(payload.regional_id).toLowerCase()
@@ -199,6 +237,13 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
         if (match) {
             payload.regional_id = match.id;
         }
+    }
+    // Un nombre de regional que no está en el catálogo no se manda (el backend exige un id
+    // y rechazaría el contrato completo): se deja en `regional_no_encontrada` para que la
+    // pantalla lo reporte.
+    if (payload.regional_id && !/^\d+$/.test(String(payload.regional_id))) {
+        payload.regional_no_encontrada = String(payload.regional_id).trim();
+        payload.regional_id = "";
     }
 
     const centroCostoCodigo = resolveValue(row, ["centro_costo", "centro de costos", "codigo centro costo", "centrode", "cco"]);
@@ -241,6 +286,25 @@ function isFilled(value) {
     if (typeof value === "number") return !Number.isNaN(value);
     if (Array.isArray(value)) return value.length > 0;
     return String(value).trim() !== "";
+}
+
+// Campos que se pueden rellenar en un contrato que YA existe (ContratoController@
+// importarDatosFaltantes). Salario, fechas de ingreso/retiro, estado, tipo de contrato,
+// centros de costo y anexos quedan fuera a propósito: tienen reglas de negocio propias
+// (dotación, pedidos, porcentajes) y se cambian desde el formulario del contrato.
+const CAMPOS_COMPLETAR_CONTRATO = [
+    "cargo", "sede", "area_empresa", "jefe_inmediato", "jefe_inmediato_correo", "tipo_vinculacion",
+    "arl", "fecha_vinculacion_arl", "lps_afiliado", "fecha_vinculacion_lps", "caja_compensacion",
+    "fecha_vinculacion_caja", "fondo_pensiones", "fondo_cesantias", "empleador", "cliente_proyecto",
+];
+
+/** Fila { documento, campo: valor, ... } con solo los campos rellenables que traen dato. */
+export function filaParaCompletarContrato(payload) {
+    const fila = { documento: String(payload.documento ?? "").trim() };
+    CAMPOS_COMPLETAR_CONTRATO.forEach((campo) => {
+        if (isFilled(payload[campo])) fila[campo] = String(payload[campo]).trim();
+    });
+    return fila;
 }
 
 /**

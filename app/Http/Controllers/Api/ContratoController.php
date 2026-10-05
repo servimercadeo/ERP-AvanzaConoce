@@ -11,6 +11,7 @@ use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
 use App\Services\EmpresaProyectoRules;
+use App\Services\ImportacionExcelValidador;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -338,17 +339,30 @@ class ContratoController extends Controller
         return response()->json($contratos);
     }
 
-    public function store(Request $request)
+    private function crearContratoYEmpleado(Request $request): Contrato
     {
         if (empty($request->empleado_id) && $request->documento) {
+            // Proceso: el contrato se crea primero y el empleado queda "pendiente de alta"
+            // hasta que Empleados (formulario o Importar Excel) completa su ficha y le
+            // entrega credenciales. Mientras tanto no puede iniciar sesión (AuthController).
+            $documento = trim((string) $request->documento);
+            // Si el correo ya es de otra persona, se usa el autogenerado en vez de fallar
+            // por el índice único de `users.email`.
+            $correo = trim((string) $request->correo);
+            $duenoCorreo = $correo === '' ? null : \App\Models\User::where('email', $correo)->first();
+            if ($correo === '' || ($duenoCorreo && (string) $duenoCorreo->cedula !== $documento)) {
+                $correo = $documento . '@avanzaconoce.com';
+            }
             $user = \App\Models\User::firstOrCreate(
-                ['cedula' => $request->documento],
+                ['cedula' => $documento],
                 [
                     'nombres' => mb_strtoupper($request->nombres ?? '', 'UTF-8'),
                     'apellidos' => mb_strtoupper($request->apellidos ?? '', 'UTF-8'),
                     'name' => trim(mb_strtoupper($request->nombres ?? '', 'UTF-8') . ' ' . mb_strtoupper($request->apellidos ?? '', 'UTF-8')),
-                    'email' => $request->correo ?: ($request->documento . '@avanzaconoce.com'),
-                    'password' => \Illuminate\Support\Facades\Hash::make($request->documento),
+                    'email' => $correo,
+                    // Nunca la cédula como contraseña: las credenciales reales se generan al dar el alta.
+                    'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(40)),
+                    'pendiente_alta' => true,
                     'sede' => $request->sede ?? 'Principal',
                     'cargo' => mb_strtoupper($request->cargo ?? '', 'UTF-8') ?: 'SIN ASIGNAR',
                     'estado_empleado' => 'Activo',
@@ -382,6 +396,7 @@ class ContratoController extends Controller
             'sede'                    => 'nullable|string',
             'area_empresa'            => 'nullable|string',
             'jefe_inmediato'          => 'nullable|string',
+            'jefe_inmediato_correo'   => 'nullable|email|max:180',
             'fecha_ingreso'           => 'nullable|date',
             'fecha_retiro'            => 'nullable|date',
             'salario'                 => 'nullable|numeric',
@@ -415,7 +430,7 @@ class ContratoController extends Controller
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
 
-        $contrato = DB::transaction(function() use ($data) {
+        return DB::transaction(function() use ($data) {
             $data['completado'] = true;
 
             $contrato = Contrato::create($data);
@@ -440,6 +455,14 @@ class ContratoController extends Controller
 
             return $contrato;
         });
+    }
+
+    public function store(Request $request)
+    {
+        // Crear al empleado pendiente (si la cédula es nueva) y el contrato es una sola
+        // operación: si algo falla después de crear el usuario (validación del contrato,
+        // auditoría, etc.), no debe quedar un empleado huérfano sin contrato.
+        $contrato = DB::transaction(fn () => $this->crearContratoYEmpleado($request));
 
         $this->enviarContratoASharepoint($contrato);
 
@@ -495,6 +518,7 @@ class ContratoController extends Controller
             'sede'                    => 'nullable|string',
             'area_empresa'            => 'nullable|string',
             'jefe_inmediato'          => 'nullable|string',
+            'jefe_inmediato_correo'   => 'nullable|email|max:180',
             'fecha_ingreso'           => 'nullable|date',
             'fecha_retiro'            => 'nullable|date',
             'salario'                 => 'nullable|numeric',
@@ -600,8 +624,8 @@ class ContratoController extends Controller
      * Regla de seguridad (no negociable, igual que en
      * EmpleadoController@importarDatosPersonales): por cada campo, solo se escribe si el
      * valor actual en BD está vacío/NULL. Un campo que ya tiene dato se deja intacto y se
-     * reporta como omitido, nunca se sobreescribe. Distinto del "Importar Excel" que ya
-     * existe (crea contratos nuevos): este nunca crea nada, solo completa.
+     * reporta como omitido, nunca se sobreescribe. Nunca crea contratos: lo usa "Importar
+     * Excel" de Contratos para las cédulas que ya tienen uno (las demás se crean con store()).
      */
     public function importarDatosFaltantes(Request $request)
     {
@@ -640,13 +664,16 @@ class ContratoController extends Controller
 
         DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
             foreach ($filas as $fila) {
-                if (!is_array($fila)) continue;
-                $documento = trim((string) ($fila['documento'] ?? ''));
+                if (!is_array($fila) || !is_scalar($fila['documento'] ?? null)) continue;
+                $documento = trim((string) $fila['documento']);
                 if ($documento === '') continue;
 
                 $empleado = User::where('cedula', $documento)->first();
+                // Solo contratos vigentes (completado = true), los mismos que muestra la
+                // lista: un contrato anulado más reciente no debe recibir los datos.
                 $contrato = $empleado
                     ? Contrato::where('empleado_id', $empleado->id)
+                        ->where('completado', true)
                         ->orderByDesc('fecha_ingreso')
                         ->orderByDesc('id')
                         ->first()
@@ -659,18 +686,19 @@ class ContratoController extends Controller
 
                 $actualizadosFila = [];
                 $omitidosFila = [];
+                // Celdas con un valor que no se pudo aceptar: se omiten y se reportan.
+                $invalidosFila = [];
 
                 foreach ($camposPermitidos as $campo) {
                     if (!array_key_exists($campo, $fila)) continue;
                     $valor = $fila[$campo];
                     $valor = is_string($valor) ? trim($valor) : $valor;
                     if ($valor === null || $valor === '') continue;
-                    if (isset($longitudesMaximas[$campo]) && mb_strlen((string) $valor) > $longitudesMaximas[$campo]) continue;
 
-                    if (in_array($campo, $camposFecha, true)) {
-                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $valor)) continue;
-                        $year = (int) substr((string) $valor, 0, 4);
-                        if ($year < 1950 || $year > (int) date('Y') + 1) continue;
+                    $valor = $this->valorImportable($campo, $valor, $contrato, $camposFecha, $longitudesMaximas);
+                    if ($valor === null) {
+                        $invalidosFila[] = $campo;
+                        continue;
                     }
 
                     $actual = $contrato->{$campo};
@@ -697,11 +725,36 @@ class ContratoController extends Controller
                     'nombre'              => trim(($empleado->nombres ?? '') . ' ' . ($empleado->apellidos ?? '')),
                     'campos_actualizados' => $actualizadosFila,
                     'campos_omitidos'     => $omitidosFila,
+                    'campos_invalidos'    => $invalidosFila,
                 ];
             }
         });
 
         return response()->json($resumen);
+    }
+
+    /** Valor de una celda del import ya validado, o null si no es aceptable. */
+    private function valorImportable(string $campo, mixed $valor, Contrato $contrato, array $camposFecha, array $longitudesMaximas): ?string
+    {
+        if (!is_scalar($valor) || is_bool($valor)) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if (isset($longitudesMaximas[$campo]) && mb_strlen($valor) > $longitudesMaximas[$campo]) {
+            return null;
+        }
+
+        if (in_array($campo, $camposFecha, true)) {
+            return ImportacionExcelValidador::fecha($valor, 1950, (int) date('Y') + 1);
+        }
+
+        return match ($campo) {
+            'jefe_inmediato_correo' => ImportacionExcelValidador::correo($valor),
+            'sede' => ImportacionExcelValidador::sede($valor),
+            // La misma regla empresa ↔ proyecto que exigen store() y update().
+            'cliente_proyecto' => EmpresaProyectoRules::validar($contrato->empresa, $valor) === null ? $valor : null,
+            default => $valor,
+        };
     }
 
 }
