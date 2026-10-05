@@ -14,6 +14,7 @@ class OrdenCompraItem extends Model
         'tipo_producto_id',
         'producto',
         'categoria',
+        'empresa_id',
         'cantidad',
         'precio_unitario',
         'iva_porcentaje',
@@ -44,5 +45,10 @@ class OrdenCompraItem extends Model
     public function tipoProducto()
     {
         return $this->belongsTo(TipoProducto::class);
+    }
+
+    public function empresa()
+    {
+        return $this->belongsTo(Empresa::class);
     }
 }

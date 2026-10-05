@@ -26,8 +26,8 @@ class PedidosAutomaticosTest extends TestCase
     {
         parent::setUp();
         Cache::store('file')->forget('inventario-dotacion:flat');
-        $this->actuarComo('consultor');
-        $this->empleado = $this->usuario('consultor', ['nombres' => 'Ana', 'apellidos' => 'Pérez', 'cedula' => '1001']);
+        $this->actuarComo('general');
+        $this->empleado = $this->usuario('general', ['nombres' => 'Ana', 'apellidos' => 'Pérez', 'cedula' => '1001']);
 
         $this->camisa = $this->prenda('CAMISA', 'M', 10);
         $this->pantalon = $this->prenda('PANTALON', '32', 5);

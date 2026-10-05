@@ -15,7 +15,7 @@ class InventarioProductoController extends Controller
 {
     public function index(Request $request)
     {
-        $query = InventarioProducto::with(['tipoProducto', 'sede', 'series']);
+        $query = InventarioProducto::with(['tipoProducto', 'sede', 'series', 'empresa']);
 
         if ($request->categoria) {
             $query->whereHas('tipoProducto', fn ($q) => $q->where('categoria', $request->categoria));
@@ -72,6 +72,7 @@ class InventarioProductoController extends Controller
             'tipo_producto_id' => 'required|exists:tipos_producto,id',
             'sede_id'          => 'required|exists:sedes,id',
             'talla'            => 'nullable|string|max:50',
+            'empresa_id'       => 'nullable|exists:empresas,id',
             'precio'           => 'nullable|integer|min:0',
             'cantidad'         => 'required|integer|min:0',
             'stock_minimo'     => 'nullable|integer|min:0',
@@ -79,6 +80,7 @@ class InventarioProductoController extends Controller
             'series.*'         => 'string|max:100|distinct',
         ]);
         $talla = trim($data['talla'] ?? '');
+        $empresaId = $data['empresa_id'] ?? null;
 
         $series = array_values(array_filter(array_map('trim', $data['series'] ?? [])));
         if (!empty($series) && count($series) !== $data['cantidad']) {
@@ -90,10 +92,11 @@ class InventarioProductoController extends Controller
             $this->validarSerialesUnicos($series);
         }
 
-        return DB::transaction(function () use ($data, $series, $talla) {
+        return DB::transaction(function () use ($data, $series, $talla, $empresaId) {
             $existente = InventarioProducto::where('tipo_producto_id', $data['tipo_producto_id'])
                 ->where('sede_id', $data['sede_id'])
                 ->where('talla', $talla)
+                ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId), fn ($q) => $q->whereNull('empresa_id'))
                 ->first();
 
             if ($existente) {
@@ -111,6 +114,7 @@ class InventarioProductoController extends Controller
                     'tipo_producto_id' => $data['tipo_producto_id'],
                     'sede_id'          => $data['sede_id'],
                     'talla'            => $talla,
+                    'empresa_id'       => $empresaId,
                     'precio'           => $data['precio'] ?? 0,
                     'cantidad'         => $data['cantidad'],
                     'stock_minimo'     => $data['stock_minimo'] ?? 0,
@@ -122,7 +126,7 @@ class InventarioProductoController extends Controller
             }
 
             return response()->json(
-                $this->serializar($item->fresh(['tipoProducto', 'sede', 'series'])),
+                $this->serializar($item->fresh(['tipoProducto', 'sede', 'series', 'empresa'])),
                 $existente ? 200 : 201
             );
         });
@@ -172,7 +176,7 @@ class InventarioProductoController extends Controller
                 }
             }
 
-            return response()->json($this->serializar($inventarioProducto->fresh(['tipoProducto', 'sede', 'series'])));
+            return response()->json($this->serializar($inventarioProducto->fresh(['tipoProducto', 'sede', 'series', 'empresa'])));
         });
     }
 
@@ -327,6 +331,8 @@ class InventarioProductoController extends Controller
             'talla'        => $i->talla ?: null,
             'sede_id'      => $i->sede_id,
             'sede'         => $i->sede?->nombre,
+            'empresa_id'   => $i->empresa_id,
+            'empresa'      => $i->empresa?->nombre,
             'precio'       => $i->precio,
             'cantidad'     => $i->cantidad,
             'stock_minimo' => $i->stock_minimo,

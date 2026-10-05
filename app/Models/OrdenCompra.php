@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 
 class OrdenCompra extends Model
 {
+    use RegistraAuditoria;
+
     protected $table = 'ordenes_compra';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Compras';
+    }
 
     protected $fillable = [
         'codigo',

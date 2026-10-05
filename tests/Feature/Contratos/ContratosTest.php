@@ -28,7 +28,7 @@ class ContratosTest extends TestCase
         Http::fake();
         Cache::store('file')->forget('inventario-dotacion:flat');
         $this->actuarComo('th');
-        $this->empleado = $this->usuario('consultor', [
+        $this->empleado = $this->usuario('general', [
             'cedula' => '3001', 'nombres' => 'LUIS', 'apellidos' => 'GOMEZ', 'genero' => 'Masculino',
             'talla_camisa' => 'M', 'talla_pantalon' => '32',
         ]);

@@ -11,7 +11,7 @@ const fmtDate = d =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
 
 const OPT = {
-  procesos:    ['Administrativo', 'Operativo', 'Comercial', 'Tecnología'],
+  procesos:    ['Administrativo', 'Operativo', 'Comercial'],
   tipos:       ['RP: Reemplazo', 'CN: Cargo Nuevo'],
   paises:      ['Colombia', 'Perú', 'Ecuador', 'México'],
   estados:     ['Abierta', 'En proceso', 'Completada', 'Cancelada'],

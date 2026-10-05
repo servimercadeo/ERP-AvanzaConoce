@@ -264,7 +264,7 @@ class IngresoDePersonalTest extends TestCase
     {
         $this->subir('hoja_vida')->assertCreated();
 
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->getJson('/api/documentos-contratacion/5551234')->assertForbidden();
         $this->get('/api/documentos-contratacion/5551234/hoja_vida/download')->assertForbidden();
         $this->deleteJson('/api/documentos-contratacion/5551234/hoja_vida')->assertForbidden();

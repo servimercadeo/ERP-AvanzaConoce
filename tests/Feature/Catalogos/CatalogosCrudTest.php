@@ -18,7 +18,7 @@ class CatalogosCrudTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actuarComo('consultor'); // los catálogos solo exigen sesión, no rol
+        $this->actuarComo('general'); // los catálogos solo exigen sesión, no rol
     }
 
     public static function catalogosConNombreUnico(): array

@@ -71,6 +71,7 @@
         <tr>
             <th style="width:24px;">ITEM</th>
             <th>PRODUCTO</th>
+            <th style="width:80px;">EMPRESA</th>
             <th>UNIDAD DE MEDIDA</th>
             <th style="width:40px;">TALLA</th>
             <th style="width:70px;">CANTIDAD ORDENADA</th>
@@ -79,7 +80,7 @@
         </tr>
         @foreach ($grupos as $grupo)
             <tr class="grupo-ciudad">
-                <td colspan="7">
+                <td colspan="8">
                     Productos de la ciudad: <span class="ciudad-nombre">{{ $grupo['ciudad'] }}</span><br>
                     Direccion: <strong>{{ $grupo['direccion'] }}</strong> Telefono: <strong>{{ $grupo['telefono'] }}</strong>
                 </td>
@@ -88,6 +89,7 @@
                 <tr>
                     <td class="num">{{ $it['num'] }}</td>
                     <td>{{ $it['producto'] }}</td>
+                    <td style="text-align:center;">{{ $it['empresa'] ?? '—' }}</td>
                     <td class="unidad">UNIDADES</td>
                     <td class="talla">NA</td>
                     <td class="cant">{{ $it['cantidad'] }}</td>

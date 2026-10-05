@@ -25,7 +25,7 @@ class PedidosGlobalesYCronogramaTest extends TestCase
         parent::setUp();
         Mail::fake();
         Cache::store('file')->forget('inventario-dotacion:flat');
-        $this->actuarComo('consultor', ['name' => 'Quien Confirma']);
+        $this->actuarComo('general', ['name' => 'Quien Confirma']);
 
         $this->regionalEjeCafetero = DB::table('regionales')->where('nombre', 'EJE CAFETERO')->value('id');
         $this->camisa = InventarioDotacion::create([
@@ -37,7 +37,7 @@ class PedidosGlobalesYCronogramaTest extends TestCase
     /** Pedido automático Activo, de un empleado con contrato del proyecto/regional dados. */
     private function pedidoActivo(string $proyecto = 'TIGO HOME', ?int $regionalId = null, array $empleado = []): PedidoAutomatico
     {
-        $emp = $this->usuario('consultor', array_merge([
+        $emp = $this->usuario('general', array_merge([
             'nombres' => 'Emp', 'apellidos' => $this->unico('AP'), 'cedula' => (string) random_int(10000, 99999999),
         ], $empleado));
 

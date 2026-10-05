@@ -255,7 +255,7 @@ class ImportarContratosActivosCommand extends Command
             'arl' => $arl,
             'fondo_pensiones' => $fondoPensiones,
             'caja_compensacion' => $cajaCompensacion,
-            'rol' => 'consultor',
+            'rol' => 'general',
             'activo' => true,
             // El usuario aún no fue dado de alta manualmente en el módulo Empleados (ahí es
             // donde se generan sus credenciales reales) — no debe listarse como empleado todavía.

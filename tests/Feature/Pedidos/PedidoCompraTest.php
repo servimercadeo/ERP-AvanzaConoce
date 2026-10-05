@@ -20,7 +20,7 @@ class PedidoCompraTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->sede = $this->sede('SEDE PEDIDOS');
         $this->tipo = $this->tipoProducto('SILLA ERGONOMICA', 'Equipos');
     }

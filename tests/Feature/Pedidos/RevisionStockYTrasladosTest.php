@@ -33,12 +33,12 @@ class RevisionStockYTrasladosTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        $this->actuarComo('consultor', ['name' => 'Quien Aprueba']);
+        $this->actuarComo('general', ['name' => 'Quien Aprueba']);
 
         $this->sedePedida = $this->sede('SEDE PEDIDA');
         $this->sedeOrigen = $this->sede('SEDE ORIGEN');
         $this->tipo = $this->tipoProducto('LAPTOP', 'Equipos');
-        $this->responsable = $this->usuario('consultor', ['name' => 'Responsable Pedido', 'email' => 'responsable@test.co']);
+        $this->responsable = $this->usuario('general', ['name' => 'Responsable Pedido', 'email' => 'responsable@test.co']);
 
         $this->crearPedido(3);
     }

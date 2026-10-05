@@ -2,11 +2,24 @@
 
 namespace App\Models;
 
+use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 
 class Requisicion extends Model
 {
+    use RegistraAuditoria;
+
     protected $table = 'requisiciones';
+
+    public function auditoriaProceso(): string
+    {
+        return 'Selección';
+    }
+
+    public function auditoriaNombreRegistro(): string
+    {
+        return $this->nro_identificacion ? "Requisición {$this->nro_identificacion}" : ('#' . $this->id);
+    }
 
     protected static function boot()
     {

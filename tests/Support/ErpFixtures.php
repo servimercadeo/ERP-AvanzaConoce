@@ -20,7 +20,7 @@ trait ErpFixtures
         return $prefijo . '-' . uniqid() . '-' . (++$this->seq);
     }
 
-    protected function usuario(string $rol = 'consultor', array $atributos = []): User
+    protected function usuario(string $rol = 'general', array $atributos = []): User
     {
         $user = User::factory()->create(array_merge(['activo' => true], $atributos));
         // El rol se fuerza directo para no pasar por el hook que lo deriva del cargo.

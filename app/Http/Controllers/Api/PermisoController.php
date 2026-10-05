@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Auditoria;
 use App\Models\PermisoDenegado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,12 +47,29 @@ class PermisoController extends Controller
             ->values()
             ->all();
 
+        // PermisoDenegado::query()->delete() / ::insert() son operaciones en bloque: NO
+        // disparan los eventos de Eloquent de los que vive RegistraAuditoria, así que un
+        // cambio de permisos (algo sensible) quedaría sin rastro si no se deja esta fila
+        // manual aquí.
         DB::transaction(function () use ($filas) {
             PermisoDenegado::query()->delete();
             foreach (array_chunk($filas, 500) as $chunk) {
                 PermisoDenegado::insert($chunk);
             }
         });
+
+        $user = $request->user();
+        Auditoria::create([
+            'user_id'     => $user?->id,
+            'usuario'     => $user?->name ?? 'Sistema',
+            'rol'         => $user?->rol,
+            'accion'      => 'actualizado',
+            'proceso'     => 'Permisos',
+            'modelo'      => PermisoDenegado::class,
+            'registro_id' => null,
+            'descripcion' => 'Actualizó Permisos: sincronizó la matriz completa (' . count($filas) . ' denegaciones activas).',
+            'created_at'  => now(),
+        ]);
 
         return response()->json(
             PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id'])

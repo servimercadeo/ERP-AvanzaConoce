@@ -19,14 +19,14 @@ class AjustesYPreferenciasTest extends TestCase
 
         $this->postJson('/api/settings', ['theme' => 'purple'])->assertUnauthorized();
 
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->postJson('/api/settings', ['theme' => 'purple'])->assertOk()->assertJsonPath('theme', 'purple');
         $this->getJson('/api/settings')->assertJsonPath('theme', 'purple');
     }
 
     public function test_preferencias_por_defecto_y_actualizacion_parcial_que_conserva_lo_anterior(): void
     {
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
 
         $this->getJson('/api/user/preferences')->assertOk()->assertJsonPath('preferences.theme', 'teal')->assertJsonPath('preferences.dark', false);
 
@@ -39,7 +39,7 @@ class AjustesYPreferenciasTest extends TestCase
 
     public function test_preferencias_validan_los_valores_permitidos(): void
     {
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
 
         $this->postJson('/api/user/preferences', ['preferences' => ['fontSize' => 'gigante']])->assertStatus(422);
         $this->postJson('/api/user/preferences', ['preferences' => ['navbar' => 'volador']])->assertStatus(422);
@@ -48,18 +48,18 @@ class AjustesYPreferenciasTest extends TestCase
 
     public function test_las_preferencias_son_por_usuario(): void
     {
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->postJson('/api/user/preferences', ['preferences' => ['dark' => true]])->assertOk();
 
-        $this->actuarComo('consultor');
+        $this->actuarComo('general');
         $this->getJson('/api/user/preferences')->assertJsonPath('preferences.dark', false);
     }
 
     public function test_catalogo_de_usuarios_solo_muestra_activos_con_nombre_y_sin_datos_sensibles(): void
     {
-        $this->usuario('consultor', ['name' => 'Activo Visible', 'activo' => true, 'cargo' => 'ANALISTA']);
-        $this->usuario('consultor', ['name' => 'Inactivo Oculto', 'activo' => false]);
-        $this->actuarComo('consultor');
+        $this->usuario('general', ['name' => 'Activo Visible', 'activo' => true, 'cargo' => 'ANALISTA']);
+        $this->usuario('general', ['name' => 'Inactivo Oculto', 'activo' => false]);
+        $this->actuarComo('general');
 
         $r = $this->getJson('/api/usuarios-catalogo')->assertOk();
 

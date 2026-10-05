@@ -96,7 +96,7 @@ class RequisicionesYCandidatosTest extends TestCase
     {
         $this->actuarComo('th');
         $req = $this->requisicion();
-        $emp = $this->usuario('consultor', ['cedula' => '9001']);
+        $emp = $this->usuario('general', ['cedula' => '9001']);
         Candidato::create([
             'requisicion_id' => $req['id'], 'nombres' => 'X', 'identificacion' => '9001', 'correo' => 'x@test.co',
             'fecha_postulacion' => now()->toDateString(),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PedidoCompra;
 use App\Models\TipoProducto;
+use App\Models\User;
 use App\Services\ActaPedidoCompraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class PedidoCompraController extends Controller
     public function index()
     {
         return response()->json(
-            PedidoCompra::with(['items.tipoProducto:id,nombre,categoria', 'asignadoA:id,name'])->orderBy('id', 'desc')->get()
+            PedidoCompra::with(['items.tipoProducto:id,nombre,categoria', 'asignadoA:id,name', 'empresa:id,nombre'])->orderBy('id', 'desc')->get()
         );
     }
 
@@ -81,6 +82,7 @@ class PedidoCompraController extends Controller
                 'fecha_registro'   => now()->toDateString(),
                 'tipo_responsable' => $data['tipo_responsable'],
                 'responsable'      => $data['responsable'],
+                'empresa_id'       => $this->resolverEmpresaId($data['tipo_responsable'], $data['responsable']),
                 'sede'             => $data['sede'],
                 'clase'            => $data['clase'],
                 'concepto'         => $data['concepto'],
@@ -136,6 +138,16 @@ class PedidoCompraController extends Controller
             }
         }
 
+        // Si cambia el responsable (o su tipo), la empresa "dueña" del pedido se
+        // vuelve a resolver — es un snapshot que sigue al responsable ACTUAL del
+        // pedido, no algo que se edite directamente.
+        if (array_key_exists('responsable', $data) || array_key_exists('tipo_responsable', $data)) {
+            $data['empresa_id'] = $this->resolverEmpresaId(
+                $data['tipo_responsable'] ?? $pedidoCompra->tipo_responsable,
+                $data['responsable'] ?? $pedidoCompra->responsable,
+            );
+        }
+
         return DB::transaction(function () use ($data, $pedidoCompra) {
             $pedidoCompra->update(collect($data)->except('items')->all());
 
@@ -152,6 +164,21 @@ class PedidoCompraController extends Controller
     {
         $pedidoCompra->delete();
         return response()->json(null, 204);
+    }
+
+    /**
+     * Empresa "dueña" del pedido: la del EMPLEADO para quien se pide (resuelto por
+     * nombre exacto contra `users`, mismo criterio que el resto del sistema para
+     * encontrar al responsable). Los "Aliado" no son usuarios del ERP, así que quedan
+     * sin empresa (null) — no hay de dónde resolverla.
+     */
+    private function resolverEmpresaId(string $tipoResponsable, string $responsable): ?int
+    {
+        if ($tipoResponsable !== 'Empleado') {
+            return null;
+        }
+
+        return User::where('name', $responsable)->value('empresa_id');
     }
 
     /**

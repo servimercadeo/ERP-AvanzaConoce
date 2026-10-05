@@ -365,6 +365,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('formas-pago', App\Http\Controllers\Api\FormaPagoController::class)
         ->parameters(['formas-pago' => 'formaPago']);
 
+    // Tipos de Parámetro genéricos, creados libremente desde Parametros > Ver y Crear
+    // Parametros (igual que Categoría del Producto, pero sin generar submódulos aparte).
+    Route::apiResource('tipos-parametro', App\Http\Controllers\Api\TipoParametroController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['tipos-parametro' => 'tipoParametro']);
+
+    // Valores dentro de cada Tipo de Parámetro genérico.
+    Route::apiResource('valores-parametro', App\Http\Controllers\Api\ValorParametroController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['valores-parametro' => 'valorParametro']);
+
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);
@@ -388,11 +399,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('asignaciones-inventario/{asignacionInventario}/devolver', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'devolver']);
     Route::post('asignaciones-inventario/{asignacionInventario}/acta-entrega', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'actaEntrega']);
 
+    // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
+    // cargadas por importación masiva desde el Excel de origen del proveedor.
+    Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar']);
+    Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
+        ->only(['index', 'destroy'])
+        ->parameters(['work-orders' => 'workOrder']);
+
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Solo admin administra la matriz
     // completa (el resto de usuarios solo recibe lo suyo, ya incluido en /user).
     Route::middleware('role:admin')->group(function () {
         Route::get('permisos', [App\Http\Controllers\Api\PermisoController::class, 'index']);
         Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync']);
+
+        // Auditoría del Sistema (Permisos > Auditoría): solo admin puede ver el rastro.
+        Route::get('auditoria', [App\Http\Controllers\Api\AuditoriaController::class, 'index']);
+        Route::get('auditoria/procesos', [App\Http\Controllers\Api\AuditoriaController::class, 'procesos']);
     });
 
     // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)

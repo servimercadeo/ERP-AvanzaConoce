@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Concerns\HasSedeCatalogo;
+use App\Traits\RegistraAuditoria;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,23 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
     use HasSedeCatalogo;
+    use RegistraAuditoria;
+
+    // "ultimo_sso_at" se toca en cada login SSO y "remember_token" en cada sesión nueva:
+    // ninguno de los dos es una edición real del empleado, así que no deben generar ruido
+    // en la Auditoría del Sistema.
+    protected $auditoriaIgnorar = ['ultimo_sso_at', 'remember_token'];
+
+    public function auditoriaProceso(): string
+    {
+        return 'Empleados';
+    }
+
+    public function auditoriaNombreRegistro(): string
+    {
+        $nombre = trim(($this->nombres ?? '') . ' ' . ($this->apellidos ?? ''));
+        return $nombre !== '' ? $nombre : ($this->name ?? ('#' . $this->id));
+    }
 
     /**
      * The attributes that are mass assignable.

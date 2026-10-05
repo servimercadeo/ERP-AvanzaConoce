@@ -7,6 +7,10 @@ import { MODULE_ICONS, IconFolder, IconLoading } from "../components/Icons";
 const ROLES = [
     { value: "th", label: "Talento Humano" },
     { value: "tic", label: "TIC / Sistemas" },
+    { value: "operaciones", label: "Operaciones" },
+    { value: "financiera", label: "Financiera" },
+    { value: "supervisores", label: "Supervisores" },
+    { value: "general", label: "General" },
 ];
 
 // Catálogo real de módulos y submódulos (los mismos que arman el menú), con un

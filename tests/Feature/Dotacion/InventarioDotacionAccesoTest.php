@@ -55,7 +55,7 @@ class InventarioDotacionAccesoTest extends TestCase
             ]);
         }
 
-        return $this->actuarComo('consultor', $atributos);
+        return $this->actuarComo('general', $atributos);
     }
 
     public function test_sym_ve_solo_sus_tres_proyectos(): void
@@ -84,7 +84,7 @@ class InventarioDotacionAccesoTest extends TestCase
 
     public function test_la_empresa_se_toma_del_contrato_si_el_usuario_no_tiene_empresa_id(): void
     {
-        $u = $this->actuarComo('consultor');
+        $u = $this->actuarComo('general');
         DB::table('contratos')->insert([
             'empleado_id' => $u->id, 'empresa' => 'SERVIMERCADEO COL', 'estado_contrato' => 'Activo',
             'fecha_ingreso' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now(),

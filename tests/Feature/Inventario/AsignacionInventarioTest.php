@@ -24,10 +24,10 @@ class AsignacionInventarioTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
-        $this->actuarComo('consultor', ['name' => 'Quien Asigna']);
+        $this->actuarComo('general', ['name' => 'Quien Asigna']);
         $this->sede = $this->sede();
         $this->tipo = $this->tipoProducto('PORTATIL', 'Equipos');
-        $this->empleado = $this->usuario('consultor', ['name' => 'Empleado Custodio', 'email' => 'custodio@test.co']);
+        $this->empleado = $this->usuario('general', ['name' => 'Empleado Custodio', 'email' => 'custodio@test.co']);
     }
 
     private function asignar(InventarioProducto $inv, array $extra = [])
@@ -127,7 +127,7 @@ class AsignacionInventarioTest extends TestCase
 
     public function test_listado_filtra_por_estado_y_empleado(): void
     {
-        $otro = $this->usuario('consultor', ['name' => 'Otro Empleado']);
+        $otro = $this->usuario('general', ['name' => 'Otro Empleado']);
         $inv = $this->inventario($this->tipo, $this->sede, 10);
         $activa = $this->asignar($inv)->json('id');
         $devuelta = $this->asignar($inv)->json('id');

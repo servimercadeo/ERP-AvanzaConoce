@@ -308,6 +308,24 @@ export const ERP_MODULES = [
           { id: 'asignacion_inventario_file', label: 'Asignación de Inventario' },
         ]
       },
+      {
+        id: 'inventario_empleado',
+        label: 'Inventario de Empleado',
+        icon: 'productos',
+        desc: 'Elige un empleado y consulta qué tiene asignado actualmente',
+        archivos: [
+          { id: 'inventario_empleado_file', label: 'Inventario de Empleado' },
+        ]
+      },
+      {
+        id: 'work_orders',
+        label: 'Work Orders',
+        icon: 'productos',
+        desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
+        archivos: [
+          { id: 'work_orders_file', label: 'Work Orders' },
+        ]
+      },
       /*
       {
         id: 'consultas',
@@ -472,15 +490,6 @@ export const ERP_MODULES = [
         ]
       },
       {
-        id: 'tipo_producto',
-        label: 'Tipo de Producto',
-        icon: 'productos',
-        desc: 'Catálogo de tipos de producto',
-        archivos: [
-          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
-        ]
-      },
-      {
         id: 'clases_pedido',
         label: 'Clases de Pedidos',
         icon: 'pedidos',
@@ -508,6 +517,15 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'tipo_producto',
+        label: 'Tipo de Producto',
+        icon: 'productos',
+        desc: 'Catálogo de tipos de producto',
+        archivos: [
+          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
+        ]
+      },
+      {
         id: 'proveedores',
         label: 'Proveedores',
         icon: 'empresas_cat',
@@ -517,7 +535,9 @@ export const ERP_MODULES = [
         ]
       }
     ],
-    archivos: []
+    archivos: [
+      { id: 'ver_y_crear_parametros', label: 'Ver y Crear Parametros' },
+    ]
   },
   {
     id: 'permisos',
@@ -533,6 +553,15 @@ export const ERP_MODULES = [
         desc: 'Visibilidad de módulos y submódulos por rol',
         archivos: [
           { id: 'permisos_file', label: 'Roles y Permisos' },
+        ]
+      },
+      {
+        id: 'auditoria',
+        label: 'Auditoría',
+        icon: 'permisos',
+        desc: 'Rastro de quién creó, editó o eliminó qué en el sistema',
+        archivos: [
+          { id: 'auditoria_file', label: 'Auditoría del Sistema' },
         ]
       }
     ],
