@@ -14,10 +14,9 @@ const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FIXED_DOCS = ["Hoja de vida", "Pruebas psicotécnicas"];
 
-// Los correos del aval salen de los contactos del empleador (Parámetros > Empleadores),
-// filtrados por empleador + regional elegidos en el modal. Vinculación Directa usa los
-// empleadores de tipo "Directo" e Indirecta los de tipo "Indirecto".
-const TIPO_EMPLEADOR_VINC = { Directa: "Directo", Indirecta: "Indirecto" };
+// Los correos del aval salen de los contactos de los empleadores (Parámetros > Empleadores):
+// Directa = todos los contactos de los empleadores directos; Indirecta = los del empleador
+// indirecto + regional elegidos en el modal.
 
 const MESES = [
     "ENERO",
@@ -191,6 +190,14 @@ export default function CandidatosCrud() {
         queryKey: ["empleadores-aval"],
         queryFn: () => api.get("/empleadores").then((r) => r.data ?? []),
     });
+    // Vinculación Directa: el aval va a todos los contactos de los empleadores directos
+    // (Servimercadeo y S&M), sin elegir empleador ni regional. Sin correos repetidos.
+    const contactosDirectos = empleadoresAval
+        .filter((e) => e.tipo === "Directo")
+        .flatMap((e) => e.contactos ?? [])
+        .filter(
+            (c, i, arr) => arr.findIndex((x) => x.correo === c.correo) === i,
+        );
     const loadingData = _lc || _lr || _lk;
 
     useEffect(() => {
@@ -320,10 +327,10 @@ export default function CandidatosCrud() {
                 open: true,
                 candidateId,
                 tipo,
-                empleadorId: empReq ? String(empReq.id) : "",
+                empleadorId: tipo === "Indirecta" ? String(empReq.id) : "",
                 correos:
                     tipo === "Directa"
-                        ? (empReq?.contactos ?? []).map((c) => c.correo)
+                        ? contactosDirectos.map((c) => c.correo)
                         : [],
             });
             return;
@@ -738,11 +745,11 @@ export default function CandidatosCrud() {
         );
     }, [candidates, debouncedSearch]);
 
-    // Empleadores del tipo de vinculación elegido, el empleador seleccionado, sus regionales
+    // Indirecta: empleadores indirectos, el empleador seleccionado, sus regionales
     // con contacto registrado, y los contactos que coinciden con la regional elegida (más los
     // de "Todo a nivel nacional", que aplican sin importar la regional específica).
     const empleadoresVinc = empleadoresAval.filter(
-        (e) => e.tipo === TIPO_EMPLEADOR_VINC[vinculacionModal.tipo],
+        (e) => e.tipo === "Indirecto",
     );
     const empleadorVinc = empleadoresVinc.find(
         (e) => String(e.id) === String(vinculacionModal.empleadorId),
@@ -753,10 +760,9 @@ export default function CandidatosCrud() {
             contactosEmpleadorVinc.map((c) => c.regional?.nombre).filter(Boolean),
         ),
     ).sort((a, b) => a.localeCompare(b));
-    // En vinculación Directa no importa la regional: van todos los contactos del empleador.
     const esDirectaVinc = vinculacionModal.tipo === "Directa";
     const contactosCoincidentesVinc = esDirectaVinc
-        ? contactosEmpleadorVinc
+        ? contactosDirectos
         : vinculacionModal.regional
         ? contactosEmpleadorVinc.filter(
               (c) =>
@@ -2845,7 +2851,12 @@ export default function CandidatosCrud() {
                                                 setVinculacionModal((p) => ({
                                                     ...p,
                                                     tipo: op,
-                                                    correos: [],
+                                                    correos:
+                                                        op === "Directa"
+                                                            ? contactosDirectos.map(
+                                                                  (c) => c.correo,
+                                                              )
+                                                            : [],
                                                     empleadorId: "",
                                                     regional: "",
                                                 }))
@@ -2861,7 +2872,22 @@ export default function CandidatosCrud() {
                                 ))}
                             </div>
 
-                            <div
+                            {esDirectaVinc ? (
+                                contactosDirectos.length === 0 && (
+                                    <div
+                                        style={{
+                                            fontSize: "0.82rem",
+                                            color: "#a33",
+                                            marginTop: 16,
+                                        }}
+                                    >
+                                        Los empleadores directos no tienen
+                                        contactos registrados. Ve a Parámetros →
+                                        Empleadores para agregarlos.
+                                    </div>
+                                )
+                            ) : (
+                                <div
                                     style={{
                                         display: "flex",
                                         flexDirection: "column",
@@ -2888,16 +2914,7 @@ export default function CandidatosCrud() {
                                                     ...p,
                                                     empleadorId: v,
                                                     regional: "",
-                                                    correos:
-                                                        p.tipo === "Directa"
-                                                            ? (
-                                                                  empleadoresVinc.find(
-                                                                      (e) =>
-                                                                          String(e.id) ===
-                                                                          String(v),
-                                                                  )?.contactos ?? []
-                                                              ).map((c) => c.correo)
-                                                            : [],
+                                                    correos: [],
                                                 }))
                                             }
                                             defaultValue=""
@@ -2909,7 +2926,6 @@ export default function CandidatosCrud() {
                                             )}
                                         />
                                     </div>
-                                    {!esDirectaVinc && (
                                     <div>
                                         <label
                                             style={{
@@ -2949,11 +2965,8 @@ export default function CandidatosCrud() {
                                             )}
                                         />
                                     </div>
-                                    )}
                                     {vinculacionModal.empleadorId &&
-                                        (esDirectaVinc
-                                            ? contactosEmpleadorVinc.length === 0
-                                            : regionalesEmpleadorVinc.length === 0) && (
+                                        regionalesEmpleadorVinc.length === 0 && (
                                             <div
                                                 style={{
                                                     fontSize: "0.82rem",
@@ -2967,10 +2980,9 @@ export default function CandidatosCrud() {
                                             </div>
                                         )}
                                 </div>
+                            )}
 
-                            {(esDirectaVinc
-                                ? vinculacionModal.empleadorId
-                                : vinculacionModal.regional) && (
+                            {(esDirectaVinc || vinculacionModal.regional) && (
                                 <div style={{ marginTop: 16 }}>
                                     <label
                                         style={{
@@ -2998,7 +3010,7 @@ export default function CandidatosCrud() {
                                     >
                                         {contactosCoincidentesVinc.map((c) => ({
                                             correo: c.correo,
-                                            label: `${c.nombre} — ${c.correo}${c.regional ? ` (${c.regional.nombre})` : ""}`,
+                                            label: `${c.nombre} — ${c.correo}${!esDirectaVinc && c.regional ? ` (${c.regional.nombre})` : ""}`,
                                         })).map(({ correo, label }) => {
                                             const checked =
                                                 vinculacionModal.correos.includes(
