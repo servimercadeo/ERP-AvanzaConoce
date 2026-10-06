@@ -2,12 +2,63 @@
 
 namespace App\Services;
 
+use App\Models\Contrato;
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class EmpleadoSyncService
 {
+    /**
+     * Campos del empleado que pertenecen al contrato: solo se editan en Contratos y se copian
+     * al empleado desde allí (Empleados no los recibe ni los valida).
+     */
+    public const CAMPOS_CONTRATO = [
+        'ingresos', 'cargo', 'sede', 'empresa_id', 'empleador', 'tipo_vinculacion',
+        'eps', 'arl', 'fondo_pensiones', 'caja_compensacion', 'jefe_inmediato',
+        'banco', 'tipo_cuenta', 'cuenta_bancaria',
+    ];
+
+    /** Copia al empleado los datos de su contrato (salario, cargo, sede, seguridad social, banco…). */
+    public function syncDesdeContrato(Contrato $contrato): void
+    {
+        $cedula = User::whereKey($contrato->empleado_id)->value('cedula');
+        if (!$cedula) {
+            return;
+        }
+
+        $empresaId = $contrato->empresa
+            ? Empresa::whereRaw('UPPER(TRIM(nombre)) = ?', [mb_strtoupper(trim($contrato->empresa), 'UTF-8')])->value('id')
+            : null;
+
+        $this->syncToUser($cedula, [
+            'ingresos'          => $contrato->salario,
+            'caja_compensacion' => $contrato->caja_compensacion,
+            'arl'               => $contrato->arl,
+            'fondo_pensiones'   => $contrato->fondo_pensiones,
+            'eps'               => $contrato->lps_afiliado,
+            'cargo'             => $contrato->cargo,
+            'sede'              => $contrato->sede,
+            'tipo_vinculacion'  => $contrato->tipo_vinculacion,
+            'empleador'         => $contrato->empleador,
+            'jefe_inmediato'    => $contrato->jefe_inmediato,
+            'empresa_id'        => $empresaId,
+            'banco'             => $contrato->banco,
+            'tipo_cuenta'       => $contrato->tipo_cuenta,
+            'cuenta_bancaria'   => $contrato->cuenta_bancaria,
+        ]);
+    }
+
+    /** Copia al empleado los datos de su contrato más reciente, si tiene alguno. */
+    public function syncDesdeUltimoContrato(User $user): void
+    {
+        $contrato = Contrato::where('empleado_id', $user->id)->orderByDesc('fecha_ingreso')->orderByDesc('id')->first();
+        if ($contrato) {
+            $this->syncDesdeContrato($contrato);
+        }
+    }
+
     /**
      * Sync non-null values FROM any CRUD TO the users table.
      * $userFields: [users_column => value]

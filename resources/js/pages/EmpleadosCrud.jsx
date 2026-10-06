@@ -136,7 +136,6 @@ const TIPOS_VINC = [
     "Otro",
 ];
 const POR_PAGINA = 10;
-const TIPOS_CUENTA = ["Ahorros", "Corriente"];
 const BANCOS = [
     "Bancolombia",
     "Davivienda",
@@ -221,12 +220,16 @@ const toForm = (emp, catalogs = {}) => ({
         "",
 });
 
-const toApi = (form) => ({
+// Los datos de contratación no se envían desde Empleados: se administran en Contratos.
+const toApi = ({
+    ingresos, cargo, sede, empresa_id, empleador, tipo_vinculacion,
+    eps, arl, fondo_pensiones, caja_compensacion,
+    banco, tipo_cuenta, cuenta_bancaria,
+    ...form
+}) => ({
     ...form,
     tiene_cert_alturas: form.tiene_cert_alturas === "Sí",
-    empresa_id: form.empresa_id !== "" ? Number(form.empresa_id) : null,
     numero_hijos: form.numero_hijos !== "" ? Number(form.numero_hijos) : null,
-    ingresos: form.ingresos !== "" ? Number(form.ingresos) : null,
 });
 
 const EMPTY_FORM = {
@@ -824,16 +827,11 @@ function Modal({
         if (!form.cedula?.trim()) e.cedula = "Requerido";
         if (!form.apellidos?.trim()) e.apellidos = "Requerido";
         if (!form.nombres?.trim()) e.nombres = "Requerido";
-        if (!form.sede?.trim()) e.sede = "Requerido";
         if (!form.genero?.trim()) e.genero = "Requerido";
         if (!form.movil?.trim()) e.movil = "Requerido";
         if (!form.email?.trim()) e.email = "Requerido";
-        if (!form.eps?.trim()) e.eps = "Requerido";
-        if (!form.arl?.trim()) e.arl = "Requerido";
         if (!form.estado_empleado?.trim()) e.estado_empleado = "Requerido";
-        if (!form.cargo?.trim()) e.cargo = "Requerido";
         if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = "Requerido";
-        if (!form.tipo_vinculacion?.trim()) e.tipo_vinculacion = "Requerido";
         return e;
     };
 
@@ -841,11 +839,7 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            const enAdicional = [
-                "cargo",
-                "tipo_funcionario",
-                "tipo_vinculacion",
-            ];
+            const enAdicional = ["tipo_funcionario"];
             const hasGeneralErrors = Object.keys(e).some(
                 (k) => !enAdicional.includes(k),
             );
@@ -1059,15 +1053,8 @@ function Modal({
                                 </div>
                             </div>
 
-                            {/* Fila 2 – Sede y fechas */}
+                            {/* Fila 2 – Fechas */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Sede a la que pertenece"
-                                    k="sede"
-                                    opts={catalogs.sedes}
-                                    req
-                                    {...fp}
-                                />
                                 <Field
                                     label="Fecha Nacimiento"
                                     k="fecha_nacimiento"
@@ -1164,15 +1151,6 @@ function Modal({
                                 />
                             </div>
 
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Ingresos $"
-                                    k="ingresos"
-                                    type="number"
-                                    span={2}
-                                    {...fp}
-                                />
-                            </div>
 
                             {/* Fila 5 – Observaciones */}
                             <div style={{ ...S.grid2, marginTop: 16 }}>
@@ -1211,43 +1189,12 @@ function Modal({
                                 <div />
                             </div>
 
-                            {/* Fila 6 – Seguridad Social */}
+                            {/* Fila 6 – RH y licencias */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="RH"
                                     k="rh"
                                     opts={catalogs.tipos_rh}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="EPS Afiliado"
-                                    k="eps"
-                                    opts={catalogs.eps}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="ARL"
-                                    k="arl"
-                                    opts={catalogs.arls}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Fondo de Pensiones"
-                                    k="fondo_pensiones"
-                                    opts={catalogs.pensiones}
-                                    req
-                                    {...fp}
-                                />
-                            </div>
-
-                            {/* Fila 7 – Licencias */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Caja Compensación"
-                                    k="caja_compensacion"
-                                    opts={catalogs.cajas}
                                     {...fp}
                                 />
                                 <Field
@@ -1301,23 +1248,6 @@ function Modal({
                                     k="codigo_directv"
                                     {...fp}
                                 />
-                                <Field
-                                    label="Empresa"
-                                    k="empresa_id"
-                                    opts={empresas.map((e) => ({
-                                        value: e.id,
-                                        label: e.nombre,
-                                    }))}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Empleador"
-                                    k="empleador"
-                                    opts={(catalogs.empleadores || []).map(
-                                        (e) => e.nombre,
-                                    )}
-                                    {...fp}
-                                />
                             </div>
 
                             <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -1358,14 +1288,13 @@ function Modal({
                     {/* ══ PESTAÑA: INFORMACIÓN ADICIONAL ══ */}
                     {activeTab === "adicional" && (
                         <>
-                            <div style={S.grid3}>
-                                <Field
-                                    label="Cargo"
-                                    k="cargo"
-                                    opts={catalogs.cargos}
-                                    req
-                                    {...fp}
-                                />
+                            <div style={S.contratoNota}>
+                                Salario, cargo, sede, empresa, empleador, tipo de
+                                vinculación, seguridad social (EPS, ARL, pensión y
+                                caja) y datos bancarios se administran en el módulo de
+                                Contratos.
+                            </div>
+                            <div style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Tipo Funcionario"
                                     k="tipo_funcionario"
@@ -1373,34 +1302,8 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <Field
-                                    label="Tipo Vinculación"
-                                    k="tipo_vinculacion"
-                                    opts={catalogs.tipos_vinculacion}
-                                    req
-                                    {...fp}
-                                />
                             </div>
 
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
-                                <Field
-                                    label="No. de Cuenta Bancaria"
-                                    k="cuenta_bancaria"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Tipo de Cuenta"
-                                    k="tipo_cuenta"
-                                    opts={TIPOS_CUENTA}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Banco de la cuenta"
-                                    k="banco"
-                                    opts={catalogs.bancos}
-                                    {...fp}
-                                />
-                            </div>
                         </>
                     )}
                 </div>
@@ -2904,6 +2807,14 @@ const S = {
     },
 
     /* Sección */
+    contratoNota: {
+        padding: "10px 14px",
+        borderRadius: "var(--radius-sm)",
+        border: "1.5px solid var(--border)",
+        background: "var(--bg)",
+        color: "var(--text-muted)",
+        fontSize: "0.82rem",
+    },
     sectionHeader: {
         marginTop: 24,
         marginBottom: 4,

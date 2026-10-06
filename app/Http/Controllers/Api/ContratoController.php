@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Candidato;
 use App\Models\CentroCostoCatalogo;
 use App\Models\Contrato;
-use App\Models\Empresa;
 use App\Models\PedidoAutomatico;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
@@ -172,21 +171,6 @@ class ContratoController extends Controller
      * códigos repetidos dentro del mismo contrato, y exige que la suma de porcentajes no supere
      * 100%. Devuelve los items resueltos (con el nombre oficial del catálogo) listos para crear.
      */
-    /**
-     * Resuelve el id de `empresas` a partir del texto libre `contratos.empresa`, para
-     * mantener `users.empresa_id` sincronizado con la empresa del contrato vigente (lo usan,
-     * entre otros, los módulos de Empleados y el filtro por empresa del inventario de dotación).
-     */
-    private function resolverEmpresaId(?string $nombreEmpresa): ?int
-    {
-        if (!$nombreEmpresa) {
-            return null;
-        }
-
-        return Empresa::whereRaw('UPPER(TRIM(nombre)) = ?', [mb_strtoupper(trim($nombreEmpresa), 'UTF-8')])
-            ->value('id');
-    }
-
     private function validarYResolverCentrosCosto(array $items): array
     {
         if (empty($items)) {
@@ -409,6 +393,9 @@ class ContratoController extends Controller
             'fecha_vinculacion_caja'   => 'nullable|date',
             'fondo_pensiones'         => 'nullable|string',
             'fondo_cesantias'         => 'nullable|string',
+            'banco'                   => 'nullable|string|max:100',
+            'tipo_cuenta'             => 'nullable|string|max:30',
+            'cuenta_bancaria'         => 'nullable|string|max:30',
             'estado_contrato'         => 'nullable|string',
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
@@ -467,22 +454,7 @@ class ContratoController extends Controller
         $this->enviarContratoASharepoint($contrato);
 
         // Sync campos del contrato al empleado
-        $contratoUser = \App\Models\User::find($contrato->empleado_id);
-        if ($contratoUser?->cedula) {
-            app(\App\Services\EmpleadoSyncService::class)->syncToUser($contratoUser->cedula, [
-                'ingresos'          => $contrato->salario,
-                'caja_compensacion' => $contrato->caja_compensacion,
-                'arl'               => $contrato->arl,
-                'fondo_pensiones'   => $contrato->fondo_pensiones,
-                'eps'               => $contrato->lps_afiliado,
-                'cargo'             => $contrato->cargo,
-                'sede'              => $contrato->sede,
-                'tipo_vinculacion'  => $contrato->tipo_vinculacion,
-                'empleador'         => $contrato->empleador,
-                'jefe_inmediato'    => $contrato->jefe_inmediato,
-                'empresa_id'        => $this->resolverEmpresaId($contrato->empresa),
-            ]);
-        }
+        app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($contrato);
 
         $pedidoAutomatico = null;
         if ($contrato->estado_contrato !== 'No ingreso') {
@@ -531,6 +503,9 @@ class ContratoController extends Controller
             'fecha_vinculacion_caja'   => 'nullable|date',
             'fondo_pensiones'         => 'nullable|string',
             'fondo_cesantias'         => 'nullable|string',
+            'banco'                   => 'nullable|string|max:100',
+            'tipo_cuenta'             => 'nullable|string|max:30',
+            'cuenta_bancaria'         => 'nullable|string|max:30',
             'estado_contrato'         => 'nullable|string',
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
@@ -591,22 +566,7 @@ class ContratoController extends Controller
         });
 
         // Sync campos del contrato al empleado
-        $contratoUser = \App\Models\User::find($result->empleado_id);
-        if ($contratoUser?->cedula) {
-            app(\App\Services\EmpleadoSyncService::class)->syncToUser($contratoUser->cedula, [
-                'ingresos'          => $result->salario,
-                'caja_compensacion' => $result->caja_compensacion,
-                'arl'               => $result->arl,
-                'fondo_pensiones'   => $result->fondo_pensiones,
-                'eps'               => $result->lps_afiliado,
-                'cargo'             => $result->cargo,
-                'sede'              => $result->sede,
-                'tipo_vinculacion'  => $result->tipo_vinculacion,
-                'empleador'         => $result->empleador,
-                'jefe_inmediato'    => $result->jefe_inmediato,
-                'empresa_id'        => $this->resolverEmpresaId($result->empresa),
-            ]);
-        }
+        app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($result);
 
         return response()->json($result);
     }

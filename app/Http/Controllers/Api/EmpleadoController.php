@@ -4,17 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contrato;
-use App\Models\Empresa;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
-use App\Services\EmpresaProyectoRules;
 use App\Services\ImportacionExcelValidador;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class EmpleadoController extends Controller
 {
@@ -235,7 +232,6 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
-            $this->validarEmpresaSegunProyecto($data, $empleado);
 
             // El registro existente vino de un import (p. ej. de contratos) y todavía no se
             // dio de alta manualmente aquí — esta es su alta real, así que se le generan
@@ -249,6 +245,7 @@ class EmpleadoController extends Controller
                 $data['password']  = Hash::make($plainPassword);
 
                 $empleado->update($data);
+                app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
                 app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
@@ -262,6 +259,7 @@ class EmpleadoController extends Controller
             }
 
             $empleado->update($data);
+            app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
             return response()->json([
                 'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                 'credenciales' => [
@@ -312,9 +310,8 @@ class EmpleadoController extends Controller
             unset($data['fotografia']);
         }
 
-        $this->validarEmpresaSegunProyecto($data, $empleado);
-
         $empleado->update($data);
+        app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
 
@@ -720,35 +717,10 @@ class EmpleadoController extends Controller
         );
     }
 
-    /**
-     * El formulario de Empleado no tiene un campo "proyecto" propio — el proyecto
-     * (cliente_proyecto) vive en los Contratos. Por eso, para validar la empresa elegida aquí,
-     * se toma el cliente_proyecto del contrato más reciente del empleado (si tiene alguno) y se
-     * reutiliza la misma regla que ya bloquea combinaciones inválidas en Contratos.
-     */
-    private function validarEmpresaSegunProyecto(array $data, ?User $empleadoActual): void
-    {
-        $empresaId = $data['empresa_id'] ?? $empleadoActual?->empresa_id;
-        if (!$empresaId || !$empleadoActual) {
-            return;
-        }
-
-        $proyecto = Contrato::where('empleado_id', $empleadoActual->id)
-            ->orderByDesc('fecha_ingreso')
-            ->value('cliente_proyecto');
-        if (!$proyecto) {
-            return;
-        }
-
-        $empresaNombre = Empresa::find($empresaId)?->nombre;
-        if ($msg = EmpresaProyectoRules::validar($empresaNombre, $proyecto)) {
-            throw ValidationException::withMessages(['empresa_id' => $msg]);
-        }
-    }
 
     private function normalizarNombres(array &$data): void
     {
-        $campos = ['nombres', 'apellidos', 'cargo', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'];
+        $campos = ['nombres', 'apellidos', 'tipo_funcionario'];
         foreach ($campos as $campo) {
             if (isset($data[$campo])) {
                 $data[$campo] = mb_strtoupper($data[$campo], 'UTF-8');
@@ -758,22 +730,19 @@ class EmpleadoController extends Controller
 
     private function rules(?int $ignoreId = null): array
     {
+        // Los datos de contratación (salario, cargo, sede, empresa, vinculación, seguridad
+        // social y datos bancarios) no se reciben aquí: viven en Contratos y se copian al empleado desde allá
+        // (EmpleadoSyncService::CAMPOS_CONTRATO).
         return [
             // Obligatorios
             'cedula'           => 'required|string|max:20',
             'apellidos'        => 'required|string|max:150',
             'nombres'          => 'required|string|max:150',
-            'sede'             => 'required|string|max:100',
             'genero'           => 'required|string|max:50',
             'movil'            => 'required|string|max:20',
             'email'            => ['required', 'email', Rule::unique('users', 'email')->ignore($ignoreId)],
-            'eps'              => 'required|string|max:100',
-            'arl'              => 'required|string|max:100',
-            'fondo_pensiones'  => 'nullable|string|max:100',
             'estado_empleado'  => 'required|string|max:50',
-            'cargo'            => 'required|string|max:150',
             'tipo_funcionario' => 'required|string|max:100',
-            'tipo_vinculacion' => 'required|string|max:100',
 
             // Opcionales
             'fotografia'           => 'nullable|max:5120',
@@ -788,14 +757,12 @@ class EmpleadoController extends Controller
             'estrato'              => 'nullable|string|max:5',
             'barrio'               => 'nullable|string|max:100',
             'numero_hijos'         => 'nullable|integer|min:0',
-            'ingresos'             => 'nullable|numeric|min:0',
             'observaciones_medicas'=> 'nullable|string',
             'alergias'             => 'nullable|string',
             'talla_camisa'         => 'nullable|string|max:20',
             'talla_pantalon'       => 'nullable|string|max:20',
             'talla_zapatos'        => 'nullable|string|max:20',
             'rh'                   => 'nullable|string|max:5',
-            'caja_compensacion'    => 'nullable|string|max:100',
             'licencia_carro'       => 'nullable|string|max:20',
             'licencia_carro_vence' => 'nullable|date',
             'licencia_moto'        => 'nullable|string|max:20',
@@ -803,14 +770,10 @@ class EmpleadoController extends Controller
             'tiene_cert_alturas'   => 'nullable|boolean',
             'cert_alturas_vence'   => 'nullable|date',
             'codigo_directv'       => 'nullable|string|max:30',
-            'empresa_id'           => 'nullable|exists:empresas,id',
             'comentarios'          => 'nullable|string',
             'contacto_emergencia_nombre'     => 'nullable|string|max:150',
             'contacto_emergencia_telefono'   => 'nullable|string|max:20',
             'contacto_emergencia_parentesco' => 'nullable|string|max:80',
-            'cuenta_bancaria'      => 'nullable|string|max:30',
-            'tipo_cuenta'          => 'nullable|string|max:30',
-            'banco'                => 'nullable|string|max:100',
         ];
     }
 }

@@ -39,7 +39,7 @@ class EmpleadosTest extends TestCase
     {
         $r = $this->postJson('/api/empleados', $this->payload())->assertCreated();
 
-        $r->assertJsonPath('empleado.name', 'CARLOS ANDRES RAMIREZ SOTO')->assertJsonPath('empleado.cargo', 'ANALISTA')
+        $r->assertJsonPath('empleado.name', 'CARLOS ANDRES RAMIREZ SOTO')->assertJsonPath('empleado.tipo_funcionario', 'CONSULTOR')
             ->assertJsonPath('credenciales.email', 'carlos@test.co');
 
         $clave = $r->json('credenciales.password');
@@ -58,19 +58,50 @@ class EmpleadosTest extends TestCase
     public function test_campos_obligatorios(): void
     {
         $this->postJson('/api/empleados', [])->assertStatus(422)->assertJsonValidationErrors([
-            'cedula', 'apellidos', 'nombres', 'sede', 'genero', 'movil', 'email', 'eps', 'arl', 'estado_empleado', 'cargo', 'tipo_funcionario', 'tipo_vinculacion',
-        ]);
+            'cedula', 'apellidos', 'nombres', 'genero', 'movil', 'email', 'estado_empleado', 'tipo_funcionario',
+        ])->assertJsonMissingValidationErrors(['sede', 'eps', 'arl', 'cargo', 'tipo_vinculacion'], 'errors');
         $this->postJson('/api/empleados', $this->payload(['email' => 'no-es-correo']))->assertStatus(422)->assertJsonValidationErrors('email');
     }
 
     public function test_registrar_dos_veces_la_misma_cedula_actualiza_en_vez_de_duplicar(): void
     {
         $this->postJson('/api/empleados', $this->payload())->assertCreated();
-        $r = $this->postJson('/api/empleados', $this->payload(['cargo' => 'coordinador']))->assertCreated();
+        $r = $this->postJson('/api/empleados', $this->payload(['movil' => '3009998877']))->assertCreated();
 
         $this->assertSame(1, User::where('cedula', '4001')->count());
-        $this->assertSame('COORDINADOR', User::where('cedula', '4001')->value('cargo'));
+        $this->assertSame('3009998877', User::where('cedula', '4001')->value('movil'));
         $r->assertJsonPath('credenciales.password', '(Ya registrado)');
+    }
+
+    public function test_los_datos_de_contratacion_salen_del_contrato_y_no_se_editan_desde_empleados(): void
+    {
+        $empleado = $this->usuario('general', ['cedula' => '4001', 'email' => 'carlos@test.co']);
+        $empleado->forceFill(['pendiente_alta' => true, 'activo' => false])->saveQuietly();
+        \App\Models\Contrato::create([
+            'empleado_id' => $empleado->id, 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE CONTRATO', 'salario' => 1800000,
+            'tipo_vinculacion' => 'Directa', 'lps_afiliado' => 'NUEVA EPS', 'arl' => 'SURA', 'fondo_pensiones' => 'PORVENIR',
+            'caja_compensacion' => 'COMFAMA', 'empleador' => 'SERVIMERCADEO', 'fecha_ingreso' => '2026-01-01',
+            'banco' => 'BANCOLOMBIA', 'tipo_cuenta' => 'Ahorros', 'cuenta_bancaria' => '12345678901',
+            'estado_contrato' => 'Activo', 'completado' => true,
+        ]);
+
+        // El alta manda otros valores (como haría un formulario viejo): se ignoran y mandan los del contrato.
+        $this->postJson('/api/empleados', $this->payload(['ingresos' => 99, 'cargo' => 'otro', 'sede' => 'OTRA']))->assertCreated();
+        $this->putJson("/api/empleados/{$empleado->id}", $this->payload(['ingresos' => 99, 'eps' => 'OTRA EPS', 'banco' => 'NEQUI', 'cuenta_bancaria' => '000']))->assertOk();
+
+        $e = $empleado->fresh();
+        $this->assertSame('ASESOR COMERCIAL', $e->cargo);
+        $this->assertSame('SEDE CONTRATO', $e->sede);
+        $this->assertEquals(1800000, $e->ingresos);
+        $this->assertSame('Directa', $e->tipo_vinculacion);
+        $this->assertSame('NUEVA EPS', $e->eps);
+        $this->assertSame('SURA', $e->arl);
+        $this->assertSame('PORVENIR', $e->fondo_pensiones);
+        $this->assertSame('COMFAMA', $e->caja_compensacion);
+        $this->assertSame('SERVIMERCADEO', $e->empleador);
+        $this->assertSame('BANCOLOMBIA', $e->banco);
+        $this->assertSame('Ahorros', $e->tipo_cuenta);
+        $this->assertSame('12345678901', $e->cuenta_bancaria);
     }
 
     public function test_dar_de_alta_un_empleado_importado_le_genera_credenciales_nuevas(): void

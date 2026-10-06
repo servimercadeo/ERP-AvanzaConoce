@@ -31,6 +31,7 @@ const CAMPOS_IMPORT_LABEL = {
     cliente_proyecto: "Cliente Proyecto",
 };
 
+const TIPOS_CUENTA = ["Ahorros", "Corriente"];
 const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Traslado", "No ingreso"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
@@ -103,6 +104,9 @@ const EMPTY_FORM = {
     fecha_vinculacion_caja: "",
     fondo_pensiones: "",
     fondo_cesantias: "",
+    banco: "",
+    tipo_cuenta: "",
+    cuenta_bancaria: "",
     estado_contrato: "Activo",
     empleador: "",
     empresa: "",
@@ -717,6 +721,8 @@ function Modal({
                 lps_afiliado:       matchOpt(initial.lps_afiliado,       catalogs.eps)                ?? initial.lps_afiliado       ?? "",
                 fondo_pensiones:    matchOpt(initial.fondo_pensiones,    catalogs.pensiones)          ?? initial.fondo_pensiones    ?? "",
                 fondo_cesantias:    matchOpt(initial.fondo_cesantias,    catalogs.cesantias)          ?? initial.fondo_cesantias    ?? "",
+                banco:              matchOpt(initial.banco,              catalogs.bancos)             ?? initial.banco              ?? "",
+                tipo_cuenta:        matchOpt(initial.tipo_cuenta,        TIPOS_CUENTA)                ?? initial.tipo_cuenta        ?? "",
                 jefe_inmediato:     matchOpt(initial.jefe_inmediato,     jefeOpts)                    ?? initial.jefe_inmediato     ?? "",
                 cliente_proyecto:   matchOpt(initial.cliente_proyecto,   proyectoOpts)                ?? initial.cliente_proyecto   ?? "",
                 centros_costos: initial.centros_costos || [],
@@ -1477,6 +1483,26 @@ function Modal({
                                     {...fp}
                                 />
                                 <div />
+                            </div>
+                            <div style={S.sectionHeader}>DATOS BANCARIOS</div>
+                            <div style={{ ...S.grid3, marginTop: 12 }}>
+                                <Field
+                                    label="Banco"
+                                    k="banco"
+                                    opts={catalogs.bancos}
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Tipo de Cuenta"
+                                    k="tipo_cuenta"
+                                    opts={TIPOS_CUENTA}
+                                    {...fp}
+                                />
+                                <Field
+                                    label="No. de Cuenta Bancaria"
+                                    k="cuenta_bancaria"
+                                    {...fp}
+                                />
                             </div>
                         </>
                     )}
