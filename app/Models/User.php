@@ -134,8 +134,11 @@ class User extends Authenticatable
      */
     protected static function booted(): void
     {
+        // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
+        // (th/tic) a quien todavía no tiene rol asignado; nunca cambia ni quita uno elegido.
         static::saving(function (User $user) {
-            if (!$user->isDirty('cargo') || $user->rol === 'admin') {
+            $rolElegidoAhora = $user->exists && $user->isDirty('rol');
+            if (!$user->isDirty('cargo') || $rolElegidoAhora || !in_array($user->rol, [null, 'general'], true)) {
                 return;
             }
 
@@ -145,8 +148,6 @@ class User extends Authenticatable
                 $user->rol = 'th';
             } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || str_contains($cargo, 'TIC'))) {
                 $user->rol = 'tic';
-            } else {
-                $user->rol = null;
             }
         });
     }

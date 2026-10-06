@@ -176,10 +176,17 @@ class AutenticacionYRolesTest extends TestCase
 
         $this->assertSame('th', $th->fresh()->rol);
         $this->assertSame('tic', $tic->fresh()->rol);
-        $this->assertNull($otro->fresh()->rol);
+        $this->assertSame('general', $otro->fresh()->rol, 'Un cargo que no es TH/TIC no asigna rol especial.');
 
         $admin = $this->usuario('admin');
         $admin->update(['cargo' => 'Vendedor']);
         $this->assertSame('admin', $admin->fresh()->rol);
+
+        // Un rol elegido a mano (Empleados > Tipo de funcionario) nunca lo cambia el cargo.
+        $operaciones = $this->usuario('operaciones');
+        $operaciones->update(['cargo' => 'Analista de Talento Humano']);
+        $this->assertSame('operaciones', $operaciones->fresh()->rol);
+        $th->update(['cargo' => 'Vendedor']);
+        $this->assertSame('th', $th->fresh()->rol, 'Cambiar de cargo no quita el rol asignado.');
     }
 }

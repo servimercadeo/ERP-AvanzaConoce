@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect as FilterSelect,
-    PresetFiltersDropdown,
 } from "../components/SearchableSelect";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
@@ -2866,66 +2865,6 @@ export default function ContratosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            {
-                                label: "Contratos activos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Activo");
-                                },
-                            },
-                            {
-                                label: "Contratos inactivos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Inactivo");
-                                },
-                            },
-                            {
-                                label: "Contratos cancelados",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Cancelado");
-                                },
-                            },
-                            {
-                                label: "Contratos en translado",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Traslado");
-                                },
-                            },
-                            {
-                                label: "Contratos con No ingreso",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("No ingreso");
-                                },
-                            },
-                            {
-                                label: "Término fijo",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoContrato("Término Fijo");
-                                },
-                            },
-                            {
-                                label: "Prestación de servicios",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoContrato(
-                                        "Prestación de Servicios",
-                                    );
-                                },
-                            },
-                            {
-                                label: "Limpiar filtros",
-                                apply: () => clearFilters(),
-                                clear: true,
-                            },
-                        ]}
-                    />
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button

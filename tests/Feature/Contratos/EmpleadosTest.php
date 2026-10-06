@@ -31,7 +31,7 @@ class EmpleadosTest extends TestCase
         return array_merge([
             'cedula' => '4001', 'apellidos' => 'ramirez soto', 'nombres' => 'carlos andres', 'sede' => 'SEDE X', 'genero' => 'Masculino',
             'movil' => '3001112233', 'email' => 'carlos@test.co', 'eps' => 'sura', 'arl' => 'positiva',
-            'estado_empleado' => 'Activo', 'cargo' => 'analista', 'tipo_funcionario' => 'Consultor', 'tipo_vinculacion' => 'Indefinido',
+            'estado_empleado' => 'Activo', 'cargo' => 'analista', 'rol' => 'operaciones', 'tipo_vinculacion' => 'Indefinido',
         ], $extra);
     }
 
@@ -39,7 +39,7 @@ class EmpleadosTest extends TestCase
     {
         $r = $this->postJson('/api/empleados', $this->payload())->assertCreated();
 
-        $r->assertJsonPath('empleado.name', 'CARLOS ANDRES RAMIREZ SOTO')->assertJsonPath('empleado.tipo_funcionario', 'CONSULTOR')
+        $r->assertJsonPath('empleado.name', 'CARLOS ANDRES RAMIREZ SOTO')->assertJsonPath('empleado.rol', 'operaciones')
             ->assertJsonPath('credenciales.email', 'carlos@test.co');
 
         $clave = $r->json('credenciales.password');
@@ -48,17 +48,33 @@ class EmpleadosTest extends TestCase
         $this->assertNotSame($clave, User::where('cedula', '4001')->value('password'), 'Nunca se guarda en plano.');
     }
 
-    public function test_un_empleado_nuevo_siempre_entra_como_consultor_aunque_se_intente_forzar_otro_rol(): void
+    public function test_el_tipo_de_funcionario_es_el_rol_y_solo_un_admin_asigna_administrador(): void
     {
-        $this->postJson('/api/empleados', $this->payload(['rol' => 'admin']))->assertCreated();
+        // TH (el usuario de setUp) no puede crear administradores ni roles inventados.
+        $this->postJson('/api/empleados', $this->payload(['rol' => 'admin']))->assertStatus(422)->assertJsonValidationErrors('rol');
+        $this->postJson('/api/empleados', $this->payload(['rol' => 'consultor']))->assertStatus(422)->assertJsonValidationErrors('rol');
+        $this->assertNull(User::where('cedula', '4001')->first());
 
-        $this->assertNotSame('admin', User::where('cedula', '4001')->value('rol'));
+        $id = $this->postJson('/api/empleados', $this->payload(['rol' => 'financiera']))->assertCreated()->json('empleado.id');
+        $this->assertSame('financiera', User::find($id)->rol);
+        $this->putJson("/api/empleados/$id", $this->payload(['rol' => 'supervisores']))->assertOk();
+        $this->assertSame('supervisores', User::find($id)->rol);
+
+        // Un admin sí puede.
+        $this->actuarComo('admin');
+        $this->putJson("/api/empleados/$id", $this->payload(['rol' => 'admin']))->assertOk();
+        $this->assertSame('admin', User::find($id)->rol);
+
+        // Y TH no puede quitárselo (aunque lo intente, se conserva).
+        $this->actuarComo('th');
+        $this->putJson("/api/empleados/$id", $this->payload(['rol' => 'general']))->assertOk();
+        $this->assertSame('admin', User::find($id)->rol);
     }
 
     public function test_campos_obligatorios(): void
     {
         $this->postJson('/api/empleados', [])->assertStatus(422)->assertJsonValidationErrors([
-            'cedula', 'apellidos', 'nombres', 'genero', 'movil', 'email', 'estado_empleado', 'tipo_funcionario',
+            'cedula', 'apellidos', 'nombres', 'genero', 'movil', 'email', 'estado_empleado', 'rol',
         ])->assertJsonMissingValidationErrors(['sede', 'eps', 'arl', 'cargo', 'tipo_vinculacion'], 'errors');
         $this->postJson('/api/empleados', $this->payload(['email' => 'no-es-correo']))->assertStatus(422)->assertJsonValidationErrors('email');
     }

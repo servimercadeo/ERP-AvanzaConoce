@@ -219,7 +219,7 @@ class EmpleadoController extends Controller
             $existingId = $userByEmail->id;
         }
 
-        $data = $request->validate($this->rules($existingId));
+        $data = $request->validate($this->rules($existingId, $existingId ? User::find($existingId) : null));
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
@@ -232,6 +232,9 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
+            if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+                $data['rol'] = 'admin';
+            }
 
             // El registro existente vino de un import (p. ej. de contratos) y todavía no se
             // dio de alta manualmente aquí — esta es su alta real, así que se le generan
@@ -299,10 +302,13 @@ class EmpleadoController extends Controller
         // Si el correo ya pertenece a OTRO usuario, Rule::unique (ignorando solo a este empleado)
         // responde 422. Antes se "fusionaba": se borraba al empleado editado y se sobrescribía
         // al otro, así que un error de tipeo en el correo eliminaba a una persona real.
-        $data = $request->validate($this->rules($empleado->id));
+        $data = $request->validate($this->rules($empleado->id, $empleado));
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);
+        if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+            $data['rol'] = 'admin';
+        }
 
         if ($request->hasFile('fotografia')) {
             $data['fotografia'] = $request->file('fotografia')->store('empleados/fotos', 'public');
@@ -396,7 +402,7 @@ class EmpleadoController extends Controller
             'fecha_expedicion', 'genero', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
             'estado_civil', 'nivel_escolaridad', 'profesion', 'numero_hijos', 'rh', 'movil',
             'direccion_residencia', 'barrio', 'estrato',
-            'tipo_funcionario', 'tipo_vinculacion', 'sede', 'empleador',
+            'tipo_vinculacion', 'sede', 'empleador',
             'jefe_inmediato', 'jefe_inmediato_correo', 'codigo_directv',
             'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
             'banco', 'tipo_cuenta', 'cuenta_bancaria',
@@ -720,7 +726,7 @@ class EmpleadoController extends Controller
 
     private function normalizarNombres(array &$data): void
     {
-        $campos = ['nombres', 'apellidos', 'tipo_funcionario'];
+        $campos = ['nombres', 'apellidos'];
         foreach ($campos as $campo) {
             if (isset($data[$campo])) {
                 $data[$campo] = mb_strtoupper($data[$campo], 'UTF-8');
@@ -728,7 +734,21 @@ class EmpleadoController extends Controller
         }
     }
 
-    private function rules(?int $ignoreId = null): array
+    /**
+     * Roles que quien edita puede asignar. Solo un admin da (o quita) el rol de administrador;
+     * TH/TIC tampoco pueden cambiarle el rol a un admin existente.
+     */
+    private function rolesAsignables(?User $empleado): array
+    {
+        $roles = \App\Models\PermisoDenegado::ROLES_GESTIONABLES;
+        if (auth()->user()?->rol === 'admin' || $empleado?->rol === 'admin') {
+            $roles[] = 'admin';
+        }
+
+        return $roles;
+    }
+
+    private function rules(?int $ignoreId = null, ?User $empleado = null): array
     {
         // Los datos de contratación (salario, cargo, sede, empresa, vinculación, seguridad
         // social y datos bancarios) no se reciben aquí: viven en Contratos y se copian al empleado desde allá
@@ -742,7 +762,8 @@ class EmpleadoController extends Controller
             'movil'            => 'required|string|max:20',
             'email'            => ['required', 'email', Rule::unique('users', 'email')->ignore($ignoreId)],
             'estado_empleado'  => 'required|string|max:50',
-            'tipo_funcionario' => 'required|string|max:100',
+            // "Tipo de funcionario" en pantalla: es el rol del usuario en el ERP.
+            'rol'              => ['required', Rule::in($this->rolesAsignables($empleado))],
 
             // Opcionales
             'fotografia'           => 'nullable|max:5120',

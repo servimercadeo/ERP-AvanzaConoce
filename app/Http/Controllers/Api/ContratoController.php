@@ -350,7 +350,6 @@ class ContratoController extends Controller
                     'sede' => $request->sede ?? 'Principal',
                     'cargo' => mb_strtoupper($request->cargo ?? '', 'UTF-8') ?: 'SIN ASIGNAR',
                     'estado_empleado' => 'Activo',
-                    'tipo_funcionario' => 'Consultor',
                     'tipo_vinculacion' => $request->tipo_vinculacion ?? 'Indefinido',
                     'eps' => $request->lps_afiliado ?? 'Sin asignar',
                     'arl' => $request->arl ?? 'Sin asignar',

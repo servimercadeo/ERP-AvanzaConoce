@@ -42,7 +42,6 @@ export const COLUMNAS_IMPORTABLES = [
     { titulo: "Dirección Residencia", campo: "direccion_residencia" },
     { titulo: "Barrio", campo: "barrio" },
     { titulo: "Estrato", campo: "estrato" },
-    { titulo: "Tipo Funcionario", campo: "tipo_funcionario" },
     { titulo: "Tipo Vinculación", campo: "tipo_vinculacion" },
     { titulo: "Sede", campo: "sede" },
     { titulo: "Empleador", campo: "empleador" },

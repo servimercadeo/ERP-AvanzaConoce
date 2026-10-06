@@ -97,14 +97,14 @@ class ImportacionExcelTest extends TestCase
 
     public function test_dar_de_alta_un_empleado_creado_desde_contratos_no_tumba_la_importacion(): void
     {
-        // Igual que lo crea "Importar Excel" de Contratos: el hook de cargo deja `rol` en null.
+        // Igual que lo crea "Importar Excel" de Contratos: queda pendiente de alta con rol "general".
         $this->postJson('/api/contratos', [
             'documento' => '5001', 'nombres' => 'ana', 'apellidos' => 'perez', 'cargo' => 'ASESOR',
             'tipo_contrato' => 'Indefinido', 'fecha_ingreso' => '2026-09-01', 'estado_contrato' => 'Activo',
         ])->assertCreated();
         $user = User::where('cedula', '5001')->first();
         $user->forceFill(['pendiente_alta' => true])->saveQuietly();
-        $this->assertNull($user->fresh()->rol);
+        $this->assertSame('general', $user->fresh()->rol);
 
         $r = $this->importarEmpleados([['cedula' => '5001', 'barrio' => 'CENTRO']])->assertOk();
 

@@ -1,1 +1,0 @@
-import{j as r}from"./vendor-query-qy_ppomC.js";import t from"./InventarioCategoriaCrud-Cb_Lxq72.js";import"./app-CeUR1Gsu.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-CVu_E5XX.js";import"./SearchableSelect-BuBDGCn2.js";function s(){return r.jsx(t,{categoria:"EPP"})}export{s as default};

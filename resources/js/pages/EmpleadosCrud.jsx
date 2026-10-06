@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect,
-    PresetFiltersDropdown,
 } from "../components/SearchableSelect";
 import api from "../api/axios";
 import { exportarEmpleadosExcel } from "../utils/empleadosExport";
+import { ROLES_ERP } from "../utils/roles";
+import { useAuth } from "../context/AuthContext";
 import {
     COLUMNAS_IMPORTABLES,
     descargarPlantillaImportacion,
@@ -117,16 +118,6 @@ const CARGOS = [
     "ANALISTA ADMINISTRATIVO",
     "OTRO",
 ];
-const TIPOS_FUNC = [
-    "ADMINISTRATIVO",
-    "TÉCNICO",
-    "VENDEDOR",
-    "SUPERVISOR",
-    "GERENTE",
-    "APRENDIZ",
-    "DIRECTO",
-    "OTRO",
-];
 const TIPOS_VINC = [
     "Empleado directo",
     "Contratista",
@@ -214,10 +205,7 @@ const toForm = (emp, catalogs = {}) => ({
         matchOpt(emp.tipo_vinculacion, catalogs.tipos_vinculacion) ??
         emp.tipo_vinculacion ??
         "",
-    tipo_funcionario:
-        matchOpt(emp.tipo_funcionario, catalogs.tipos_funcionario) ??
-        emp.tipo_funcionario ??
-        "",
+    rol: emp.rol || "general",
 });
 
 // Los datos de contratación no se envían desde Empleados: se administran en Contratos.
@@ -276,7 +264,7 @@ const EMPTY_FORM = {
     contacto_emergencia_telefono: "",
     contacto_emergencia_parentesco: "",
     cargo: "",
-    tipo_funcionario: "",
+    rol: "general",
     tipo_vinculacion: "",
     cuenta_bancaria: "",
     tipo_cuenta: "",
@@ -716,6 +704,13 @@ function Modal({
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("general");
+    // Solo un admin puede dar o quitar el rol de administrador.
+    const { user } = useAuth();
+    const esAdmin = user?.rol === "admin";
+    const rolBloqueado = !esAdmin && initial?.rol === "admin";
+    const rolesOpts = ROLES_ERP.filter(
+        (r) => r.value !== "admin" || esAdmin || rolBloqueado,
+    );
     const [saving, setSaving] = useState(false);
     const [fotografiaFile, setFotografiaFile] = useState(null);
     const isCreate = !initial?.id && !readOnly;
@@ -795,10 +790,6 @@ function Modal({
                     c.tipo_vinculacion,
                 f.tipo_vinculacion,
             ),
-            tipo_funcionario: v(
-                matchOpt(c.tipo_funcionario, catalogs.tipos_funcionario),
-                f.tipo_funcionario,
-            ),
             empleador: v(c.empleador, f.empleador),
             jefe_inmediato: v(c.jefe_inmediato, f.jefe_inmediato),
             empresa_id: v(c.empresa_id, f.empresa_id),
@@ -831,7 +822,7 @@ function Modal({
         if (!form.movil?.trim()) e.movil = "Requerido";
         if (!form.email?.trim()) e.email = "Requerido";
         if (!form.estado_empleado?.trim()) e.estado_empleado = "Requerido";
-        if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = "Requerido";
+        if (!form.rol?.trim()) e.rol = "Requerido";
         return e;
     };
 
@@ -839,11 +830,6 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            const enAdicional = ["tipo_funcionario"];
-            const hasGeneralErrors = Object.keys(e).some(
-                (k) => !enAdicional.includes(k),
-            );
-            setActive(hasGeneralErrors ? "general" : "adicional");
             return;
         }
         setSaving(true);
@@ -902,27 +888,17 @@ function Modal({
                     </div>
                 )}
 
-                {/* Pestañas */}
-                <div className="tab-bar" style={S.tabBar}>
-                    {[
-                        ["general", "Información General"],
-                        ["adicional", "Información Adicional"],
-                    ].map(([key, lbl]) => (
-                        <button
-                            key={key}
-                            style={activeTab === key ? S.tabActive : S.tab}
-                            onClick={() => setActive(key)}
-                        >
-                            {lbl}
-                        </button>
-                    ))}
-                </div>
-
                 {/* Cuerpo con scroll */}
                 <div style={S.modalBody}>
-                    {/* ══ PESTAÑA: INFORMACIÓN GENERAL ══ */}
+                    {/* ══ INFORMACIÓN GENERAL ══ */}
                     {activeTab === "general" && (
                         <>
+                            <div style={{ ...S.contratoNota, marginBottom: 16 }}>
+                                Salario, cargo, sede, empresa, empleador, tipo de
+                                vinculación, seguridad social (EPS, ARL, pensión y
+                                caja) y datos bancarios se administran en el módulo de
+                                Contratos.
+                            </div>
                             {/* Fila 1 – Identificación + Foto */}
                             <div style={{ ...S.grid4, alignItems: "flex-end" }}>
                                 <Field label="Cédula" k="cedula" req {...fp} />
@@ -1248,6 +1224,14 @@ function Modal({
                                     k="codigo_directv"
                                     {...fp}
                                 />
+                                <Field
+                                    label="Tipo de funcionario (rol)"
+                                    k="rol"
+                                    opts={rolesOpts}
+                                    req
+                                    {...fp}
+                                    disabled={readOnly || rolBloqueado}
+                                />
                             </div>
 
                             <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -1282,28 +1266,6 @@ function Modal({
                                 />
                                 <div />
                             </div>
-                        </>
-                    )}
-
-                    {/* ══ PESTAÑA: INFORMACIÓN ADICIONAL ══ */}
-                    {activeTab === "adicional" && (
-                        <>
-                            <div style={S.contratoNota}>
-                                Salario, cargo, sede, empresa, empleador, tipo de
-                                vinculación, seguridad social (EPS, ARL, pensión y
-                                caja) y datos bancarios se administran en el módulo de
-                                Contratos.
-                            </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
-                                <Field
-                                    label="Tipo Funcionario"
-                                    k="tipo_funcionario"
-                                    opts={catalogs.tipos_funcionario}
-                                    req
-                                    {...fp}
-                                />
-                            </div>
-
                         </>
                     )}
                 </div>
@@ -1513,7 +1475,6 @@ export default function EmpleadosCrud() {
         tipos_rh: RH_LIST,
         ciudades: [],
         sedes_por_ciudad: {},
-        tipos_funcionario: TIPOS_FUNC,
         tipos_vinculacion: TIPOS_VINC,
     });
     const [modalOpen, setModalOpen] = useState(false);
@@ -1620,7 +1581,7 @@ export default function EmpleadosCrud() {
                     String(e.empresa_id) === String(filtroEmpresa);
                 const matchTF =
                     filtroTipoFunc === "Todos" ||
-                    e.tipo_funcionario === filtroTipoFunc;
+                    (e.rol || "general") === filtroTipoFunc;
                 const matchEps = filtroEps === "Todas" || e.eps === filtroEps;
                 const matchArl = filtroArl === "Todas" || e.arl === filtroArl;
                 const matchPen =
@@ -1883,64 +1844,6 @@ export default function EmpleadosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            {
-                                label: "Empleados activos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Activo");
-                                },
-                            },
-                            {
-                                label: "En vacaciones",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Vacaciones");
-                                },
-                            },
-                            {
-                                label: "Incapacitados",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Incapacitado");
-                                },
-                            },
-                            {
-                                label: "Contratistas",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroVinc("Contratista");
-                                },
-                            },
-                            {
-                                label: "Aprendices SENA",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroVinc("Aprendiz SENA");
-                                },
-                            },
-                            {
-                                label: "Técnicos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoFunc("TÉCNICO");
-                                },
-                            },
-                            {
-                                label: "Vendedores",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoFunc("VENDEDOR");
-                                },
-                            },
-                            {
-                                label: "Limpiar filtros",
-                                apply: () => clearFilters(),
-                                clear: true,
-                            },
-                        ]}
-                    />
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button
@@ -2392,15 +2295,13 @@ export default function EmpleadosCrud() {
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>
-                                        Tipo Funcionario
+                                        Tipo de funcionario (rol)
                                     </label>
                                     <SearchableSelect
                                         value={filtroTipoFunc}
                                         onChange={setFiltroTipoFunc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_funcionario.map(
-                                            (v) => ({ label: v, value: v }),
-                                        )}
+                                        options={ROLES_ERP}
                                     />
                                 </div>
                                 <div style={S.formGroup}>

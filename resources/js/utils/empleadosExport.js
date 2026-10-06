@@ -1,4 +1,5 @@
 import { descargarExcel, fechaArchivo, aFechaLocal } from "./excelExport.js";
+import { etiquetaRol } from "./roles.js";
 
 /*
  * Exportación de Empleados a Excel: una fila por empleado con toda su ficha (los mismos
@@ -39,7 +40,7 @@ const COLUMNAS = [
     // Información laboral
     { titulo: "Estado Empleado", tipo: "texto", ancho: 14, valor: (e) => e.estado_empleado },
     { titulo: "Cargo", tipo: "texto", ancho: 30, valor: (e) => e.cargo },
-    { titulo: "Tipo Funcionario", tipo: "texto", ancho: 16, valor: (e) => e.tipo_funcionario },
+    { titulo: "Tipo de funcionario (rol)", tipo: "texto", ancho: 18, valor: (e) => etiquetaRol(e.rol) },
     { titulo: "Tipo Vinculación", tipo: "texto", ancho: 16, valor: (e) => e.tipo_vinculacion },
     { titulo: "Sede", tipo: "texto", ancho: 30, valor: (e) => e.sede },
     { titulo: "Empresa", tipo: "texto", ancho: 26, valor: (e) => e.empresa?.nombre },

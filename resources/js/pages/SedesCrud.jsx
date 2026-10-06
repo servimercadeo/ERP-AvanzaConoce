@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
-import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import { SearchableSelect } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -670,13 +670,6 @@ export default function SedesCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown presets={[
-                        { label: "Sedes activas", apply: () => { clearFilters(); setFiltroEstado("Activa"); } },
-                        { label: "Sedes inactivas", apply: () => { clearFilters(); setFiltroEstado("Inactiva"); } },
-                        { label: "Sedes principales", apply: () => { clearFilters(); setFiltroTipo("Principal"); } },
-                        { label: "Sedes secundarias", apply: () => { clearFilters(); setFiltroTipo("Secundaria"); } },
-                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                    ]} />
                 </div>
                 <button
                     className="btn-primary"
