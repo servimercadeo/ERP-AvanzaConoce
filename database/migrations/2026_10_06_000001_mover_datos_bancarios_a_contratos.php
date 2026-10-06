@@ -25,15 +25,20 @@ return new class extends Migration
 
     public function up(): void
     {
-        Schema::table('contratos', function (Blueprint $table) {
-            $table->string('banco', 100)->nullable()->after('fondo_cesantias');
-            $table->string('tipo_cuenta', 30)->nullable()->after('banco');
-            $table->string('cuenta_bancaria', 30)->nullable()->after('tipo_cuenta');
-        });
+        if (!Schema::hasColumn('contratos', 'banco')) {
+            Schema::table('contratos', function (Blueprint $table) {
+                $table->string('banco', 100)->nullable()->after('fondo_cesantias');
+                $table->string('tipo_cuenta', 30)->nullable()->after('banco');
+                $table->string('cuenta_bancaria', 30)->nullable()->after('tipo_cuenta');
+            });
+        }
 
         // Conservar los datos bancarios que ya tenían los empleados: se copian a sus contratos.
         DB::table('contratos')
             ->join('users', 'users.id', '=', 'contratos.empleado_id')
+            ->whereNull('contratos.banco')
+            ->whereNull('contratos.tipo_cuenta')
+            ->whereNull('contratos.cuenta_bancaria')
             ->where(fn ($q) => $q->whereNotNull('users.banco')
                 ->orWhereNotNull('users.tipo_cuenta')
                 ->orWhereNotNull('users.cuenta_bancaria'))

@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasIndex('candidatos', ['identificacion'])) {
+            return;
+        }
+
         Schema::table('candidatos', function (Blueprint $table) {
             $table->index('identificacion');
         });

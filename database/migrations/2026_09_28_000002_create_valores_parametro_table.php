@@ -12,6 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // En producción algunas tablas se crearon a mano antes que la migración: no recrearla.
+        if (Schema::hasTable('valores_parametro')) {
+            return;
+        }
+
         Schema::create('valores_parametro', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tipo_parametro_id')->constrained('tipos_parametro')->cascadeOnDelete();
