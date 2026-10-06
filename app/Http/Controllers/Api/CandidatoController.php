@@ -7,6 +7,7 @@ use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
 use App\Models\EmpleadorContacto;
+use App\Models\Requisicion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -208,6 +209,13 @@ class CandidatoController extends Controller
             }
 
             if ($activandoAval) {
+                $requisicionAval = Requisicion::find($data['requisicion_id'] ?? $candidato->requisicion_id);
+                if ($requisicionAval && $requisicionAval->vacantesCubiertas() >= $requisicionAval->requeridas) {
+                    return response()->json(
+                        ['message' => "La requisición {$requisicionAval->nro_identificacion_proceso} ya tiene sus {$requisicionAval->requeridas} vacantes cubiertas. Aumenta el número de vacantes para dar otro aval."],
+                        422
+                    );
+                }
                 $pruebasActivas = $data['pruebas'] ?? $candidato->pruebas;
                 if (!$pruebasActivas) {
                     return response()->json(
@@ -258,7 +266,8 @@ class CandidatoController extends Controller
             }
         }
 
-        $avalAntes = $candidato->aval;
+        $avalAntes        = $candidato->aval;
+        $requisicionAntes = $candidato->requisicion_id;
 
         // Si se está desactivando el aval, forzar estado = Entrevista sin importar lo que venga del frontend
         if ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
@@ -294,12 +303,24 @@ class CandidatoController extends Controller
             BaseIngreso::where('candidato_id', $candidato->id)->delete();
         }
 
+        // Cambiar el aval o mover el candidato de requisición cambia las vacantes cubiertas:
+        // cerrar/reabrir automáticamente la(s) requisición(es) afectada(s).
+        if ((bool) $avalAntes !== (bool) $candidato->aval || $requisicionAntes != $candidato->requisicion_id) {
+            Requisicion::actualizarEstadoPorVacantesDe($candidato->requisicion_id);
+            if ($requisicionAntes != $candidato->requisicion_id) {
+                Requisicion::actualizarEstadoPorVacantesDe($requisicionAntes);
+            }
+        }
+
         return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));
     }
 
     public function destroy(Candidato $candidato)
     {
         $candidato->delete();
+        if ($candidato->aval) {
+            Requisicion::actualizarEstadoPorVacantesDe($candidato->requisicion_id);
+        }
         return response()->json(null, 204);
     }
 }

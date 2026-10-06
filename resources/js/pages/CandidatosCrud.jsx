@@ -281,6 +281,8 @@ export default function CandidatosCrud() {
             ...extra,
         }).then(() => {
             qc.invalidateQueries({ queryKey: ['candidatos'] });
+            // El aval cambia las vacantes cubiertas: la requisición puede haberse cerrado o reabierto.
+            if (field === "aval") qc.invalidateQueries({ queryKey: ['requisiciones'] });
         }).catch((err) => {
             setCandidates((prev) =>
                 prev.map((c) => (c.id === candidateId ? candidate : c)),
