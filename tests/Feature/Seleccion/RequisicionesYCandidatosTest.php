@@ -273,6 +273,34 @@ class RequisicionesYCandidatosTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_aval_directo_solo_acepta_contactos_de_empleadores_directos(): void
+    {
+        $this->actuarComo('th');
+        $c = $this->candidato(['pruebas' => true]);
+        $this->subirDocumentos($c);
+
+        $idDirecto = (int) DB::table('empleadores')->max('id') + 1;
+        DB::table('empleadores')->insert([
+            ['id' => $idDirecto, 'nombre' => $this->unico('DIRECTO'), 'tipo' => 'Directo', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $idDirecto + 1, 'nombre' => $this->unico('INDIRECTO'), 'tipo' => 'Indirecto', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('empleador_contactos')->insert([
+            ['empleador_id' => $idDirecto, 'nombre' => 'Nómina', 'correo' => 'nomina@directo.co', 'created_at' => now(), 'updated_at' => now()],
+            ['empleador_id' => $idDirecto + 1, 'nombre' => 'Temporal', 'correo' => 'contacto@temporal.co', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $aval = fn (array $correos) => $this->putJson("/api/candidatos/{$c->id}", [
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+            'correos_aval' => $correos,
+        ]);
+
+        // Un contacto de un empleador Indirecto no sirve para vinculación Directa.
+        $aval(['contacto@temporal.co'])->assertStatus(422);
+        Mail::assertNothingSent();
+
+        $aval(['nomina@directo.co'])->assertOk();
+        Mail::assertSent(\App\Mail\AvalContratacionMail::class, fn ($m) => $m->hasTo('nomina@directo.co'));
+    }
+
     public function test_quitar_el_aval_regresa_al_candidato_a_entrevista(): void
     {
         $this->actuarComo('th');

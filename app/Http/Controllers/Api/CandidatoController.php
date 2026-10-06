@@ -13,17 +13,6 @@ use Illuminate\Support\Facades\Mail;
 
 class CandidatoController extends Controller
 {
-    // Destinatarios fijos del correo de aval para vinculación Directa (siempre el mismo
-    // equipo interno). Para Indirecta ya no hay lista fija: se valida contra los contactos
-    // reales registrados en Parámetros > Empleadores (tabla `empleador_contactos`), elegidos
-    // en el frontend según el empleador y la regional del candidato.
-    private const CORREOS_DIRECTO = [
-        'julianvalencia@servimercadeo.com',
-        'coordinador.th@servimercadeo.com',
-        'nomina@servimercadeo.com',
-        'coordinadora.sst@servimercadeo.com',
-    ];
-
     public function index(Request $request)
     {
         $query = Candidato::with([
@@ -250,16 +239,15 @@ class CandidatoController extends Controller
                 $tipoVinculacion = $data['tipo_vinculacion'] ?? $candidato->tipo_vinculacion;
                 $correosAval     = $data['correos_aval'] ?? [];
 
-                if ($tipoVinculacion === 'Directa') {
-                    $correosPermitidos = self::CORREOS_DIRECTO;
-                } elseif ($tipoVinculacion === 'Indirecta') {
-                    // Cualquier correo de contacto registrado en algún empleador Indirecto
-                    // (el frontend ya filtra por empleador+regional, esto solo evita que
-                    // llegue un correo que no está en el catálogo).
-                    $correosPermitidos = EmpleadorContacto::pluck('correo')->all();
-                } else {
-                    $correosPermitidos = [];
-                }
+                // Los destinatarios salen de los contactos registrados en Parámetros > Empleadores
+                // (tabla `empleador_contactos`) de un empleador del tipo que corresponde a la
+                // vinculación. El frontend ya filtra por empleador+regional; esto solo evita que
+                // llegue un correo que no está en el catálogo.
+                $tipoEmpleador = ['Directa' => 'Directo', 'Indirecta' => 'Indirecto'][$tipoVinculacion] ?? null;
+                $correosPermitidos = $tipoEmpleador
+                    ? EmpleadorContacto::whereHas('empleador', fn ($q) => $q->where('tipo', $tipoEmpleador))
+                        ->pluck('correo')->all()
+                    : [];
 
                 if (array_diff($correosAval, $correosPermitidos)) {
                     return response()->json(
@@ -299,7 +287,7 @@ class CandidatoController extends Controller
                 try {
                     Mail::to($recipients)->send(new AvalContratacionMail($candidato, $baseIngreso));
                 } catch (\Exception $e) {
-                    Log::warning('Correo de aval no enviado: ' . $e->getMessage());
+                    Log::error('Correo de aval no enviado: ' . $e->getMessage());
                 }
             }
         } elseif ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
