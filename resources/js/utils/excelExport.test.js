@@ -82,6 +82,26 @@ test("con permiso sensible exporta todas las hojas con sus filas", () => {
     assert.equal(anexo.Documento, "0012345678");
 });
 
+test("la hoja Contratos resume los anexos y auxilios de cada contrato", () => {
+    const conVarios = {
+        ...contrato,
+        anexos: [
+            ...contrato.anexos,
+            { anexo_auxilio: "AUXILIO DE COMUNICACION", valor: "15000.00", fecha_entrega_firma: null },
+        ],
+    };
+    const [fila, sinAnexos] = filasPlanas(
+        construirHojasContratos([conVarios, { ...contrato, anexos: [] }], { incluirSensible: true })[0],
+    );
+    assert.match(fila["Anexos y Auxilios"], /^Rodamiento \(\$\s?150\.000 · 05\/01\/2019\); AUXILIO DE COMUNICACION \(\$\s?15\.000\)$/);
+    assert.equal(fila["Total Anexos y Auxilios"], 165000);
+    assert.equal(sinAnexos["Anexos y Auxilios"], null);
+    assert.equal(sinAnexos["Total Anexos y Auxilios"], null);
+
+    const sinPermiso = construirHojasContratos([conVarios], { incluirSensible: false })[0].columnas.map((c) => c.titulo);
+    assert.ok(!sinPermiso.includes("Anexos y Auxilios"));
+});
+
 test("el Excel de contratos se puede volver a importar con los mismos datos", () => {
     const [hoja] = construirHojasContratos([contrato], { incluirSensible: true });
     // En el archivo real las fechas son números de serie de Excel; el importador los soporta.

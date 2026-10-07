@@ -8,11 +8,21 @@ class EmpresaProyectoRules
      * Empresa (nombre exacto de la tabla `empresas`) => proyectos (nombre exacto de
      * `proyectos`) permitidos para esa empresa. Empresas que no aparecen aquí (Servimercadeo EC,
      * Servicios y Mercadeo EC, E2BPO, Confianza y Colaboración, FT&H Consulting, Altycom) no están
-     * sujetas a esta regla.
+     * sujetas a esta regla. ADMINISTRATIVO es solo de Servicios y Mercadeo (SYM), no de
+     * Servimercadeo.
      */
     private const REGLAS = [
-        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRACION'],
+        'SERVICIOS Y MERCADEO COL' => ['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRATIVO'],
         'SERVIMERCADEO COL'        => ['DIRECTV CO'],
+    ];
+
+    /**
+     * Nombres anteriores de un proyecto => nombre actual. "ADMINISTRACION" se renombró a
+     * "ADMINISTRATIVO" (2026-09-24); contratos y requisiciones viejos pueden traer aún el
+     * nombre anterior y no deben quedar bloqueados al editarlos.
+     */
+    private const ALIAS_PROYECTO = [
+        'ADMINISTRACION' => 'ADMINISTRATIVO',
     ];
 
     /**
@@ -32,12 +42,14 @@ class EmpresaProyectoRules
         }
 
         $proyectoKey = mb_strtoupper(trim($proyecto), 'UTF-8');
+        $proyectoKey = self::ALIAS_PROYECTO[$proyectoKey] ?? $proyectoKey;
         if (in_array($proyectoKey, $permitidos, true)) {
             return null;
         }
 
         $lista = implode(', ', $permitidos);
-        return "El proyecto \"{$proyecto}\" no es válido para la empresa \"{$empresa}\". Proyectos permitidos: {$lista}.";
+        return "El proyecto \"{$proyecto}\" no está permitido para la empresa \"{$empresa}\". "
+            . "Para esta empresa elige uno de estos proyectos: {$lista}.";
     }
 
     /**

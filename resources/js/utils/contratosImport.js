@@ -265,8 +265,13 @@ function buildAnexoFromExcelRow(row) {
     // El auxilio de transporte legal es un campo del contrato, no un anexo: sin excluirlo,
     // la coincidencia por substring de "auxilio" tomaría esa columna (p. ej. "auxiliot" o
     // "Auxilio Transporte Legal") como tipo de auxilio cuando la columna de anexo está vacía.
+    // Tampoco el resumen "Anexos y Auxilios" / "Total Anexos y Auxilios" que agrega la
+    // exportación de Contratos: el detalle real va en su hoja "Anexos".
     const anexoRow = Object.fromEntries(
-        Object.entries(row).filter(([key]) => !/^auxilio(de)?t/.test(normalizeCompact(key))),
+        Object.entries(row).filter(([key]) => {
+            const k = normalizeCompact(key);
+            return !/^auxilio(de)?t/.test(k) && !/^(total)?anexosyauxilios/.test(k);
+        }),
     );
     const tipo = resolveValue(anexoRow, ["auxilio", "tipo_auxilio", "tipo de auxilio", "anexo_auxilio"]);
     const valor = parseNumeric(resolveValue(anexoRow, ["valor_auxilio", "valor de auxilio", "total_auxilio"]));

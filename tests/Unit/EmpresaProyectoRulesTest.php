@@ -17,7 +17,8 @@ class EmpresaProyectoRulesTest extends TestCase
         return [
             'SYM + TIGO EXPRESS'     => ['SERVICIOS Y MERCADEO COL', 'TIGO EXPRESS'],
             'SYM + TIGO HOME'        => ['SERVICIOS Y MERCADEO COL', 'TIGO HOME'],
-            'SYM + ADMINISTRACION'   => ['SERVICIOS Y MERCADEO COL', 'ADMINISTRACION'],
+            'SYM + ADMINISTRATIVO'   => ['SERVICIOS Y MERCADEO COL', 'ADMINISTRATIVO'],
+            'SYM + nombre anterior ADMINISTRACION' => ['SERVICIOS Y MERCADEO COL', 'ADMINISTRACION'],
             'Servimercadeo + DIRECTV' => ['SERVIMERCADEO COL', 'DIRECTV CO'],
             'ignora mayúsculas y espacios' => ['  servimercadeo col ', ' directv co '],
             'empresa no sujeta a la regla' => ['ALTYCOM', 'CUALQUIER PROYECTO'],
@@ -39,6 +40,7 @@ class EmpresaProyectoRulesTest extends TestCase
             'SYM + DIRECTV'          => ['SERVICIOS Y MERCADEO COL', 'DIRECTV CO'],
             'Servimercadeo + TIGO'   => ['SERVIMERCADEO COL', 'TIGO HOME'],
             'Servimercadeo + otro'   => ['SERVIMERCADEO COL', 'HUGHES COL'],
+            'Servimercadeo + ADMINISTRATIVO' => ['SERVIMERCADEO COL', 'ADMINISTRATIVO'],
         ];
     }
 
@@ -49,13 +51,13 @@ class EmpresaProyectoRulesTest extends TestCase
 
         $this->assertNotNull($msg);
         $this->assertStringContainsString($proyecto, $msg);
-        $this->assertStringContainsString('Proyectos permitidos', $msg);
+        $this->assertStringContainsString('elige uno de estos proyectos', $msg);
     }
 
     public function test_proyectos_permitidos(): void
     {
         $this->assertSame(['DIRECTV CO'], EmpresaProyectoRules::proyectosPermitidos('SERVIMERCADEO COL'));
-        $this->assertSame(['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRACION'], EmpresaProyectoRules::proyectosPermitidos('Servicios y Mercadeo Col'));
+        $this->assertSame(['TIGO EXPRESS', 'TIGO HOME', 'ADMINISTRATIVO'], EmpresaProyectoRules::proyectosPermitidos('Servicios y Mercadeo Col'));
         $this->assertNull(EmpresaProyectoRules::proyectosPermitidos('E2BPO'));
         $this->assertNull(EmpresaProyectoRules::proyectosPermitidos(null));
         $this->assertNull(EmpresaProyectoRules::proyectosPermitidos(''));

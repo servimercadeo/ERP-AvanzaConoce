@@ -1,4 +1,4 @@
-import { descargarExcel, fechaArchivo, nombreCompleto, aFechaLocal } from "./excelExport.js";
+import { descargarExcel, fechaArchivo, nombreCompleto, aFecha, aFechaLocal } from "./excelExport.js";
 
 /*
  * Exportación de Contratos a Excel.
@@ -16,6 +16,25 @@ import { descargarExcel, fechaArchivo, nombreCompleto, aFechaLocal } from "./exc
 
 const doc = (c) => c.empleado?.cedula;
 const empleadoNombre = (c) => nombreCompleto(c.empleado?.nombres, c.empleado?.apellidos) ?? c.empleado?.name;
+
+const pesos = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+
+/** "AUXILIO DE COMUNICACION ($ 15.000 · 01/10/2026); VARIABLE ($ 0)" */
+const resumenAnexos = (c) => {
+    const partes = (c.anexos ?? [])
+        .filter((a) => a.anexo_auxilio || Number(a.valor))
+        .map((a) => {
+            const fecha = aFecha(a.fecha_entrega_firma);
+            const detalle = [pesos.format(Number(a.valor) || 0), fecha && fecha.split("-").reverse().join("/")]
+                .filter(Boolean)
+                .join(" · ");
+            return `${a.anexo_auxilio || "Sin nombre"} (${detalle})`;
+        });
+    return partes.length ? partes.join("; ") : null;
+};
+
+const totalAnexos = (c) =>
+    (c.anexos ?? []).length ? (c.anexos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0) : null;
 
 const COLUMNAS_BASE = [
     { titulo: "Documento", tipo: "texto", ancho: 14, valor: doc },
@@ -58,6 +77,11 @@ const COLUMNAS_SENSIBLES = [
         valor: (c) => (c.centros_costos ?? []).map((cc) => cc.codigo).filter(Boolean).join(", "),
     },
     { titulo: "Fecha Cierre Seguimiento", tipo: "fecha", ancho: 14, valor: (c) => c.seguimiento_fecha_cierre },
+    // Resumen en la hoja principal; el detalle fila por fila sigue en la hoja "Anexos".
+    // El importador ignora estas dos columnas (contratosImport.js): contienen "auxilio" y
+    // si no, al reimportar se tomarían como tipo de auxilio.
+    { titulo: "Anexos y Auxilios", tipo: "texto", ancho: 45, valor: resumenAnexos },
+    { titulo: "Total Anexos y Auxilios", tipo: "moneda", ancho: 16, valor: totalAnexos },
 ];
 
 const COLUMNAS_FINALES = [

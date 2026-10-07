@@ -1244,7 +1244,7 @@ function Modal({
                         : [
                             ["principal",         "Información Principal"],
                             ["seguridad",         "Seguridad Social"],
-                            ["costos",            "Costos y Anexos"],
+                            ["costos",            "Centros de Costo"],
                             ["Seguimiento_medico","Seguimiento Médico"],
                             ["doc_medicos",       "Documentos Médicos"],
                         ]
@@ -1431,6 +1431,112 @@ function Modal({
                                 />
                                 <div />
                                 <div />
+                            </div>
+                            <div style={{ ...S.sectionHeader, marginTop: 32 }}>
+                                ANEXOS Y AUXILIOS
+                            </div>
+                            <div style={{ marginTop: 12 }}>
+                                {form.anexos.map((anexo, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            ...S.grid3,
+                                            marginBottom: 10,
+                                            alignItems: "end",
+                                        }}
+                                    >
+                                        <Field
+                                            label="Anexo / Auxilio"
+                                            k={`a_${i}_name`}
+                                            form={{
+                                                [`a_${i}_name`]:
+                                                    anexo.anexo_auxilio,
+                                            }}
+                                            onChange={() => (e) =>
+                                                updateAnexo(
+                                                    i,
+                                                    "anexo_auxilio",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            errors={{}}
+                                            disabled={readOnly}
+                                        />
+                                        <Field
+                                            label="Valor $"
+                                            k={`a_${i}_val`}
+                                            type="number"
+                                            form={{
+                                                [`a_${i}_val`]: anexo.valor,
+                                            }}
+                                            onChange={() => (e) =>
+                                                updateAnexo(
+                                                    i,
+                                                    "valor",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            errors={{}}
+                                            disabled={readOnly}
+                                        />
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                gap: 10,
+                                                alignItems: "end",
+                                            }}
+                                        >
+                                            <Field
+                                                label="Fecha Entrega/Firma"
+                                                k={`a_${i}_date`}
+                                                type="date"
+                                                form={{
+                                                    [`a_${i}_date`]: dateOnly(
+                                                        anexo.fecha_entrega_firma,
+                                                    ),
+                                                }}
+                                                onChange={() => (e) =>
+                                                    updateAnexo(
+                                                        i,
+                                                        "fecha_entrega_firma",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                errors={{}}
+                                                disabled={readOnly}
+                                            />
+                                            {!readOnly && (
+                                                <button
+                                                    style={{
+                                                        ...S.actionBtn(
+                                                            "#fce8e8",
+                                                            "#a33",
+                                                        ),
+                                                        height: 38,
+                                                    }}
+                                                    onClick={() =>
+                                                        removeAnexo(i)
+                                                    }
+                                                >
+                                                    <IconTrash size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {!readOnly && (
+                                    <button
+                                        style={{
+                                            ...S.btnSecondary,
+                                            marginTop: 8,
+                                            padding: "6px 12px",
+                                            fontSize: "0.8rem",
+                                        }}
+                                        onClick={addAnexo}
+                                    >
+                                        + Agregar Anexo/Auxilio
+                                    </button>
+                                )}
                             </div>
                         </>
                     )}
@@ -2223,113 +2329,6 @@ function Modal({
                                     <div style={{ ...S.err, marginTop: 6 }}>
                                         {errors.centros_costos}
                                     </div>
-                                )}
-                            </div>
-
-                            <div style={{ ...S.sectionHeader, marginTop: 32 }}>
-                                ANEXOS Y AUXILIOS
-                            </div>
-                            <div style={{ marginTop: 12 }}>
-                                {form.anexos.map((anexo, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            ...S.grid3,
-                                            marginBottom: 10,
-                                            alignItems: "end",
-                                        }}
-                                    >
-                                        <Field
-                                            label="Anexo / Auxilio"
-                                            k={`a_${i}_name`}
-                                            form={{
-                                                [`a_${i}_name`]:
-                                                    anexo.anexo_auxilio,
-                                            }}
-                                            onChange={() => (e) =>
-                                                updateAnexo(
-                                                    i,
-                                                    "anexo_auxilio",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            errors={{}}
-                                            disabled={readOnly}
-                                        />
-                                        <Field
-                                            label="Valor $"
-                                            k={`a_${i}_val`}
-                                            type="number"
-                                            form={{
-                                                [`a_${i}_val`]: anexo.valor,
-                                            }}
-                                            onChange={() => (e) =>
-                                                updateAnexo(
-                                                    i,
-                                                    "valor",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            errors={{}}
-                                            disabled={readOnly}
-                                        />
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                gap: 10,
-                                                alignItems: "end",
-                                            }}
-                                        >
-                                            <Field
-                                                label="Fecha Entrega/Firma"
-                                                k={`a_${i}_date`}
-                                                type="date"
-                                                form={{
-                                                    [`a_${i}_date`]: dateOnly(
-                                                        anexo.fecha_entrega_firma,
-                                                    ),
-                                                }}
-                                                onChange={() => (e) =>
-                                                    updateAnexo(
-                                                        i,
-                                                        "fecha_entrega_firma",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                errors={{}}
-                                                disabled={readOnly}
-                                            />
-                                            {!readOnly && (
-                                                <button
-                                                    style={{
-                                                        ...S.actionBtn(
-                                                            "#fce8e8",
-                                                            "#a33",
-                                                        ),
-                                                        height: 38,
-                                                    }}
-                                                    onClick={() =>
-                                                        removeAnexo(i)
-                                                    }
-                                                >
-                                                    <IconTrash size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                {!readOnly && (
-                                    <button
-                                        style={{
-                                            ...S.btnSecondary,
-                                            marginTop: 8,
-                                            padding: "6px 12px",
-                                            fontSize: "0.8rem",
-                                        }}
-                                        onClick={addAnexo}
-                                    >
-                                        + Agregar Anexo/Auxilio
-                                    </button>
                                 )}
                             </div>
                         </>
