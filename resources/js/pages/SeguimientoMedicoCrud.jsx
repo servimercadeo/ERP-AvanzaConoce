@@ -6,6 +6,7 @@ import {
     IconSearch, IconEye, IconEdit, IconClose,
     IconEmptySearch, IconLoading,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /* ─── constantes ──────────────────────────────────────────────────── */
 const POR_PAGINA = 10;
@@ -50,12 +51,12 @@ function Field({ label, k, type = "text", opts, req, form, errors = {}, onChange
         <div style={S.formGroup}>
             <label style={S.label}>{label}{req && !disabled ? " *" : ""}</label>
             {opts ? (
-                <select style={{ ...S.input, ...dis }} value={form[k] ?? ""} onChange={onChange(k)} disabled={disabled}>
+                <SelectBuscable style={{ ...S.input, ...dis }} value={form[k] ?? ""} onChange={onChange(k)} disabled={disabled}>
                     <option value="">Elige</option>
                     {isObjOpts
                         ? opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)
                         : opts.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                </SelectBuscable>
             ) : type === "textarea" ? (
                 <textarea
                     style={{ ...S.input, minHeight: 68, resize: disabled ? "none" : "vertical", ...dis }}
@@ -369,7 +370,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                                     </div>
                                                                     <div style={S.formGroup}>
                                                                         <label style={S.label}>Año</label>
-                                                                        <select
+                                                                        <SelectBuscable
                                                                             value={evObsYears[i] ?? String(CUR_YEAR)}
                                                                             onChange={e => setEvObsYears(y => y.map((v, j) => j === i ? e.target.value : v))}
                                                                             style={{ ...S.input, cursor: "pointer" }}
@@ -377,7 +378,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                                             {[...new Set([...YEAR_OPTS, ...Object.keys(ev.observaciones ?? {}).filter(k => /^\d{4}$/.test(k))])].sort().map(y => (
                                                                                 <option key={y} value={y}>{y}{Object.values(ev.observaciones?.[y] ?? {}).some(Boolean) ? " ✓" : ""}</option>
                                                                             ))}
-                                                                        </select>
+                                                                        </SelectBuscable>
                                                                     </div>
                                                                 </div>
                                                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, paddingBottom: 14 }}>
@@ -436,7 +437,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                     <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
                                     <div style={{ ...S.formGroup, marginTop: 14, maxWidth: 360 }}>
                                         <label style={S.label}>Evento médico</label>
-                                        <select
+                                        <SelectBuscable
                                             style={{ ...S.input, cursor: "pointer" }}
                                             value={eventoIdx}
                                             onChange={e => setEventoDocIdx(Number(e.target.value))}
@@ -446,7 +447,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                     {(ev.fecha_ingreso_seguimiento || "Sin fecha") + (ev.tipo_evento ? ` · ${ev.tipo_evento}` : "")}
                                                 </option>
                                             ))}
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
                                     {!eventoFecha ? (
                                         <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>

@@ -9,6 +9,7 @@ import {
     IconCheckCircle,
     IconMinusCircle,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 function parseDateLocal(str) {
     return new Date(str + "T00:00:00");
 }
@@ -137,7 +138,7 @@ function CronogramaModal({ entry, proyectos, cronogramas, onClose, onSaved }) {
                             {entry.proyecto?.nombre ?? "—"}
                         </div>
                     ) : (
-                        <select
+                        <SelectBuscable
                             style={S.input}
                             value={form.proyecto_id}
                             onChange={(e) =>
@@ -153,7 +154,7 @@ function CronogramaModal({ entry, proyectos, cronogramas, onClose, onSaved }) {
                                     {p.label}
                                 </option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     )}
 
                     <label style={{ ...S.label, marginTop: 16 }}>

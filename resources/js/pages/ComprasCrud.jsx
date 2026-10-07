@@ -9,6 +9,7 @@ import {
     IconClose,
 } from "../components/Icons";
 import { SearchableSelect as FilterSelect } from "../components/SearchableSelect";
+import SelectBuscable from "../components/SelectBuscable";
 
 const ESTADOS_COMPRA = ["Cotizando", "Pendiente Aprobación"];
 
@@ -273,14 +274,14 @@ export default function ComprasCrud() {
                                     <td>{p.clase}</td>
                                     <td>{p.concepto}</td>
                                     <td>
-                                        <select
+                                        <SelectBuscable
                                             style={S.selectInline}
                                             value={p.estado_compra || "Cotizando"}
                                             disabled={actualizandoId === p.id}
                                             onChange={e => handleCambiarEstadoCompra(p, e.target.value)}
                                         >
                                             {ESTADOS_COMPRA.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>

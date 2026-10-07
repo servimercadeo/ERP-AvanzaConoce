@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /**
  * Asignación de Inventario: custodia de una unidad (serial puntual) o de una cantidad
@@ -121,10 +122,10 @@ function NuevaAsignacionModal({ usuarios, onClose, onSaved }) {
                             {itemSeleccionado.series?.length > 0 && (
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Serial (opcional — deja vacío para asignar por cantidad)</label>
-                                    <select style={S.input} value={serial} onChange={(e) => setSerial(e.target.value)}>
+                                    <SelectBuscable style={S.input} value={serial} onChange={(e) => setSerial(e.target.value)}>
                                         <option value="">— Asignar por cantidad —</option>
                                         {itemSeleccionado.series.map((s) => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                                    </SelectBuscable>
                                 </div>
                             )}
 
@@ -141,11 +142,11 @@ function NuevaAsignacionModal({ usuarios, onClose, onSaved }) {
 
                             <div style={S.formGroup}>
                                 <label style={S.label}>Asignar a *</label>
-                                <select style={S.input} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                                <SelectBuscable style={S.input} value={userId} onChange={(e) => setUserId(e.target.value)}>
                                     {usuarios.map((u) => (
                                         <option key={u.id} value={u.id}>{u.name}{u.cargo ? ` (${u.cargo})` : ""}</option>
                                     ))}
-                                </select>
+                                </SelectBuscable>
                             </div>
 
                             <div style={S.formGroup}>

@@ -19,6 +19,7 @@ import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "..
 import { exportarContratosExcel } from "../utils/contratosExport";
 import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 5;
 
@@ -160,7 +161,7 @@ function Field({
                 {req && !disabled ? " *" : ""}
             </label>
             {opts ? (
-                <select
+                <SelectBuscable
                     style={{
                         ...S.input,
                         ...(errors[k] ? S.inputErr : {}),
@@ -182,7 +183,7 @@ function Field({
                                   {o}
                               </option>
                           ))}
-                </select>
+                </SelectBuscable>
             ) : type === "textarea" ? (
                 <textarea
                     style={{
@@ -1955,7 +1956,7 @@ function Modal({
                                                                             </div>
                                                                             <div style={S.formGroup}>
                                                                                 <label style={S.label}>Año</label>
-                                                                                <select
+                                                                                <SelectBuscable
                                                                                     value={evObsYears[i] ?? String(CUR_YEAR)}
                                                                                     onChange={e => setEvObsYears(y => y.map((v, j) => j === i ? e.target.value : v))}
                                                                                     style={{ ...S.input, cursor: "pointer" }}
@@ -1963,7 +1964,7 @@ function Modal({
                                                                                     {[...new Set([...YEAR_OPTS, ...Object.keys(ev.observaciones ?? {}).filter(k => /^\d{4}$/.test(k))])].sort().map(y => (
                                                                                         <option key={y} value={y}>{y}{Object.values(ev.observaciones?.[y] ?? {}).some(Boolean) ? " ✓" : ""}</option>
                                                                                     ))}
-                                                                                </select>
+                                                                                </SelectBuscable>
                                                                             </div>
                                                                         </div>
                                                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, paddingBottom: 14 }}>
@@ -2033,7 +2034,7 @@ function Modal({
                                     <div style={S.sectionHeader}>DOCUMENTOS MÉDICOS</div>
                                     <div style={{ ...S.formGroup, marginTop: 14, maxWidth: 360 }}>
                                         <label style={S.label}>Evento médico</label>
-                                        <select
+                                        <SelectBuscable
                                             style={{ ...S.input, cursor: "pointer" }}
                                             value={eventoIdx}
                                             onChange={e => setEventoDocIdx(Number(e.target.value))}
@@ -2043,7 +2044,7 @@ function Modal({
                                                     {(ev.fecha_ingreso_seguimiento || "Sin fecha") + (ev.tipo_evento ? ` · ${ev.tipo_evento}` : "")}
                                                 </option>
                                             ))}
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
                                     {!eventoFecha ? (
                                         <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>

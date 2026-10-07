@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import { IconClose, IconEmptySearch, IconLoading, IconTrash } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const money = (n) => `$ ${Number(n ?? 0).toLocaleString("es-CO")}`;
 
@@ -312,25 +313,25 @@ export default function OrdenCompraCrud() {
                             </div>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Sede Orden de Compra *</label>
-                                <select style={S.input} value={sedeId} onChange={(e) => setSedeId(e.target.value)}>
+                                <SelectBuscable style={S.input} value={sedeId} onChange={(e) => setSedeId(e.target.value)}>
                                     <option value="">Elige</option>
                                     {sedes.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                                </select>
+                                </SelectBuscable>
                             </div>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Empresa</label>
-                                <select style={S.input} value={empresaId} onChange={(e) => setEmpresaId(e.target.value)}>
+                                <SelectBuscable style={S.input} value={empresaId} onChange={(e) => setEmpresaId(e.target.value)}>
                                     <option value="">Elige</option>
                                     {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                                </select>
+                                </SelectBuscable>
                             </div>
 
                             <div style={S.formGroup}>
                                 <label style={S.label}>Proveedor *</label>
-                                <select style={S.input} value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
+                                <SelectBuscable style={S.input} value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}>
                                     <option value="">Elige</option>
                                     {proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre} — {p.nit}</option>)}
-                                </select>
+                                </SelectBuscable>
                             </div>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Naturaleza</label>
@@ -338,10 +339,10 @@ export default function OrdenCompraCrud() {
                             </div>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Forma de Pago</label>
-                                <select style={S.input} value={formaPagoId} onChange={(e) => setFormaPagoId(e.target.value)}>
+                                <SelectBuscable style={S.input} value={formaPagoId} onChange={(e) => setFormaPagoId(e.target.value)}>
                                     <option value="">Elige</option>
                                     {formasPago.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                                </select>
+                                </SelectBuscable>
                             </div>
 
                             <div style={S.formGroup}>

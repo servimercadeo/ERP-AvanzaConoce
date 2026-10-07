@@ -6,6 +6,7 @@ import {
     IconSearch, IconEdit, IconTrash, IconClose,
     IconEmptySearch, IconLoading,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 15;
 
@@ -82,7 +83,7 @@ function FormModal({ open, onClose, onSave, editTarget, empresas }) {
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Empresa</label>
-                        <select
+                        <SelectBuscable
                             style={S.input}
                             value={empresaId}
                             onChange={(e) => setEmpresaId(e.target.value)}
@@ -93,7 +94,7 @@ function FormModal({ open, onClose, onSave, editTarget, empresas }) {
                                     {emp.nombre}
                                 </option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <label style={S.checkboxRow}>
                         <input

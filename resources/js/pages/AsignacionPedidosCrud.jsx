@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { IconSearch, IconEmptySearch, IconLoading } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /**
  * Asignación de Pedidos: quién queda a cargo de GESTIONAR cada pedido (cotizar,
@@ -153,7 +154,7 @@ export default function AsignacionPedidosCrud() {
                                         </span>
                                     </td>
                                     <td>
-                                        <select
+                                        <SelectBuscable
                                             style={S.selectInline}
                                             value={p.asignado_a_user_id ?? ""}
                                             disabled={asignandoId === p.id || (!puedeAsignar(p) && !p.asignado_a_user_id)}
@@ -164,7 +165,7 @@ export default function AsignacionPedidosCrud() {
                                             {usuarios.map((u) => (
                                                 <option key={u.id} value={u.id}>{u.name}{u.cargo ? ` (${u.cargo})` : ""}</option>
                                             ))}
-                                        </select>
+                                        </SelectBuscable>
                                         {!puedeAsignar(p) && !p.asignado_a_user_id && (
                                             <div style={S.hint}>Revisa el stock antes de asignar</div>
                                         )}

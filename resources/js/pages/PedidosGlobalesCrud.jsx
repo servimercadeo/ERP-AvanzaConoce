@@ -9,6 +9,7 @@ import {
     IconClose,
 } from "../components/Icons";
 import api from "../api/axios";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 8;
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
@@ -1656,7 +1657,7 @@ export default function PedidosGlobalesCrud() {
                         }}
                     />
                 </div>
-                <select
+                <SelectBuscable
                     style={S.selectFilter}
                     value={filtroEstado}
                     onChange={(e) => {
@@ -1668,7 +1669,7 @@ export default function PedidosGlobalesCrud() {
                     <option value="En proceso">En proceso</option>
                     <option value="Pedido confirmado">Pedido confirmado</option>
                     <option value="Completado">Completado</option>
-                </select>
+                </SelectBuscable>
                 <button
                     style={S.btnSecondary}
                     onClick={handleExport}
@@ -1691,7 +1692,7 @@ export default function PedidosGlobalesCrud() {
                         {selectedIds.size !== 1 ? "s" : ""} seleccionado
                         {selectedIds.size !== 1 ? "s" : ""}
                     </span>
-                    <select
+                    <SelectBuscable
                         style={S.selectFilter}
                         value={bulkEstado}
                         onChange={(e) => setBulkEstado(e.target.value)}
@@ -1703,7 +1704,7 @@ export default function PedidosGlobalesCrud() {
                         <option value="Devolución usada">
                             Devolución usada
                         </option>
-                    </select>
+                    </SelectBuscable>
                     <button
                         style={{
                             ...S.btnPrimary,

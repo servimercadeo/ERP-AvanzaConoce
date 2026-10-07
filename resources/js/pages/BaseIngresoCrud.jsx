@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
 import { IconEye, IconEdit, IconTrash, IconClose, IconPhone } from '../components/Icons';
+import SelectBuscable from "../components/SelectBuscable";
 
 const EMPTY_FORM = {
   candidato_id: '',
@@ -679,10 +680,10 @@ function Field({ label, k, type = 'text', opts, req, span, form, onChange, disab
         {label}{req && <span style={{ color: '#e74c3c', marginLeft: 3 }}>*</span>}
       </label>
       {opts ? (
-        <select style={inp} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
+        <SelectBuscable style={inp} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled}>
           <option value="">-- Selecciona --</option>
           {opts.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
-        </select>
+        </SelectBuscable>
       ) : (
         <input type={type} style={inp} value={form[k] ?? ''} onChange={onChange(k)} disabled={disabled} />
       )}

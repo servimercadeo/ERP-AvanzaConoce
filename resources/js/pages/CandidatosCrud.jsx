@@ -9,6 +9,7 @@ import {
     IconGestionar,
 } from "../components/Icons";
 import { SearchableSelect } from "../components/SearchableSelect";
+import SelectBuscable from "../components/SelectBuscable";
 
 const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -2100,7 +2101,7 @@ export default function CandidatosCrud() {
                                             >
                                                 CLARIDAD DEL MENSAJE
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.claridad_mensaje ?? ""
@@ -2117,7 +2118,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2130,7 +2131,7 @@ export default function CandidatosCrud() {
                                             >
                                                 CONVICCIÓN Y ENERGÍA
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.conviccion_energia ??
@@ -2148,7 +2149,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2161,7 +2162,7 @@ export default function CandidatosCrud() {
                                             >
                                                 ADAPTABILIDAD Y ESCUCHA
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.adaptabilidad_escucha ??
@@ -2179,7 +2180,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2192,7 +2193,7 @@ export default function CandidatosCrud() {
                                             >
                                                 ORIENTACIÓN A LA ACCIÓN
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.orientacion_accion ??
@@ -2210,7 +2211,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2223,7 +2224,7 @@ export default function CandidatosCrud() {
                                             >
                                                 MANEJO DE LA PRESIÓN
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.manejo_presion ?? ""
@@ -2240,7 +2241,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                     </div>
                                     <div style={{ marginTop: 12 }}>
@@ -2284,7 +2285,7 @@ export default function CandidatosCrud() {
                                             >
                                                 TRAYECTORIA
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.entrevista
                                                         ?.trayectoria ?? ""
@@ -2301,7 +2302,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2315,7 +2316,7 @@ export default function CandidatosCrud() {
                                                 CONEXIÓN CON EL CLIENTE O EL
                                                 RESULTADO
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.entrevista
                                                         ?.conexion_cliente ?? ""
@@ -2332,7 +2333,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2345,7 +2346,7 @@ export default function CandidatosCrud() {
                                             >
                                                 APRENDIZAJE Y MADUREZ
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.entrevista
                                                         ?.aprendizaje_madurez ??
@@ -2363,7 +2364,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2376,7 +2377,7 @@ export default function CandidatosCrud() {
                                             >
                                                 MOTIVACIÓN HACIA EL ROL
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.entrevista
                                                         ?.motivacion ?? ""
@@ -2393,7 +2394,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label
@@ -2406,7 +2407,7 @@ export default function CandidatosCrud() {
                                             >
                                                 DISPOSICIÓN Y PROYECTO DE VIDA
                                             </label>
-                                            <select
+                                            <SelectBuscable
                                                 value={
                                                     procForm.entrevista
                                                         ?.disposicion_proyecto ??
@@ -2424,7 +2425,7 @@ export default function CandidatosCrud() {
                                                 <option value={3}>3</option>
                                                 <option value={4}>4</option>
                                                 <option value={5}>5</option>
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                     </div>
                                     <div style={{ marginTop: 12 }}>
@@ -2725,7 +2726,7 @@ export default function CandidatosCrud() {
                                         >
                                             ESTUDIO DE SEGURIDAD
                                         </label>
-                                        <select
+                                        <SelectBuscable
                                             value={
                                                 procForm.seguridad?.estudio ||
                                                 ""
@@ -2750,7 +2751,7 @@ export default function CandidatosCrud() {
                                             <option value="No Aprobado">
                                                 No Aprobado
                                             </option>
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
                                 </div>
                             )}

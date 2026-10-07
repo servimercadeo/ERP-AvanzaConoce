@@ -6,6 +6,7 @@ import {
     IconSearch, IconEdit, IconTrash, IconClose,
     IconEmptySearch, IconLoading,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 15;
 
@@ -69,9 +70,9 @@ function FormModal({ open, onClose, onSave, editTarget, categoriasOpciones }) {
                 <div style={S.modalBody}>
                     <div style={S.formGroup}>
                         <label style={S.label}>Categoría *</label>
-                        <select style={S.input} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                        <SelectBuscable style={S.input} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
                             {categoriasOpciones.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Nombre *</label>
@@ -224,14 +225,14 @@ export default function TiposProductoCrud() {
                         }}
                     />
                 </div>
-                <select
+                <SelectBuscable
                     style={S.selectFilter}
                     value={filtroCategoria}
                     onChange={(e) => { setFiltroCategoria(e.target.value); setPagina(1); }}
                 >
                     <option value="Todas">Todas las categorías</option>
                     {categoriasOpciones.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </SelectBuscable>
                 <button className="btn-primary" onClick={handleCreate}>
                     + Nuevo Tipo de Producto
                 </button>

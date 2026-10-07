@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-query-qy_ppomC.js";import t from"./InventarioCategoriaCrud-DA1EOUU_.js";import"./app-DjUK9roO.js";import"./vendor-router-Bl-8jUln.js";/* empty css            */import"./useDebounce-B89BvJx0.js";import"./Layout-DIK8mW4l.js";import"./SearchableSelect-DQuQs2s8.js";import"./SelectBuscable-BNDinIbv.js";function f(){return r.jsx(t,{})}export{f as default};
