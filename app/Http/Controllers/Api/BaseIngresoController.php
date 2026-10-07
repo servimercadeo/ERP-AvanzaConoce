@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BaseIngreso;
 use App\Services\EmpresaProyectoRules;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -175,6 +176,31 @@ class BaseIngresoController extends Controller
         }
 
         return response()->json($this->resolveFromRequisicion($baseIngreso));
+    }
+
+    /**
+     * Anula el aval: desmarca el aval del candidato (vuelve a Entrevista), libera la vacante de
+     * su requisición y retira el registro de la base de ingresos (soft delete, queda el histórico),
+     * igual que al desactivar el check de aval en Candidatos.
+     */
+    public function anular(BaseIngreso $baseIngreso)
+    {
+        $candidato = $baseIngreso->candidato;
+
+        DB::transaction(function () use ($baseIngreso, $candidato) {
+            $candidato?->update([
+                'aval'             => false,
+                'fecha_aval'       => null,
+                'tipo_vinculacion' => null,
+                'estado'           => 'Entrevista',
+            ]);
+            $baseIngreso->update(['estado' => 'cancelada']);
+            $baseIngreso->delete();
+        });
+
+        \App\Models\Requisicion::actualizarEstadoPorVacantesDe($candidato?->requisicion_id);
+
+        return response()->json(['message' => 'Aval anulado. La vacante quedó disponible en la requisición.']);
     }
 
     public function destroy(BaseIngreso $baseIngreso)

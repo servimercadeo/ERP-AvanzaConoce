@@ -28,7 +28,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 // ── Público ──────────────────────────────────────────────────────────────────
 Route::get('/health', function () {
@@ -496,6 +495,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
+    // Anular aval: desmarca el aval del candidato y libera la vacante de la requisición
+    Route::post('base-ingresos/{baseIngreso}/anular', [BaseIngresoController::class, 'anular']);
     // Enviar alerta de ingreso al candidato por correo
     Route::post('base-ingresos/{baseIngreso}/alerta', function (BaseIngreso $baseIngreso) {
         if (!$baseIngreso->correo) {
@@ -612,14 +613,17 @@ Route::middleware('auth:sanctum')->group(function () {
             $meta     = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
             $archivosEvento = $meta[$data['documento']]['archivos_eventos'][$evento] ?? [];
 
+            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+            $disk = Storage::disk('local');
+
             foreach ($data['tipos'] as $tipo) {
                 $entry = $archivosEvento[$tipo] ?? null;
-                if (!$entry || !Storage::disk('local')->exists($entry['ruta'])) continue;
+                if (!$entry || !$disk->exists($entry['ruta'])) continue;
 
                 $payload['archivos'][] = [
                     'nombre'    => $entry['nombre_original'],
-                    'tipo'      => Storage::disk('local')->mimeType($entry['ruta']),
-                    'contenido' => base64_encode(Storage::disk('local')->get($entry['ruta'])),
+                    'tipo'      => $disk->mimeType($entry['ruta']),
+                    'contenido' => base64_encode($disk->get($entry['ruta'])),
                 ];
             }
         }

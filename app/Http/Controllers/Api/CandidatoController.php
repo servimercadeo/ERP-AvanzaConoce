@@ -210,9 +210,9 @@ class CandidatoController extends Controller
 
             if ($activandoAval) {
                 $requisicionAval = Requisicion::find($data['requisicion_id'] ?? $candidato->requisicion_id);
-                if ($requisicionAval && $requisicionAval->vacantesCubiertas() >= $requisicionAval->requeridas) {
+                if ($requisicionAval && !$requisicionAval->tieneVacantesLibres()) {
                     return response()->json(
-                        ['message' => "La requisición {$requisicionAval->nro_identificacion_proceso} ya tiene sus {$requisicionAval->requeridas} vacantes cubiertas. Aumenta el número de vacantes para dar otro aval."],
+                        ['message' => "La requisición {$requisicionAval->nro_identificacion_proceso} ya tiene {$requisicionAval->vacantesCubiertas()} de {$requisicionAval->vacantesRequeridas()} vacantes cubiertas. Aumenta el número de vacantes para dar otro aval."],
                         422
                     );
                 }

@@ -92,7 +92,7 @@ class RequisicionController extends Controller
             'fecha_solicitud'         => 'sometimes|date',
             'fecha_ingreso'           => 'nullable|date',
             'fecha_cierre'            => 'nullable|date',
-            'requeridas'              => 'nullable|integer|min:1',
+            'requeridas'              => 'sometimes|required|integer|min:1',
             'contratadas'             => 'nullable|integer|min:0',
             'proyecto_id'             => 'nullable|exists:proyectos,id',
             'empresa_id'              => 'nullable|exists:empresas,id',
@@ -116,7 +116,7 @@ class RequisicionController extends Controller
         $requeridasFinal = $data['requeridas'] ?? $requisicion->requeridas;
         $cambioVacantes  = $requeridasFinal != $requisicion->requeridas;
         if ($estadoFinal !== $requisicion->estado) {
-            $this->validarCierre($estadoFinal, (int) $requeridasFinal, $requisicion->vacantesCubiertas());
+            $this->validarCierre($estadoFinal, max(1, (int) $requeridasFinal), $requisicion->vacantesCubiertas());
         }
 
         $requisicion->update($data);

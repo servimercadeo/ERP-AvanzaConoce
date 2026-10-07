@@ -287,6 +287,38 @@ export default function AvalesContratacionCrud() {
         );
     };
 
+    const [anularLoading, setAnularLoading] = useState(null);
+
+    const handleAnularAval = (row) => {
+        if (anularLoading === row.id) return;
+        showConfirm(
+            "Anular aval de contratación",
+            `¿Anular el aval de ${row.nombre_completo || "este candidato"}? Se desmarcará el aval de contratación del candidato (vuelve a Entrevista) y la vacante quedará disponible de nuevo en la requisición.`,
+            async () => {
+                setAnularLoading(row.id);
+                try {
+                    const { data: res } = await api.post(
+                        `/base-ingresos/${row.id}/anular`,
+                    );
+                    setData((prev) => prev.filter((r) => r.id !== row.id));
+                    qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+                    qc.invalidateQueries({ queryKey: ["candidatos"] });
+                    qc.invalidateQueries({ queryKey: ["requisiciones"] });
+                    showToast(res?.message || "Aval anulado");
+                } catch (e) {
+                    showToast(
+                        "Error al anular el aval: " +
+                            (e.response?.data?.message || e.message),
+                        "error",
+                    );
+                    qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+                } finally {
+                    setAnularLoading(null);
+                }
+            },
+        );
+    };
+
     const filteredData = useMemo(
         () =>
             data.filter((row) => {
@@ -600,6 +632,25 @@ export default function AvalesContratacionCrud() {
                                                     ) : (
                                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
                                                     )}
+                                                </button>
+                                                <button
+                                                    style={{
+                                                        ...S.actionBtn(
+                                                            "#fee2e2",
+                                                            "#991b1b",
+                                                        ),
+                                                        opacity:
+                                                            anularLoading === row.id
+                                                                ? 0.5
+                                                                : 1,
+                                                    }}
+                                                    title="Anular aval"
+                                                    disabled={anularLoading === row.id}
+                                                    onClick={() =>
+                                                        handleAnularAval(row)
+                                                    }
+                                                >
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
                                                 </button>
                                             </div>
                                         </td>

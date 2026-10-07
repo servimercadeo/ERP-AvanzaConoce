@@ -83,6 +83,20 @@ class Requisicion extends Model
     }
 
     /**
+     * Vacantes requeridas como entero. Si quedó vacío (null/0) se toma 1, igual que la columna
+     * por defecto y la tabla de Selección; comparar `0 >= null` en PHP da true y bloqueaba el aval.
+     */
+    public function vacantesRequeridas(): int
+    {
+        return max(1, (int) $this->requeridas);
+    }
+
+    public function tieneVacantesLibres(): bool
+    {
+        return $this->vacantesCubiertas() < $this->vacantesRequeridas();
+    }
+
+    /**
      * Cierra la requisición automáticamente cuando se cubren todas sus vacantes, y la reabre
      * ("En proceso") si una cerrada vuelve a tener vacantes libres (se quitó un aval o se
      * aumentaron las vacantes). Las canceladas no se tocan.
@@ -93,7 +107,7 @@ class Requisicion extends Model
             return;
         }
 
-        $completa = $this->vacantesCubiertas() >= $this->requeridas;
+        $completa = !$this->tieneVacantesLibres();
 
         if ($completa && $this->estado !== 'Completada') {
             $this->update(['estado' => 'Completada']);
