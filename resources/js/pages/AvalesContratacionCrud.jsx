@@ -690,7 +690,7 @@ export default function AvalesContratacionCrud() {
                             <label style={S.sectionLabel}>
                                 Datos del candidato
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <ReadField
                                     label="Documento"
                                     value={form.documento_identificacion}
@@ -729,7 +729,7 @@ export default function AvalesContratacionCrud() {
                             <label style={S.sectionLabel}>
                                 Vinculación y fechas de ingreso
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <Field
                                     label="Tipo de vinculación"
                                     k="tipo_vinculacion"
@@ -796,7 +796,7 @@ export default function AvalesContratacionCrud() {
                             </div>
 
                             <label style={S.sectionLabel}>Remuneración</label>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 <ReadField
                                     label="Tasa riesgo ARL"
                                     value={form.tasa_riesgo_arl}
@@ -1270,7 +1270,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 1000,
+        maxWidth: "min(1400px, 96vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -1319,7 +1319,7 @@ const S = {
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     sectionLabel: {

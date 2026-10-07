@@ -557,7 +557,7 @@ export default function RespuestasFormularioCrud() {
                             <label style={S.sectionLabel}>
                                 1. Información Personal
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <DetailItem
                                     label="Número de documento"
                                     value={selectedResponse.documento}
@@ -607,7 +607,7 @@ export default function RespuestasFormularioCrud() {
                             <label style={S.sectionLabel}>
                                 2. Información de Contacto y Residencia
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <DetailItem
                                     label="Ciudad de residencia"
                                     value={selectedResponse.ciudad}
@@ -637,7 +637,7 @@ export default function RespuestasFormularioCrud() {
                             <label style={S.sectionLabel}>
                                 3. Contacto en Caso de Emergencia
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <DetailItem
                                     label="Nombre del contacto"
                                     value={selectedResponse.emergencia_nombre}
@@ -657,7 +657,7 @@ export default function RespuestasFormularioCrud() {
                             <label style={S.sectionLabel}>
                                 4. Afiliaciones a Seguridad Social
                             </label>
-                            <div style={{ ...S.grid3, marginBottom: 20 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginBottom: 20 }}>
                                 <DetailItem
                                     label="E.P.S. (Salud)"
                                     value={selectedResponse.eps}
@@ -671,7 +671,7 @@ export default function RespuestasFormularioCrud() {
                             <label style={S.sectionLabel}>
                                 5. Tallas de Dotación (Uniformes)
                             </label>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 <DetailItem
                                     label="Talla de camisa"
                                     value={selectedResponse.talla_camisa}
@@ -833,7 +833,7 @@ function DocsModal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 680 }}
+                style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={S.modalHeader}>
@@ -1314,7 +1314,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 880,
+        maxWidth: "min(1400px, 96vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -1363,7 +1363,7 @@ const S = {
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     sectionLabel: {

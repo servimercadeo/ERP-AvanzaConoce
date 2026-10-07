@@ -185,7 +185,7 @@ function ImportModal({ onClose, onImported }) {
 
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Importar Work Orders desde Excel</span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
@@ -348,7 +348,7 @@ function CampoSoloLectura({ label, valor, span }) {
 function VerModal({ item, onClose }) {
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Work Order {item.numero_wo}</span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
@@ -357,7 +357,7 @@ function VerModal({ item, onClose }) {
                     {SECCIONES_DETALLE.map((seccion) => (
                         <div key={seccion.titulo} style={{ marginBottom: 18 }}>
                             <p className="section-title" style={{ marginBottom: 10 }}>{seccion.titulo}</p>
-                            <div style={S.grid4}>
+                            <div className="form-grid" style={S.grid4}>
                                 {seccion.campos.map(([campo, label]) => (
                                     <CampoSoloLectura key={campo} label={label} valor={item[campo]} />
                                 ))}
@@ -365,7 +365,7 @@ function VerModal({ item, onClose }) {
                         </div>
                     ))}
                     <p className="section-title" style={{ marginBottom: 10 }}>Descripción</p>
-                    <div style={S.grid4}>
+                    <div className="form-grid" style={S.grid4}>
                         <CampoSoloLectura label="Descripción de IBS" valor={item.descripcion} span={4} />
                     </div>
                 </div>
@@ -573,7 +573,7 @@ const S = {
     modalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px 14px", borderBottom: "1.5px solid var(--border)", flexShrink: 0 },
     modalBody: { padding: "18px 22px", overflowY: "auto", flex: 1 },
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 22px 18px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
-    grid4: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 14 },
+    grid4: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },

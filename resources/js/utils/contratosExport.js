@@ -57,7 +57,6 @@ const COLUMNAS_SENSIBLES = [
         ancho: 16,
         valor: (c) => (c.centros_costos ?? []).map((cc) => cc.codigo).filter(Boolean).join(", "),
     },
-    { titulo: "Origen Seguimiento", tipo: "texto", ancho: 18, valor: (c) => c.origen_seguimiento },
     { titulo: "Fecha Cierre Seguimiento", tipo: "fecha", ancho: 14, valor: (c) => c.seguimiento_fecha_cierre },
 ];
 

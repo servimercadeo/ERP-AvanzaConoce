@@ -312,7 +312,7 @@ export default function ComprasCrud() {
             {/* --- Modal Filtros --- */}
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
-                    <div style={{ ...S.modal, maxWidth: 760, maxHeight: "none", overflow: "visible" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)", maxHeight: "none", overflow: "visible" }} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>Filtros de Búsqueda</span>
                             <button style={S.closeBtn} onClick={() => setFilterOpen(false)}>
@@ -387,7 +387,7 @@ export default function ComprasCrud() {
                             </button>
                         </div>
                         <div style={S.modalBody}>
-                            <div style={S.grid2}>
+                            <div className="form-grid" style={S.grid2}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Responsable</label>
                                     <div style={{ fontWeight: 700 }}>{verTarget.responsable}</div>
@@ -453,13 +453,13 @@ const S = {
     actionIconBtn: (bg, color) => ({ background: bg, border: "none", borderRadius: 6, padding: "5px 8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color, transition: "opacity 0.15s" }),
     emptyState: { padding: "60px 20px", textAlign: "center", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
     overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5000, padding: 20 },
-    modal: { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 16px 60px rgba(26,155,140,0.22)", width: "100%", maxWidth: 720, maxHeight: "90vh", display: "flex", flexDirection: "column" },
+    modal: { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 16px 60px rgba(26,155,140,0.22)", width: "100%", maxWidth: "min(1100px, 94vw)", maxHeight: "90vh", display: "flex", flexDirection: "column" },
     modalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", background: "var(--primary)", borderTopLeftRadius: "var(--radius)", borderTopRightRadius: "var(--radius)", flexShrink: 0 },
     modalTitle: { fontFamily: "'Poppins', sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "#fff" },
     closeBtn: { background: "none", border: "1.5px solid rgba(255, 255, 255, 0.6)", borderRadius: "50%", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" },
     modalBody: { padding: 24, overflowY: "auto", flex: 1 },
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 24px", borderTop: "1.5px solid var(--border)", background: "var(--bg)", borderBottomLeftRadius: "var(--radius)", borderBottomRightRadius: "var(--radius)", flexShrink: 0 },
-    grid2: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 },
+    grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 16 },
     formGroup: { display: "flex", flexDirection: "column", gap: 4 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" },
     btnPrimary: { background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", padding: "8px 18px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", fontFamily: "Nunito, sans-serif" },

@@ -76,7 +76,7 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
                 </div>
                 <div style={S.modalBody}>
-                    <div style={S.grid2}>
+                    <div className="form-grid" style={S.grid2}>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Producto *</label>
                             <SelectBuscable style={S.input} value={form.tipo_producto_id} onChange={set("tipo_producto_id")} disabled={isEdit}>
@@ -328,7 +328,7 @@ function ImportModal({ categoria, esGeneral, tiposProducto, sedes, onClose, onIm
 
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Importar desde Excel</span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
@@ -847,7 +847,7 @@ const S = {
     modalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px 14px", borderBottom: "1.5px solid var(--border)", flexShrink: 0 },
     modalBody: { padding: "18px 22px", overflowY: "auto", flex: 1 },
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 22px 18px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
-    grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
+    grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" },
     input: { padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.9rem", fontFamily: "Nunito,sans-serif", background: "var(--white)", color: "var(--text)", outline: "none", width: "100%", boxSizing: "border-box" },

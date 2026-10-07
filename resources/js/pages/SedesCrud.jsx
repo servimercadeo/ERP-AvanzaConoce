@@ -180,7 +180,7 @@ function Modal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 960 }}
+                style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={S.modalHeaderGreen}>
@@ -191,177 +191,111 @@ function Modal({
                 </div>
 
                 <div style={S.modalBody}>
-                    <div style={S.grid3}>
-                        {/* Left Column */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <Field
-                                label="Nombre"
-                                k="nombre"
-                                req
-                                uppercase
-                                {...fp}
-                            />
-                            <Field
-                                label="Código PDV"
-                                k="codigo_distribuidor"
-                                uppercase
-                                {...fp}
-                            />
-                            <Field label="Teléfonos" k="telefono" {...fp} />
-                            <Field
-                                label="Ciudad"
-                                k="id_ciudad"
-                                opts={ciudadesOpts}
-                                req
-                                {...fp}
-                            />
-                            <Field
-                                label="Usuario Almacenista"
-                                k="id_almacenista_mac"
-                                opts={options.users.map((u) => ({
-                                    value: u.id,
-                                    label: u.label,
-                                }))}
-                                {...fp}
-                            />
-                        </div>
-
-                        {/* Middle Column */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <div style={{ visibility: "hidden" }}>
-                                <Field label="Spacer" k="spacer" {...fp} />
-                            </div>
-                            <Field
-                                label="Subcanal"
-                                k="sub_canal"
-                                opts={options.subcanales}
-                                {...fp}
-                            />
-                            <Field
-                                label="Estado"
-                                k="estado"
-                                opts={options.estados}
-                                req
-                                {...fp}
-                            />
-                        </div>
-
-                        {/* Right Column */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <Field
-                                label="Dirección"
-                                k="direccion"
-                                uppercase
-                                {...fp}
-                            />
-                            <Field
-                                label="Código C.I"
-                                k="codigo_instalador"
-                                uppercase
-                                {...fp}
-                            />
-                            <Field
-                                label="Tipo sede"
-                                k="tipo_sede"
-                                opts={options.tipos_sede}
-                                req
-                                {...fp}
-                            />
-                            <Field
-                                label="Sede padre"
-                                k="id_sede_padre"
-                                opts={options.sedes.map((s) => ({
-                                    value: s.id,
-                                    label: s.nombre,
-                                }))}
-                                {...fp}
-                            />
-                        </div>
+                    {/* Campos en orden de lectura: la grilla los acomoda en tantas
+                        columnas como quepan, sin huecos entre ellos. */}
+                    <div style={S.sectionLabel}>Datos de la sede</div>
+                    <div className="form-grid" style={S.grid3}>
+                        <Field label="Nombre" k="nombre" req uppercase {...fp} />
+                        <Field
+                            label="Ciudad"
+                            k="id_ciudad"
+                            opts={ciudadesOpts}
+                            req
+                            {...fp}
+                        />
+                        <Field label="Dirección" k="direccion" uppercase {...fp} />
+                        <Field label="Teléfonos" k="telefono" {...fp} />
+                        <Field
+                            label="Estado"
+                            k="estado"
+                            opts={options.estados}
+                            req
+                            {...fp}
+                        />
+                        <Field
+                            label="Tipo sede"
+                            k="tipo_sede"
+                            opts={options.tipos_sede}
+                            req
+                            {...fp}
+                        />
+                        <Field
+                            label="Sede padre"
+                            k="id_sede_padre"
+                            opts={options.sedes.map((s) => ({
+                                value: s.id,
+                                label: s.nombre,
+                            }))}
+                            {...fp}
+                        />
+                        <Field
+                            label="Subcanal"
+                            k="sub_canal"
+                            opts={options.subcanales}
+                            {...fp}
+                        />
+                        <Field
+                            label="Código PDV"
+                            k="codigo_distribuidor"
+                            uppercase
+                            {...fp}
+                        />
+                        <Field
+                            label="Código C.I"
+                            k="codigo_instalador"
+                            uppercase
+                            {...fp}
+                        />
+                        <Field
+                            label="Usuario Almacenista"
+                            k="id_almacenista_mac"
+                            opts={options.users.map((u) => ({
+                                value: u.id,
+                                label: u.label,
+                            }))}
+                            {...fp}
+                        />
                     </div>
 
-                    <div style={{ ...S.grid3, marginTop: 16 }}>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <Field
-                                label="Regional"
-                                k="regional_id"
-                                opts={options.regionales.map((r) => ({
-                                    value: r.id,
-                                    label: r.nombre,
-                                }))}
-                                {...fp}
-                            />
-                            <Field
-                                label="Proyecto"
-                                k="proyecto_id"
-                                opts={options.proyectos.map((p) => ({
-                                    value: p.id,
-                                    label: p.nombre,
-                                }))}
-                                {...fp}
-                            />
-                            <Field
-                                label="Supervisor"
-                                k="supervisor"
-                                uppercase
-                                {...fp}
-                            />
-                        </div>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <Field
-                                label="Contacto Supervisor"
-                                k="contacto_supervisor"
-                                {...fp}
-                            />
-                            <Field
-                                label="Líder Regional"
-                                k="lider_regional"
-                                uppercase
-                                {...fp}
-                            />
-                        </div>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 16,
-                            }}
-                        >
-                            <Field
-                                label="Contacto Líder Regional"
-                                k="contacto_lider_regional"
-                                {...fp}
-                            />
-                        </div>
+                    <div style={{ ...S.sectionLabel, marginTop: 10 }}>
+                        Regional y responsables
+                    </div>
+                    <div className="form-grid" style={S.grid3}>
+                        <Field
+                            label="Regional"
+                            k="regional_id"
+                            opts={options.regionales.map((r) => ({
+                                value: r.id,
+                                label: r.nombre,
+                            }))}
+                            {...fp}
+                        />
+                        <Field
+                            label="Proyecto"
+                            k="proyecto_id"
+                            opts={options.proyectos.map((p) => ({
+                                value: p.id,
+                                label: p.nombre,
+                            }))}
+                            {...fp}
+                        />
+                        <Field label="Supervisor" k="supervisor" uppercase {...fp} />
+                        <Field
+                            label="Contacto Supervisor"
+                            k="contacto_supervisor"
+                            {...fp}
+                        />
+                        <Field
+                            label="Líder Regional"
+                            k="lider_regional"
+                            uppercase
+                            {...fp}
+                        />
+                        <Field
+                            label="Contacto Líder Regional"
+                            k="contacto_lider_regional"
+                            {...fp}
+                        />
                     </div>
                 </div>
 
@@ -1140,7 +1074,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: "min(1100px, 94vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -1190,7 +1124,7 @@ const S = {
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 24,
     },
     formGroup: {
@@ -1200,6 +1134,14 @@ const S = {
         minWidth: 0,
     },
     label: { fontSize: "0.75rem", fontWeight: 700, color: "var(--text-dark)" },
+    sectionLabel: {
+        fontSize: "0.82rem",
+        fontWeight: 800,
+        color: "var(--primary)",
+        fontFamily: "'Poppins',sans-serif",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+    },
     input: {
         width: "100%",
         boxSizing: "border-box",

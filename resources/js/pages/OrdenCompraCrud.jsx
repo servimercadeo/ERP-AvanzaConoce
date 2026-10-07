@@ -26,7 +26,7 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
 
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>Productos pendientes — {categoria}</span>
                     <button style={S.closeBtnWhite} onClick={onClose}><IconClose size={14} /></button>
@@ -77,7 +77,7 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
 function VerOrdenModal({ orden, onClose, onImprimir, imprimiendo }) {
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>Orden {orden.codigo}</span>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -306,7 +306,7 @@ export default function OrdenCompraCrud() {
             {vista === "crear" ? (
                 <>
                     <div style={S.formCard}>
-                        <div style={S.formGrid}>
+                        <div className="form-grid" style={S.formGrid}>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Fecha de registro</label>
                                 <input style={{ ...S.input, background: "var(--bg)" }} value={fechaRegistro} disabled />
@@ -554,7 +554,7 @@ const S = {
     tabActive: { color: "var(--primary-dark)", borderBottom: "2.5px solid var(--primary)" },
 
     formCard: { background: "var(--white)", border: "1.5px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", padding: 22, marginBottom: 20 },
-    formGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px 20px" },
+    formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: "16px 20px" },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },

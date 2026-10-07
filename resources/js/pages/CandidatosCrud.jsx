@@ -1123,7 +1123,7 @@ export default function CandidatosCrud() {
                     onClick={() => setIsCandModalOpen(false)}
                 >
                     <div
-                        style={{ ...S.modal, maxWidth: 960 }}
+                        style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
@@ -1154,7 +1154,7 @@ export default function CandidatosCrud() {
                             >
                                 Datos personales
                             </h4>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 <Field
                                     label="Nombres completos"
                                     k="nombres"
@@ -1319,7 +1319,7 @@ export default function CandidatosCrud() {
                             >
                                 Proceso de selección
                             </h4>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 <Field
                                     label="Requisición asociada"
                                     k="requisicion_id"
@@ -1404,7 +1404,7 @@ export default function CandidatosCrud() {
                                     >
                                         Datos de contratación
                                     </h4>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div
                                             style={{
                                                 display: "flex",
@@ -1487,7 +1487,7 @@ export default function CandidatosCrud() {
                                     >
                                         Remuneración
                                     </h4>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <Field
                                             label="Tasa de riesgo ARL"
                                             k="tasa_riesgo_arl"
@@ -1930,7 +1930,7 @@ export default function CandidatosCrud() {
                     onClick={() => setIsProcModalOpen(false)}
                 >
                     <div
-                        style={{ ...S.modal, maxWidth: 960 }}
+                        style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
@@ -2030,7 +2030,7 @@ export default function CandidatosCrud() {
 
                             {procActiveTab === "assesment" && (
                                 <div style={{ margin: "16px 0 10px 0" }}>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div>
                                             <label
                                                 style={{
@@ -2273,7 +2273,7 @@ export default function CandidatosCrud() {
 
                             {procActiveTab === "entrevista" && (
                                 <div style={{ margin: "16px 0 10px 0" }}>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div>
                                             <label
                                                 style={{
@@ -2486,7 +2486,7 @@ export default function CandidatosCrud() {
 
                             {procActiveTab === "referencias" && (
                                 <div style={{ margin: "16px 0 10px 0" }}>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div>
                                             <label
                                                 style={{
@@ -2559,7 +2559,7 @@ export default function CandidatosCrud() {
 
                             {procActiveTab === "fraudes" && (
                                 <div style={{ margin: "16px 0 10px 0" }}>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div>
                                             <label
                                                 style={{
@@ -3572,7 +3572,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 900,
+        maxWidth: "min(1400px, 96vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -3621,7 +3621,7 @@ const S = {
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     tabSwitch: {

@@ -683,7 +683,7 @@ function Modal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 860 }}
+                style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={S.modalHeader}>
@@ -716,7 +716,7 @@ function Modal({
                 <div style={S.modalBody}>
                     {activeTab === "info" && (
                         <>
-                            <div style={S.grid2}>
+                            <div className="form-grid" style={S.grid2}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Empleado *</label>
                                     <EmpleadoSearchSelect
@@ -945,7 +945,7 @@ function Modal({
                                 </div>
                             )}
 
-                            <div style={{ ...S.grid2, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid2, marginTop: 16 }}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>
                                         Fecha pedido *
@@ -1655,7 +1655,7 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
 
     return (
         <div style={S.overlay}>
-            <div style={{ ...S.modal, maxWidth: 720 }}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }}>
                 <div style={S.modalHeader}>
                     <span style={S.modalTitle}>Importar Excel</span>
                     <button style={S.closeBtn} onClick={onClose}>
@@ -2996,7 +2996,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: "min(1100px, 94vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -3090,7 +3090,7 @@ const S = {
     },
     grid2: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 16,
     },
     formGroup: {

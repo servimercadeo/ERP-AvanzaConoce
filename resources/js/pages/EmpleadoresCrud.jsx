@@ -291,7 +291,7 @@ function ContactosModal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 860 }}
+                style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={S.modalHeaderGreen}>

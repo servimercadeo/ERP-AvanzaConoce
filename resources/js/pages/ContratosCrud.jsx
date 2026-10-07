@@ -114,7 +114,6 @@ const EMPTY_FORM = {
     empresa: "",
     cliente_proyecto: "",
     regional_id: "",
-    origen_seguimiento: "",
     centros_costos: [],
     anexos: [],
 };
@@ -1031,7 +1030,7 @@ function Modal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 960 }}
+                style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={S.modalHeaderGreen}>
@@ -1263,7 +1262,7 @@ function Modal({
                 <div style={S.modalBody}>
                     {activeTab === "principal" && (
                         <>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 {!isCreate && (
                                     <SearchableSelect
                                         label="Empleado"
@@ -1312,7 +1311,7 @@ function Modal({
                                     {...fp}
                                 />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Cargo"
                                     k="cargo"
@@ -1348,7 +1347,7 @@ function Modal({
                                     )}
                                 </div>
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Tipo Vinculación"
                                     k="tipo_vinculacion"
@@ -1361,13 +1360,8 @@ function Modal({
                                     opts={jefeOpts}
                                     {...fp}
                                 />
-                                <Field
-                                    label="Origen Seguimiento"
-                                    k="origen_seguimiento"
-                                    {...fp}
-                                />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Fecha Ingreso"
                                     k="fecha_ingreso"
@@ -1384,7 +1378,7 @@ function Modal({
                                 <div />
                             </div>
                             {!ocultarSensible && (
-                                <div style={{ ...S.grid3, marginTop: 16 }}>
+                                <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                     <Field
                                         label="Salario"
                                         k="salario"
@@ -1400,7 +1394,7 @@ function Modal({
                                     <div />
                                 </div>
                             )}
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Empleador"
                                     k="empleador"
@@ -1428,7 +1422,7 @@ function Modal({
                                     {...fp}
                                 />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Regional"
                                     k="regional_id"
@@ -1443,7 +1437,7 @@ function Modal({
 
                     {activeTab === "seguridad" && (
                         <>
-                            <div style={S.grid3}>
+                            <div className="form-grid" style={S.grid3}>
                                 <Field
                                     label="ARL"
                                     k="arl"
@@ -1458,7 +1452,7 @@ function Modal({
                                 />
                                 <div />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="EPS (LPS Afiliado)"
                                     k="lps_afiliado"
@@ -1473,7 +1467,7 @@ function Modal({
                                 />
                                 <div />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Caja Compensación"
                                     k="caja_compensacion"
@@ -1488,7 +1482,7 @@ function Modal({
                                 />
                                 <div />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
                                     label="Fondo Pensiones"
                                     k="fondo_pensiones"
@@ -1504,7 +1498,7 @@ function Modal({
                                 <div />
                             </div>
                             <div style={S.sectionHeader}>DATOS BANCARIOS</div>
-                            <div style={{ ...S.grid3, marginTop: 12 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 12 }}>
                                 <Field
                                     label="Banco"
                                     k="banco"
@@ -1541,7 +1535,7 @@ function Modal({
                                     <div style={S.sectionHeader}>
                                         INFORMACIÓN DEL EMPLEADO
                                     </div>
-                                    <div style={{ ...S.grid3, marginTop: 16 }}>
+                                    <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                         <Field
                                             label="Cédula"
                                             k="_cedula_display"
@@ -1565,7 +1559,7 @@ function Modal({
                                             {...fp}
                                         />
                                     </div>
-                                    <div style={{ ...S.grid3, marginTop: 16 }}>
+                                    <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                         <Field
                                             label="Proyecto"
                                             k="cliente_proyecto"
@@ -1591,7 +1585,7 @@ function Modal({
                                             {...fp}
                                         />
                                     </div>
-                                    <div style={{ ...S.grid3, marginTop: 16 }}>
+                                    <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                         <Field
                                             label="Cargo"
                                             k="cargo"
@@ -1844,7 +1838,7 @@ function Modal({
                                                 </div>
                                                 {!collapsed && (
                                                     <>
-                                                        <div style={S.grid3}>
+                                                        <div className="form-grid" style={S.grid3}>
                                                             <Field
                                                                 label="Fecha de Ingreso a Seguimiento"
                                                                 k="fecha_ingreso_seguimiento"
@@ -1863,6 +1857,7 @@ function Modal({
                                                             />
                                                         </div>
                                                         <div
+                                                            className="form-grid"
                                                             style={{
                                                                 ...S.grid2,
                                                                 marginTop: 14,
@@ -1914,6 +1909,7 @@ function Modal({
                                                             </div>
                                                         </div>
                                                         <div
+                                                            className="form-grid"
                                                             style={{
                                                                 ...S.grid2,
                                                                 marginTop: 14,
@@ -3244,7 +3240,7 @@ export default function ContratosCrud() {
                     <div
                         style={{
                             ...S.modal,
-                            maxWidth: 860,
+                            maxWidth: "min(1400px, 96vw)",
                             maxHeight: "none",
                             overflow: "visible",
                         }}
@@ -3615,7 +3611,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: "min(1100px, 94vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -3700,17 +3696,17 @@ const S = {
     },
     grid4: {
         display: "grid",
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     grid2: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     sectionHeader: {

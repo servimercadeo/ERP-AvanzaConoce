@@ -1062,7 +1062,7 @@ export default function PedidosCrud() {
                             </button>
                         </div>
                         <div style={S.modalBody}>
-                            <div style={S.grid2}>
+                            <div className="form-grid" style={S.grid2}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Empleado</label>
                                     <div style={{ fontWeight: 700 }}>
@@ -1127,7 +1127,7 @@ export default function PedidosCrud() {
             {/* --- Modal Revisión de Stock / Traslado (pedidos de Dotación) --- */}
             {revisionPedido && (
                 <div style={S.overlay} onClick={() => setRevisionPedido(null)}>
-                    <div style={{ ...S.modal, maxWidth: 780 }} onClick={e => e.stopPropagation()}>
+                    <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>
                                 Revisar Stock — Pedido {revisionPedido.codigo}
@@ -1202,7 +1202,7 @@ export default function PedidosCrud() {
 
                                             {!resuelto && (
                                                 <>
-                                                    <div style={S.grid2}>
+                                                    <div className="form-grid" style={S.grid2}>
                                                         {/* Opción 1: Aprobado por Stock (solo si de verdad alcanza en la sede pedida) */}
                                                         {(() => {
                                                             const hayStockPropio = (it.sede_pedido?.cantidad ?? 0) >= it.cantidad;
@@ -1322,7 +1322,7 @@ export default function PedidosCrud() {
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
                     <div
-                        style={{ ...S.modal, maxWidth: 860, maxHeight: "none", overflow: "visible" }}
+                        style={{ ...S.modal, maxWidth: "min(1400px, 96vw)", maxHeight: "none", overflow: "visible" }}
                         onClick={e => e.stopPropagation()}
                     >
                         <div style={S.modalHeader}>
@@ -1413,7 +1413,7 @@ export default function PedidosCrud() {
                         {/* Form Body */}
                         <form onSubmit={handleGuardarPedido} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                             <div style={S.modalBody}>
-                                <div style={S.grid2}>
+                                <div className="form-grid" style={S.grid2}>
                                     <div style={S.formGroup}>
                                         <label style={S.label}>Sede Destino *</label>
                                         <SelectBuscable 
@@ -1939,7 +1939,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: "min(1100px, 94vw)",
         maxHeight: "90vh",
         display: "flex",
         flexDirection: "column"
@@ -1990,7 +1990,7 @@ const S = {
     },
     grid2: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 16
     },
     btnIconRemove: {

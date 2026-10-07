@@ -537,14 +537,14 @@ export default function BaseIngresoCrud() {
               )}
 
               <label style={S.sectionLabel}>Datos de identificación</label>
-              <div style={{ ...S.grid3, marginBottom: 18 }}>
+              <div className="form-grid" style={{ ...S.grid3, marginBottom: 18 }}>
                 <Field label="Documento de identificación" k="documento_identificacion" req form={form} onChange={set} disabled={modalMode === 'view'} />
                 <ReadField label="Fecha exp. documento" value={form._fecha_exp_doc || '—'} />
                 <Field label="Nombre completo" k="nombre_completo" req span={3} form={form} onChange={set} disabled={modalMode === 'view'} />
               </div>
 
               <label style={S.sectionLabel}>Datos laborales</label>
-              <div style={{ ...S.grid3, marginBottom: 18 }}>
+              <div className="form-grid" style={{ ...S.grid3, marginBottom: 18 }}>
                 <Field label="Cargo" k="cargo" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Ciudad" k="ciudad" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Empresa" k="empresa" form={form} onChange={set} disabled={modalMode === 'view'} />
@@ -572,7 +572,7 @@ export default function BaseIngresoCrud() {
               </div>
 
               <label style={S.sectionLabel}>Remuneración</label>
-              <div style={S.grid3}>
+              <div className="form-grid" style={S.grid3}>
                 <Field label="Tasa de riesgo ARL" k="tasa_riesgo_arl" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Salario básico" k="salario_basico" type="number" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Auxilio de transporte" k="auxilio_transporte" type="number" form={form} onChange={set} disabled={modalMode === 'view'} />
@@ -716,12 +716,12 @@ const S = {
   pageBtnActive:{ minWidth: 32, height: 32, padding: '0 8px', border: '1.5px solid var(--primary)', borderRadius: 6, background: 'var(--primary)', color: '#fff', fontSize: '0.88rem', fontWeight: 700, fontFamily: 'Nunito,sans-serif', cursor: 'default' },
   pageEllipsis: { minWidth: 28, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
   overlay:      { position: 'fixed', inset: 0, background: 'rgba(26,58,53,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, padding: 20 },
-  modal:        { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: 1000, maxHeight: '92vh', display: 'flex', flexDirection: 'column' },
+  modal:        { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: "min(1400px, 96vw)", maxHeight: '92vh', display: 'flex', flexDirection: 'column' },
   modalHeader:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 28px', background: 'var(--primary)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)', flexShrink: 0 },
   modalTitle:   { fontFamily: "'Poppins',sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#fff' },
   closeBtn:     { background: 'none', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '50%', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' },
   modalBody:    { padding: '22px 28px 28px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
   modalFooter:  { display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '16px 28px', borderTop: '1.5px solid var(--border)', flexShrink: 0 },
-  grid3:        { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 },
+  grid3:        { display: 'grid', gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
   sectionLabel: { display: 'block', fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary)', fontFamily: "'Poppins',sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 },
 };

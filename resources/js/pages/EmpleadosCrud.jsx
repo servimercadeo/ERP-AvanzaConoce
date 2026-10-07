@@ -869,7 +869,7 @@ function Modal({
     return (
         <div style={S.overlay} onClick={onClose}>
             <div
-                style={{ ...S.modal, maxWidth: 960 }}
+                style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Cabecera */}
@@ -914,7 +914,7 @@ function Modal({
                     {activeTab === "general" && (
                         <>
                             {/* Fila 1 – Identificación + Foto */}
-                            <div style={{ ...S.grid4, alignItems: "flex-end" }}>
+                            <div className="form-grid" style={{ ...S.grid4, alignItems: "flex-end" }}>
                                 <Field label="Cédula" k="cedula" req {...fp} />
                                 <Field
                                     label="Apellidos"
@@ -1031,7 +1031,7 @@ function Modal({
                             </div>
 
                             {/* Fila 2 – Fechas */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Fecha Nacimiento"
                                     k="fecha_nacimiento"
@@ -1052,7 +1052,7 @@ function Modal({
                             </div>
 
                             {/* Fila 2b – Raza y género */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field label="Raza" k="raza" {...fp} />
                                 <Field
                                     label="Género"
@@ -1066,7 +1066,7 @@ function Modal({
                             </div>
 
                             {/* Fila 3 – Estado civil, escolaridad, profesión */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Estado Civil"
                                     k="estado_civil"
@@ -1088,7 +1088,7 @@ function Modal({
                             </div>
 
                             {/* Fila 3b – Email */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Email"
                                     k="email"
@@ -1101,7 +1101,7 @@ function Modal({
                                 <div />
                             </div>
 
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Dirección Residencia"
                                     k="direccion_residencia"
@@ -1111,7 +1111,7 @@ function Modal({
                             </div>
 
                             {/* Fila 4 – Contacto */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field label="Móvil" k="movil" req {...fp} />
                                 <Field
                                     label="Estrato"
@@ -1130,7 +1130,7 @@ function Modal({
 
 
                             {/* Fila 5 – Observaciones */}
-                            <div style={{ ...S.grid2, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid2, marginTop: 16 }}>
                                 <Field
                                     label="Observaciones Médicas"
                                     k="observaciones_medicas"
@@ -1147,7 +1147,7 @@ function Modal({
 
                             {/* Tallas / Dotación */}
                             <div style={S.sectionHeader}>TALLAS / DOTACIÓN</div>
-                            <div style={{ ...S.grid4, marginTop: 12 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 12 }}>
                                 <Field
                                     label="Talla Camisa"
                                     k="talla_camisa"
@@ -1167,7 +1167,7 @@ function Modal({
                             </div>
 
                             {/* Fila 6 – RH y licencias */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="RH"
                                     k="rh"
@@ -1212,7 +1212,7 @@ function Modal({
                             </div>
 
                             {/* Fila 8 – Estado laboral */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Estado Empleado"
                                     k="estado_empleado"
@@ -1235,7 +1235,7 @@ function Modal({
                                 />
                             </div>
 
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="Comentarios"
                                     k="comentarios"
@@ -1249,7 +1249,7 @@ function Modal({
                             <div style={S.sectionHeader}>
                                 CONTACTO EN CASO DE EMERGENCIA
                             </div>
-                            <div style={{ ...S.grid4, marginTop: 12 }}>
+                            <div className="form-grid" style={{ ...S.grid4, marginTop: 12 }}>
                                 <Field
                                     label="Nombre"
                                     k="contacto_emergencia_nombre"
@@ -2237,7 +2237,7 @@ export default function EmpleadosCrud() {
             {filterOpen && (
                 <div style={S.overlay} onClick={() => setFilterOpen(false)}>
                     <div
-                        style={{ ...S.modal, maxWidth: 900 }}
+                        style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
@@ -2593,7 +2593,7 @@ const S = {
         borderRadius: "var(--radius)",
         boxShadow: "0 16px 60px rgba(26,155,140,0.22)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: "min(1100px, 94vw)",
         maxHeight: "92vh",
         display: "flex",
         flexDirection: "column",
@@ -2708,17 +2708,17 @@ const S = {
     /* Grids */
     grid4: {
         display: "grid",
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     grid3: {
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
     grid2: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))",
         gap: 14,
     },
 

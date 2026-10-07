@@ -343,7 +343,7 @@ export default function SeleccionCrud() {
                   {errors._general || errors.proyecto_id || errors.estado || errors.requeridas}
                 </div>
               )}
-              <div style={S.g3}>
+              <div className="form-grid" style={S.g3}>
                 {/* Responsable — selección con auto-relleno */}
                 <SField l="Nombre responsable" req={!isRO(mode)}>
                   <SearchableSelect
@@ -498,14 +498,14 @@ const S = {
   pgActive:    { ..._pgb, border: '1.5px solid var(--primary)', background: 'var(--primary)', color: '#fff', cursor: 'default' },
   pgDot:       { minWidth: 24, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', userSelect: 'none' },
   overlay:     { position: 'fixed', inset: 0, background: 'rgba(26,58,53,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5000, padding: 20 },
-  modal:       { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: 900, maxHeight: '92vh', display: 'flex', flexDirection: 'column' },
+  modal:       { background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.22)', width: '100%', maxWidth: "min(1400px, 96vw)", maxHeight: '92vh', display: 'flex', flexDirection: 'column' },
   mHead:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'var(--primary)', borderTopLeftRadius: 'var(--radius)', borderTopRightRadius: 'var(--radius)', flexShrink: 0 },
   mTitle:      { fontFamily: POP, fontWeight: 700, fontSize: '1.05rem', color: '#fff' },
   mClose:      { background: 'none', border: '1.5px solid rgba(255,255,255,0.5)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', flexShrink: 0 },
   mBody:       { padding: '20px 24px 24px', overflowY: 'auto', overflowX: 'hidden', flex: 1 },
   errorBanner: { background: '#fce8e8', color: '#a33', border: '1.5px solid #f0b8b8', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 600, fontFamily: NUN, marginBottom: 14 },
   mFoot:       { display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 24px', borderTop: BD, flexShrink: 0 },
-  g3:          { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 },
+  g3:          { display: 'grid', gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 10 },
   secTitle:    { margin: '22px 0 10px', fontSize: '0.88rem', fontWeight: 700, color: 'var(--primary)', fontFamily: POP },
   ta:          d => ({ ..._inp, color: d ? 'var(--text-muted)' : 'var(--text)', background: d ? 'var(--bg)' : 'var(--white)', minHeight: 72, resize: 'vertical' }),
   fl:          { fontSize: '0.76rem', fontWeight: 700, color: 'var(--text)', fontFamily: NUN },

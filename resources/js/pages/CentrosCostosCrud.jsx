@@ -78,7 +78,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                     </button>
                 </div>
                 <div style={S.modalBody}>
-                    <div style={S.grid2}>
+                    <div className="form-grid" style={S.grid2}>
                         <div style={S.formGroup}>
                             <label style={S.label}>Código *</label>
                             <input
@@ -344,7 +344,7 @@ const S = {
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 12, padding: "16px 28px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
 
     /* form */
-    grid2: { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14 },
+    grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },

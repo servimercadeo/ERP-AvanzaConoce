@@ -272,7 +272,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
 
     return (
         <div style={S.overlay} onClick={onClose}>
-            <div style={{ ...S.modal, maxWidth: 980 }} onClick={e => e.stopPropagation()}>
+            <div style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }} onClick={e => e.stopPropagation()}>
 
                 {/* Cabecera verde */}
                 <div style={S.modalHeaderGreen}>
@@ -310,7 +310,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                     {activeTab === "empleado" && (
                         <>
                             <div style={S.sectionHeader}>DATOS GENERALES</div>
-                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 14 }}>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Cédula</label>
                                     <input style={{ ...S.input, background: "var(--bg)", color: "var(--text-muted)" }} value={cedula} disabled />
@@ -321,12 +321,12 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                 </div>
                                 <Field label="Empleador" k="empleador" {...fp} />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 14 }}>
                                 <Field label="Proyecto"         k="cliente_proyecto" opts={proyectoOpts.length ? proyectoOpts : undefined} {...fp} />
                                 <Field label="Fecha de Ingreso" k="fecha_ingreso"    type="date" {...fp} />
                                 <Field label="Ciudad / Sede"    k="sede"             opts={catalogs.sedes} {...fp} />
                             </div>
-                            <div style={{ ...S.grid3, marginTop: 14 }}>
+                            <div className="form-grid" style={{ ...S.grid3, marginTop: 14 }}>
                                 <Field label="Cargo" k="cargo"        opts={catalogs.cargos} {...fp} />
                                 <Field label="EPS"   k="lps_afiliado" {...fp} />
                                 <Field label="ARL"   k="arl"          opts={catalogs.arls}   {...fp} />
@@ -395,12 +395,12 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                         </div>
                                         {!collapsed && (
                                             <>
-                                                <div style={S.grid3}>
+                                                <div className="form-grid" style={S.grid3}>
                                                     <Field label="Fecha Ingreso a Seguimiento" k="fecha_ingreso_seguimiento" type="date" {...evFp} />
                                                     <Field label="Tipo de Evento"              k="tipo_evento"               {...evFp} />
                                                     <Field label="Origen del Diagnóstico"      k="origen_diagnostico"        {...evFp} />
                                                 </div>
-                                                <div style={{ ...S.grid2, marginTop: 12 }}>
+                                                <div className="form-grid" style={{ ...S.grid2, marginTop: 12 }}>
                                                     <Field label="Diagnóstico" k="diagnostico" type="textarea" {...evFp} />
                                                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                                         <Field label="Recomendaciones / Restricciones Médico Laborales" k="recomendaciones" type="textarea" {...evFp} />
@@ -410,7 +410,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div style={{ ...S.grid2, marginTop: 12 }}>
+                                                <div className="form-grid" style={{ ...S.grid2, marginTop: 12 }}>
                                                     <Field label="Condición" k="condicion" {...evFp} />
                                                     <Field label="Estado"    k="estado"    {...evFp} />
                                                 </div>
@@ -599,7 +599,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
 
                             {!readOnly && (
                                 <div style={{ marginTop: 14, padding: "14px 16px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                                    <div style={S.grid3}>
+                                    <div className="form-grid" style={S.grid3}>
                                         <div style={S.formGroup}>
                                             <label style={S.label}>Nombre del Documento</label>
                                             <input
@@ -628,7 +628,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                             />
                                         </div>
                                     </div>
-                                    <div style={{ ...S.grid2, marginTop: 12 }}>
+                                    <div className="form-grid" style={{ ...S.grid2, marginTop: 12 }}>
                                         <div style={S.formGroup}>
                                             <label style={S.label}>Responsable</label>
                                             <select
@@ -980,8 +980,8 @@ const S = {
     sectionHeader:   { marginTop: 24, marginBottom: 4, padding: "9px 14px", background: "var(--primary)", color: "#fff", borderRadius: "var(--radius-sm)", fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.05em", textAlign: "center" },
 
     /* form */
-    grid3:     { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14 },
-    grid2:     { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14 },
+    grid3:     { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
+    grid2:     { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label:     { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input:     { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },

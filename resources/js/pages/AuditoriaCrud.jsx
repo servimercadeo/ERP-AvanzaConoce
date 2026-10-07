@@ -98,7 +98,7 @@ export default function AuditoriaCrud() {
             </div>
 
             <div style={S.filtrosCard}>
-                <div style={S.grid4}>
+                <div className="form-grid" style={S.grid4}>
                     <div style={S.formGroup}>
                         <label style={S.label}>Usuario</label>
                         <SelectBuscable style={S.input} value={userId} onChange={(e) => setUserId(e.target.value)}>
@@ -219,7 +219,7 @@ export default function AuditoriaCrud() {
 
 const S = {
     filtrosCard: { background: "var(--white)", border: "1.5px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)", padding: "20px 22px" },
-    grid4: { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 14 },
+    grid4: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },

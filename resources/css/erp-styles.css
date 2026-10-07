@@ -1807,6 +1807,51 @@ html.dark .tpb-switch-row:hover {
     box-sizing: border-box !important;
 }
 
+/* ── GRILLA DE FORMULARIOS (.form-grid) ──
+   Hasta 5 columnas de mínimo 200px: 5 en pantallas anchas, menos a medida que se angosta
+   el modal, 1 en celular. (100% - 4 × 16px de separación) / 5 es lo que topa en 5.
+   Cada "fila" de un formulario está escrita como su propia grilla; si quedaran
+   separadas, una fila de 3 campos dejaría 2 huecos. Por eso el contenedor de varias
+   filas se vuelve una sola grilla y las filas se "disuelven" (display: contents): los
+   campos fluyen seguidos. Lo que no es fila (títulos de sección, avisos, botones) ocupa
+   la fila completa. Las celdas vacías que se usaban para saltar a la siguiente fila ya
+   no hacen falta y se ocultan. */
+.form-grid,
+:has(> .form-grid) {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(max(min(200px, 100%), calc((100% - 64px) / 5)), 1fr)) !important;
+    gap: 14px 16px !important;
+    align-items: start !important;
+}
+
+:has(> .form-grid) > .form-grid {
+    display: contents !important;
+}
+
+:has(> .form-grid) > :not(.form-grid) {
+    grid-column: 1 / -1;
+}
+
+.form-grid > div:empty {
+    display: none !important;
+}
+
+/* Las grillas de formulario ajustan el número de columnas al ancho (auto-fill), así que
+   un campo con `span 3`/`span 4` —pensado como "toda la fila" en grillas de 3-4
+   columnas— ocupa la fila completa sea cual sea el número de columnas, y en pantallas
+   angostas lo mismo con `span 2`, para no desbordar el formulario. Se apunta al estilo
+   en línea que React escribe (`grid-column: span N`). */
+[style*="grid-column: span 3"],
+[style*="grid-column: span 4"] {
+    grid-column: 1 / -1 !important;
+}
+
+@media (max-width: 640px) {
+    [style*="grid-column: span 2"] {
+        grid-column: 1 / -1 !important;
+    }
+}
+
 label + textarea:not([class]) {
     padding: 12px !important;
     border-width: 1.5px !important;

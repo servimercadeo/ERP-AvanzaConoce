@@ -1120,7 +1120,7 @@ function ImportPedidosGlobalesModal({
 
     return (
         <div style={S.overlay}>
-            <div style={{ ...S.modal, maxWidth: 720 }}>
+            <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>
                         Importar Pedido Global desde Excel
