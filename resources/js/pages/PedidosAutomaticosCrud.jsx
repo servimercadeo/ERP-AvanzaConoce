@@ -16,6 +16,7 @@ import {
     IconWarning,
     IconFile,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 8;
 const ESTADOS = ["Pendiente", "Activo", "Completado", "Cancelado"];
@@ -972,7 +973,7 @@ function Modal({
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Estado</label>
-                                    <select
+                                    <SelectBuscable
                                         style={{
                                             ...S.input,
                                             ...(readOnly
@@ -988,7 +989,7 @@ function Modal({
                                                 {ESTADO_LABEL[s] ?? s}
                                             </option>
                                         ))}
-                                    </select>
+                                    </SelectBuscable>
                                 </div>
                             </div>
                             <div style={{ marginTop: 16 }}>
@@ -2206,7 +2207,7 @@ export default function PedidosAutomaticosCrud() {
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <select
+                    <SelectBuscable
                         style={S.selectFilter}
                         value={filtroEstado}
                         onChange={(e) => setFiltroEstado(e.target.value)}
@@ -2217,9 +2218,9 @@ export default function PedidosAutomaticosCrud() {
                                 {ESTADO_LABEL[s] ?? s}
                             </option>
                         ))}
-                    </select>
+                    </SelectBuscable>
                     {proyectosUsados.length > 0 && (
-                        <select
+                        <SelectBuscable
                             style={S.selectFilter}
                             value={filtroProyecto}
                             onChange={(e) => setFiltroProyecto(e.target.value)}
@@ -2230,10 +2231,10 @@ export default function PedidosAutomaticosCrud() {
                                     {p}
                                 </option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     )}
                     {regionalesUsados.length > 0 && (
-                        <select
+                        <SelectBuscable
                             style={S.selectFilter}
                             value={filtroRegional}
                             onChange={(e) => setFiltroRegional(e.target.value)}
@@ -2244,7 +2245,7 @@ export default function PedidosAutomaticosCrud() {
                                     {r.nombre}
                                 </option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     )}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>

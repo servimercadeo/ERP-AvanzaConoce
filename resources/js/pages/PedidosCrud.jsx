@@ -13,6 +13,7 @@ import {
     IconFile
 } from "../components/Icons";
 import { SearchableSelect as FilterSelect } from "../components/SearchableSelect";
+import SelectBuscable from "../components/SelectBuscable";
 
 // --- Valores estáticos para los filtros ---
 const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras", "Completado", "Rechazado"];
@@ -939,12 +940,12 @@ export default function PedidosCrud() {
             <div style={S.paginationRow}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>Ver #</span>
-                    <select style={S.selectCompact} value={limit} onChange={e => setLimit(Number(e.target.value))}>
+                    <SelectBuscable style={S.selectCompact} value={limit} onChange={e => setLimit(Number(e.target.value))}>
                         <option value={5}>5</option>
                         <option value={10}>10</option>
                         <option value={20}>20</option>
                         <option value={50}>50</option>
-                    </select>
+                    </SelectBuscable>
                 </div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-muted)' }}>
                     Resultados {filteredPedidos.length}
@@ -1266,7 +1267,7 @@ export default function PedidosCrud() {
                                                                 </p>
                                                             ) : (
                                                                 <>
-                                                                    <select
+                                                                    <SelectBuscable
                                                                         style={{ ...S.select, marginBottom: 8 }}
                                                                         value={trasladoSede[it.item_id] || ""}
                                                                         onChange={e => setTrasladoSede(prev => ({ ...prev, [it.item_id]: e.target.value }))}
@@ -1281,7 +1282,7 @@ export default function PedidosCrud() {
                                                                                 {s.sede_nombre} — stock: {s.cantidad}
                                                                             </option>
                                                                         ))}
-                                                                    </select>
+                                                                    </SelectBuscable>
                                                                     <button
                                                                         style={{ ...S.btnRevisionAccion("#e8f0ff", "#1a4fa8"), width: "100%", opacity: (!trasladoSede[it.item_id] || disabledAccion) ? 0.4 : 1 }}
                                                                         disabled={!trasladoSede[it.item_id] || disabledAccion}
@@ -1415,7 +1416,7 @@ export default function PedidosCrud() {
                                 <div style={S.grid2}>
                                     <div style={S.formGroup}>
                                         <label style={S.label}>Sede Destino *</label>
-                                        <select 
+                                        <SelectBuscable 
                                             style={S.select} 
                                             value={modalData.sede} 
                                             onChange={e => setModalData(prev => ({ ...prev, sede: e.target.value }))}
@@ -1423,12 +1424,12 @@ export default function PedidosCrud() {
                                             required
                                         >
                                             {sedesOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
 
                                     <div style={S.formGroup}>
                                         <label style={S.label}>Clase de Pedido *</label>
-                                        <select 
+                                        <SelectBuscable 
                                             style={S.select} 
                                             value={modalData.clase} 
                                             onChange={e => setModalData(prev => ({ ...prev, clase: e.target.value }))}
@@ -1436,12 +1437,12 @@ export default function PedidosCrud() {
                                             required
                                         >
                                             {CLASES_PEDIDO.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
 
                                     <div style={S.formGroup}>
                                         <label style={S.label}>Concepto Pedido *</label>
-                                        <select 
+                                        <SelectBuscable 
                                             style={S.select} 
                                             value={modalData.concepto} 
                                             onChange={e => setModalData(prev => ({ ...prev, concepto: e.target.value }))}
@@ -1449,13 +1450,13 @@ export default function PedidosCrud() {
                                             required
                                         >
                                             {CONCEPTOS_PEDIDO.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </div>
 
                                     {modalMode !== "new" && (
                                         <div style={S.formGroup}>
                                             <label style={S.label}>Estado de Pedido *</label>
-                                            <select 
+                                            <SelectBuscable 
                                                 style={S.select} 
                                                 value={modalData.estado} 
                                                 onChange={e => setModalData(prev => ({ ...prev, estado: e.target.value }))}
@@ -1463,7 +1464,7 @@ export default function PedidosCrud() {
                                                 required
                                             >
                                                 {ESTADOS_PEDIDO.map(e => <option key={e} value={e}>{e}</option>)}
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                     )}
 
@@ -1496,7 +1497,7 @@ export default function PedidosCrud() {
                                     <div style={S.formGroup}>
                                         <label style={S.label}>Responsable Asignado *</label>
                                         {modalData.tipo_responsable === "Empleado" ? (
-                                            <select 
+                                            <SelectBuscable 
                                                 style={S.select} 
                                                 value={modalData.responsable} 
                                                 onChange={e => setModalData(prev => ({ ...prev, responsable: e.target.value }))}
@@ -1504,9 +1505,9 @@ export default function PedidosCrud() {
                                                 required
                                             >
                                                 {responsablesOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                                            </select>
+                                            </SelectBuscable>
                                         ) : (
-                                            <select 
+                                            <SelectBuscable 
                                                 style={S.select} 
                                                 value={modalData.responsable} 
                                                 onChange={e => setModalData(prev => ({ ...prev, responsable: e.target.value }))}
@@ -1514,7 +1515,7 @@ export default function PedidosCrud() {
                                                 required
                                             >
                                                 {ALIADOS_MOCK.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
+                                            </SelectBuscable>
                                         )}
                                     </div>
                                 </div>
@@ -1530,17 +1531,17 @@ export default function PedidosCrud() {
                                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 16 }}>
                                         <div style={{ ...S.formGroup, flex: 2 }}>
                                             <label style={S.label}>Categoría</label>
-                                            <select style={S.select} value={itemCategoria} onChange={e => handleCambiarItemCategoria(e.target.value)}>
+                                            <SelectBuscable style={S.select} value={itemCategoria} onChange={e => handleCambiarItemCategoria(e.target.value)}>
                                                 {CATEGORIAS_PRODUCTO.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div style={{ ...S.formGroup, flex: 3 }}>
                                             <label style={S.label}>Tipo de Producto</label>
-                                            <select style={S.select} value={itemProduct} onChange={e => setItemProduct(e.target.value)}>
+                                            <SelectBuscable style={S.select} value={itemProduct} onChange={e => setItemProduct(e.target.value)}>
                                                 {PRODUCTOS_CATALOGO.length === 0
                                                     ? <option value="">Sin productos en esta categoría</option>
                                                     : PRODUCTOS_CATALOGO.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                                            </select>
+                                            </SelectBuscable>
                                         </div>
                                         <div style={{ ...S.formGroup, flex: 1 }}>
                                             <label style={S.label}>Cantidad</label>

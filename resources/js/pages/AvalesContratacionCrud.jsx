@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import { FilterDropdown } from "../components/SearchableSelect";
 import { IconEye, IconEdit, IconClose } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const ESTADOS = ["activa", "en proceso", "finalizada", "cancelada"];
 
@@ -1023,7 +1024,7 @@ function Field({
                 )}
             </label>
             {opts ? (
-                <select
+                <SelectBuscable
                     style={inp}
                     value={form[k] ?? ""}
                     onChange={onChange(k)}
@@ -1035,7 +1036,7 @@ function Field({
                             {o.charAt(0).toUpperCase() + o.slice(1)}
                         </option>
                     ))}
-                </select>
+                </SelectBuscable>
             ) : (
                 <input
                     type={type}

@@ -4,6 +4,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { IconEdit, IconTrash, IconClose, IconEmptySearch, IconSearch, IconLoading } from "../components/Icons";
 import { SearchableSelect } from "../components/SearchableSelect";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 10;
 
@@ -78,9 +79,9 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
                     <div style={S.grid2}>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Producto *</label>
-                            <select style={S.input} value={form.tipo_producto_id} onChange={set("tipo_producto_id")} disabled={isEdit}>
+                            <SelectBuscable style={S.input} value={form.tipo_producto_id} onChange={set("tipo_producto_id")} disabled={isEdit}>
                                 {tiposProducto.map((t) => <option key={t.id} value={t.id}>{esGeneral ? `${t.nombre} (${t.categoria})` : t.nombre}</option>)}
-                            </select>
+                            </SelectBuscable>
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Sede *</label>
@@ -105,10 +106,10 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Empresa (Propiedad)</label>
-                            <select style={S.input} value={form.empresa_id} onChange={set("empresa_id")} disabled={isEdit}>
+                            <SelectBuscable style={S.input} value={form.empresa_id} onChange={set("empresa_id")} disabled={isEdit}>
                                 <option value="">Sin especificar</option>
                                 {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                            </select>
+                            </SelectBuscable>
                         </div>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>{isEdit ? "Cantidad" : "Cantidad a agregar"}</label>
@@ -659,10 +660,10 @@ export default function InventarioCategoriaCrud({ categoria }) {
                 {esGeneral && (
                     <div style={{ maxWidth: 320, flex: 1, minWidth: 220 }}>
                         <label style={{ ...S.label, display: "block", marginBottom: 4 }}>Categoría</label>
-                        <select style={S.input} value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)}>
+                        <SelectBuscable style={S.input} value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)}>
                             <option value="Todas">Todas las categorías</option>
                             {categoriasDisponibles.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        </SelectBuscable>
                     </div>
                 )}
             </div>

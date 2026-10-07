@@ -24,6 +24,7 @@ import {
     IconEmptySearch,
     IconLoading,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /* ─── Catálogos ──────────────────────────────────────────────────────── */
 const SEDES = [
@@ -314,7 +315,7 @@ function Field({
                 {req && !disabled ? " *" : ""}
             </label>
             {opts ? (
-                <select
+                <SelectBuscable
                     style={{
                         ...S.input,
                         ...(errors[k] ? S.inputErr : {}),
@@ -336,7 +337,7 @@ function Field({
                                   {o}
                               </option>
                           ))}
-                </select>
+                </SelectBuscable>
             ) : type === "textarea" ? (
                 <textarea
                     style={{

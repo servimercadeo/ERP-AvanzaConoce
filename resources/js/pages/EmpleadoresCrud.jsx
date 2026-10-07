@@ -13,6 +13,7 @@ import {
     IconEye,
     IconPlus,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 15;
 
@@ -93,14 +94,14 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Tipo *</label>
-                        <select
+                        <SelectBuscable
                             style={S.input}
                             value={tipo}
                             onChange={(e) => setTipo(e.target.value)}
                         >
                             <option value="Directo">Directo</option>
                             <option value="Indirecto">Indirecto</option>
-                        </select>
+                        </SelectBuscable>
                     </div>
                 </div>
                 <div style={S.modalFooter}>

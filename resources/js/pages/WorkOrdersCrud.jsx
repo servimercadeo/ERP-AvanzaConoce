@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /**
  * Work Orders (Inventarios > Work Orders): visor de las órdenes de trabajo técnicas que
@@ -457,14 +458,14 @@ export default function WorkOrdersCrud() {
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
-                <select style={S.filtroSelect} value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)}>
+                <SelectBuscable style={S.filtroSelect} value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)}>
                     <option value="">Todos los estados</option>
                     {estados.map((e) => <option key={e} value={e}>{e}</option>)}
-                </select>
-                <select style={S.filtroSelect} value={proveedorFiltro} onChange={(e) => setProveedorFiltro(e.target.value)}>
+                </SelectBuscable>
+                <SelectBuscable style={S.filtroSelect} value={proveedorFiltro} onChange={(e) => setProveedorFiltro(e.target.value)}>
                     <option value="">Todos los proveedores</option>
                     {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
+                </SelectBuscable>
                 <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
                     <IconPlus size={14} /> Importar
                 </button>

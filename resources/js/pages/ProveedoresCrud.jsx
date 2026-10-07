@@ -6,6 +6,7 @@ import {
     IconSearch, IconEdit, IconTrash, IconClose,
     IconEmptySearch, IconLoading,
 } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 15;
 
@@ -90,7 +91,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Naturaleza *</label>
-                        <select
+                        <SelectBuscable
                             style={S.input}
                             value={naturaleza}
                             onChange={(e) => setNaturaleza(e.target.value)}
@@ -98,7 +99,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
                             {NATURALEZAS.map((n) => (
                                 <option key={n} value={n}>{n}</option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Nombre *</label>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/axios";
 import { IconEmptySearch, IconLoading } from "../components/Icons";
+import SelectBuscable from "../components/SelectBuscable";
 
 /**
  * Auditoría del Sistema (Permisos > Auditoría, solo admin): rastro de creaciones,
@@ -100,21 +101,21 @@ export default function AuditoriaCrud() {
                 <div style={S.grid4}>
                     <div style={S.formGroup}>
                         <label style={S.label}>Usuario</label>
-                        <select style={S.input} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                        <SelectBuscable style={S.input} value={userId} onChange={(e) => setUserId(e.target.value)}>
                             <option value="">Elige</option>
                             {usuarios.map((u) => (
                                 <option key={u.id} value={u.id}>{u.name}</option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Acción realizada</label>
-                        <select style={S.input} value={accion} onChange={(e) => setAccion(e.target.value)}>
+                        <SelectBuscable style={S.input} value={accion} onChange={(e) => setAccion(e.target.value)}>
                             <option value="">Elige</option>
                             {ACCIONES.map((a) => (
                                 <option key={a.value} value={a.value}>{a.label}</option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Consecutivo</label>
@@ -122,12 +123,12 @@ export default function AuditoriaCrud() {
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Proceso</label>
-                        <select style={S.input} value={proceso} onChange={(e) => setProceso(e.target.value)}>
+                        <SelectBuscable style={S.input} value={proceso} onChange={(e) => setProceso(e.target.value)}>
                             <option value="">Elige</option>
                             {procesos.map((p) => (
                                 <option key={p} value={p}>{p}</option>
                             ))}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={S.formGroup}>
                         <label style={S.label}>Fecha de inicio</label>
@@ -194,7 +195,7 @@ export default function AuditoriaCrud() {
                 <div style={S.paginationBar}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <label style={S.label}>Ver #</label>
-                        <select
+                        <SelectBuscable
                             style={{ ...S.input, width: 80 }}
                             value={porPagina}
                             onChange={(e) => {
@@ -203,7 +204,7 @@ export default function AuditoriaCrud() {
                             }}
                         >
                             {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-                        </select>
+                        </SelectBuscable>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <button style={S.pageBtn(pagina === 1)} disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>‹</button>

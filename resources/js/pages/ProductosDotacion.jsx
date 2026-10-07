@@ -5,6 +5,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../context/AuthContext';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 import { SearchableSelect } from '../components/SearchableSelect';
+import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 50;
 
@@ -103,9 +104,9 @@ function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
                             <div style={S.grid2}>
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
                                     <label style={S.label}>Proyecto *</label>
-                                    <select style={S.input} value={form.proyecto} onChange={set('proyecto')}>
+                                    <SelectBuscable style={S.input} value={form.proyecto} onChange={set('proyecto')}>
                                         {proyectos.map(p => <option key={p}>{p}</option>)}
-                                    </select>
+                                    </SelectBuscable>
                                 </div>
                                 <div style={{ ...S.formGroup, gridColumn: 'span 2' }}>
                                     <label style={S.label}>Sede</label>
@@ -123,15 +124,15 @@ function ItemModal({ item, proyectos, sedesPorProyecto, onClose, onSaved }) {
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Género *</label>
-                                    <select style={S.input} value={form.genero} onChange={set('genero')}>
+                                    <SelectBuscable style={S.input} value={form.genero} onChange={set('genero')}>
                                         {GENEROS.map(g => <option key={g}>{g}</option>)}
-                                    </select>
+                                    </SelectBuscable>
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Talla *</label>
-                                    <select style={S.input} value={form.talla} onChange={set('talla')}>
+                                    <SelectBuscable style={S.input} value={form.talla} onChange={set('talla')}>
                                         {ALL_TALLAS_ORDER.map(t => <option key={t}>{t}</option>)}
-                                    </select>
+                                    </SelectBuscable>
                                 </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Cantidad</label>
@@ -207,28 +208,28 @@ function BulkModal({ proyectos, sedesPorProyecto, onClose, onSaved }) {
                             {rows.map((row, idx) => (
                                 <tr key={idx}>
                                     <td style={S.tdCell}>
-                                        <select style={S.cellInput} value={row.proyecto} onChange={e => setRow(idx, 'proyecto', e.target.value)}>
+                                        <SelectBuscable style={S.cellInput} value={row.proyecto} onChange={e => setRow(idx, 'proyecto', e.target.value)}>
                                             {proyectos.map(p => <option key={p}>{p}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </td>
                                     <td style={S.tdCell}>
-                                        <select style={S.cellInput} value={row.sede_id} onChange={e => setRow(idx, 'sede_id', e.target.value)}>
+                                        <SelectBuscable style={S.cellInput} value={row.sede_id} onChange={e => setRow(idx, 'sede_id', e.target.value)}>
                                             <option value="">Sin sede</option>
                                             {(sedesPorProyecto?.[row.proyecto] ?? []).map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </td>
                                     <td style={S.tdCell}>
                                         <input style={S.cellInput} placeholder="Ej: Polo Gris Manga Corta" value={row.prenda} onChange={e => setRow(idx, 'prenda', e.target.value)} />
                                     </td>
                                     <td style={S.tdCell}>
-                                        <select style={S.cellInput} value={row.genero} onChange={e => setRow(idx, 'genero', e.target.value)}>
+                                        <SelectBuscable style={S.cellInput} value={row.genero} onChange={e => setRow(idx, 'genero', e.target.value)}>
                                             {GENEROS.map(g => <option key={g}>{g}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </td>
                                     <td style={S.tdCell}>
-                                        <select style={S.cellInput} value={row.talla} onChange={e => setRow(idx, 'talla', e.target.value)}>
+                                        <SelectBuscable style={S.cellInput} value={row.talla} onChange={e => setRow(idx, 'talla', e.target.value)}>
                                             {ALL_TALLAS_ORDER.map(t => <option key={t}>{t}</option>)}
-                                        </select>
+                                        </SelectBuscable>
                                     </td>
                                     <td style={S.tdCell}>
                                         <input type="number" min={0} style={{ ...S.cellInput, width: 80 }} value={row.precio} onChange={e => setRow(idx, 'precio', e.target.value)} />
