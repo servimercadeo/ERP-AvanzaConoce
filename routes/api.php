@@ -511,9 +511,24 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Error al enviar: ' . $e->getMessage()], 500);
         }
     });
+    // Enlace del formulario de registro (mismo token que recibe el candidato por correo),
+    // para poder copiarlo y compartirlo manualmente. Solo disponible una vez enviada la alerta.
+    Route::get('base-ingresos/{baseIngreso}/alerta-link', function (BaseIngreso $baseIngreso) {
+        if (!$baseIngreso->alerta_enviada) {
+            return response()->json(['message' => 'Primero debes enviar la alerta de registro.'], 422);
+        }
+        $token = urlencode(Crypt::encryptString($baseIngreso->documento_identificacion));
+        return response()->json(['url' => rtrim(config('app.url'), '/') . '/registro-nuevos-ingresos?token=' . $token]);
+    });
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);
+
+    // Documentos del Empleado: otrosí, certificados, etc. ligados a un seguimiento de RH
+    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download']);
+    Route::apiResource('documentos-empleado', App\Http\Controllers\Api\DocumentoEmpleadoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['documentos-empleado' => 'documentoEmpleado']);
 
     // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
     Route::get('documentos-contratacion/employee-info', function (Request $request) {

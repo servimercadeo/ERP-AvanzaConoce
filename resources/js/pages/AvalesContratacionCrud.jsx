@@ -209,6 +209,49 @@ export default function AvalesContratacionCrud() {
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
     const [alertLoading, setAlertLoading] = useState(null);
+    const [copiedId, setCopiedId] = useState(null);
+    const [copyLoading, setCopyLoading] = useState(null);
+
+    const handleCopyAlertaLink = async (row) => {
+        if (!row.alerta_enviada || copyLoading === row.id) return;
+        setCopyLoading(row.id);
+        try {
+            const { data } = await api.get(`/base-ingresos/${row.id}/alerta-link`);
+            const url = data.url;
+            const onSuccess = () => {
+                setCopiedId(row.id);
+                setTimeout(() => setCopiedId(null), 2500);
+            };
+            const fallback = () => {
+                const ta = document.createElement("textarea");
+                ta.value = url;
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                try {
+                    document.execCommand("copy");
+                    onSuccess();
+                } catch (e) {
+                    showToast("No se pudo copiar el enlace.", "error");
+                }
+                document.body.removeChild(ta);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(onSuccess).catch(fallback);
+            } else {
+                fallback();
+            }
+        } catch (e) {
+            showToast(
+                "Error al obtener el enlace: " + (e.response?.data?.message || e.message),
+                "error",
+            );
+        } finally {
+            setCopyLoading(null);
+        }
+    };
 
     const handleAlertToggle = (row) => {
         if (row.alerta_enviada || alertLoading === row.id) return;
@@ -518,6 +561,45 @@ export default function AvalesContratacionCrud() {
                                                     }
                                                 >
                                                     <IconEdit size={15} />
+                                                </button>
+                                                <button
+                                                    style={{
+                                                        ...S.actionBtn(
+                                                            !row.alerta_enviada
+                                                                ? "var(--bg)"
+                                                                : copiedId === row.id
+                                                                  ? "#d1fae5"
+                                                                  : "#fef3c7",
+                                                            !row.alerta_enviada
+                                                                ? "var(--text-muted)"
+                                                                : copiedId === row.id
+                                                                  ? "#065f46"
+                                                                  : "#92400e",
+                                                        ),
+                                                        cursor: !row.alerta_enviada
+                                                            ? "not-allowed"
+                                                            : "pointer",
+                                                    }}
+                                                    title={
+                                                        !row.alerta_enviada
+                                                            ? "Primero activa el envío de alerta"
+                                                            : copiedId === row.id
+                                                              ? "¡Enlace copiado!"
+                                                              : "Copiar enlace del formulario de registro"
+                                                    }
+                                                    disabled={
+                                                        !row.alerta_enviada ||
+                                                        copyLoading === row.id
+                                                    }
+                                                    onClick={() =>
+                                                        handleCopyAlertaLink(row)
+                                                    }
+                                                >
+                                                    {copiedId === row.id ? (
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                    ) : (
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                                                    )}
                                                 </button>
                                             </div>
                                         </td>
