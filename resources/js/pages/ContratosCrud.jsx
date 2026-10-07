@@ -807,8 +807,12 @@ function Modal({
         }
     };
 
+    // Datos que vienen de la requisición/aval del candidato. Cada valor se ajusta a la
+    // opción equivalente de su lista (mayúsculas/tildes) para que el select la muestre.
     const handleCandidatoSelect = (c) => {
         if (!c) return;
+        const pick = (val, opts, prev) =>
+            val ? (matchOpt(val, opts) ?? val) : prev;
         setForm((f) => ({
             ...f,
             empleado_id: c.empleado_id || f.empleado_id,
@@ -816,22 +820,24 @@ function Modal({
             nombres: c.nombres || f.nombres,
             apellidos: c.apellidos || f.apellidos,
             correo: c.correo || f.correo,
-            cargo: c.cargo || f.cargo,
-            sede: c.sede || f.sede,
-            tipo_vinculacion: c.tipo_vinculacion || f.tipo_vinculacion,
-            empresa: c.empresa || f.empresa,
-            empleador: c.empleador || f.empleador,
-            jefe_inmediato: c.jefe_inmediato || f.jefe_inmediato,
-            cliente_proyecto: c.cliente_proyecto || f.cliente_proyecto,
+            cargo: pick(c.cargo, catalogs.cargos, f.cargo),
+            sede: pick(c.sede, catalogs.sedes, f.sede),
+            area_empresa: pick(c.area_empresa, catalogs.areas_empresa, f.area_empresa),
+            tipo_vinculacion: pick(c.tipo_vinculacion, catalogs.tipos_vinculacion, f.tipo_vinculacion),
+            empresa: pick(c.empresa, empresasOpts, f.empresa),
+            empleador: pick(c.empleador, empleadorOpts, f.empleador),
+            jefe_inmediato: pick(c.jefe_inmediato, jefeOpts, f.jefe_inmediato),
+            cliente_proyecto: pick(c.cliente_proyecto, proyectoOpts, f.cliente_proyecto),
+            regional_id: c.regional_id || f.regional_id,
             fecha_ingreso: c.fecha_ingreso || f.fecha_ingreso,
             salario: c.salario || f.salario,
             auxilio_transporte_legal:
                 c.auxilio_transporte_legal || f.auxilio_transporte_legal,
-            lps_afiliado: c.lps_afiliado || f.lps_afiliado,
-            fondo_pensiones: c.fondo_pensiones || f.fondo_pensiones,
-            fondo_cesantias: c.fondo_cesantias || f.fondo_cesantias,
-            arl: c.arl || f.arl,
-            caja_compensacion: c.caja_compensacion || f.caja_compensacion,
+            lps_afiliado: pick(c.lps_afiliado, catalogs.eps, f.lps_afiliado),
+            fondo_pensiones: pick(c.fondo_pensiones, catalogs.pensiones, f.fondo_pensiones),
+            fondo_cesantias: pick(c.fondo_cesantias, catalogs.cesantias, f.fondo_cesantias),
+            arl: pick(c.arl, catalogs.arls, f.arl),
+            caja_compensacion: pick(c.caja_compensacion, catalogs.cajas, f.caja_compensacion),
         }));
         setErrors({});
     };

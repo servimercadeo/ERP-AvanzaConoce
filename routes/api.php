@@ -56,6 +56,7 @@ Route::get('/registro/catalogos', function (Request $request) {
         'proyectos'       => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
         'eps'             => DB::table('eps')->orderBy('nombre')->pluck('nombre'),
         'fondos_pensiones'=> DB::table('fondos_pensiones')->orderBy('nombre')->pluck('nombre'),
+        'fondos_cesantias'=> DB::table('fondos_cesantias')->orderBy('nombre')->pluck('nombre'),
         'estados_civil'   => DB::table('estados_civil')->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
         'negocio'         => $negocio,
@@ -664,6 +665,9 @@ Route::middleware('auth:sanctum')->group(function () {
                                ->orderBy('name')
                                ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
+            // Sedes para la requisición: el formulario las filtra por la ciudad de operación.
+            'sedes'        => DB::table('sedes')->select('id', 'nombre', 'id_ciudad', 'regional_id')->orderBy('nombre')->get(),
+            'regionales'   => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
             'empleadores'  => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
             'arls'         => DB::table('arls')->select('nombre')->orderBy('nombre')->pluck('nombre'),
             'cajas'        => DB::table('cajas_compensacion')->select('nombre')->orderBy('nombre')->pluck('nombre'),
@@ -691,31 +695,57 @@ Route::middleware('auth:sanctum')->group(function () {
             return count(array_diff($requiredDocs, $subidos)) === 0;
         })->values();
 
-        return $respuestas->map(function ($resp) {
+        // Proceso de la requisición → Área Empresa del contrato (catálogo `area_empresa`).
+        $areaPorProceso = ['ADMINISTRATIVO' => 'ADMINISTRATIVO', 'COMERCIAL' => 'COMERCIAL', 'OPERATIVO' => 'OPERACIONES'];
+
+        return $respuestas->map(function ($resp) use ($areaPorProceso) {
+            // Si la cédula pasó por varias requisiciones, se toma la del aval vigente (la más reciente).
             $candidato = \App\Models\Candidato::with([
                 'requisicion.cargo',
                 'requisicion.proyecto',
                 'requisicion.empresa',
                 'requisicion.empleador',
-            ])->where('identificacion', $resp->documento)->first();
+            ])->where('identificacion', $resp->documento)
+                ->orderByDesc('aval')->latest()->first();
 
             $ingreso = $candidato
-                ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->first()
+                ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->latest()->first()
                 : null;
 
             $req = $candidato?->requisicion;
+
+            // Sede: la del aval (editable en Avales); si no, la de la requisición; si la
+            // requisición es antigua y no la tiene, la única sede de su ciudad que atiende su
+            // proyecto. La regional sale de esa sede.
+            $sede = null;
+            if ($ingreso?->lugar_trabajo) {
+                $sede = DB::table('sedes')->where('nombre', $ingreso->lugar_trabajo)->first(['nombre', 'regional_id'])
+                    ?? (object) ['nombre' => $ingreso->lugar_trabajo, 'regional_id' => null];
+            } elseif ($req?->sede_id) {
+                $sede = DB::table('sedes')->where('id', $req->sede_id)->first(['nombre', 'regional_id']);
+            } elseif ($req?->ciudad_id && $req?->proyecto_id) {
+                $sedesReq = DB::table('sedes')
+                    ->where('id_ciudad', $req->ciudad_id)
+                    ->where(fn ($q) => $q->where('proyecto_id', $req->proyecto_id)
+                        ->orWhereIn('id', DB::table('proyecto_sede')->where('proyecto_id', $req->proyecto_id)->select('sede_id')))
+                    ->get(['nombre', 'regional_id']);
+                $sede = $sedesReq->count() === 1 ? $sedesReq->first() : null;
+            }
+
+            $fechaIngreso = $ingreso?->fecha_programacion_ingreso ?? $req?->fecha_ingreso;
 
             return [
                 'documento'                => $resp->documento,
                 'nombres'                  => $resp->nombres,
                 'apellidos'                => $resp->apellidos,
+                'correo'                   => $resp->correo,
                 // Seguridad social desde respuesta
                 'lps_afiliado'             => $resp->eps,
                 'fondo_pensiones'          => $resp->afp,
-                'fondo_cesantias'          => null,
+                'fondo_cesantias'          => $resp->fondo_cesantias,
                 'ciudad'                   => $resp->ciudad,
                 // Datos laborales desde candidato
-                'tipo_vinculacion'         => $candidato?->tipo_vinculacion,
+                'tipo_vinculacion'         => $ingreso?->tipo_vinculacion ?: $candidato?->tipo_vinculacion,
                 'arl'                      => $candidato?->arl,
                 'caja_compensacion'        => $candidato?->caja_compensacion,
                 'salario'                  => $candidato?->salario_basico,
@@ -728,13 +758,16 @@ Route::middleware('auth:sanctum')->group(function () {
                 'cargo'                    => $req?->cargo?->nombre,
                 'empresa'                  => $req?->empresa?->nombre,
                 'cliente_proyecto'         => $req?->proyecto?->nombre,
-                'empleador'                => $ingreso?->empleador ?? $req?->empleador?->nombre,
-                'jefe_inmediato'           => $ingreso?->lider_inmediato ?? $req?->responsable,
+                'empleador'                => $ingreso?->empleador ?: $req?->empleador?->nombre,
+                'jefe_inmediato'           => $ingreso?->lider_inmediato ?: $req?->responsable,
+                'area_empresa'             => $areaPorProceso[mb_strtoupper((string) $req?->proceso)] ?? null,
+                'requisicion'              => $req?->nro_identificacion_proceso,
                 'fotografia'               => $resp->fotografia ?: $candidato?->fotografia,
-                // Desde base de ingresos (aval)
-                'sede'                     => $ingreso?->lugar_trabajo,
-                'fecha_ingreso'            => $ingreso?->fecha_programacion_ingreso
-                    ? \Carbon\Carbon::parse($ingreso->fecha_programacion_ingreso)->format('Y-m-d')
+                // Desde base de ingresos (aval), con respaldo en la requisición
+                'sede'                     => $sede?->nombre,
+                'regional_id'              => $req?->regional_id ?: $sede?->regional_id,
+                'fecha_ingreso'            => $fechaIngreso
+                    ? \Carbon\Carbon::parse($fechaIngreso)->format('Y-m-d')
                     : null,
             ];
         });
@@ -915,6 +948,7 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
         'emergencia_parentesco'   => 'required|string|max:100',
         'eps'                     => 'required|string|max:150',
         'afp'                     => 'required|string|max:150',
+        'fondo_cesantias'         => 'required|string|max:150',
         'talla_camisa'            => 'required|string|max:20',
         'talla_pantalon'          => 'required|string|max:20',
         'talla_zapatos'           => 'required|string|max:20',

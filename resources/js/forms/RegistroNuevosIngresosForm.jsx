@@ -15,7 +15,7 @@ const EMPTY_FORM = {
     fecha_nacimiento: "", lugar_nacimiento: "", estado_civil: "", numero_hijos: "",
     rh: "", nivel_escolaridad: "", profesion: "", ciudad: "", barrio: "",
     direccion: "", estrato: "", correo: "", celular: "", emergencia_nombre: "",
-    emergencia_telefono: "", emergencia_parentesco: "", eps: "", afp: "",
+    emergencia_telefono: "", emergencia_parentesco: "", eps: "", afp: "", fondo_cesantias: "",
     talla_camisa: "", talla_pantalon: "", talla_zapatos: ""
 };
 
@@ -463,6 +463,7 @@ export default function RegistroNuevosIngresosForm() {
     const [ciudades, setCiudades] = useState([]);
     const [epsOpts, setEpsOpts] = useState([]);
     const [fondosOpts, setFondosOpts] = useState([]);
+    const [cesantiasOpts, setCesantiasOpts] = useState([]);
     const [estadosCivilOpts, setEstadosCivilOpts] = useState([]);
     const [tiposRhOpts, setTiposRhOpts] = useState([]);
 
@@ -478,6 +479,7 @@ export default function RegistroNuevosIngresosForm() {
                 setCiudades(data.ciudades ?? []);
                 setEpsOpts(data.eps ?? []);
                 setFondosOpts(data.fondos_pensiones ?? []);
+                setCesantiasOpts(data.fondos_cesantias ?? []);
                 setEstadosCivilOpts(data.estados_civil ?? []);
                 setTiposRhOpts(data.tipos_rh ?? []);
             })
@@ -545,6 +547,7 @@ export default function RegistroNuevosIngresosForm() {
         } else if (s === 4) {
             if (!form.eps) e.eps = "Campo obligatorio";
             if (!form.afp) e.afp = "Campo obligatorio";
+            if (!form.fondo_cesantias) e.fondo_cesantias = "Campo obligatorio";
         } else if (s === 5) {
             if (!form.talla_camisa) e.talla_camisa = "Campo obligatorio";
             if (!form.talla_pantalon) e.talla_pantalon = "Campo obligatorio";
@@ -868,6 +871,11 @@ export default function RegistroNuevosIngresosForm() {
                                 <Field label="Fondo de Pensiones" required error={errors.afp} hint="Fondo de pensiones al cual te encuentras afiliado(a)">
                                     <div className={`rni-select-wrap ${errors.afp ? "rni-select-wrap-error" : ""}`}>
                                         <SearchableSelect value={form.afp} defaultValue="" options={fondosOpts.map(o => ({ value: o, label: o }))} onChange={v => set("afp", v)} />
+                                    </div>
+                                </Field>
+                                <Field label="Fondo de Cesantías" required error={errors.fondo_cesantias} hint="Fondo de cesantías al cual te encuentras afiliado(a)">
+                                    <div className={`rni-select-wrap ${errors.fondo_cesantias ? "rni-select-wrap-error" : ""}`}>
+                                        <SearchableSelect value={form.fondo_cesantias} defaultValue="" options={cesantiasOpts.map(o => ({ value: o, label: o }))} onChange={v => set("fondo_cesantias", v)} />
                                     </div>
                                 </Field>
                             </div>

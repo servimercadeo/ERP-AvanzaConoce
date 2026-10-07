@@ -666,6 +666,10 @@ export default function RespuestasFormularioCrud() {
                                     label="A.F.P. (Fondo Pensiones)"
                                     value={selectedResponse.afp}
                                 />
+                                <DetailItem
+                                    label="Fondo de Cesantías"
+                                    value={selectedResponse.fondo_cesantias}
+                                />
                             </div>
 
                             <label style={S.sectionLabel}>

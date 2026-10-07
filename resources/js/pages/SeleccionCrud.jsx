@@ -89,7 +89,23 @@ export default function SeleccionCrud() {
 
   const ch    = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
   const chVal = k => val => {
-    setForm(p => ({ ...p, [k]: val }));
+    setForm(p => {
+      const next = { ...p, [k]: val };
+      // Al cambiar de ciudad se descarta la sede si no pertenece a la nueva ciudad.
+      if (k === 'ciudad_id' && p.sede_id) {
+        const sede = (catalogs.sedes || []).find(s => String(s.id) === String(p.sede_id));
+        if (sede && String(sede.id_ciudad) !== String(val)) next.sede_id = '';
+      }
+      // La sede trae su regional (si la tiene registrada en Parámetros > Sedes).
+      if (k === 'sede_id') {
+        const sede = (catalogs.sedes || []).find(s => String(s.id) === String(val));
+        if (sede?.regional_id) next.regional_id = String(sede.regional_id);
+      }
+      return next;
+    });
+    if (k === 'sede_id' || k === 'regional_id') {
+      setErrors(prev => ({ ...prev, [k]: undefined, ...(k === 'sede_id' ? { regional_id: undefined } : {}) }));
+    }
     // Cambiar proyecto o empresa puede resolver el choque de EmpresaProyectoRules: limpiar ese error.
     if (k === 'proyecto_id' || k === 'empresa_id') {
       setErrors(prev => {
@@ -111,6 +127,11 @@ export default function SeleccionCrud() {
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
   const empleadoresOpts  = (catalogs.empleadores || []).map(e => ({ value: String(e.id), label: e.nombre }));
   const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
+  // Sedes de la ciudad de operación; si la ciudad no tiene sedes registradas, se muestran todas.
+  const sedesCiudad      = (catalogs.sedes || []).filter(s => form.ciudad_id && String(s.id_ciudad) === String(form.ciudad_id));
+  const sedesOpts        = (sedesCiudad.length ? sedesCiudad : (catalogs.sedes || []))
+                             .map(s => ({ value: String(s.id), label: s.nombre }));
+  const regionalesOpts   = (catalogs.regionales || []).map(r => ({ value: String(r.id), label: r.nombre }));
 
   const handleSolicitanteChange = (name) => {
     const user = (catalogs.responsables || []).find(u => u.name === name);
@@ -146,6 +167,8 @@ export default function SeleccionCrud() {
         pais:                        row.pais || 'Colombia',
         fecha_cierre:                row.fecha_cierre || '',
         ciudad_id:                   row.ciudad_id != null ? String(row.ciudad_id) : '',
+        sede_id:                     row.sede_id != null ? String(row.sede_id) : '',
+        regional_id:                 row.regional_id != null ? String(row.regional_id) : '',
         observaciones:               row.observaciones || '',
         estado:                      row.estado || 'Abierta',
         solicitud_confidencial:      row.solicitud_confidencial ? 'Sí' : 'No',
@@ -175,6 +198,8 @@ export default function SeleccionCrud() {
         responsable:            form.nombre_responsable,
         proceso:                form.proceso,
         ciudad_id:              form.ciudad_id      || null,
+        sede_id:                form.sede_id        || null,
+        regional_id:            form.regional_id    || null,
         pais:                   form.pais || 'Colombia',
         estado:                 form.estado || 'Abierta',
         solicitud_confidencial: form.solicitud_confidencial === 'Sí',
@@ -338,9 +363,9 @@ export default function SeleccionCrud() {
               <button style={S.mClose} onClick={() => setModal(false)}><IconClose size={13}/></button>
             </div>
             <div style={S.mBody}>
-              {(errors._general || errors.proyecto_id || errors.estado || errors.requeridas) && (
+              {(errors._general || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id) && (
                 <div style={S.errorBanner}>
-                  {errors._general || errors.proyecto_id || errors.estado || errors.requeridas}
+                  {errors._general || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id}
                 </div>
               )}
               <div className="form-grid" style={S.g3}>
@@ -413,6 +438,30 @@ export default function SeleccionCrud() {
                     value={form.ciudad_id ?? ''}
                     onChange={chVal('ciudad_id')}
                     options={ciudadesOpts}
+                    defaultValue=""
+                    disabled={isRO(mode)}
+                  />
+                </SField>
+
+                {/* Sede – SearchableSelect (filtrada por la ciudad de operación) */}
+                <SField l="Sede" req={!isRO(mode)} err={errors.sede_id}>
+                  <SearchableSelect
+                    key={`sede-${form.ciudad_id ?? ''}-${form.sede_id ?? ''}`}
+                    value={form.sede_id ?? ''}
+                    onChange={chVal('sede_id')}
+                    options={sedesOpts}
+                    defaultValue=""
+                    disabled={isRO(mode)}
+                  />
+                </SField>
+
+                {/* Regional – SearchableSelect (se preselecciona con la regional de la sede) */}
+                <SField l="Regional" req={!isRO(mode)} err={errors.regional_id}>
+                  <SearchableSelect
+                    key={`regional-${form.regional_id ?? ''}`}
+                    value={form.regional_id ?? ''}
+                    onChange={chVal('regional_id')}
+                    options={regionalesOpts}
                     defaultValue=""
                     disabled={isRO(mode)}
                   />

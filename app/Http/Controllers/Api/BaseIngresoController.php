@@ -293,7 +293,7 @@ class BaseIngresoController extends Controller
             $c = $ingreso->candidato;
             if ($c) {
                 $ingreso->update([
-                    'lugar_trabajo'              => $ingreso->lugar_trabajo              ?? $c->lugar_trabajo,
+                    'lugar_trabajo'              => $ingreso->lugar_trabajo              ?? $c->lugar_trabajo ?? $c->requisicion?->sede?->nombre,
                     'fecha_correccion'           => $ingreso->fecha_correccion           ?? $c->fecha_correccion,
                     'fecha_programacion_ingreso' => $ingreso->fecha_programacion_ingreso ?? $c->fecha_programacion_ingreso,
                 ]);
@@ -337,7 +337,7 @@ class BaseIngresoController extends Controller
                 'telefono'                   => $c->celular,
                 'correo'                     => $c->correo,
                 'tipo_vinculacion'           => $c->tipo_vinculacion,
-                'lugar_trabajo'              => $c->lugar_trabajo,
+                'lugar_trabajo'              => $c->lugar_trabajo ?: $req?->sede?->nombre,
                 'lider_inmediato'            => $req ? $req->responsable : null,
                 'empleador'                  => $req ? ($req->empleador ? $req->empleador->nombre : null) : null,
                 'fecha_programacion_ingreso' => $c->fecha_programacion_ingreso ?? now()->toDateString(),

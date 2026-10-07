@@ -35,7 +35,7 @@ class Requisicion extends Model
         'nro_identificacion_proceso', 'registro_token', 'nro_identificacion', 'estado',
         'cargo_id', 'cargo_solicitante', 'fecha_solicitud', 'fecha_ingreso',
         'fecha_cierre', 'requeridas', 'contratadas', 'proyecto_id', 'empresa_id',
-        'empleador_id', 'tipo_solicitud', 'responsable', 'proceso', 'ciudad_id', 'pais',
+        'empleador_id', 'tipo_solicitud', 'responsable', 'proceso', 'ciudad_id', 'sede_id', 'regional_id', 'pais',
         'solicitud_confidencial', 'observaciones',
     ];
 
@@ -69,6 +69,16 @@ class Requisicion extends Model
     public function ciudad()
     {
         return $this->belongsTo(Ciudad::class);
+    }
+
+    public function sede()
+    {
+        return $this->belongsTo(Sede::class);
+    }
+
+    public function regional()
+    {
+        return $this->belongsTo(Regional::class);
     }
 
     public function candidatos()

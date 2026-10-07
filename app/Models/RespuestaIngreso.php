@@ -30,6 +30,7 @@ class RespuestaIngreso extends Model
         'emergencia_parentesco',
         'eps',
         'afp',
+        'fondo_cesantias',
         'talla_camisa',
         'talla_pantalon',
         'talla_zapatos',

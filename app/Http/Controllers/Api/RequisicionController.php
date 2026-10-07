@@ -58,9 +58,14 @@ class RequisicionController extends Controller
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
             'ciudad_id'               => 'nullable|exists:ciudades,id',
+            'sede_id'                 => 'required|exists:sedes,id',
+            'regional_id'             => 'required|exists:regionales,id',
             'pais'                    => 'nullable|string|max:80',
             'solicitud_confidencial'  => 'nullable|boolean',
             'observaciones'           => 'nullable|string',
+        ], [
+            'sede_id.required'     => 'Selecciona la sede.',
+            'regional_id.required' => 'Selecciona la regional.',
         ]);
 
         $this->validarEmpresaProyecto($data['empresa_id'] ?? null, $data['proyecto_id'] ?? null);
@@ -101,9 +106,14 @@ class RequisicionController extends Controller
             'responsable'             => 'nullable|string|max:200',
             'proceso'                 => 'nullable|string|max:80',
             'ciudad_id'               => 'nullable|exists:ciudades,id',
+            'sede_id'                 => 'sometimes|required|exists:sedes,id',
+            'regional_id'             => 'sometimes|required|exists:regionales,id',
             'pais'                    => 'nullable|string|max:80',
             'solicitud_confidencial'  => 'nullable|boolean',
             'observaciones'           => 'nullable|string',
+        ], [
+            'sede_id.required'     => 'Selecciona la sede.',
+            'regional_id.required' => 'Selecciona la regional.',
         ]);
 
         $empresaIdFinal  = array_key_exists('empresa_id', $data) ? $data['empresa_id'] : $requisicion->empresa_id;
