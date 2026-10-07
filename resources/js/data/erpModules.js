@@ -514,14 +514,6 @@ export const ERP_MODULES = [
         desc: 'Catálogo de categorías de producto. Crear una nueva genera su propio módulo en Inventarios',
         archivos: [
           { id: 'categoria_producto_file', label: 'Categoría del Producto' },
-        ]
-      },
-      {
-        id: 'tipo_producto',
-        label: 'Tipo de Producto',
-        icon: 'productos',
-        desc: 'Catálogo de tipos de producto',
-        archivos: [
           { id: 'tipo_producto_file', label: 'Tipo de Producto' },
         ]
       },

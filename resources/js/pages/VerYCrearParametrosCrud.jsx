@@ -292,14 +292,22 @@ export default function VerYCrearParametrosCrud() {
     queryFn: () => api.get('/tipos-parametro').then((r) => r.data),
   });
 
-  const subActual = submods.find((s) => s.id === seleccionado);
+  // Tipo de Producto vive como archivo dentro de Categoría del Producto, pero aquí se
+  // sigue listando como catálogo propio (mismo permiso que Categoría).
+  const catalogos = submods.flatMap((sub) =>
+    sub.id === 'categoria_producto'
+      ? [sub, { id: 'tipo_producto', label: 'Tipo de Producto', icon: sub.icon }]
+      : [sub],
+  );
+
+  const subActual = catalogos.find((s) => s.id === seleccionado);
   const Componente = subActual ? COMPONENTES[subActual.id] : null;
   const tipoParamActual = seleccionado?.startsWith('dinamico_')
     ? tiposParametro.find((t) => `dinamico_${t.id}` === seleccionado)
     : null;
 
   const filasLista = [
-    ...submods.map((sub) => ({ id: sub.id, label: sub.label, icon: sub.icon, dinamico: false })),
+    ...catalogos.map((sub) => ({ id: sub.id, label: sub.label, icon: sub.icon, dinamico: false })),
     ...tiposParametro.map((t) => ({ id: `dinamico_${t.id}`, label: t.nombre, icon: 'config', dinamico: true })),
   ];
 
