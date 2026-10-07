@@ -499,6 +499,15 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Error al enviar: ' . $e->getMessage()], 500);
         }
     });
+    // Enlace del formulario de registro (mismo token que recibe el candidato por correo),
+    // para poder copiarlo y compartirlo manualmente. Solo disponible una vez enviada la alerta.
+    Route::get('base-ingresos/{baseIngreso}/alerta-link', function (BaseIngreso $baseIngreso) {
+        if (!$baseIngreso->alerta_enviada) {
+            return response()->json(['message' => 'Primero debes enviar la alerta de registro.'], 422);
+        }
+        $token = urlencode(Crypt::encryptString($baseIngreso->documento_identificacion));
+        return response()->json(['url' => rtrim(config('app.url'), '/') . '/registro-nuevos-ingresos?token=' . $token]);
+    });
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);
