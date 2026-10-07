@@ -912,12 +912,6 @@ function Modal({
                     {/* ══ INFORMACIÓN GENERAL ══ */}
                     {activeTab === "general" && (
                         <>
-                            <div style={{ ...S.contratoNota, marginBottom: 16 }}>
-                                Salario, cargo, sede, empresa, empleador, tipo de
-                                vinculación, seguridad social (EPS, ARL, pensión y
-                                caja) y datos bancarios se administran en el módulo de
-                                Contratos.
-                            </div>
                             {/* Fila 1 – Identificación + Foto */}
                             <div style={{ ...S.grid4, alignItems: "flex-end" }}>
                                 <Field label="Cédula" k="cedula" req {...fp} />
@@ -2728,14 +2722,6 @@ const S = {
     },
 
     /* Sección */
-    contratoNota: {
-        padding: "10px 14px",
-        borderRadius: "var(--radius-sm)",
-        border: "1.5px solid var(--border)",
-        background: "var(--bg)",
-        color: "var(--text-muted)",
-        fontSize: "0.82rem",
-    },
     sectionHeader: {
         marginTop: 24,
         marginBottom: 4,

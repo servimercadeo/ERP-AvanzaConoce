@@ -1018,6 +1018,11 @@ function Modal({
         }
     };
 
+    const areaEmpresaOpts = useMemo(
+        () => (catalogs.areas_empresa ?? []).map((a) => ({ value: a, label: a })),
+        [catalogs.areas_empresa],
+    );
+
     if (!open) return null;
 
     const fp = { form, errors, onChange, disabled: readOnly };
@@ -1321,11 +1326,26 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <Field
-                                    label="Área Empresa"
-                                    k="area_empresa"
-                                    {...fp}
-                                />
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Área Empresa</label>
+                                    {/* Catálogo `area_empresa`. Un valor antiguo que no esté en
+                                        el catálogo se sigue mostrando tal cual. */}
+                                    <FilterSelect
+                                        value={form.area_empresa ?? ""}
+                                        onChange={(v) =>
+                                            onChange("area_empresa")({
+                                                target: { value: v },
+                                            })
+                                        }
+                                        options={areaEmpresaOpts}
+                                        disabled={readOnly}
+                                    />
+                                    {errors.area_empresa && (
+                                        <span style={S.err}>
+                                            {errors.area_empresa}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field

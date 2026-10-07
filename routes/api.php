@@ -148,6 +148,10 @@ Route::get('/catalogos', function () {
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        // Si la migración aún no corrió en un entorno, el selector queda vacío en vez de romper /catalogos.
+        'areas_empresa'     => \Illuminate\Support\Facades\Schema::hasTable('area_empresa')
+                                    ? DB::table('area_empresa')->orderBy('nombre')->pluck('nombre')
+                                    : [],
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
