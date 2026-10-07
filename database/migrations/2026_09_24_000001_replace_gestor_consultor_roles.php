@@ -14,18 +14,20 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $prefix = DB::getTablePrefix();
+
         // Primero se amplía el enum (superset de lo viejo y lo nuevo) para poder migrar
         // los datos existentes sin que MySQL trunque 'general' por no reconocerlo todavía.
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'general'");
+        DB::statement("ALTER TABLE `{$prefix}users` MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'general'");
 
         DB::table('users')->whereIn('rol', ['gestor', 'consultor'])->update(['rol' => 'general']);
 
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'general'");
+        DB::statement("ALTER TABLE `{$prefix}users` MODIFY rol ENUM('admin', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'general'");
 
         // `permisos_denegados.rol` es igualmente un ENUM propio en la base de datos
         // (no solo una validación de la app vía ROLES_GESTIONABLES) — mismo baile de
         // ampliar-migrar-angostar que en `users.rol`.
-        DB::statement("ALTER TABLE permisos_denegados MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
+        DB::statement("ALTER TABLE `{$prefix}permisos_denegados` MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
 
         $heredadas = DB::table('permisos_denegados')->whereIn('rol', ['gestor', 'consultor'])->get();
         foreach ($heredadas as $fila) {
@@ -36,7 +38,7 @@ return new class extends Migration
         }
         DB::table('permisos_denegados')->whereIn('rol', ['gestor', 'consultor'])->delete();
 
-        DB::statement("ALTER TABLE permisos_denegados MODIFY rol ENUM('th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
+        DB::statement("ALTER TABLE `{$prefix}permisos_denegados` MODIFY rol ENUM('th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
 
         // Los roles nuevos sin historial previo (nunca existieron como 'gestor'/'consultor')
         // no heredan nada del paso anterior: se les niega "Permisos" igual que ya se le
@@ -51,16 +53,18 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'consultor'");
+        $prefix = DB::getTablePrefix();
+
+        DB::statement("ALTER TABLE `{$prefix}users` MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NULL DEFAULT 'consultor'");
         DB::table('users')
             ->whereIn('rol', ['operaciones', 'financiera', 'supervisores', 'general'])
             ->update(['rol' => 'consultor']);
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic') NULL DEFAULT 'consultor'");
+        DB::statement("ALTER TABLE `{$prefix}users` MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic') NULL DEFAULT 'consultor'");
 
-        DB::statement("ALTER TABLE permisos_denegados MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
+        DB::statement("ALTER TABLE `{$prefix}permisos_denegados` MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general') NOT NULL");
         DB::table('permisos_denegados')
             ->whereIn('rol', ['operaciones', 'financiera', 'supervisores', 'general'])
             ->update(['rol' => 'consultor']);
-        DB::statement("ALTER TABLE permisos_denegados MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic') NOT NULL");
+        DB::statement("ALTER TABLE `{$prefix}permisos_denegados` MODIFY rol ENUM('gestor', 'consultor', 'th', 'tic') NOT NULL");
     }
 };

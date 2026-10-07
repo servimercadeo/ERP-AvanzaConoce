@@ -7,23 +7,13 @@ use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
 use App\Models\EmpleadorContacto;
+use App\Models\Requisicion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class CandidatoController extends Controller
 {
-    // Destinatarios fijos del correo de aval para vinculación Directa (siempre el mismo
-    // equipo interno). Para Indirecta ya no hay lista fija: se valida contra los contactos
-    // reales registrados en Parámetros > Empleadores (tabla `empleador_contactos`), elegidos
-    // en el frontend según el empleador y la regional del candidato.
-    private const CORREOS_DIRECTO = [
-        'julianvalencia@servimercadeo.com',
-        'coordinador.th@servimercadeo.com',
-        'nomina@servimercadeo.com',
-        'coordinadora.sst@servimercadeo.com',
-    ];
-
     public function index(Request $request)
     {
         $query = Candidato::with([
@@ -219,6 +209,13 @@ class CandidatoController extends Controller
             }
 
             if ($activandoAval) {
+                $requisicionAval = Requisicion::find($data['requisicion_id'] ?? $candidato->requisicion_id);
+                if ($requisicionAval && $requisicionAval->vacantesCubiertas() >= $requisicionAval->requeridas) {
+                    return response()->json(
+                        ['message' => "La requisición {$requisicionAval->nro_identificacion_proceso} ya tiene sus {$requisicionAval->requeridas} vacantes cubiertas. Aumenta el número de vacantes para dar otro aval."],
+                        422
+                    );
+                }
                 $pruebasActivas = $data['pruebas'] ?? $candidato->pruebas;
                 if (!$pruebasActivas) {
                     return response()->json(
@@ -250,16 +247,15 @@ class CandidatoController extends Controller
                 $tipoVinculacion = $data['tipo_vinculacion'] ?? $candidato->tipo_vinculacion;
                 $correosAval     = $data['correos_aval'] ?? [];
 
-                if ($tipoVinculacion === 'Directa') {
-                    $correosPermitidos = self::CORREOS_DIRECTO;
-                } elseif ($tipoVinculacion === 'Indirecta') {
-                    // Cualquier correo de contacto registrado en algún empleador Indirecto
-                    // (el frontend ya filtra por empleador+regional, esto solo evita que
-                    // llegue un correo que no está en el catálogo).
-                    $correosPermitidos = EmpleadorContacto::pluck('correo')->all();
-                } else {
-                    $correosPermitidos = [];
-                }
+                // Los destinatarios salen de los contactos registrados en Parámetros > Empleadores
+                // (tabla `empleador_contactos`) de un empleador del tipo que corresponde a la
+                // vinculación. El frontend ya filtra por empleador+regional; esto solo evita que
+                // llegue un correo que no está en el catálogo.
+                $tipoEmpleador = ['Directa' => 'Directo', 'Indirecta' => 'Indirecto'][$tipoVinculacion] ?? null;
+                $correosPermitidos = $tipoEmpleador
+                    ? EmpleadorContacto::whereHas('empleador', fn ($q) => $q->where('tipo', $tipoEmpleador))
+                        ->pluck('correo')->all()
+                    : [];
 
                 if (array_diff($correosAval, $correosPermitidos)) {
                     return response()->json(
@@ -270,7 +266,8 @@ class CandidatoController extends Controller
             }
         }
 
-        $avalAntes = $candidato->aval;
+        $avalAntes        = $candidato->aval;
+        $requisicionAntes = $candidato->requisicion_id;
 
         // Si se está desactivando el aval, forzar estado = Entrevista sin importar lo que venga del frontend
         if ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
@@ -299,11 +296,20 @@ class CandidatoController extends Controller
                 try {
                     Mail::to($recipients)->send(new AvalContratacionMail($candidato, $baseIngreso));
                 } catch (\Exception $e) {
-                    Log::warning('Correo de aval no enviado: ' . $e->getMessage());
+                    Log::error('Correo de aval no enviado: ' . $e->getMessage());
                 }
             }
         } elseif ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
             BaseIngreso::where('candidato_id', $candidato->id)->delete();
+        }
+
+        // Cambiar el aval o mover el candidato de requisición cambia las vacantes cubiertas:
+        // cerrar/reabrir automáticamente la(s) requisición(es) afectada(s).
+        if ((bool) $avalAntes !== (bool) $candidato->aval || $requisicionAntes != $candidato->requisicion_id) {
+            Requisicion::actualizarEstadoPorVacantesDe($candidato->requisicion_id);
+            if ($requisicionAntes != $candidato->requisicion_id) {
+                Requisicion::actualizarEstadoPorVacantesDe($requisicionAntes);
+            }
         }
 
         return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));
@@ -312,6 +318,9 @@ class CandidatoController extends Controller
     public function destroy(Candidato $candidato)
     {
         $candidato->delete();
+        if ($candidato->aval) {
+            Requisicion::actualizarEstadoPorVacantesDe($candidato->requisicion_id);
+        }
         return response()->json(null, 204);
     }
 }

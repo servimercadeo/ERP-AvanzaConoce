@@ -17,12 +17,13 @@ return new class extends Migration
 
         // Backfill: los items ya creados guardan el producto como texto; se conecta
         // con el catálogo real de tipos de producto cuando el nombre coincide exacto.
-        DB::statement('
-            UPDATE pedido_compra_items pci
-            JOIN tipos_producto tp ON UPPER(tp.nombre) = UPPER(pci.producto)
+        $prefix = DB::getTablePrefix();
+        DB::statement("
+            UPDATE `{$prefix}pedido_compra_items` pci
+            JOIN `{$prefix}tipos_producto` tp ON UPPER(tp.nombre) = UPPER(pci.producto)
             SET pci.tipo_producto_id = tp.id
             WHERE pci.tipo_producto_id IS NULL
-        ');
+        ");
     }
 
     public function down(): void

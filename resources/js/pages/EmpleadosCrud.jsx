@@ -1,13 +1,25 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
-import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import {
+    SearchableSelect,
+} from "../components/SearchableSelect";
 import api from "../api/axios";
+import { exportarEmpleadosExcel } from "../utils/empleadosExport";
+import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
+import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
+import { ROLES_ERP } from "../utils/roles";
+import { useAuth } from "../context/AuthContext";
+import {
+    COLUMNAS_IMPORTABLES,
+    descargarPlantillaImportacion,
+    parsearArchivoImportacion,
+} from "../utils/empleadosImport";
+import ImportExcelModal from "../components/ImportExcelModal";
 import {
     IconSearch,
     IconEye,
     IconEdit,
-
     IconClose,
     IconEmptySearch,
     IconLoading,
@@ -108,16 +120,6 @@ const CARGOS = [
     "ANALISTA ADMINISTRATIVO",
     "OTRO",
 ];
-const TIPOS_FUNC = [
-    "ADMINISTRATIVO",
-    "TÉCNICO",
-    "VENDEDOR",
-    "SUPERVISOR",
-    "GERENTE",
-    "APRENDIZ",
-    "DIRECTO",
-    "OTRO",
-];
 const TIPOS_VINC = [
     "Empleado directo",
     "Contratista",
@@ -127,7 +129,6 @@ const TIPOS_VINC = [
     "Otro",
 ];
 const POR_PAGINA = 10;
-const TIPOS_CUENTA = ["Ahorros", "Corriente"];
 const BANCOS = [
     "Bancolombia",
     "Davivienda",
@@ -153,42 +154,72 @@ const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 const matchOpt = (val, opts) => {
     if (!val || !opts?.length) return null;
     const norm = (s) =>
-        String(s).toLowerCase()
-            .normalize("NFD").replace(/[̀-ͯ]/g, "")
-            .replace(/\/[a-z]$/, "").trim();
+        String(s)
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .replace(/\/[a-z]$/, "")
+            .trim();
     const nVal = norm(val);
     return opts.find((o) => norm(o) === nVal) ?? null;
 };
 
-const toForm = (emp) => ({
+const toForm = (emp, catalogs = {}) => ({
     ...EMPTY_FORM,
     ...emp,
     tiene_cert_alturas: emp.tiene_cert_alturas ? "Sí" : "No",
     empresa_id: emp.empresa_id ?? "",
-    fecha_nacimiento:     dateOnly(emp.fecha_nacimiento),
-    fecha_expedicion:     dateOnly(emp.fecha_expedicion),
+    fecha_nacimiento: dateOnly(emp.fecha_nacimiento),
+    fecha_expedicion: dateOnly(emp.fecha_expedicion),
     licencia_carro_vence: dateOnly(emp.licencia_carro_vence),
-    licencia_moto_vence:  dateOnly(emp.licencia_moto_vence),
-    cert_alturas_vence:   dateOnly(emp.cert_alturas_vence),
-    ingresos:      emp.ingresos ?? "",
-    numero_hijos:  emp.numero_hijos != null ? String(emp.numero_hijos) : "",
-    profesion:     emp.profesion ?? "",
-    talla_camisa:  emp.talla_camisa ?? "",
-    talla_pantalon:emp.talla_pantalon ?? "",
+    licencia_moto_vence: dateOnly(emp.licencia_moto_vence),
+    cert_alturas_vence: dateOnly(emp.cert_alturas_vence),
+    ingresos: emp.ingresos ?? "",
+    numero_hijos: emp.numero_hijos != null ? String(emp.numero_hijos) : "",
+    profesion: emp.profesion ?? "",
+    talla_camisa: emp.talla_camisa ?? "",
+    talla_pantalon: emp.talla_pantalon ?? "",
     talla_zapatos: emp.talla_zapatos ?? "",
     // Normalizar campos de select para que coincidan exactamente con las opciones
-    genero:            matchOpt(emp.genero,           GENEROS)    ?? emp.genero ?? "",
-    estado_civil:      matchOpt(emp.estado_civil,     EST_CIVIL)  ?? emp.estado_civil ?? "",
-    nivel_escolaridad: matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ?? emp.nivel_escolaridad ?? "",
-    estrato:           matchOpt(emp.estrato,          ESTRATOS)   ?? emp.estrato ?? "PD",
+    // (mismo criterio que handleSelectCand, aplicado también al abrir un empleado existente)
+    genero: matchOpt(emp.genero, GENEROS) ?? emp.genero ?? "",
+    estado_civil:
+        matchOpt(emp.estado_civil, EST_CIVIL) ?? emp.estado_civil ?? "",
+    nivel_escolaridad:
+        matchOpt(emp.nivel_escolaridad, ESCOLARIDAD) ??
+        emp.nivel_escolaridad ??
+        "",
+    estrato: matchOpt(emp.estrato, ESTRATOS) ?? emp.estrato ?? "PD",
+    rh: matchOpt(emp.rh, catalogs.tipos_rh) ?? emp.rh ?? "",
+    eps: matchOpt(emp.eps, catalogs.eps) ?? emp.eps ?? "",
+    arl: matchOpt(emp.arl, catalogs.arls) ?? emp.arl ?? "",
+    fondo_pensiones:
+        matchOpt(emp.fondo_pensiones, catalogs.pensiones) ??
+        emp.fondo_pensiones ??
+        "",
+    caja_compensacion:
+        matchOpt(emp.caja_compensacion, catalogs.cajas) ??
+        emp.caja_compensacion ??
+        "",
+    cargo: matchOpt(emp.cargo, catalogs.cargos) ?? emp.cargo ?? "",
+    sede: matchOpt(emp.sede, catalogs.sedes) ?? emp.sede ?? "",
+    tipo_vinculacion:
+        matchOpt(emp.tipo_vinculacion, catalogs.tipos_vinculacion) ??
+        emp.tipo_vinculacion ??
+        "",
+    rol: emp.rol || "general",
 });
 
-const toApi = (form) => ({
+// Los datos de contratación no se envían desde Empleados: se administran en Contratos.
+const toApi = ({
+    ingresos, cargo, sede, empresa_id, empleador, tipo_vinculacion,
+    eps, arl, fondo_pensiones, caja_compensacion,
+    banco, tipo_cuenta, cuenta_bancaria,
+    ...form
+}) => ({
     ...form,
     tiene_cert_alturas: form.tiene_cert_alturas === "Sí",
-    empresa_id: form.empresa_id !== "" ? Number(form.empresa_id) : null,
     numero_hijos: form.numero_hijos !== "" ? Number(form.numero_hijos) : null,
-    ingresos: form.ingresos !== "" ? Number(form.ingresos) : null,
 });
 
 const EMPTY_FORM = {
@@ -235,7 +266,7 @@ const EMPTY_FORM = {
     contacto_emergencia_telefono: "",
     contacto_emergencia_parentesco: "",
     cargo: "",
-    tipo_funcionario: "",
+    rol: "general",
     tipo_vinculacion: "",
     cuenta_bancaria: "",
     tipo_cuenta: "",
@@ -340,18 +371,19 @@ function Field({
 
 /* ─── Selector de contratado (espejo de CandidatoSelector en Contratos) ── */
 function ContratadoSelector({ onSelect }) {
-    const [query, setQuery]       = useState("");
-    const [open, setOpen]         = useState(false);
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState(null);
-    const [results, setResults]   = useState([]);
-    const [loading, setLoading]   = useState(false);
-    const wrapRef                 = useRef(null);
-    const hasFocused              = useRef(false);
-    const debouncedQ              = useDebounce(query, 350);
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const wrapRef = useRef(null);
+    const hasFocused = useRef(false);
+    const debouncedQ = useDebounce(query, 350);
 
     useEffect(() => {
         const h = (e) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+            if (wrapRef.current && !wrapRef.current.contains(e.target))
+                setOpen(false);
         };
         document.addEventListener("mousedown", h);
         return () => document.removeEventListener("mousedown", h);
@@ -360,7 +392,10 @@ function ContratadoSelector({ onSelect }) {
     const loadInitial = () => {
         setLoading(true);
         api.get("/empleados/candidatos-listos")
-            .then((r) => { setResults(r.data); setOpen(true); })
+            .then((r) => {
+                setResults(r.data);
+                setOpen(true);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     };
@@ -375,10 +410,18 @@ function ContratadoSelector({ onSelect }) {
 
     useEffect(() => {
         if (!hasFocused.current) return;
-        if (!debouncedQ) { loadInitial(); return; }
+        if (!debouncedQ) {
+            loadInitial();
+            return;
+        }
         setLoading(true);
-        api.get("/empleados/candidatos-listos", { params: { search: debouncedQ } })
-            .then((r) => { setResults(r.data); setOpen(true); })
+        api.get("/empleados/candidatos-listos", {
+            params: { search: debouncedQ },
+        })
+            .then((r) => {
+                setResults(r.data);
+                setOpen(true);
+            })
             .catch(() => {})
             .finally(() => setLoading(false));
     }, [debouncedQ]);
@@ -395,92 +438,226 @@ function ContratadoSelector({ onSelect }) {
     return (
         <div ref={wrapRef} style={{ width: "100%" }}>
             {selected ? (
-                <div style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    background: "#e8f8f5", border: "2px solid var(--primary)",
-                    borderRadius: 10, padding: "14px 18px",
-                }}>
-                    <div style={{
-                        width: 46, height: 46, borderRadius: "50%",
-                        background: "var(--primary)", color: "#fff",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 800, fontSize: "1.2rem", flexShrink: 0,
-                        overflow: "hidden", position: "relative",
-                    }}>
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        background: "#e8f8f5",
+                        border: "2px solid var(--primary)",
+                        borderRadius: 10,
+                        padding: "14px 18px",
+                    }}
+                >
+                    <div
+                        style={{
+                            width: 46,
+                            height: 46,
+                            borderRadius: "50%",
+                            background: "var(--primary)",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 800,
+                            fontSize: "1.2rem",
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            position: "relative",
+                        }}
+                    >
                         {(selected.nombres || "?").charAt(0).toUpperCase()}
                         {selected.fotografia && (
-                            <img src={`/storage/${selected.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            <img
+                                src={`/storage/${selected.fotografia}`}
+                                alt=""
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                }}
+                            />
                         )}
                     </div>
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--primary-dark)", fontFamily: "'Poppins',sans-serif" }}>
+                        <div
+                            style={{
+                                fontWeight: 800,
+                                fontSize: "1rem",
+                                color: "var(--primary-dark)",
+                                fontFamily: "'Poppins',sans-serif",
+                            }}
+                        >
                             {selected.nombres} {selected.apellidos}
                         </div>
-                        <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
-                            CC: {selected.cedula}{selected.cargo ? ` · ${selected.cargo}` : ""}{selected.empresa_nombre ? ` · ${selected.empresa_nombre}` : ""}
+                        <div
+                            style={{
+                                fontSize: "0.82rem",
+                                color: "var(--text-muted)",
+                                fontFamily: "Nunito,sans-serif",
+                            }}
+                        >
+                            CC: {selected.cedula}
+                            {selected.cargo ? ` · ${selected.cargo}` : ""}
+                            {selected.empresa_nombre
+                                ? ` · ${selected.empresa_nombre}`
+                                : ""}
                         </div>
                     </div>
                     <button
-                        onClick={() => { setSelected(null); onSelect(null); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem", padding: 4 }}
+                        onClick={() => {
+                            setSelected(null);
+                            onSelect(null);
+                        }}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            fontSize: "1.1rem",
+                            padding: 4,
+                        }}
                         title="Cambiar selección"
-                    >✕</button>
+                    >
+                        ✕
+                    </button>
                 </div>
             ) : (
                 <div style={{ position: "relative" }}>
                     <input
                         style={{
-                            ...S.input, fontSize: "1rem", padding: "12px 14px",
-                            border: "2px solid var(--border)", borderRadius: 10,
+                            ...S.input,
+                            fontSize: "1rem",
+                            padding: "12px 14px",
+                            border: "2px solid var(--border)",
+                            borderRadius: 10,
                         }}
                         placeholder="Buscar por nombre o cédula…"
                         value={query}
-                        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                        onChange={(e) => {
+                            setQuery(e.target.value);
+                            setOpen(true);
+                        }}
                         onFocus={handleFocus}
                         autoFocus
                     />
                     {loading && (
-                        <div style={{ padding: "8px 14px", fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div
+                            style={{
+                                padding: "8px 14px",
+                                fontSize: "0.85rem",
+                                color: "var(--text-muted)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                            }}
+                        >
                             <IconLoading size={14} /> Buscando…
                         </div>
                     )}
                     {open && results.length > 0 && (
-                        <div style={{
-                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                            background: "var(--white)", border: "1.5px solid var(--border)",
-                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
-                            zIndex: 3000, maxHeight: 280, overflowY: "auto",
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                background: "var(--white)",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                                zIndex: 3000,
+                                maxHeight: 280,
+                                overflowY: "auto",
+                            }}
+                        >
                             {results.map((c) => (
                                 <div
                                     key={c.user_id ?? c.cedula}
                                     onMouseDown={() => handlePick(c)}
                                     style={{
-                                        padding: "10px 16px", cursor: "pointer",
+                                        padding: "10px 16px",
+                                        cursor: "pointer",
                                         borderBottom: "1px solid var(--border)",
-                                        display: "flex", alignItems: "center", gap: 12,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
                                     }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = "#f0f9f7"}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = "var(--white)"}
+                                    onMouseEnter={(e) =>
+                                        (e.currentTarget.style.background =
+                                            "#f0f9f7")
+                                    }
+                                    onMouseLeave={(e) =>
+                                        (e.currentTarget.style.background =
+                                            "var(--white)")
+                                    }
                                 >
-                                    <div style={{
-                                        width: 34, height: 34, borderRadius: "50%",
-                                        background: "var(--primary)", color: "#fff",
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontWeight: 800, fontSize: "0.9rem", flexShrink: 0,
-                                        overflow: "hidden", position: "relative",
-                                    }}>
-                                        {(c.nombres || "?").charAt(0).toUpperCase()}
+                                    <div
+                                        style={{
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: "50%",
+                                            background: "var(--primary)",
+                                            color: "#fff",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontWeight: 800,
+                                            fontSize: "0.9rem",
+                                            flexShrink: 0,
+                                            overflow: "hidden",
+                                            position: "relative",
+                                        }}
+                                    >
+                                        {(c.nombres || "?")
+                                            .charAt(0)
+                                            .toUpperCase()}
                                         {c.fotografia && (
-                                            <img src={`/storage/${c.fotografia}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                            <img
+                                                src={`/storage/${c.fotografia}`}
+                                                alt=""
+                                                style={{
+                                                    position: "absolute",
+                                                    inset: 0,
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                    borderRadius: "50%",
+                                                }}
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display =
+                                                        "none";
+                                                }}
+                                            />
                                         )}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--text)" }}>
+                                        <div
+                                            style={{
+                                                fontWeight: 700,
+                                                fontSize: "0.9rem",
+                                                color: "var(--text)",
+                                            }}
+                                        >
                                             {c.nombres} {c.apellidos}
                                         </div>
-                                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                                            CC {c.cedula}{c.cargo ? ` · ${c.cargo}` : ""}{c.empresa_nombre ? ` · ${c.empresa_nombre}` : ""}
+                                        <div
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                            }}
+                                        >
+                                            CC {c.cedula}
+                                            {c.cargo ? ` · ${c.cargo}` : ""}
+                                            {c.empresa_nombre
+                                                ? ` · ${c.empresa_nombre}`
+                                                : ""}
                                         </div>
                                     </div>
                                 </div>
@@ -488,13 +665,22 @@ function ContratadoSelector({ onSelect }) {
                         </div>
                     )}
                     {open && !loading && query && results.length === 0 && (
-                        <div style={{
-                            position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                            background: "var(--white)", border: "1.5px solid var(--border)",
-                            borderRadius: 10, boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
-                            zIndex: 3000, padding: "14px 16px",
-                            color: "var(--text-muted)", fontSize: "0.88rem",
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                background: "var(--white)",
+                                border: "1.5px solid var(--border)",
+                                borderRadius: 10,
+                                boxShadow: "0 8px 28px rgba(0,0,0,0.14)",
+                                zIndex: 3000,
+                                padding: "14px 16px",
+                                color: "var(--text-muted)",
+                                fontSize: "0.88rem",
+                            }}
+                        >
                             Sin resultados
                         </div>
                     )}
@@ -520,9 +706,33 @@ function Modal({
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("general");
+    // Solo un admin puede dar o quitar el rol de administrador.
+    const { user } = useAuth();
+    const esAdmin = user?.rol === "admin";
+    const rolBloqueado = !esAdmin && initial?.rol === "admin";
+    const rolesOpts = ROLES_ERP.filter(
+        (r) => r.value !== "admin" || esAdmin || rolBloqueado,
+    );
     const [saving, setSaving] = useState(false);
     const [fotografiaFile, setFotografiaFile] = useState(null);
+    const [fotoRota, setFotoRota] = useState(false);
     const isCreate = !initial?.id && !readOnly;
+
+    // Vista previa: el archivo recién elegido o la foto guardada. La URL temporal del
+    // archivo se libera al cambiarlo (antes se creaba una nueva en cada render).
+    const previewUrl = useMemo(
+        () => (fotografiaFile ? URL.createObjectURL(fotografiaFile) : null),
+        [fotografiaFile],
+    );
+    useEffect(
+        () => () => previewUrl && URL.revokeObjectURL(previewUrl),
+        [previewUrl],
+    );
+    const fotoSrc =
+        previewUrl || (form.fotografia ? `/storage/${form.fotografia}` : null);
+    // Si la foto guardada no existe en disco, se muestran las iniciales en vez del
+    // ícono de imagen rota.
+    useEffect(() => setFotoRota(false), [fotoSrc]);
 
     React.useEffect(() => {
         setForm(initial);
@@ -542,49 +752,80 @@ function Modal({
                 return;
             }
         }
-        const v = (val, fallback) => (val != null && val !== "") ? val : fallback;
+        const v = (val, fallback) =>
+            val != null && val !== "" ? val : fallback;
         setForm((f) => ({
             ...f,
             // Identificación
-            cedula:           v(c.cedula,           f.cedula),
-            nombres:          v(c.nombres,          f.nombres),
-            apellidos:        v(c.apellidos,        f.apellidos),
-            email:            v(c.email,            f.email),
-            movil:            v(c.movil,            f.movil),
+            cedula: v(c.cedula, f.cedula),
+            nombres: v(c.nombres, f.nombres),
+            apellidos: v(c.apellidos, f.apellidos),
+            email: v(c.email, f.email),
+            movil: v(c.movil, f.movil),
             fecha_expedicion: v(c.fecha_expedicion, f.fecha_expedicion),
             // Datos personales
-            genero:                     v(matchOpt(c.genero, GENEROS),                            f.genero),
-            fecha_nacimiento:           v(c.fecha_nacimiento,                                     f.fecha_nacimiento),
-            lugar_nacimiento:           v(c.lugar_nacimiento,                                     f.lugar_nacimiento),
-            estado_civil:               v(matchOpt(c.estado_civil, EST_CIVIL),                    f.estado_civil),
-            nivel_escolaridad:          v(matchOpt(c.nivel_escolaridad, ESCOLARIDAD),             f.nivel_escolaridad),
-            profesion:                  v(c.profesion,                                            f.profesion),
-            direccion_residencia:       v(c.direccion_residencia,                                 f.direccion_residencia),
-            estrato:                    v(matchOpt(c.estrato, ESTRATOS),                          f.estrato),
-            barrio:                     v(c.barrio,                                               f.barrio),
-            numero_hijos:               v(c.numero_hijos != null ? String(c.numero_hijos) : null, f.numero_hijos),
-            rh:                         v(matchOpt(c.rh, catalogs.tipos_rh),                      f.rh),
-            talla_camisa:               v(c.talla_camisa,                                         f.talla_camisa),
-            talla_pantalon:             v(c.talla_pantalon,                                       f.talla_pantalon),
-            talla_zapatos:              v(c.talla_zapatos,                                        f.talla_zapatos),
+            genero: v(matchOpt(c.genero, GENEROS), f.genero),
+            fecha_nacimiento: v(c.fecha_nacimiento, f.fecha_nacimiento),
+            lugar_nacimiento: v(c.lugar_nacimiento, f.lugar_nacimiento),
+            estado_civil: v(
+                matchOpt(c.estado_civil, EST_CIVIL),
+                f.estado_civil,
+            ),
+            nivel_escolaridad: v(
+                matchOpt(c.nivel_escolaridad, ESCOLARIDAD),
+                f.nivel_escolaridad,
+            ),
+            profesion: v(c.profesion, f.profesion),
+            direccion_residencia: v(
+                c.direccion_residencia,
+                f.direccion_residencia,
+            ),
+            estrato: v(matchOpt(c.estrato, ESTRATOS), f.estrato),
+            barrio: v(c.barrio, f.barrio),
+            numero_hijos: v(
+                c.numero_hijos != null ? String(c.numero_hijos) : null,
+                f.numero_hijos,
+            ),
+            rh: v(matchOpt(c.rh, catalogs.tipos_rh), f.rh),
+            talla_camisa: v(c.talla_camisa, f.talla_camisa),
+            talla_pantalon: v(c.talla_pantalon, f.talla_pantalon),
+            talla_zapatos: v(c.talla_zapatos, f.talla_zapatos),
             // Seguridad social
-            eps:               v(matchOpt(c.eps, catalogs.eps),                                   f.eps),
-            arl:               v(matchOpt(c.arl, catalogs.arls),                                  f.arl),
-            fondo_pensiones:   v(matchOpt(c.fondo_pensiones, catalogs.pensiones),                 f.fondo_pensiones),
-            caja_compensacion: v(matchOpt(c.caja_compensacion, catalogs.cajas),                   f.caja_compensacion),
+            eps: v(matchOpt(c.eps, catalogs.eps), f.eps),
+            arl: v(matchOpt(c.arl, catalogs.arls), f.arl),
+            fondo_pensiones: v(
+                matchOpt(c.fondo_pensiones, catalogs.pensiones),
+                f.fondo_pensiones,
+            ),
+            caja_compensacion: v(
+                matchOpt(c.caja_compensacion, catalogs.cajas),
+                f.caja_compensacion,
+            ),
             // Datos laborales
-            cargo:             v(matchOpt(c.cargo, catalogs.cargos),                              f.cargo),
-            sede:              v(matchOpt(c.sede, catalogs.sedes),                                f.sede),
-            tipo_vinculacion:  v(matchOpt(c.tipo_vinculacion, catalogs.tipos_vinculacion) ?? c.tipo_vinculacion, f.tipo_vinculacion),
-            tipo_funcionario:  v(matchOpt(c.tipo_funcionario, catalogs.tipos_funcionario),        f.tipo_funcionario),
-            empleador:         v(c.empleador,                                                     f.empleador),
-            jefe_inmediato:    v(c.jefe_inmediato,                                                f.jefe_inmediato),
-            empresa_id:        v(c.empresa_id,                                                    f.empresa_id),
-            ingresos:          v(c.ingresos,                                                      f.ingresos),
+            cargo: v(matchOpt(c.cargo, catalogs.cargos), f.cargo),
+            sede: v(matchOpt(c.sede, catalogs.sedes), f.sede),
+            tipo_vinculacion: v(
+                matchOpt(c.tipo_vinculacion, catalogs.tipos_vinculacion) ??
+                    c.tipo_vinculacion,
+                f.tipo_vinculacion,
+            ),
+            empleador: v(c.empleador, f.empleador),
+            jefe_inmediato: v(c.jefe_inmediato, f.jefe_inmediato),
+            empresa_id: v(c.empresa_id, f.empresa_id),
+            ingresos: v(c.ingresos, f.ingresos),
             // Contacto de emergencia
-            contacto_emergencia_nombre:      v(c.contacto_emergencia_nombre,      f.contacto_emergencia_nombre),
-            contacto_emergencia_telefono:    v(c.contacto_emergencia_telefono,    f.contacto_emergencia_telefono),
-            contacto_emergencia_parentesco:  v(c.contacto_emergencia_parentesco,  f.contacto_emergencia_parentesco),
+            contacto_emergencia_nombre: v(
+                c.contacto_emergencia_nombre,
+                f.contacto_emergencia_nombre,
+            ),
+            contacto_emergencia_telefono: v(
+                c.contacto_emergencia_telefono,
+                f.contacto_emergencia_telefono,
+            ),
+            contacto_emergencia_parentesco: v(
+                c.contacto_emergencia_parentesco,
+                f.contacto_emergencia_parentesco,
+            ),
         }));
     };
 
@@ -596,16 +837,11 @@ function Modal({
         if (!form.cedula?.trim()) e.cedula = "Requerido";
         if (!form.apellidos?.trim()) e.apellidos = "Requerido";
         if (!form.nombres?.trim()) e.nombres = "Requerido";
-        if (!form.sede?.trim()) e.sede = "Requerido";
         if (!form.genero?.trim()) e.genero = "Requerido";
         if (!form.movil?.trim()) e.movil = "Requerido";
         if (!form.email?.trim()) e.email = "Requerido";
-        if (!form.eps?.trim()) e.eps = "Requerido";
-        if (!form.arl?.trim()) e.arl = "Requerido";
         if (!form.estado_empleado?.trim()) e.estado_empleado = "Requerido";
-        if (!form.cargo?.trim()) e.cargo = "Requerido";
-        if (!form.tipo_funcionario?.trim()) e.tipo_funcionario = "Requerido";
-        if (!form.tipo_vinculacion?.trim()) e.tipo_vinculacion = "Requerido";
+        if (!form.rol?.trim()) e.rol = "Requerido";
         return e;
     };
 
@@ -613,15 +849,6 @@ function Modal({
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
-            const enAdicional = [
-                "cargo",
-                "tipo_funcionario",
-                "tipo_vinculacion",
-            ];
-            const hasGeneralErrors = Object.keys(e).some(
-                (k) => !enAdicional.includes(k),
-            );
-            setActive(hasGeneralErrors ? "general" : "adicional");
             return;
         }
         setSaving(true);
@@ -654,16 +881,24 @@ function Modal({
 
                 {/* Selector de contratado prominente solo en modo crear */}
                 {isCreate && (
-                    <div style={{
-                        padding: "20px 28px 0",
-                        borderBottom: "2px solid var(--border)",
-                        background: "var(--bg)",
-                    }}>
-                        <div style={{
-                            fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.07em",
-                            color: "var(--primary)", fontFamily: "'Poppins',sans-serif",
-                            textTransform: "uppercase", marginBottom: 8,
-                        }}>
+                    <div
+                        style={{
+                            padding: "20px 28px 0",
+                            borderBottom: "2px solid var(--border)",
+                            background: "var(--bg)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: "0.72rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.07em",
+                                color: "var(--primary)",
+                                fontFamily: "'Poppins',sans-serif",
+                                textTransform: "uppercase",
+                                marginBottom: 8,
+                            }}
+                        >
                             Autocompletar desde usuario con contrato
                         </div>
                         <div style={{ paddingBottom: 20 }}>
@@ -672,25 +907,9 @@ function Modal({
                     </div>
                 )}
 
-                {/* Pestañas */}
-                <div className="tab-bar" style={S.tabBar}>
-                    {[
-                        ["general", "Información General"],
-                        ["adicional", "Información Adicional"],
-                    ].map(([key, lbl]) => (
-                        <button
-                            key={key}
-                            style={activeTab === key ? S.tabActive : S.tab}
-                            onClick={() => setActive(key)}
-                        >
-                            {lbl}
-                        </button>
-                    ))}
-                </div>
-
                 {/* Cuerpo con scroll */}
                 <div style={S.modalBody}>
-                    {/* ══ PESTAÑA: INFORMACIÓN GENERAL ══ */}
+                    {/* ══ INFORMACIÓN GENERAL ══ */}
                     {activeTab === "general" && (
                         <>
                             {/* Fila 1 – Identificación + Foto */}
@@ -711,51 +930,107 @@ function Modal({
                                     {...fp}
                                 />
                                 {/* Campo foto */}
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                    <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", fontFamily: "Nunito,sans-serif" }}>
-                                        Fotografía
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 4,
+                                    }}
+                                >
+                                    <label
+                                        style={{
+                                            fontSize: "0.75rem",
+                                            fontWeight: 700,
+                                            color: "var(--text-muted)",
+                                            fontFamily: "Nunito,sans-serif",
+                                        }}
+                                    >
+                                        Fotografía del empleado
                                     </label>
-                                    <label style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        padding: "6px 10px",
-                                        border: "1.5px dashed var(--border)",
-                                        borderRadius: "var(--radius-sm, 8px)",
-                                        cursor: readOnly ? "not-allowed" : "pointer",
-                                        background: "var(--white)",
-                                        overflow: "hidden",
-                                    }}>
-                                        {fotografiaFile ? (
-                                            <img src={URL.createObjectURL(fotografiaFile)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                        ) : form.fotografia ? (
-                                            <img src={`/storage/${form.fotografia}`} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                    <label
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 10,
+                                            padding: "6px 10px",
+                                            border: "1.5px dashed var(--border)",
+                                            borderRadius:
+                                                "var(--radius-sm, 8px)",
+                                            cursor: readOnly
+                                                ? "not-allowed"
+                                                : "pointer",
+                                            background: "var(--white)",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {fotoSrc && !fotoRota ? (
+                                            <img
+                                                src={fotoSrc}
+                                                alt=""
+                                                onError={() => setFotoRota(true)}
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: "50%",
+                                                    objectFit: "cover",
+                                                    flexShrink: 0,
+                                                }}
+                                            />
                                         ) : (
-                                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0 }}>
-                                                {(form.nombres || "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: "50%",
+                                                    background:
+                                                        "var(--primary)",
+                                                    color: "#fff",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    fontWeight: 800,
+                                                    fontSize: "0.9rem",
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                {(form.nombres || "?")
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                             </div>
                                         )}
-                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {fotografiaFile ? fotografiaFile.name : (form.fotografia ? "Cambiar foto" : "Subir foto…")}
+                                        <span
+                                            style={{
+                                                fontSize: "0.78rem",
+                                                color: "var(--text-muted)",
+                                                fontFamily: "Nunito,sans-serif",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {fotografiaFile
+                                                ? fotografiaFile.name
+                                                : form.fotografia
+                                                  ? "Cambiar foto"
+                                                  : "Subir foto…"}
                                         </span>
                                         <input
                                             type="file"
                                             accept="image/*"
                                             disabled={readOnly}
                                             style={{ display: "none" }}
-                                            onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
+                                            onChange={(e) =>
+                                                setFotografiaFile(
+                                                    e.target.files[0] || null,
+                                                )
+                                            }
                                         />
                                     </label>
                                 </div>
                             </div>
 
-                            {/* Fila 2 – Sede y fechas */}
+                            {/* Fila 2 – Fechas */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Sede a la que pertenece"
-                                    k="sede"
-                                    opts={catalogs.sedes}
-                                    req
-                                    {...fp}
-                                />
                                 <Field
                                     label="Fecha Nacimiento"
                                     k="fecha_nacimiento"
@@ -785,7 +1060,8 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <div /><div />
+                                <div />
+                                <div />
                             </div>
 
                             {/* Fila 3 – Estado civil, escolaridad, profesión */}
@@ -820,7 +1096,8 @@ function Modal({
                                     span={2}
                                     {...fp}
                                 />
-                                <div /><div />
+                                <div />
+                                <div />
                             </div>
 
                             <div style={{ ...S.grid4, marginTop: 16 }}>
@@ -850,15 +1127,6 @@ function Modal({
                                 />
                             </div>
 
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Ingresos $"
-                                    k="ingresos"
-                                    type="number"
-                                    span={2}
-                                    {...fp}
-                                />
-                            </div>
 
                             {/* Fila 5 – Observaciones */}
                             <div style={{ ...S.grid2, marginTop: 16 }}>
@@ -877,53 +1145,32 @@ function Modal({
                             </div>
 
                             {/* Tallas / Dotación */}
-                            <div style={S.sectionHeader}>
-                                TALLAS / DOTACIÓN
-                            </div>
+                            <div style={S.sectionHeader}>TALLAS / DOTACIÓN</div>
                             <div style={{ ...S.grid4, marginTop: 12 }}>
-                                <Field label="Talla Camisa" k="talla_camisa" {...fp} />
-                                <Field label="Talla Pantalón" k="talla_pantalon" {...fp} />
-                                <Field label="Talla Zapatos" k="talla_zapatos" {...fp} />
+                                <Field
+                                    label="Talla Camisa"
+                                    k="talla_camisa"
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Talla Pantalón"
+                                    k="talla_pantalon"
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Talla Zapatos"
+                                    k="talla_zapatos"
+                                    {...fp}
+                                />
                                 <div />
                             </div>
 
-                            {/* Fila 6 – Seguridad Social */}
+                            {/* Fila 6 – RH y licencias */}
                             <div style={{ ...S.grid4, marginTop: 16 }}>
                                 <Field
                                     label="RH"
                                     k="rh"
                                     opts={catalogs.tipos_rh}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="EPS Afiliado"
-                                    k="eps"
-                                    opts={catalogs.eps}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="ARL"
-                                    k="arl"
-                                    opts={catalogs.arls}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Fondo de Pensiones"
-                                    k="fondo_pensiones"
-                                    opts={catalogs.pensiones}
-                                    req
-                                    {...fp}
-                                />
-                            </div>
-
-                            {/* Fila 7 – Licencias */}
-                            <div style={{ ...S.grid4, marginTop: 16 }}>
-                                <Field
-                                    label="Caja Compensación"
-                                    k="caja_compensacion"
-                                    opts={catalogs.cajas}
                                     {...fp}
                                 />
                                 <Field
@@ -978,21 +1225,12 @@ function Modal({
                                     {...fp}
                                 />
                                 <Field
-                                    label="Empresa"
-                                    k="empresa_id"
-                                    opts={empresas.map((e) => ({
-                                        value: e.id,
-                                        label: e.nombre,
-                                    }))}
+                                    label="Tipo de funcionario (rol)"
+                                    k="rol"
+                                    opts={rolesOpts}
+                                    req
                                     {...fp}
-                                />
-                                <Field
-                                    label="Empleador"
-                                    k="empleador"
-                                    opts={(catalogs.empleadores || []).map(
-                                        (e) => e.nombre,
-                                    )}
-                                    {...fp}
+                                    disabled={readOnly || rolBloqueado}
                                 />
                             </div>
 
@@ -1027,55 +1265,6 @@ function Modal({
                                     {...fp}
                                 />
                                 <div />
-                            </div>
-                        </>
-                    )}
-
-                    {/* ══ PESTAÑA: INFORMACIÓN ADICIONAL ══ */}
-                    {activeTab === "adicional" && (
-                        <>
-                            <div style={S.grid3}>
-                                <Field
-                                    label="Cargo"
-                                    k="cargo"
-                                    opts={catalogs.cargos}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Tipo Funcionario"
-                                    k="tipo_funcionario"
-                                    opts={catalogs.tipos_funcionario}
-                                    req
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Tipo Vinculación"
-                                    k="tipo_vinculacion"
-                                    opts={catalogs.tipos_vinculacion}
-                                    req
-                                    {...fp}
-                                />
-                            </div>
-
-                            <div style={{ ...S.grid3, marginTop: 16 }}>
-                                <Field
-                                    label="No. de Cuenta Bancaria"
-                                    k="cuenta_bancaria"
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Tipo de Cuenta"
-                                    k="tipo_cuenta"
-                                    opts={TIPOS_CUENTA}
-                                    {...fp}
-                                />
-                                <Field
-                                    label="Banco de la cuenta"
-                                    k="banco"
-                                    opts={catalogs.bancos}
-                                    {...fp}
-                                />
                             </div>
                         </>
                     )}
@@ -1286,7 +1475,6 @@ export default function EmpleadosCrud() {
         tipos_rh: RH_LIST,
         ciudades: [],
         sedes_por_ciudad: {},
-        tipos_funcionario: TIPOS_FUNC,
         tipos_vinculacion: TIPOS_VINC,
     });
     const [modalOpen, setModalOpen] = useState(false);
@@ -1299,38 +1487,65 @@ export default function EmpleadosCrud() {
     const [credencialesOpen, setCredencialesOpen] = useState(false);
     const [pagina, setPagina] = useState(1);
     const [sedesActivas, setSedesActivas] = useState([]);
+    const [exporting, setExporting] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
+    const queryClient = useQueryClient();
 
-    const { data: _qEmpresas,  isLoading: _le } = useQuery({ queryKey: ['empresas'],  queryFn: () => api.get('/empresas').then(r => r.data) });
-    const { data: _qCatalogos, isLoading: _lc } = useQuery({ queryKey: ['catalogos'], queryFn: () => api.get('/catalogos').then(r => r.data) });
-    const { data: _qSedes,     isLoading: _ls } = useQuery({ queryKey: ['sedes'],     queryFn: () => api.get('/sedes').then(r => r.data) });
-    const { data: _qEmpleados, isLoading: _lem }= useQuery({ queryKey: ['empleados'], queryFn: () => api.get('/empleados').then(r => r.data) });
+    const { data: _qEmpresas, isLoading: _le } = useQuery({
+        queryKey: ["empresas"],
+        queryFn: () => api.get("/empresas").then((r) => r.data),
+    });
+    const { data: _qCatalogos, isLoading: _lc } = useQuery({
+        queryKey: ["catalogos"],
+        queryFn: () => api.get("/catalogos").then((r) => r.data),
+    });
+    const { data: _qSedes, isLoading: _ls } = useQuery({
+        queryKey: ["sedes"],
+        queryFn: () => api.get("/sedes").then((r) => r.data),
+    });
+    const { data: _qEmpleados, isLoading: _lem } = useQuery({
+        queryKey: ["empleados"],
+        queryFn: () => api.get("/empleados").then((r) => r.data),
+    });
     const loading = _lem;
 
-    useEffect(() => { if (_qEmpresas)  setEmpresas(_qEmpresas); },  [_qEmpresas]);
-    useEffect(() => { if (_qCatalogos) setCatalogs(_qCatalogos); }, [_qCatalogos]);
     useEffect(() => {
-        if (_qSedes) setSedesActivas((Array.isArray(_qSedes) ? _qSedes : []).filter(s => s.estado === 'Activa'));
+        if (_qEmpresas) setEmpresas(_qEmpresas);
+    }, [_qEmpresas]);
+    useEffect(() => {
+        if (_qCatalogos) setCatalogs(_qCatalogos);
+    }, [_qCatalogos]);
+    useEffect(() => {
+        if (_qSedes)
+            setSedesActivas(
+                (Array.isArray(_qSedes) ? _qSedes : []).filter(
+                    (s) => s.estado === "Activa",
+                ),
+            );
     }, [_qSedes]);
-    useEffect(() => { if (_qEmpleados) setEmpleados(_qEmpleados); }, [_qEmpleados]);
+    useEffect(() => {
+        if (_qEmpleados) setEmpleados(_qEmpleados);
+    }, [_qEmpleados]);
 
     React.useEffect(() => {
         const anyOpen =
             modalOpen ||
             filterOpen ||
             viewOpen ||
-            credencialesOpen;
+            credencialesOpen ||
+            importOpen;
         if (anyOpen) {
-            document.documentElement.style.overflowY = 'hidden';
-            document.body.style.overflowY = 'hidden';
+            document.documentElement.style.overflowY = "hidden";
+            document.body.style.overflowY = "hidden";
         } else {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         }
         return () => {
-            document.documentElement.style.overflowY = '';
-            document.body.style.overflowY = '';
+            document.documentElement.style.overflowY = "";
+            document.body.style.overflowY = "";
         };
-    }, [modalOpen, filterOpen, viewOpen, credencialesOpen]);
+    }, [modalOpen, filterOpen, viewOpen, credencialesOpen, importOpen]);
 
     /* Filtrado */
     const filtered = useMemo(
@@ -1366,7 +1581,7 @@ export default function EmpleadosCrud() {
                     String(e.empresa_id) === String(filtroEmpresa);
                 const matchTF =
                     filtroTipoFunc === "Todos" ||
-                    e.tipo_funcionario === filtroTipoFunc;
+                    (e.rol || "general") === filtroTipoFunc;
                 const matchEps = filtroEps === "Todas" || e.eps === filtroEps;
                 const matchArl = filtroArl === "Todas" || e.arl === filtroArl;
                 const matchPen =
@@ -1442,10 +1657,13 @@ export default function EmpleadosCrud() {
         (e) => e.estado_empleado === "Activo",
     ).length;
     // Sedes activas que tienen al menos un empleado asignado
-    const sedesConEmpleado = new Set(empleados.map((e) => e.sede).filter(Boolean));
-    const numSedes = sedesActivas.length > 0
-        ? sedesActivas.filter((s) => sedesConEmpleado.has(s.nombre)).length
-        : sedesConEmpleado.size;
+    const sedesConEmpleado = new Set(
+        empleados.map((e) => e.sede).filter(Boolean),
+    );
+    const numSedes =
+        sedesActivas.length > 0
+            ? sedesActivas.filter((s) => sedesConEmpleado.has(s.nombre)).length
+            : sedesConEmpleado.size;
     const numEmp = [
         ...new Set(empleados.map((e) => e.empresa_id).filter(Boolean)),
     ].length;
@@ -1453,6 +1671,23 @@ export default function EmpleadosCrud() {
     const showToast = (msg) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
+    };
+
+    // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
+    // la página actual.
+    const handleExportExcel = async () => {
+        if (!filtered.length) return;
+        setExporting(true);
+        try {
+            await exportarEmpleadosExcel(filtered);
+            showToast(
+                `Excel exportado (${filtered.length} empleado${filtered.length === 1 ? "" : "s"}).`,
+            );
+        } catch {
+            showToast("No se pudo generar el Excel.");
+        } finally {
+            setExporting(false);
+        }
     };
 
     const clearFilters = () => {
@@ -1491,9 +1726,12 @@ export default function EmpleadosCrud() {
         if (fotografiaFile) {
             const fd = new FormData();
             Object.entries(plain).forEach(([k, v]) => {
-                if (v !== null && v !== undefined) fd.append(k, v);
+                if (v === null || v === undefined) return;
+                // FormData convierte `false` en el texto "false", que la regla `boolean`
+                // de Laravel rechaza (422); se envía como "1"/"0".
+                fd.append(k, typeof v === "boolean" ? (v ? "1" : "0") : v);
             });
-            fd.append("fotografia", fotografiaFile);
+            fd.append("fotografia", await compressImage(fotografiaFile));
             if (editTarget) fd.append("_method", "PUT");
             payload = fd;
             // No fijar Content-Type; Axios lo establece con el boundary correcto al detectar FormData
@@ -1506,13 +1744,22 @@ export default function EmpleadosCrud() {
                 const { data } = fotografiaFile
                     ? await api.post(`/empleados/${editTarget.id}`, payload)
                     : await api.put(`/empleados/${editTarget.id}`, payload);
-                setEmpleados((prev) =>
-                    prev.map((e) => (e.id === editTarget.id ? data : e)),
-                );
+                // En la caché (no solo en el estado): si no, al volver a esta pantalla
+                // React Query devolvía la lista anterior durante 5 minutos.
+                const reemplazar = (prev) =>
+                    Array.isArray(prev)
+                        ? prev.map((e) => (e.id === editTarget.id ? data : e))
+                        : prev;
+                setEmpleados(reemplazar);
+                queryClient.setQueryData(["empleados"], reemplazar);
+                if (fotografiaFile) {
+                    propagarFotoEmpleado(queryClient, data.id, data.fotografia);
+                }
                 showToast("Empleado actualizado correctamente.");
             } else {
                 const { data } = await api.post("/empleados", payload);
                 setEmpleados((prev) => [...prev, data.empleado]);
+                queryClient.invalidateQueries({ queryKey: ["empleados"], refetchType: "none" });
                 // Mostrar credenciales generadas
                 setCredenciales(data.credenciales);
                 setCredencialesOpen(true);
@@ -1521,7 +1768,9 @@ export default function EmpleadosCrud() {
             setModalOpen(false);
         } catch (err) {
             const msgs = err.response?.data?.errors;
-            const msg = msgs
+            const msg = msgs?.fotografia
+                ? mensajeErrorFoto(err.response.data)
+                : msgs
                 ? Object.values(msgs)[0][0]
                 : (err.response?.data?.message ??
                   "Error al guardar. Revisa los datos.");
@@ -1609,20 +1858,37 @@ export default function EmpleadosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown presets={[
-                        { label: "Empleados activos", apply: () => { clearFilters(); setFiltroEstado("Activo"); } },
-                        { label: "En vacaciones", apply: () => { clearFilters(); setFiltroEstado("Vacaciones"); } },
-                        { label: "Incapacitados", apply: () => { clearFilters(); setFiltroEstado("Incapacitado"); } },
-                        { label: "Contratistas", apply: () => { clearFilters(); setFiltroVinc("Contratista"); } },
-                        { label: "Aprendices SENA", apply: () => { clearFilters(); setFiltroVinc("Aprendiz SENA"); } },
-                        { label: "Técnicos", apply: () => { clearFilters(); setFiltroTipoFunc("TÉCNICO"); } },
-                        { label: "Vendedores", apply: () => { clearFilters(); setFiltroTipoFunc("VENDEDOR"); } },
-                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                    ]} />
                 </div>
-                <button className="btn-primary" onClick={openCreate}>
-                    + Nuevo empleado
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                        style={{
+                            ...S.filterBtn,
+                            cursor:
+                                exporting || loading || !filtered.length
+                                    ? "not-allowed"
+                                    : "pointer",
+                            opacity:
+                                exporting || loading || !filtered.length
+                                    ? 0.6
+                                    : 1,
+                        }}
+                        onClick={handleExportExcel}
+                        disabled={exporting || loading || !filtered.length}
+                        title="Exporta los empleados que coinciden con la búsqueda y los filtros activos"
+                    >
+                        {exporting ? "Exportando…" : "Exportar Excel"}
+                    </button>
+                    <button
+                        style={S.filterBtn}
+                        onClick={() => setImportOpen(true)}
+                        title="Importa datos personales desde Excel, buscando por cédula. Nunca sobrescribe datos existentes."
+                    >
+                        Importar Excel
+                    </button>
+                    <button className="btn-primary" onClick={openCreate}>
+                        + Nuevo empleado
+                    </button>
+                </div>
             </div>
 
             {/* Tabla */}
@@ -1662,14 +1928,35 @@ export default function EmpleadosCrud() {
                                 <tr key={emp.id}>
                                     <td>
                                         <div style={S.avatarCell}>
-                                            <div style={{ ...S.avatar, position: "relative" }}>
-                                                {((emp.nombres || emp.name) ?? "?").charAt(0).toUpperCase()}
+                                            <div
+                                                style={{
+                                                    ...S.avatar,
+                                                    position: "relative",
+                                                }}
+                                            >
+                                                {(
+                                                    (emp.nombres || emp.name) ??
+                                                    "?"
+                                                )
+                                                    .charAt(0)
+                                                    .toUpperCase()}
                                                 {emp.fotografia && (
                                                     <img
                                                         src={`/storage/${emp.fotografia}`}
                                                         alt=""
-                                                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                                                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                                        style={{
+                                                            position:
+                                                                "absolute",
+                                                            inset: 0,
+                                                            width: "100%",
+                                                            height: "100%",
+                                                            objectFit: "cover",
+                                                            borderRadius: "50%",
+                                                        }}
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display =
+                                                                "none";
+                                                        }}
                                                     />
                                                 )}
                                             </div>
@@ -1877,7 +2164,7 @@ export default function EmpleadosCrud() {
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
                 onSave={handleSave}
-                initial={editTarget ? toForm(editTarget) : EMPTY_FORM}
+                initial={editTarget ? toForm(editTarget, catalogs) : EMPTY_FORM}
                 title={
                     editTarget ? "Editar empleado" : "Registrar nuevo empleado"
                 }
@@ -1891,7 +2178,7 @@ export default function EmpleadosCrud() {
                 open={viewOpen}
                 onClose={() => setViewOpen(false)}
                 onSave={() => {}}
-                initial={viewTarget ? toForm(viewTarget) : EMPTY_FORM}
+                initial={viewTarget ? toForm(viewTarget, catalogs) : EMPTY_FORM}
                 title="Ver empleado"
                 empresas={empresas}
                 catalogs={catalogs}
@@ -1905,6 +2192,44 @@ export default function EmpleadosCrud() {
                     setCredencialesOpen(false);
                     setCredenciales(null);
                 }}
+            />
+
+            <ImportExcelModal
+                open={importOpen}
+                onClose={() => setImportOpen(false)}
+                onImported={() =>
+                    queryClient.invalidateQueries({ queryKey: ["empleados"] })
+                }
+                titulo="Importar datos personales desde Excel"
+                descripcion={
+                    <>
+                        <strong>
+                            Solo acepta cédulas que ya tienen contrato
+                        </strong>{" "}
+                        (el contrato se crea primero, en Ver y Crear Contratos
+                        &gt; Importar Excel). Busca cada empleado por{" "}
+                        <strong>Cédula</strong> y rellena los campos que traiga
+                        el archivo.{" "}
+                        <strong>
+                            Nunca sobrescribe un dato que el empleado ya tenga
+                            guardado
+                        </strong>
+                        : si una celda corresponde a un campo que ya tiene valor
+                        en el sistema, esa celda se ignora y queda reportada al
+                        final.{" "}
+                        <strong>
+                            Si la cédula está pendiente de alta, también la
+                            completa
+                        </strong>
+                        : queda visible en esta lista, con usuario y contraseña
+                        nuevos (se muestran al terminar, cópialos porque no se
+                        pueden volver a ver después).
+                    </>
+                }
+                columnas={COLUMNAS_IMPORTABLES}
+                descargarPlantilla={descargarPlantillaImportacion}
+                parsearArchivo={parsearArchivoImportacion}
+                endpoint="/empleados/importar-datos-personales"
             />
 
             {/* Modal de filtros */}
@@ -1939,7 +2264,10 @@ export default function EmpleadosCrud() {
                                         value={filtroCiudad}
                                         onChange={setFiltroCiudad}
                                         defaultValue="Todas"
-                                        options={catalogs.ciudades.map((c) => ({ label: c, value: c }))}
+                                        options={catalogs.ciudades.map((c) => ({
+                                            label: c,
+                                            value: c,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1948,7 +2276,10 @@ export default function EmpleadosCrud() {
                                         value={filtroSede}
                                         onChange={setFiltroSede}
                                         defaultValue="Todas"
-                                        options={catalogs.sedes.map((s) => ({ label: s, value: s }))}
+                                        options={catalogs.sedes.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1957,25 +2288,34 @@ export default function EmpleadosCrud() {
                                         value={filtroEmpresa}
                                         onChange={setFiltroEmpresa}
                                         defaultValue="Todas"
-                                        options={empresas.map((e) => ({ label: e.nombre, value: e.id }))}
+                                        options={empresas.map((e) => ({
+                                            label: e.nombre,
+                                            value: e.id,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo Vinculación</label>
+                                    <label style={S.label}>
+                                        Tipo Vinculación
+                                    </label>
                                     <SearchableSelect
                                         value={filtroVinc}
                                         onChange={setFiltroVinc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_vinculacion.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_vinculacion.map(
+                                            (v) => ({ label: v, value: v }),
+                                        )}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Tipo Funcionario</label>
+                                    <label style={S.label}>
+                                        Tipo de funcionario (rol)
+                                    </label>
                                     <SearchableSelect
                                         value={filtroTipoFunc}
                                         onChange={setFiltroTipoFunc}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_funcionario.map((v) => ({ label: v, value: v }))}
+                                        options={ROLES_ERP}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1984,7 +2324,10 @@ export default function EmpleadosCrud() {
                                         value={filtroCargo}
                                         onChange={setFiltroCargo}
                                         defaultValue="Todos"
-                                        options={catalogs.cargos.map((c) => ({ label: c, value: c }))}
+                                        options={catalogs.cargos.map((c) => ({
+                                            label: c,
+                                            value: c,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -1993,7 +2336,10 @@ export default function EmpleadosCrud() {
                                         value={filtroEps}
                                         onChange={setFiltroEps}
                                         defaultValue="Todas"
-                                        options={catalogs.eps.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.eps.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2002,16 +2348,24 @@ export default function EmpleadosCrud() {
                                         value={filtroArl}
                                         onChange={setFiltroArl}
                                         defaultValue="Todas"
-                                        options={catalogs.arls.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.arls.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
-                                    <label style={S.label}>Fondo de Pensiones</label>
+                                    <label style={S.label}>
+                                        Fondo de Pensiones
+                                    </label>
                                     <SearchableSelect
                                         value={filtroPensiones}
                                         onChange={setFiltroPensiones}
                                         defaultValue="Todas"
-                                        options={PENSIONES.map((v) => ({ label: v, value: v }))}
+                                        options={PENSIONES.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2020,7 +2374,10 @@ export default function EmpleadosCrud() {
                                         value={filtroRH}
                                         onChange={setFiltroRH}
                                         defaultValue="Todos"
-                                        options={catalogs.tipos_rh.map((v) => ({ label: v, value: v }))}
+                                        options={catalogs.tipos_rh.map((v) => ({
+                                            label: v,
+                                            value: v,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2029,7 +2386,10 @@ export default function EmpleadosCrud() {
                                         value={filtroEstado}
                                         onChange={setFiltroEstado}
                                         defaultValue="Todos"
-                                        options={ESTADOS_EMP.map((s) => ({ label: s, value: s }))}
+                                        options={ESTADOS_EMP.map((s) => ({
+                                            label: s,
+                                            value: s,
+                                        }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>

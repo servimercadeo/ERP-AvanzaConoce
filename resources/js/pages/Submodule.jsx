@@ -70,6 +70,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
     /* ── ADMINISTRATIVO ─────────────────────────────────── */
     case 'administrativo':
       switch (submoduleId) {
+        case 'empleados':
+          switch (archivoId) {
+            case 'empleados_file': return EmpleadosCrud;
+            default: return null;
+          }
         case 'seleccion':
           switch (archivoId) {
             case 'proceso_seleccion': return SeleccionCrud;

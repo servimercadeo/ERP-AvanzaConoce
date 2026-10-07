@@ -55,7 +55,11 @@ return [
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
+            // Prefijo de tabla: en producción esta base se comparte con geoproyect, así que
+            // todas las tablas del ERP (incluidas las propias de Laravel: sessions, cache,
+            // jobs, personal_access_tokens, migrations...) se crean como "ERP-<tabla>" para
+            // no chocar con las de geoproyect. Vacío en local/test (ver .env / phpunit.xml).
+            'prefix' => env('DB_PREFIX', ''),
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
@@ -75,7 +79,7 @@ return [
             'unix_socket' => env('DB_SOCKET', ''),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
-            'prefix' => '',
+            'prefix' => env('DB_PREFIX', ''),
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,

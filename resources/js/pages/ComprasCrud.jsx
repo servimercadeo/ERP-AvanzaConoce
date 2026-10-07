@@ -8,7 +8,7 @@ import {
     IconEye,
     IconClose,
 } from "../components/Icons";
-import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import { SearchableSelect as FilterSelect } from "../components/SearchableSelect";
 
 const ESTADOS_COMPRA = ["Cotizando", "Pendiente Aprobación"];
 
@@ -226,13 +226,6 @@ export default function ComprasCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            { label: "Cotizando", apply: () => { clearFilters(); setFiltroEstadoCompra("Cotizando"); } },
-                            { label: "Pendiente Aprobación", apply: () => { clearFilters(); setFiltroEstadoCompra("Pendiente Aprobación"); } },
-                            { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                        ]}
-                    />
                 </div>
             </div>
 

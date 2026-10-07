@@ -36,8 +36,17 @@ class RequisicionesYCandidatosTest extends TestCase
 
     private function requisicion(array $extra = []): array
     {
-        return $this->postJson('/api/requisiciones', array_merge(['fecha_solicitud' => '2026-09-01'], $extra))
+        return $this->postJson('/api/requisiciones', array_merge(['fecha_solicitud' => '2026-09-01', 'requeridas' => 1], $extra))
             ->assertCreated()->json();
+    }
+
+    /** Requisición ya cerrada (sin pasar por la validación de vacantes, como las históricas). */
+    private function requisicionCompletada(): array
+    {
+        $req = $this->requisicion();
+        Requisicion::whereKey($req['id'])->update(['estado' => 'Completada']);
+
+        return $req;
     }
 
     private function ciudadId(): int
@@ -75,11 +84,11 @@ class RequisicionesYCandidatosTest extends TestCase
         $servimercadeo = $this->empresa('SERVIMERCADEO COL');
 
         $this->postJson('/api/requisiciones', [
-            'fecha_solicitud' => '2026-09-01', 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('TIGO HOME'),
+            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('TIGO HOME'),
         ])->assertStatus(422)->assertJsonValidationErrors('proyecto_id');
 
         $this->postJson('/api/requisiciones', [
-            'fecha_solicitud' => '2026-09-01', 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('DIRECTV CO'),
+            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('DIRECTV CO'),
         ])->assertCreated();
     }
 
@@ -111,11 +120,88 @@ class RequisicionesYCandidatosTest extends TestCase
         $this->assertDatabaseHas('contratos', ['id' => $contratoId, 'cliente_proyecto' => 'TIGO HOME']);
     }
 
+    public function test_requisicion_exige_numero_de_vacantes(): void
+    {
+        $this->actuarComo('th');
+
+        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01'])
+            ->assertStatus(422)->assertJsonValidationErrors('requeridas');
+        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01', 'requeridas' => 0])
+            ->assertStatus(422)->assertJsonValidationErrors('requeridas');
+
+        $this->assertSame(3, $this->requisicion(['requeridas' => 3])['requeridas']);
+    }
+
+    public function test_requisicion_no_se_cierra_hasta_cubrir_todas_las_vacantes(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['requeridas' => 2]);
+        $cerrar = fn () => $this->putJson("/api/requisiciones/{$req['id']}", ['estado' => 'Completada']);
+
+        // No puede nacer cerrada.
+        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'estado' => 'Completada'])
+            ->assertStatus(422)->assertJsonValidationErrors('estado');
+
+        // 1 de 2 vacantes cubiertas (el candidato sin aval no cuenta).
+        $this->candidato(['requisicion_id' => $req['id'], 'aval' => true]);
+        $this->candidato(['requisicion_id' => $req['id'], 'aval' => false]);
+        $cerrar()->assertStatus(422)->assertJsonPath('errors.estado.0', fn ($m) => str_contains($m, '1 de 2'));
+        $this->assertSame('Abierta', Requisicion::find($req['id'])->estado);
+
+        // Cancelar sí se permite aunque falten vacantes.
+        $this->putJson("/api/requisiciones/{$req['id']}", ['estado' => 'Cancelada'])->assertOk();
+        $this->putJson("/api/requisiciones/{$req['id']}", ['estado' => 'En proceso'])->assertOk();
+
+        // Con 2 de 2 ya se puede cerrar, y el listado muestra las vacantes cubiertas.
+        $this->candidato(['requisicion_id' => $req['id'], 'aval' => true]);
+        $cerrar()->assertOk()->assertJsonPath('vacantes_cubiertas', 2);
+        $fila = collect($this->getJson('/api/requisiciones')->json())->firstWhere('id', $req['id']);
+        $this->assertSame(2, $fila['vacantes_cubiertas']);
+
+        // Subir las vacantes de una requisición cerrada la reabre; volver a bajarlas la cierra sola.
+        $this->putJson("/api/requisiciones/{$req['id']}", ['requeridas' => 3])->assertOk();
+        $this->assertSame('En proceso', Requisicion::find($req['id'])->estado);
+        $this->putJson("/api/requisiciones/{$req['id']}", ['requeridas' => 2])->assertOk();
+        $this->assertSame('Completada', Requisicion::find($req['id'])->estado);
+    }
+
+    public function test_la_requisicion_se_cierra_sola_al_cubrir_las_vacantes_y_se_reabre_al_liberar_una(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['requeridas' => 2]);
+        $avalar = function () use ($req) {
+            $c = $this->candidato(['requisicion_id' => $req['id'], 'pruebas' => true]);
+            $this->subirDocumentos($c);
+
+            return [$c, $this->putJson("/api/candidatos/{$c->id}", [
+                'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+                'correos_aval' => [],
+            ])];
+        };
+        $estado = fn () => Requisicion::find($req['id'])->estado;
+
+        [$primero, $r] = $avalar();
+        $r->assertOk();
+        $this->assertSame('Abierta', $estado());
+
+        [, $r] = $avalar();
+        $r->assertOk();
+        $this->assertSame('Completada', $estado(), 'Con 2 de 2 vacantes cubiertas debe cerrarse sola.');
+
+        // Ya no admite más avales que vacantes.
+        [, $r] = $avalar();
+        $r->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'vacantes cubiertas'));
+
+        // Quitar un aval libera una vacante y la requisición se reabre.
+        $this->putJson("/api/candidatos/{$primero->id}", ['aval' => false])->assertOk();
+        $this->assertSame('En proceso', $estado());
+    }
+
     public function test_listar_filtrar_ver_y_eliminar_requisiciones(): void
     {
         $this->actuarComo('th');
         $abierta = $this->requisicion(['responsable' => 'BUSCAME']);
-        $cerrada = $this->requisicion(['estado' => 'Completada']);
+        $cerrada = $this->requisicionCompletada();
 
         $porEstado = collect($this->getJson('/api/requisiciones?estado=Completada')->json())->pluck('id');
         $this->assertTrue($porEstado->contains($cerrada['id']));
@@ -161,7 +247,7 @@ class RequisicionesYCandidatosTest extends TestCase
     {
         $this->actuarComo('th');
         $abierta = $this->requisicion();
-        $completada = $this->requisicion(['estado' => 'Completada']);
+        $completada = $this->requisicionCompletada();
         $tokenAbierta = Requisicion::find($abierta['id'])->registro_token;
         $tokenCompletada = Requisicion::find($completada['id'])->registro_token;
         $this->assertNotEmpty($tokenAbierta, 'Toda requisición debe tener token de registro.');
@@ -271,6 +357,34 @@ class RequisicionesYCandidatosTest extends TestCase
         ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'destinatarios'));
 
         Mail::assertNothingSent();
+    }
+
+    public function test_aval_directo_solo_acepta_contactos_de_empleadores_directos(): void
+    {
+        $this->actuarComo('th');
+        $c = $this->candidato(['pruebas' => true]);
+        $this->subirDocumentos($c);
+
+        $idDirecto = (int) DB::table('empleadores')->max('id') + 1;
+        DB::table('empleadores')->insert([
+            ['id' => $idDirecto, 'nombre' => $this->unico('DIRECTO'), 'tipo' => 'Directo', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $idDirecto + 1, 'nombre' => $this->unico('INDIRECTO'), 'tipo' => 'Indirecto', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('empleador_contactos')->insert([
+            ['empleador_id' => $idDirecto, 'nombre' => 'Nómina', 'correo' => 'nomina@directo.co', 'created_at' => now(), 'updated_at' => now()],
+            ['empleador_id' => $idDirecto + 1, 'nombre' => 'Temporal', 'correo' => 'contacto@temporal.co', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $aval = fn (array $correos) => $this->putJson("/api/candidatos/{$c->id}", [
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+            'correos_aval' => $correos,
+        ]);
+
+        // Un contacto de un empleador Indirecto no sirve para vinculación Directa.
+        $aval(['contacto@temporal.co'])->assertStatus(422);
+        Mail::assertNothingSent();
+
+        $aval(['nomina@directo.co'])->assertOk();
+        Mail::assertSent(\App\Mail\AvalContratacionMail::class, fn ($m) => $m->hasTo('nomina@directo.co'));
     }
 
     public function test_quitar_el_aval_regresa_al_candidato_a_entrevista(): void

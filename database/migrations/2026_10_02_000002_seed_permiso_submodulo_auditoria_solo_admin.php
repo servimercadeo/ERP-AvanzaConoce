@@ -15,6 +15,12 @@ return new class extends Migration
         $now = now();
         $rows = [];
         foreach (['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
+            // Puede existir ya si el permiso se cargó a mano en producción.
+            $existe = DB::table('permisos_denegados')
+                ->where(['rol' => $rol, 'modulo_id' => 'permisos', 'submodulo_id' => 'auditoria'])->exists();
+            if ($existe) {
+                continue;
+            }
             $rows[] = [
                 'rol' => $rol,
                 'modulo_id' => 'permisos',
@@ -23,7 +29,9 @@ return new class extends Migration
                 'updated_at' => $now,
             ];
         }
-        DB::table('permisos_denegados')->insert($rows);
+        if ($rows) {
+            DB::table('permisos_denegados')->insert($rows);
+        }
     }
 
     public function down(): void

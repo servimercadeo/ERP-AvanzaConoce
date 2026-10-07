@@ -9,6 +9,12 @@ export const SUBMODULO_RAIZ = '_modulo';
 export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user) return false;
   if (user.rol === 'admin') return true;
+  // Usuarios sin rol asignado (aún no clasificados): acceso general por defecto,
+  // pero sin Administrativo (datos de contratación/empleados) ni Permisos
+  // (gestión de roles), mientras se les asigna su rol definitivo.
+  if (!user.rol && (moduleId === 'administrativo' || moduleId === 'permisos')) {
+    return false;
+  }
   const denegados = user.permisos_denegados ?? [];
   return !denegados.some((p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId);
 }
@@ -82,6 +88,15 @@ export const ERP_MODULES = [
     desc: 'Gestión administrativa.',
     submods: [
       {
+        id: 'empleados',
+        label: 'Empleados',
+        icon: 'usuarios',
+        desc: 'Gestión completa de empleados',
+        archivos: [
+          { id: 'empleados_file', label: 'Empleados' },
+        ]
+      },
+      {
         id: 'seleccion',
         label: 'Selección',
         icon: 'usuarios',
@@ -154,7 +169,6 @@ export const ERP_MODULES = [
       */
     ],
     archivos: [
-      { id: 'empleados', label: 'Empleados' },
       // { id: 'importar_codigos_directv', label: 'Importar Códigos DirecTv a Empleados' },
       // { id: 'importar_empleados', label: 'Importar Empleados' },
       // { id: 'vehiculos', label: 'Vehículos' },

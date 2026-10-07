@@ -4,179 +4,189 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contrato;
-use App\Models\Empresa;
+use App\Models\RespuestaIngreso;
 use App\Models\User;
-use App\Services\EmpresaProyectoRules;
+use App\Services\ImportacionExcelValidador;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class EmpleadoController extends Controller
 {
     public function index(Request $request)
     {
+        $users = User::with([
+                'empresa',
+                'sedeCatalogo',
+                'contratos' => function($q) {
+                    $q->orderBy('fecha_ingreso', 'desc');
+                },
+                // Cada Contrato resuelve su atributo `sede` contra este catálogo (ver
+                // HasSedeCatalogo); sin precargarlo aquí, se dispara una consulta por
+                // cada contrato al serializar la respuesta (N+1 severo con cientos de
+                // empleados).
+                'contratos.sedeCatalogo',
+            ])
+            ->whereNotNull('cedula')
+            ->where('cedula', '!=', '')
+            // Por defecto solo se listan empleados ya dados de alta en este módulo.
+            // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
+            // a quienes aún no tienen la alta manual pero ya cuentan con un contrato
+            // (p. ej. importados en bloque vía ImportarContratosActivosCommand): basta con
+            // tener contrato para poder asignarles dotación, sin exigir la ficha completa.
+            ->where(function ($q) use ($request) {
+                $q->where('pendiente_alta', false);
+                if ($request->boolean('con_contrato')) {
+                    $q->orWhereHas('contratos');
+                }
+            })
+            ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
+            ->orderByRaw('nombres IS NULL ASC, nombres ASC')
+            ->get();
+
+        $cedulas = $users->pluck('cedula')->filter()->unique()->values()->toArray();
+
+        // Todo lo que sigue reemplaza ~14 consultas POR EMPLEADO (N+1) por un puñado de
+        // consultas en bloque (whereIn) resueltas una sola vez para toda la lista, y luego
+        // se resuelve cada empleado en memoria. Con cientos de empleados esto es la
+        // diferencia entre miles de queries y una decena.
+
+        $respuestasPorCedula = RespuestaIngreso::whereIn('documento', $cedulas)
+            ->orderBy('id')
+            ->get()
+            ->unique('documento')
+            ->keyBy('documento');
+
+        $candidatosPorCedula = DB::table('candidatos')
+            ->whereIn('identificacion', $cedulas)
+            ->orderBy('id')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $ciudadCandidatoPorCedula = DB::table('candidatos')
+            ->join('ciudades', 'candidatos.ciudad_id', '=', 'ciudades.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->orderBy('candidatos.id')
+            ->select('candidatos.identificacion', 'ciudades.nombre as ciudad')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $baseIngresosPorCedula = DB::table('base_ingresos')
+            ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->select('candidatos.identificacion', 'base_ingresos.ciudad', 'base_ingresos.salario_basico', 'base_ingresos.created_at')
+            ->get()
+            ->groupBy('identificacion');
+
+        $empresaPorCedula = DB::table('candidatos')
+            ->join('requisiciones', 'candidatos.requisicion_id', '=', 'requisiciones.id')
+            ->whereIn('candidatos.identificacion', $cedulas)
+            ->whereNotNull('requisiciones.empresa_id')
+            ->orderBy('candidatos.id')
+            ->select('candidatos.identificacion', 'requisiciones.empresa_id')
+            ->get()
+            ->unique('identificacion')
+            ->keyBy('identificacion');
+
+        $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
+
         return response()->json(
-            User::with(['empresa', 'sedeCatalogo', 'contratos' => function($q) {
-                $q->orderBy('fecha_ingreso', 'desc');
-            }])
-                ->whereNotNull('cedula')
-                ->where('cedula', '!=', '')
-                // Por defecto solo se listan empleados ya dados de alta en este módulo.
-                // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
-                // a quienes aún no tienen la alta manual pero ya cuentan con un contrato
-                // (p. ej. importados en bloque vía ImportarContratosActivosCommand): basta con
-                // tener contrato para poder asignarles dotación, sin exigir la ficha completa.
-                ->where(function ($q) use ($request) {
-                    $q->where('pendiente_alta', false);
-                    if ($request->boolean('con_contrato')) {
-                        $q->orWhereHas('contratos');
-                    }
-                })
-                ->orderByRaw('apellidos IS NULL ASC, apellidos ASC')
-                ->orderByRaw('nombres IS NULL ASC, nombres ASC')
-                ->get()
-                ->map(function($user) {
-                    // 1. Buscar en respuestas_ingresos
-                    $ciudad = \Illuminate\Support\Facades\DB::table('respuestas_ingresos')
-                        ->where('documento', $user->cedula)
-                        ->value('ciudad');
+            $users->map(function ($user) use (
+                $respuestasPorCedula, $candidatosPorCedula, $ciudadCandidatoPorCedula,
+                $baseIngresosPorCedula, $empresaPorCedula, $generosValidos
+            ) {
+                $cedula = $user->cedula ?? '';
+                $respuesta = $respuestasPorCedula->get($cedula);
+                $candidato = $candidatosPorCedula->get($cedula);
+                $baseIngresoRows = $baseIngresosPorCedula->get($cedula);
 
-                    // 2. Buscar en candidatos (usando ciudad_id)
-                    if (!$ciudad) {
-                        $ciudad = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->join('ciudades', 'candidatos.ciudad_id', '=', 'ciudades.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->value('ciudades.nombre');
-                    }
+                // 1. respuestas_ingresos → 2. candidatos (join ciudades) → 3. base_ingresos
+                $user->ciudad = $respuesta?->ciudad
+                    ?: $ciudadCandidatoPorCedula->get($cedula)?->ciudad
+                    ?: $baseIngresoRows?->first()?->ciudad;
 
-                    // 3. Buscar en base_ingresos
-                    if (!$ciudad) {
-                        $ciudad = \Illuminate\Support\Facades\DB::table('base_ingresos')
-                            ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->value('base_ingresos.ciudad');
-                    }
+                // Género: usar users.genero si es un valor reconocido; si no, el de candidatos
+                if (!in_array($user->genero, $generosValidos)) {
+                    $user->genero = $candidato?->genero;
+                }
 
-                    $user->ciudad = $ciudad;
+                // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
+                // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
+                // candidatos (fuente antigua, previa a que el campo se moviera aquí).
+                if (!$user->fotografia) {
+                    $user->fotografia = $respuesta?->fotografia ?: $candidato?->fotografia;
+                }                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
+                $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
+                $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
+                $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
+                if ($respuesta) {
+                    $user->estado_civil         = $user->estado_civil         ?: $respuesta->estado_civil;
+                    $user->nivel_escolaridad    = $user->nivel_escolaridad    ?: $respuesta->nivel_escolaridad;
+                    $user->estrato              = $user->estrato              ?: $respuesta->estrato;
+                    $user->barrio               = $user->barrio               ?: $respuesta->barrio;
+                    $user->numero_hijos         = $user->numero_hijos         ?: $respuesta->numero_hijos;
+                    $user->rh                   = $user->rh                   ?: $respuesta->rh;
+                    $user->fecha_nacimiento     = $user->fecha_nacimiento     ?: $respuesta->fecha_nacimiento;
+                    $user->lugar_nacimiento     = $user->lugar_nacimiento     ?: $respuesta->lugar_nacimiento;
+                    $user->direccion_residencia = $user->direccion_residencia ?: $respuesta->direccion;
+                    $user->contacto_emergencia_nombre     = $user->contacto_emergencia_nombre     ?: $respuesta->emergencia_nombre;
+                    $user->contacto_emergencia_telefono   = $user->contacto_emergencia_telefono   ?: $respuesta->emergencia_telefono;
+                    $user->contacto_emergencia_parentesco = $user->contacto_emergencia_parentesco ?: $respuesta->emergencia_parentesco;
+                    $user->eps             = $user->eps             ?: $respuesta->eps;
+                    $user->fondo_pensiones = $user->fondo_pensiones ?: $respuesta->afp;
+                }
 
-                    // Género: usar users.genero si es un valor reconocido; si no, buscar en candidatos
-                    $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
-                    if (!in_array($user->genero, $generosValidos)) {
-                        $user->genero = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->where('identificacion', $user->cedula)
-                            ->value('genero');
-                    }
+                // fecha_expedicion desde candidatos
+                if (!$user->fecha_expedicion) {
+                    $user->fecha_expedicion = $candidato?->fecha_expedicion;
+                }
 
-                    // Datos desde respuestas_ingresos: tallas, profesión y datos personales nulos
-                    $respuesta = \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first();
+                // Móvil: si está vacío o es el placeholder por defecto
+                if (!$user->movil || $user->movil === '0000000000') {
+                    $celular = $respuesta?->celular ?? $candidato?->celular;
+                    if ($celular) $user->movil = $celular;
+                }
 
-                    // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
-                    // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
-                    // candidatos (fuente antigua, previa a que el campo se moviera aquí).
-                    if (!$user->fotografia) {
-                        $user->fotografia = $respuesta?->fotografia
-                            ?: \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('fotografia');
-                    }
-                    $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
-                    $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
-                    $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
-                    $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
-                    if ($respuesta) {
-                        $user->estado_civil         = $user->estado_civil         ?: $respuesta->estado_civil;
-                        $user->nivel_escolaridad    = $user->nivel_escolaridad    ?: $respuesta->nivel_escolaridad;
-                        $user->estrato              = $user->estrato              ?: $respuesta->estrato;
-                        $user->barrio               = $user->barrio               ?: $respuesta->barrio;
-                        $user->numero_hijos         = $user->numero_hijos         ?: $respuesta->numero_hijos;
-                        $user->rh                   = $user->rh                   ?: $respuesta->rh;
-                        $user->fecha_nacimiento     = $user->fecha_nacimiento     ?: $respuesta->fecha_nacimiento;
-                        $user->lugar_nacimiento     = $user->lugar_nacimiento     ?: $respuesta->lugar_nacimiento;
-                        $user->direccion_residencia = $user->direccion_residencia ?: $respuesta->direccion;
-                        $user->contacto_emergencia_nombre     = $user->contacto_emergencia_nombre     ?: $respuesta->emergencia_nombre;
-                        $user->contacto_emergencia_telefono   = $user->contacto_emergencia_telefono   ?: $respuesta->emergencia_telefono;
-                        $user->contacto_emergencia_parentesco = $user->contacto_emergencia_parentesco ?: $respuesta->emergencia_parentesco;
-                        $user->eps             = $user->eps             ?: $respuesta->eps;
-                        $user->fondo_pensiones = $user->fondo_pensiones ?: $respuesta->afp;
-                    }
-                    // fecha_expedicion desde candidatos
-                    if (!$user->fecha_expedicion) {
-                        $user->fecha_expedicion = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->where('identificacion', $user->cedula)
-                            ->value('fecha_expedicion');
-                    }
+                // Email: si parece auto-generado (cedula@dominio)
+                if ($cedula && $user->email && str_starts_with($user->email, $cedula . '@')) {
+                    $realEmail = $respuesta?->correo ?? $candidato?->correo;
+                    if ($realEmail) $user->email = $realEmail;
+                }
 
-                    // Móvil: si está vacío o es el placeholder por defecto
-                    if (!$user->movil || $user->movil === '0000000000') {
-                        $celular = $respuesta?->celular
-                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('celular');
-                        if ($celular) $user->movil = $celular;
-                    }
+                // Caja Compensación: desde contratos (ya cargados y ordenados por fecha_ingreso
+                // desc vía el eager load de arriba, no hace falta volver a consultar) → candidatos
+                if (!$user->caja_compensacion) {
+                    $contratoConCaja = $user->contratos->first(fn($c) => !is_null($c->caja_compensacion));
+                    $caja = $contratoConCaja?->caja_compensacion ?: $candidato?->caja_compensacion;
+                    if ($caja) $user->caja_compensacion = $caja;
+                }
 
-                    // Email: si parece auto-generado (cedula@dominio)
-                    $cedula = $user->cedula ?? '';
-                    if ($cedula && $user->email && str_starts_with($user->email, $cedula . '@')) {
-                        $realEmail = $respuesta?->correo
-                            ?? \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $cedula)
-                                ->value('correo');
-                        if ($realEmail) $user->email = $realEmail;
-                    }
+                // Empresa: desde requisicion del candidato si no tiene empresa_id
+                if (!$user->empresa_id) {
+                    $empresaId = $empresaPorCedula->get($cedula)?->empresa_id;
+                    if ($empresaId) $user->empresa_id = $empresaId;
+                }
 
-                    // Caja Compensación: desde contratos → candidatos
-                    if (!$user->caja_compensacion) {
-                        $caja = \Illuminate\Support\Facades\DB::table('contratos')
-                            ->where('empleado_id', $user->id)
-                            ->whereNotNull('caja_compensacion')
-                            ->orderByDesc('fecha_ingreso')
-                            ->value('caja_compensacion');
-                        if (!$caja) {
-                            $caja = \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('caja_compensacion');
-                        }
-                        if ($caja) $user->caja_compensacion = $caja;
+                // Ingresos: si nulo, buscar en contratos (ya cargados) → base_ingresos (más
+                // reciente) → candidatos
+                if (is_null($user->ingresos) || $user->ingresos == 0) {
+                    $contratoConSalario = $user->contratos->first(fn($c) => !is_null($c->salario));
+                    $salario = $contratoConSalario?->salario;
+                    if (!$salario && $baseIngresoRows) {
+                        $salario = $baseIngresoRows->whereNotNull('salario_basico')
+                            ->sortByDesc('created_at')
+                            ->first()?->salario_basico;
                     }
+                    if (!$salario) $salario = $candidato?->salario_basico;
+                    if ($salario) $user->ingresos = $salario;
+                }
 
-                    // Empresa: desde requisicion del candidato si no tiene empresa_id
-                    if (!$user->empresa_id) {
-                        $empresaId = \Illuminate\Support\Facades\DB::table('candidatos')
-                            ->join('requisiciones', 'candidatos.requisicion_id', '=', 'requisiciones.id')
-                            ->where('candidatos.identificacion', $user->cedula)
-                            ->whereNotNull('requisiciones.empresa_id')
-                            ->value('requisiciones.empresa_id');
-                        if ($empresaId) $user->empresa_id = $empresaId;
-                    }
-
-                    // Ingresos: si nulo, buscar en contratos → base_ingresos → candidatos
-                    if (is_null($user->ingresos) || $user->ingresos == 0) {
-                        $salario = \Illuminate\Support\Facades\DB::table('contratos')
-                            ->where('empleado_id', $user->id)
-                            ->whereNotNull('salario')
-                            ->orderByDesc('fecha_ingreso')
-                            ->value('salario');
-                        if (!$salario) {
-                            $salario = \Illuminate\Support\Facades\DB::table('base_ingresos')
-                                ->join('candidatos', 'base_ingresos.candidato_id', '=', 'candidatos.id')
-                                ->where('candidatos.identificacion', $user->cedula)
-                                ->whereNotNull('base_ingresos.salario_basico')
-                                ->orderByDesc('base_ingresos.created_at')
-                                ->value('base_ingresos.salario_basico');
-                        }
-                        if (!$salario) {
-                            $salario = \Illuminate\Support\Facades\DB::table('candidatos')
-                                ->where('identificacion', $user->cedula)
-                                ->value('salario_basico');
-                        }
-                        if ($salario) $user->ingresos = $salario;
-                    }
-
-                    return $user;
-                })
+                return $user;
+            })
         );
     }
 
@@ -208,7 +218,7 @@ class EmpleadoController extends Controller
             $existingId = $userByEmail->id;
         }
 
-        $data = $request->validate($this->rules($existingId));
+        $data = $request->validate($this->rules($existingId, $existingId ? User::find($existingId) : null));
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
@@ -221,7 +231,9 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
-            $this->validarEmpresaSegunProyecto($data, $empleado);
+            if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+                $data['rol'] = 'admin';
+            }
 
             // El registro existente vino de un import (p. ej. de contratos) y todavía no se
             // dio de alta manualmente aquí — esta es su alta real, así que se le generan
@@ -235,6 +247,7 @@ class EmpleadoController extends Controller
                 $data['password']  = Hash::make($plainPassword);
 
                 $empleado->update($data);
+                app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
                 app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
@@ -248,6 +261,7 @@ class EmpleadoController extends Controller
             }
 
             $empleado->update($data);
+            app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
             return response()->json([
                 'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                 'credenciales' => [
@@ -287,10 +301,13 @@ class EmpleadoController extends Controller
         // Si el correo ya pertenece a OTRO usuario, Rule::unique (ignorando solo a este empleado)
         // responde 422. Antes se "fusionaba": se borraba al empleado editado y se sobrescribía
         // al otro, así que un error de tipeo en el correo eliminaba a una persona real.
-        $data = $request->validate($this->rules($empleado->id));
+        $data = $request->validate($this->rules($empleado->id, $empleado));
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);
+        if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+            $data['rol'] = 'admin';
+        }
 
         if ($request->hasFile('fotografia')) {
             $data['fotografia'] = $request->file('fotografia')->store('empleados/fotos', 'public');
@@ -298,13 +315,17 @@ class EmpleadoController extends Controller
             unset($data['fotografia']);
         }
 
-        $this->validarEmpresaSegunProyecto($data, $empleado);
-
         $empleado->update($data);
+        app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
 
-        return response()->json($empleado->fresh()->load(['empresa', 'sedeCatalogo']));
+        // Igual que en index(): si no tiene foto propia se muestra la del formulario de
+        // ingreso, para que el avatar no desaparezca de la lista tras editar.
+        $respuesta = $empleado->fresh()->load(['empresa', 'sedeCatalogo']);
+        User::completarFotografias([$respuesta]);
+
+        return response()->json($respuesta);
     }
 
     public function updateTallas(Request $request, User $empleado)
@@ -346,6 +367,251 @@ class EmpleadoController extends Controller
             'id'         => $empleado->id,
             'fotografia' => $empleado->fotografia,
         ]);
+    }
+
+    /**
+     * Importación masiva de datos personales desde Excel, buscando por cédula.
+     * Regla de seguridad (no negociable, pisar datos de empleados reales rompería
+     * información real): por cada campo, solo se escribe si el valor actual en BD
+     * está vacío/NULL (o, solo para `genero`, si vale el placeholder 'No especificado'
+     * que deja el alta automática). Un campo que ya tiene dato se deja intacto y se
+     * reporta como omitido, nunca se sobreescribe.
+     *
+     * Si la cédula encontrada está `pendiente_alta` (creada como cascarón por el import
+     * de Contratos, nunca dada de alta aquí), este import también completa su alta —
+     * igual que al editarla manualmente en store() — para que deje de estar invisible en
+     * el módulo de Empleados. Esto sí genera credenciales nuevas, que se devuelven en el
+     * detalle de cada fila porque no hay otra forma de recuperarlas después (la
+     * contraseña se guarda ya hasheada).
+     */
+    public function importarDatosPersonales(Request $request)
+    {
+        // Solo se valida que `filas` sea un array no vacío; una fila puntual mal
+        // formada (sin cédula, no es objeto, etc.) se descarta más abajo fila por
+        // fila, no se rechaza todo el lote por un solo registro raro. `validate()`
+        // también descarta cualquier campo sin regla declarada, así que los datos
+        // reales se toman del input crudo y se validan campo por campo más abajo.
+        $request->validate([
+            'filas' => 'required|array|min:1|max:2000',
+        ]);
+        $filas = $request->input('filas', []);
+
+        // NO incluye: cargo (User::booted() deriva `rol` de él al guardarlo — demasiado
+        // riesgoso para una carga masiva sin revisión caso por caso), estado_empleado,
+        // email, ingresos, empresa_id (cada uno con su propio flujo dedicado). Los campos
+        // de Contrato (tipo/estado de contrato, fechas, cliente_proyecto, etc.) los cubre
+        // ContratoController@importarDatosFaltantes, no este método.
+        $camposPermitidos = [
+            'nombres', 'apellidos',
+            'fecha_expedicion', 'genero', 'fecha_nacimiento', 'lugar_nacimiento', 'raza',
+            'estado_civil', 'nivel_escolaridad', 'profesion', 'numero_hijos', 'rh', 'movil',
+            'direccion_residencia', 'barrio', 'estrato',
+            'tipo_vinculacion', 'sede', 'empleador',
+            'jefe_inmediato', 'jefe_inmediato_correo', 'codigo_directv',
+            'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
+            'banco', 'tipo_cuenta', 'cuenta_bancaria',
+            'talla_camisa', 'talla_pantalon', 'talla_zapatos',
+            'licencia_carro', 'licencia_carro_vence', 'licencia_moto', 'licencia_moto_vence',
+            'tiene_cert_alturas', 'cert_alturas_vence',
+            'contacto_emergencia_nombre', 'contacto_emergencia_telefono', 'contacto_emergencia_parentesco',
+            'observaciones_medicas', 'alergias', 'comentarios',
+        ];
+        $camposFecha = [
+            'fecha_expedicion', 'fecha_nacimiento',
+            'licencia_carro_vence', 'licencia_moto_vence', 'cert_alturas_vence',
+        ];
+        // Límite real de cada columna varchar en `users` (ver migraciones). Un valor más
+        // largo rompería el UPDATE completo del lote con un 500 (columna varchar no
+        // trunca, lanza SQLSTATE 22001) — mejor omitir solo ese campo, igual que un valor
+        // inválido, que perder las 2000 filas por una celda demasiado larga.
+        $longitudesMaximas = [
+            'nombres' => 100, 'apellidos' => 100, 'genero' => 30, 'lugar_nacimiento' => 100,
+            'raza' => 50, 'estado_civil' => 30, 'nivel_escolaridad' => 50, 'profesion' => 150,
+            'rh' => 5, 'movil' => 20, 'direccion_residencia' => 200, 'barrio' => 100, 'estrato' => 5,
+            'tipo_funcionario' => 80, 'tipo_vinculacion' => 30, 'sede' => 100, 'empleador' => 150,
+            'jefe_inmediato' => 150, 'jefe_inmediato_correo' => 180, 'codigo_directv' => 50,
+            'eps' => 100, 'arl' => 100, 'fondo_pensiones' => 100, 'caja_compensacion' => 100,
+            'banco' => 100, 'tipo_cuenta' => 30, 'cuenta_bancaria' => 30,
+            'talla_camisa' => 20, 'talla_pantalon' => 20, 'talla_zapatos' => 20,
+            'licencia_carro' => 50, 'licencia_moto' => 50,
+            'contacto_emergencia_nombre' => 150, 'contacto_emergencia_telefono' => 20,
+            'contacto_emergencia_parentesco' => 80,
+        ];
+
+        $resumen = [
+            'actualizados'   => 0,
+            'dados_de_alta'  => 0,
+            'sin_cambios'    => 0,
+            'no_encontrados' => [],
+            'sin_contrato'   => [],
+            'detalle'        => [],
+        ];
+
+        DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
+            foreach ($filas as $fila) {
+                if (!is_array($fila) || !is_scalar($fila['cedula'] ?? null)) continue;
+                $cedula = trim((string) $fila['cedula']);
+                if ($cedula === '') continue;
+
+                $user = User::where('cedula', $cedula)->first();
+                if (!$user) {
+                    $resumen['no_encontrados'][] = $cedula;
+                    continue;
+                }
+                // Proceso: primero se crea el contrato (Contratos) y después se completa el
+                // empleado aquí, que es donde se entregan credenciales. Sin contrato vigente
+                // no se toca nada.
+                if (!$user->contratos()->where('completado', true)->exists()) {
+                    $resumen['sin_contrato'][] = $cedula;
+                    continue;
+                }
+
+                $actualizadosFila = [];
+                $omitidosFila = [];
+                // Celdas con un valor que no se pudo aceptar (fecha imposible, sede que no
+                // existe, etc.): se omiten y se reportan, para que quien importa sepa qué
+                // corregir en vez de que el dato desaparezca en silencio.
+                $invalidosFila = [];
+
+                foreach ($camposPermitidos as $campo) {
+                    if (!array_key_exists($campo, $fila)) continue;
+                    $valor = $fila[$campo];
+                    $valor = is_string($valor) ? trim($valor) : $valor;
+                    if ($valor === null || $valor === '') continue;
+
+                    $valor = $this->valorImportable($campo, $valor, $camposFecha, $longitudesMaximas);
+                    if ($valor === null) {
+                        $invalidosFila[] = $campo;
+                        continue;
+                    }
+
+                    if (!$this->campoSinDato($campo, $user->{$campo})) {
+                        $omitidosFila[] = $campo;
+                        continue;
+                    }
+
+                    $user->{$campo} = $valor;
+                    $actualizadosFila[] = $campo;
+                }
+
+                // Esta cédula vino de un alta automática (p. ej. import de Contratos, que
+                // crea un User "cascarón" para poder enlazar el contrato) y nunca se
+                // completó su alta real en este módulo — por eso no aparecía en la lista de
+                // Empleados aunque sus datos sí existieran. El import también la completa
+                // aquí, con la misma lógica que store() al editar manualmente: no tiene
+                // sentido rellenarle los datos y dejarlo igual de invisible.
+                $seDioDeAlta = false;
+                $credenciales = null;
+                if ($user->pendiente_alta) {
+                    // Mismo rol por defecto que store(): 'consultor' ya no existe en el ENUM
+                    // de `users.rol` y MySQL estricto tumbaría todo el lote.
+                    $user->rol            = $user->rol ?: 'general';
+                    $user->activo         = true;
+                    $user->pendiente_alta = false;
+                    $plainPassword = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
+                    $user->password = Hash::make($plainPassword);
+                    $credenciales = ['email' => $user->email, 'password' => $plainPassword];
+                    $seDioDeAlta = true;
+                }
+
+                $huboDatosNuevos = !empty($actualizadosFila);
+
+                if ($huboDatosNuevos || $seDioDeAlta) {
+                    // `name` no se deriva solo al guardar (a diferencia de `rol`, que sí
+                    // tiene un hook en User::booted() para `cargo`) — si se acaban de
+                    // rellenar nombres/apellidos, se recalcula aquí para no dejarlo
+                    // desincronizado con lo que se ve en el resto del sistema.
+                    if (in_array('nombres', $actualizadosFila, true) || in_array('apellidos', $actualizadosFila, true)) {
+                        $user->name = trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? ''));
+                    }
+                    $user->save();
+                    if ($seDioDeAlta) {
+                        app(\App\Services\EmpleadoSyncService::class)->syncFromUser($user);
+                        $resumen['dados_de_alta']++;
+                    }
+                    if ($huboDatosNuevos) {
+                        $resumen['actualizados']++;
+                    }
+                } else {
+                    $resumen['sin_cambios']++;
+                }
+
+                $resumen['detalle'][] = [
+                    'cedula'               => $cedula,
+                    'nombre'               => trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')),
+                    'campos_actualizados'  => $actualizadosFila,
+                    'campos_omitidos'      => $omitidosFila,
+                    'campos_invalidos'     => $invalidosFila,
+                    'dado_de_alta'         => $seDioDeAlta,
+                    'credenciales'         => $credenciales,
+                ];
+            }
+        });
+
+        return response()->json($resumen);
+    }
+
+    /**
+     * Valor de una celda del import ya validado y normalizado igual que lo deja el
+     * formulario, o null si no es aceptable.
+     */
+    private function valorImportable(string $campo, mixed $valor, array $camposFecha, array $longitudesMaximas): mixed
+    {
+        if ($campo === 'tiene_cert_alturas') {
+            return is_bool($valor) ? $valor : null;
+        }
+        if (!is_scalar($valor) || is_bool($valor)) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if (isset($longitudesMaximas[$campo]) && mb_strlen($valor) > $longitudesMaximas[$campo]) {
+            return null;
+        }
+
+        if (in_array($campo, $camposFecha, true)) {
+            return ImportacionExcelValidador::fecha($valor, 1920, (int) date('Y') + 10);
+        }
+
+        switch ($campo) {
+            case 'genero':
+                $generos = [
+                    'MASCULINO' => 'Masculino', 'M' => 'Masculino', 'FEMENINO' => 'Femenino', 'F' => 'Femenino',
+                    'OTRO' => 'Otro', 'NO BINARIO' => 'No binario', 'PREFIERO NO DECIR' => 'Prefiero no decir',
+                ];
+                return $generos[mb_strtoupper($valor, 'UTF-8')] ?? null;
+            case 'numero_hijos':
+                return preg_match('/^\d{1,2}$/', $valor) && (int) $valor <= 20 ? (int) $valor : null;
+            case 'jefe_inmediato_correo':
+                return ImportacionExcelValidador::correo($valor);
+            case 'sede':
+                return ImportacionExcelValidador::sede($valor);
+        }
+
+        // Mismos campos que normalizarNombres() pone en mayúsculas al guardar desde el
+        // formulario: sin esto, los filtros de la lista verían "Sura" y "SURA" como dos EPS.
+        if (in_array($campo, ['nombres', 'apellidos', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'], true)) {
+            return mb_strtoupper($valor, 'UTF-8');
+        }
+
+        return $valor;
+    }
+
+    /**
+     * El campo del empleado no tiene un dato real: vacío, o con el valor de relleno que
+     * deja el alta automática desde Contratos (ContratoController@store).
+     */
+    private function campoSinDato(string $campo, mixed $actual): bool
+    {
+        if ($actual === null || $actual === '') {
+            return true;
+        }
+
+        return match ($campo) {
+            'genero' => $actual === 'No especificado',
+            'movil' => (bool) preg_match('/^0+$/', (string) $actual),
+            'eps', 'arl' => mb_strtoupper(trim((string) $actual), 'UTF-8') === 'SIN ASIGNAR',
+            default => false,
+        };
     }
 
     public function destroy(User $empleado)
@@ -461,35 +727,10 @@ class EmpleadoController extends Controller
         );
     }
 
-    /**
-     * El formulario de Empleado no tiene un campo "proyecto" propio — el proyecto
-     * (cliente_proyecto) vive en los Contratos. Por eso, para validar la empresa elegida aquí,
-     * se toma el cliente_proyecto del contrato más reciente del empleado (si tiene alguno) y se
-     * reutiliza la misma regla que ya bloquea combinaciones inválidas en Contratos.
-     */
-    private function validarEmpresaSegunProyecto(array $data, ?User $empleadoActual): void
-    {
-        $empresaId = $data['empresa_id'] ?? $empleadoActual?->empresa_id;
-        if (!$empresaId || !$empleadoActual) {
-            return;
-        }
-
-        $proyecto = Contrato::where('empleado_id', $empleadoActual->id)
-            ->orderByDesc('fecha_ingreso')
-            ->value('cliente_proyecto');
-        if (!$proyecto) {
-            return;
-        }
-
-        $empresaNombre = Empresa::find($empresaId)?->nombre;
-        if ($msg = EmpresaProyectoRules::validar($empresaNombre, $proyecto)) {
-            throw ValidationException::withMessages(['empresa_id' => $msg]);
-        }
-    }
 
     private function normalizarNombres(array &$data): void
     {
-        $campos = ['nombres', 'apellidos', 'cargo', 'fondo_pensiones', 'arl', 'tipo_funcionario', 'eps', 'caja_compensacion'];
+        $campos = ['nombres', 'apellidos'];
         foreach ($campos as $campo) {
             if (isset($data[$campo])) {
                 $data[$campo] = mb_strtoupper($data[$campo], 'UTF-8');
@@ -497,24 +738,36 @@ class EmpleadoController extends Controller
         }
     }
 
-    private function rules(?int $ignoreId = null): array
+    /**
+     * Roles que quien edita puede asignar. Solo un admin da (o quita) el rol de administrador;
+     * TH/TIC tampoco pueden cambiarle el rol a un admin existente.
+     */
+    private function rolesAsignables(?User $empleado): array
     {
+        $roles = \App\Models\PermisoDenegado::ROLES_GESTIONABLES;
+        if (auth()->user()?->rol === 'admin' || $empleado?->rol === 'admin') {
+            $roles[] = 'admin';
+        }
+
+        return $roles;
+    }
+
+    private function rules(?int $ignoreId = null, ?User $empleado = null): array
+    {
+        // Los datos de contratación (salario, cargo, sede, empresa, vinculación, seguridad
+        // social y datos bancarios) no se reciben aquí: viven en Contratos y se copian al empleado desde allá
+        // (EmpleadoSyncService::CAMPOS_CONTRATO).
         return [
             // Obligatorios
             'cedula'           => 'required|string|max:20',
             'apellidos'        => 'required|string|max:150',
             'nombres'          => 'required|string|max:150',
-            'sede'             => 'required|string|max:100',
             'genero'           => 'required|string|max:50',
             'movil'            => 'required|string|max:20',
             'email'            => ['required', 'email', Rule::unique('users', 'email')->ignore($ignoreId)],
-            'eps'              => 'required|string|max:100',
-            'arl'              => 'required|string|max:100',
-            'fondo_pensiones'  => 'nullable|string|max:100',
             'estado_empleado'  => 'required|string|max:50',
-            'cargo'            => 'required|string|max:150',
-            'tipo_funcionario' => 'required|string|max:100',
-            'tipo_vinculacion' => 'required|string|max:100',
+            // "Tipo de funcionario" en pantalla: es el rol del usuario en el ERP.
+            'rol'              => ['required', Rule::in($this->rolesAsignables($empleado))],
 
             // Opcionales
             'fotografia'           => 'nullable|max:5120',
@@ -529,14 +782,12 @@ class EmpleadoController extends Controller
             'estrato'              => 'nullable|string|max:5',
             'barrio'               => 'nullable|string|max:100',
             'numero_hijos'         => 'nullable|integer|min:0',
-            'ingresos'             => 'nullable|numeric|min:0',
             'observaciones_medicas'=> 'nullable|string',
             'alergias'             => 'nullable|string',
             'talla_camisa'         => 'nullable|string|max:20',
             'talla_pantalon'       => 'nullable|string|max:20',
             'talla_zapatos'        => 'nullable|string|max:20',
             'rh'                   => 'nullable|string|max:5',
-            'caja_compensacion'    => 'nullable|string|max:100',
             'licencia_carro'       => 'nullable|string|max:20',
             'licencia_carro_vence' => 'nullable|date',
             'licencia_moto'        => 'nullable|string|max:20',
@@ -544,14 +795,10 @@ class EmpleadoController extends Controller
             'tiene_cert_alturas'   => 'nullable|boolean',
             'cert_alturas_vence'   => 'nullable|date',
             'codigo_directv'       => 'nullable|string|max:30',
-            'empresa_id'           => 'nullable|exists:empresas,id',
             'comentarios'          => 'nullable|string',
             'contacto_emergencia_nombre'     => 'nullable|string|max:150',
             'contacto_emergencia_telefono'   => 'nullable|string|max:20',
             'contacto_emergencia_parentesco' => 'nullable|string|max:80',
-            'cuenta_bancaria'      => 'nullable|string|max:30',
-            'tipo_cuenta'          => 'nullable|string|max:30',
-            'banco'                => 'nullable|string|max:100',
         ];
     }
 }

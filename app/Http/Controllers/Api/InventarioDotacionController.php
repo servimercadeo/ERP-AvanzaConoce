@@ -50,10 +50,15 @@ class InventarioDotacionController extends Controller
      * según la empresa a la que pertenece (misma regla que EmpresaProyectoRules usa para
      * contratos/empleados: SYM ve TIGO EXPRESS/TIGO HOME/ADMINISTRATIVO, Servimercadeo ve DIRECTV).
      * Si el usuario no tiene empresa asignada, o su empresa no está sujeta a la regla, ve todas.
+     * El admin siempre ve y gestiona el inventario completo, sin importar su empresa.
      */
     private function proyectosPermitidos(?User $user): array
     {
         $todas = self::proyectosDotacion();
+
+        if ($user?->rol === 'admin') {
+            return $todas;
+        }
 
         $proyectosEmpresa = EmpresaProyectoRules::proyectosPermitidos($this->empresaUsuario($user));
         if ($proyectosEmpresa === null) {

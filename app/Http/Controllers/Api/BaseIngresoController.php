@@ -183,6 +183,10 @@ class BaseIngresoController extends Controller
         if ($baseIngreso->candidato_id) {
             \App\Models\Candidato::where('id', $baseIngreso->candidato_id)
                 ->update(['aval' => false, 'fecha_aval' => null, 'tipo_vinculacion' => null, 'estado' => 'Entrevista']);
+            // Se libera una vacante: reabrir la requisición si estaba cerrada por cupo completo.
+            \App\Models\Requisicion::actualizarEstadoPorVacantesDe(
+                \App\Models\Candidato::whereKey($baseIngreso->candidato_id)->value('requisicion_id')
+            );
         }
 
         // Eliminar documentos locales y en SharePoint

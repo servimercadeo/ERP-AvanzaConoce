@@ -17,12 +17,13 @@ return new class extends Migration
         });
 
         // Backfill: relaciona cada pedido existente con su sede real por nombre exacto.
-        DB::statement('
-            UPDATE pedidos_compra pc
-            JOIN sedes s ON UPPER(s.nombre) = UPPER(pc.sede)
+        $prefix = DB::getTablePrefix();
+        DB::statement("
+            UPDATE `{$prefix}pedidos_compra` pc
+            JOIN `{$prefix}sedes` s ON UPPER(s.nombre) = UPPER(pc.sede)
             SET pc.sede_id = s.id
             WHERE pc.sede_id IS NULL
-        ');
+        ");
     }
 
     public function down(): void

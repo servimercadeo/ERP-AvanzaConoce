@@ -127,7 +127,7 @@ export default function SeleccionCrud() {
     setMode(m);
     setErrors({});
     if (m === 'create') {
-      setForm({ fecha_solicitud: today(), estado: 'Abierta', solicitud_confidencial: 'No', pais: 'Colombia' });
+      setForm({ fecha_solicitud: today(), estado: 'Abierta', solicitud_confidencial: 'No', pais: 'Colombia', requeridas: '' });
     } else if (row) {
       setForm({
         id:                          row.id,
@@ -149,6 +149,8 @@ export default function SeleccionCrud() {
         observaciones:               row.observaciones || '',
         estado:                      row.estado || 'Abierta',
         solicitud_confidencial:      row.solicitud_confidencial ? 'Sí' : 'No',
+        requeridas:                  row.requeridas != null ? String(row.requeridas) : '',
+        vacantes_cubiertas:          row.vacantes_cubiertas ?? 0,
       });
     }
     setModal(true);
@@ -165,7 +167,7 @@ export default function SeleccionCrud() {
         fecha_solicitud:        form.fecha_solicitud,
         fecha_ingreso:          form.fecha_ingreso  || null,
         fecha_cierre:           form.fecha_cierre   || null,
-        requeridas:             parseInt(form.numero_personas) || 1,
+        requeridas:             parseInt(form.requeridas) || null,
         proyecto_id:            form.proyecto_id    || null,
         empresa_id:             form.empresa_id     || null,
         empleador_id:           form.empleador_id   || null,
@@ -268,7 +270,7 @@ export default function SeleccionCrud() {
         <div style={S.card}>
           <table style={S.table}>
             <thead><tr>
-              {['Item', 'Nro. ID proceso', 'Estado', 'Cargo requerido', 'Fecha solicitud', 'Proyecto', 'Tipo solicitud', 'Ciudad'].map(h => <th key={h} style={S.th}>{h}</th>)}
+              {['Item', 'Nro. ID proceso', 'Estado', 'Cargo requerido', 'Vacantes', 'Fecha solicitud', 'Proyecto', 'Tipo solicitud', 'Ciudad'].map(h => <th key={h} style={S.th}>{h}</th>)}
               <th style={{ ...S.th, textAlign: 'center' }}>Acciones</th>
             </tr></thead>
             <tbody>
@@ -280,6 +282,7 @@ export default function SeleccionCrud() {
                     <td style={S.td}>{row.nro_identificacion_proceso}</td>
                     <td style={S.td}><span style={S.badge(bg, color)}>{row.estado}</span></td>
                     <td style={S.td}>{row.cargo?.nombre || '-'}</td>
+                    <td style={S.td} title="Vacantes cubiertas (candidatos con aval) / vacantes requeridas">{row.vacantes_cubiertas ?? 0} / {row.requeridas ?? 1}</td>
                     <td style={S.td}>{fmtDate(row.fecha_solicitud)}</td>
                     <td style={S.td}>{row.proyecto?.nombre || '-'}</td>
                     <td style={S.td}>{row.tipo_solicitud}</td>
@@ -305,7 +308,7 @@ export default function SeleccionCrud() {
                   </tr>
                 );
               })}
-              {!filtered.length && <tr><td colSpan="9" style={S.empty}>No hay requisiciones que coincidan con la búsqueda.</td></tr>}
+              {!filtered.length && <tr><td colSpan="10" style={S.empty}>No hay requisiciones que coincidan con la búsqueda.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -335,9 +338,9 @@ export default function SeleccionCrud() {
               <button style={S.mClose} onClick={() => setModal(false)}><IconClose size={13}/></button>
             </div>
             <div style={S.mBody}>
-              {(errors._general || errors.proyecto_id) && (
+              {(errors._general || errors.proyecto_id || errors.estado || errors.requeridas) && (
                 <div style={S.errorBanner}>
-                  {errors._general || errors.proyecto_id}
+                  {errors._general || errors.proyecto_id || errors.estado || errors.requeridas}
                 </div>
               )}
               <div style={S.g3}>
@@ -358,6 +361,11 @@ export default function SeleccionCrud() {
                 <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />
                 <F l="Cargo requerido"             k="cargo_id"                     req={!isRO(mode)} opts={cargosOpts} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Tipo de solicitud"           k="tipo_solicitud"               req={!isRO(mode)} opts={OPT.tipos} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Número de vacantes"          k="requeridas"                   req={!isRO(mode)} type="number" form={form} ch={ch} dis={isRO(mode)} />
+                {mode !== 'create' && (
+                  <F l="Vacantes cubiertas (con aval)" k="_cubiertas" dis
+                     form={{ _cubiertas: `${form.vacantes_cubiertas ?? 0} de ${form.requeridas || 0}` }} ch={ch} />
+                )}
                 {/* Proyecto – SearchableSelect */}
                 <SField l="Proyecto" req={!isRO(mode)} err={errors.proyecto_id}>
                   <SearchableSelect

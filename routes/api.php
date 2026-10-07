@@ -144,9 +144,14 @@ Route::get('/catalogos', function () {
         'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'pensiones'         => DB::table('fondos_pensiones')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        'cesantias'         => DB::table('fondos_cesantias')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
+        // Si la migración aún no corrió en un entorno, el selector queda vacío en vez de romper /catalogos.
+        'areas_empresa'     => \Illuminate\Support\Facades\Schema::hasTable('area_empresa')
+                                    ? DB::table('area_empresa')->orderBy('nombre')->pluck('nombre')
+                                    : [],
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
@@ -221,11 +226,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin,th,tic')->group(function () {
         // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
         Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
+        // Importación masiva de datos personales desde Excel, por cédula (solo rellena
+        // campos vacíos, nunca pisa un dato ya existente).
+        Route::post('empleados/importar-datos-personales', [EmpleadoController::class, 'importarDatosPersonales']);
         // CRUD completo de empleados
         Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
         Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
         Route::apiResource('empleados', EmpleadoController::class);
 
+        // Rellenar datos faltantes de contratos desde Excel, por documento/cédula (solo
+        // rellena campos vacíos, nunca pisa un dato ya existente; nunca crea contratos). Lo usa
+        // "Importar Excel" de Contratos para las cédulas que ya tienen contrato.
+        Route::post('contratos/importar-datos-faltantes', [ContratoController::class, 'importarDatosFaltantes']);
         // CRUD completo de contratos
         Route::apiResource('contratos', ContratoController::class);
     });

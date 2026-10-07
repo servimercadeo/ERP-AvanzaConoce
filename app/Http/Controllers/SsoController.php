@@ -20,19 +20,21 @@ class SsoController extends Controller
         $token = $request->query('token');
 
         if (!$token) {
-            return redirect('/')->withErrors(['sso' => 'Token SSO no proporcionado.']);
+            return redirect('/login?sso_error=token_ausente');
         }
 
         $payload = $this->sso->validarToken($token);
 
         if (!$payload) {
-            return redirect('/')->withErrors(['sso' => 'Token SSO inválido o expirado.']);
+            return redirect('/login?sso_error=token_invalido');
         }
 
-        $usuario = User::where('email', $payload->email)->where('activo', true)->first();
+        // Pendiente de alta = creado desde Contratos, aún sin alta en Empleados: sin acceso.
+        $usuario = User::where('email', $payload->email)->where('activo', true)->where('pendiente_alta', false)->first();
 
         if (!$usuario) {
-            return redirect('/')->withErrors(['sso' => 'Usuario no encontrado en el ERP.']);
+            // El usuario existe en AvanzaConoce pero aún no fue creado (o está inactivo) en el ERP.
+            return redirect('/login?sso_error=sin_acceso');
         }
 
         // Registrar el momento del login SSO

@@ -55,7 +55,7 @@ return new class extends Migration
 
         DB::table('empleador_contactos')
             ->join('regionales', 'regionales.id', '=', 'empleador_contactos.regional_id')
-            ->update(['empleador_contactos.regional' => DB::raw('regionales.nombre')]);
+            ->update(['empleador_contactos.regional' => DB::raw('`' . DB::getTablePrefix() . 'regionales`.`nombre`')]);
 
         Schema::table('empleador_contactos', function (Blueprint $table) {
             $table->dropConstrainedForeignId('regional_id');

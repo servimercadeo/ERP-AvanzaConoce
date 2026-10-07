@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import {
     SearchableSelect as FilterSelect,
-    PresetFiltersDropdown,
 } from "../components/SearchableSelect";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
@@ -16,10 +15,24 @@ import {
     IconEmptySearch,
     IconLoading,
 } from "../components/Icons";
-import { buildContratoPayloadFromExcelRows } from "../utils/contratosImport";
+import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "../utils/contratosImport";
+import { exportarContratosExcel } from "../utils/contratosExport";
+import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
+import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 
 const POR_PAGINA = 5;
 
+// Nombre de columna (como en "Exportar Excel") de los campos que reporta la importación.
+const CAMPOS_IMPORT_LABEL = {
+    cargo: "Cargo", sede: "Sede", area_empresa: "Área Empresa", jefe_inmediato: "Jefe Inmediato",
+    jefe_inmediato_correo: "Correo del Jefe", tipo_vinculacion: "Tipo de Vinculación", arl: "ARL",
+    fecha_vinculacion_arl: "Fecha Vinculación ARL", lps_afiliado: "EPS", fecha_vinculacion_lps: "Fecha Vinculación EPS",
+    caja_compensacion: "Caja de Compensación", fecha_vinculacion_caja: "Fecha Vinculación Caja",
+    fondo_pensiones: "Fondo de Pensiones", fondo_cesantias: "Fondo de Cesantías", empleador: "Empleador",
+    cliente_proyecto: "Cliente Proyecto",
+};
+
+const TIPOS_CUENTA = ["Ahorros", "Corriente"];
 const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Traslado", "No ingreso"];
 const TIPOS_CONTRATO = [
     "Término Fijo",
@@ -31,6 +44,20 @@ const TIPOS_CONTRATO = [
 ];
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
+
+// Normaliza un valor para que coincida con las opciones del <select> (ignora mayúsculas, tildes y espacios)
+const matchOpt = (val, opts) => {
+    if (!val || !opts?.length) return null;
+    const norm = (s) =>
+        String(s).toLowerCase()
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .trim();
+    const nVal = norm(val);
+    const isObjOpts = typeof opts[0] === "object";
+    const found = opts.find((o) => norm(isObjOpts ? o.label ?? o.value : o) === nVal);
+    if (!found) return null;
+    return isObjOpts ? found.value : found;
+};
 const TODAY = new Date().toISOString().split("T")[0];
 const CUR_YEAR = new Date().getFullYear();
 const YEAR_OPTS = Array.from(
@@ -78,6 +105,9 @@ const EMPTY_FORM = {
     fecha_vinculacion_caja: "",
     fondo_pensiones: "",
     fondo_cesantias: "",
+    banco: "",
+    tipo_cuenta: "",
+    cuenta_bancaria: "",
     estado_contrato: "Activo",
     empleador: "",
     empresa: "",
@@ -657,6 +687,13 @@ function Modal({
         value: r.id,
         label: r.nombre,
     }));
+    const jefeOpts = (empleados || [])
+        .map((e) => {
+            const nombre = `${e.nombres ?? ""} ${e.apellidos ?? ""}`.trim();
+            if (!nombre) return null;
+            return e.email ? `${nombre} - ${e.email}` : nombre;
+        })
+        .filter(Boolean);
     const totalPorcentajeCC = (form.centros_costos || []).reduce(
         (s, cc) => s + (parseFloat(cc.porcentaje) || 0),
         0,
@@ -673,6 +710,22 @@ function Modal({
                 fecha_vinculacion_caja: dateOnly(
                     initial.fecha_vinculacion_caja,
                 ),
+                // Normalizar campos de select para que coincidan exactamente con las opciones
+                // (el valor guardado puede diferir en mayúsculas/tildes del catálogo actual)
+                cargo:              matchOpt(initial.cargo,              catalogs.cargos)             ?? initial.cargo              ?? "",
+                sede:               matchOpt(initial.sede,               catalogs.sedes)              ?? initial.sede               ?? "",
+                tipo_contrato:      matchOpt(initial.tipo_contrato,      TIPOS_CONTRATO)              ?? initial.tipo_contrato      ?? "",
+                estado_contrato:    matchOpt(initial.estado_contrato,    ESTADOS_CONTRATO)            ?? initial.estado_contrato    ?? "",
+                tipo_vinculacion:   matchOpt(initial.tipo_vinculacion,   catalogs.tipos_vinculacion)  ?? initial.tipo_vinculacion   ?? "",
+                arl:                matchOpt(initial.arl,                catalogs.arls)               ?? initial.arl                ?? "",
+                caja_compensacion:  matchOpt(initial.caja_compensacion,  catalogs.cajas)              ?? initial.caja_compensacion  ?? "",
+                lps_afiliado:       matchOpt(initial.lps_afiliado,       catalogs.eps)                ?? initial.lps_afiliado       ?? "",
+                fondo_pensiones:    matchOpt(initial.fondo_pensiones,    catalogs.pensiones)          ?? initial.fondo_pensiones    ?? "",
+                fondo_cesantias:    matchOpt(initial.fondo_cesantias,    catalogs.cesantias)          ?? initial.fondo_cesantias    ?? "",
+                banco:              matchOpt(initial.banco,              catalogs.bancos)             ?? initial.banco              ?? "",
+                tipo_cuenta:        matchOpt(initial.tipo_cuenta,        TIPOS_CUENTA)                ?? initial.tipo_cuenta        ?? "",
+                jefe_inmediato:     matchOpt(initial.jefe_inmediato,     jefeOpts)                    ?? initial.jefe_inmediato     ?? "",
+                cliente_proyecto:   matchOpt(initial.cliente_proyecto,   proyectoOpts)                ?? initial.cliente_proyecto   ?? "",
                 centros_costos: initial.centros_costos || [],
                 anexos: initial.anexos || [],
                 seguimiento_fecha_cierre: dateOnly(
@@ -740,7 +793,7 @@ function Modal({
         setFotoUploading(true);
         try {
             const fd = new FormData();
-            fd.append("fotografia", file);
+            fd.append("fotografia", await compressImage(file));
             const { data } = await api.post(
                 `/empleados/${form.empleado_id}/fotografia`,
                 fd,
@@ -748,10 +801,7 @@ function Modal({
             setFotoOverride(data.fotografia);
             onFotografiaUpdated?.(form.empleado_id, data.fotografia);
         } catch (err) {
-            setFotoError(
-                err?.response?.data?.message ??
-                    "No se pudo subir la fotografía.",
-            );
+            setFotoError(mensajeErrorFoto(err?.response?.data));
         } finally {
             setFotoUploading(false);
         }
@@ -967,6 +1017,11 @@ function Modal({
             setSaving(false);
         }
     };
+
+    const areaEmpresaOpts = useMemo(
+        () => (catalogs.areas_empresa ?? []).map((a) => ({ value: a, label: a })),
+        [catalogs.areas_empresa],
+    );
 
     if (!open) return null;
 
@@ -1271,11 +1326,26 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <Field
-                                    label="Área Empresa"
-                                    k="area_empresa"
-                                    {...fp}
-                                />
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Área Empresa</label>
+                                    {/* Catálogo `area_empresa`. Un valor antiguo que no esté en
+                                        el catálogo se sigue mostrando tal cual. */}
+                                    <FilterSelect
+                                        value={form.area_empresa ?? ""}
+                                        onChange={(v) =>
+                                            onChange("area_empresa")({
+                                                target: { value: v },
+                                            })
+                                        }
+                                        options={areaEmpresaOpts}
+                                        disabled={readOnly}
+                                    />
+                                    {errors.area_empresa && (
+                                        <span style={S.err}>
+                                            {errors.area_empresa}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
@@ -1287,6 +1357,7 @@ function Modal({
                                 <Field
                                     label="Jefe Inmediato"
                                     k="jefe_inmediato"
+                                    opts={jefeOpts}
                                     {...fp}
                                 />
                                 <Field
@@ -1390,6 +1461,7 @@ function Modal({
                                 <Field
                                     label="EPS (LPS Afiliado)"
                                     k="lps_afiliado"
+                                    opts={catalogs.eps}
                                     {...fp}
                                 />
                                 <Field
@@ -1419,14 +1491,36 @@ function Modal({
                                 <Field
                                     label="Fondo Pensiones"
                                     k="fondo_pensiones"
+                                    opts={catalogs.pensiones}
                                     {...fp}
                                 />
                                 <Field
                                     label="Fondo Cesantías"
                                     k="fondo_cesantias"
+                                    opts={catalogs.cesantias}
                                     {...fp}
                                 />
                                 <div />
+                            </div>
+                            <div style={S.sectionHeader}>DATOS BANCARIOS</div>
+                            <div style={{ ...S.grid3, marginTop: 12 }}>
+                                <Field
+                                    label="Banco"
+                                    k="banco"
+                                    opts={catalogs.bancos}
+                                    {...fp}
+                                />
+                                <Field
+                                    label="Tipo de Cuenta"
+                                    k="tipo_cuenta"
+                                    opts={TIPOS_CUENTA}
+                                    {...fp}
+                                />
+                                <Field
+                                    label="No. de Cuenta Bancaria"
+                                    k="cuenta_bancaria"
+                                    {...fp}
+                                />
                             </div>
                         </>
                     )}
@@ -1507,6 +1601,7 @@ function Modal({
                                         <Field
                                             label="EPS"
                                             k="lps_afiliado"
+                                            opts={catalogs.eps}
                                             {...fp}
                                         />
                                         <Field
@@ -2306,6 +2401,7 @@ export default function ContratosCrud() {
         cajas: [],
         bancos: [],
         pensiones: [],
+        cesantias: [],
         tipos_vinculacion: [],
         regionales: [],
     });
@@ -2321,6 +2417,7 @@ export default function ContratosCrud() {
     const [importFileName, setImportFileName] = useState("");
     const [importing, setImporting] = useState(false);
     const [importError, setImportError] = useState("");
+    const [exporting, setExporting] = useState(false);
     const [pagina, setPagina] = useState(1);
 
     const { data: _qContratos } = useQuery({
@@ -2376,6 +2473,12 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qEmpleados) setEmpleados(_qEmpleados);
     }, [_qEmpleados]);
+
+    // La foto vive en `users`: al actualizar la caché, los efectos de arriba la llevan
+    // al selector de empleados y a las filas de contratos, y las demás pantallas la ven
+    // al abrirse.
+    const handleFotografiaUpdated = (empleadoId, fotografia) =>
+        propagarFotoEmpleado(qc, empleadoId, fotografia);
     useEffect(() => {
         if (_qCatalogos) setCatalogs(_qCatalogos);
     }, [_qCatalogos]);
@@ -2564,6 +2667,21 @@ export default function ContratosCrud() {
         setFiltroFondoPensiones("Todos");
     };
 
+    // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
+    // la página actual. Las columnas sensibles solo salen para quien puede verlas.
+    const handleExportExcel = async () => {
+        if (!filtered.length) return;
+        setExporting(true);
+        try {
+            await exportarContratosExcel(filtered, { incluirSensible: puedeVerInfoSensible });
+            showToast(`Excel exportado (${filtered.length} contrato${filtered.length === 1 ? "" : "s"}).`);
+        } catch {
+            showToast("No se pudo generar el Excel.");
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const handleImportExcel = async () => {
         if (!importFile) {
             setImportError("Selecciona un archivo Excel válido (.xlsx o .xls).");
@@ -2603,29 +2721,46 @@ export default function ContratosCrud() {
             );
 
             let created = 0;
-            let omitted = 0;
-            let noEncontrados = 0;
+            let nuevosPendientes = 0;
             const errors = [];
-            for (const [index, payload] of payloads.entries()) {
+            // Cédulas que ya tienen contrato: no se crea otro, se rellenan los campos vacíos
+            // de su contrato vigente (nunca se sobrescribe un dato existente).
+            const paraCompletar = [];
+            for (const [index, rawPayload] of payloads.entries()) {
+                const { correo_jefe_invalido: correoJefeInvalido, ...payload } = rawPayload;
                 const documento = payload.documento ? String(payload.documento).trim() : "";
+                if (correoJefeInvalido) {
+                    errors.push(`Cédula ${documento}: el correo del jefe "${correoJefeInvalido}" no es válido y no se cargó (el resto del contrato sí).`);
+                }
                 if (documento && cedulasExistentes.has(documento)) {
-                    omitted += 1;
+                    paraCompletar.push(filaParaCompletarContrato(payload));
                     continue;
                 }
 
-                // No dejar que el backend cree el empleado automáticamente al importar:
-                // si la cédula no corresponde a un empleado ya existente, se omite.
-                const empleado = documento ? empleadosPorCedula.get(documento) : null;
-                if (!empleado) {
-                    noEncontrados += 1;
-                    errors.push(`Cédula ${documento || "sin documento"}: no existe como empleado en el sistema, no se creó el contrato.`);
+                // Proceso: el contrato va primero. Si la cédula aún no es empleado, el backend
+                // la crea "pendiente de alta" (sin credenciales); después Empleados > Importar
+                // Excel completa su ficha y le da el alta. Para crearla hacen falta los nombres.
+                if (!documento) {
+                    errors.push(`Contrato ${index + 1}: no tiene Documento (cédula), no se creó.`);
+                    continue;
+                }
+                const empleado = empleadosPorCedula.get(documento);
+                if (!empleado && (!payload.nombres || !payload.apellidos)) {
+                    errors.push(`Cédula ${documento}: no es empleado todavía y le faltan Nombres o Apellidos para crearlo; no se creó el contrato.`);
                     continue;
                 }
 
-                const payloadConEmpleado = { ...payload, empleado_id: empleado.id };
+                const { regional_no_encontrada: regionalNoEncontrada, ...payloadLimpio } = payload;
+                if (regionalNoEncontrada) {
+                    errors.push(`Cédula ${documento}: la regional "${regionalNoEncontrada}" no existe en el catálogo, no se creó el contrato.`);
+                    continue;
+                }
+
+                const payloadConEmpleado = empleado ? { ...payloadLimpio, empleado_id: empleado.id } : payloadLimpio;
                 try {
                     await api.post("/contratos", payloadConEmpleado);
                     created += 1;
+                    if (!empleado) nuevosPendientes += 1;
                     if (documento) cedulasExistentes.add(documento);
                 } catch (err) {
                     const message = err?.response?.data?.message || err?.message || "Error desconocido";
@@ -2634,19 +2769,51 @@ export default function ContratosCrud() {
                 }
             }
 
+            let completados = 0;
+            let sinCambios = 0;
+            const etiqueta = (campo) => CAMPOS_IMPORT_LABEL[campo] ?? campo;
+            // El endpoint acepta hasta 2000 filas por petición.
+            for (let i = 0; i < paraCompletar.length; i += 500) {
+                try {
+                    const { data } = await api.post("/contratos/importar-datos-faltantes", {
+                        filas: paraCompletar.slice(i, i + 500),
+                    });
+                    completados += data.actualizados;
+                    sinCambios += data.sin_cambios;
+                    data.no_encontrados.forEach((doc) =>
+                        errors.push(`Cédula ${doc}: no se encontró su contrato vigente para completarlo.`),
+                    );
+                    data.detalle
+                        .filter((d) => d.campos_invalidos?.length)
+                        .forEach((d) =>
+                            errors.push(
+                                `Cédula ${d.documento}: valores inválidos que no se cargaron (${d.campos_invalidos.map(etiqueta).join(", ")}).`,
+                            ),
+                        );
+                } catch (err) {
+                    errors.push(
+                        `No se pudieron completar ${Math.min(500, paraCompletar.length - i)} contrato(s) existentes: ${err?.response?.data?.message || err?.message || "Error desconocido"}`,
+                    );
+                }
+            }
+
             qc.invalidateQueries({ queryKey: ["contratos"] });
             qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
 
-            if (errors.length && created === 0 && omitted === 0) {
-                throw new Error(errors.join(" \n"));
-            }
-
             const resumen = [];
-            if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} importado${created === 1 ? "" : "s"}`);
-            if (omitted > 0) resumen.push(`${omitted} omitido${omitted === 1 ? "" : "s"} (ya existía un contrato con esa cédula)`);
-            if (noEncontrados > 0) resumen.push(`${noEncontrados} sin crear (cédula no registrada como empleado)`);
-            if (errors.length - noEncontrados > 0) resumen.push(`${errors.length - noEncontrados} con error`);
-            showToast(resumen.length ? resumen.join(", ") : "No se importó ningún contrato.");
+            if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} creado${created === 1 ? "" : "s"}`);
+            if (completados > 0) resumen.push(`${completados} existente${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"} (solo campos vacíos)`);
+            if (sinCambios > 0) resumen.push(`${sinCambios} existente${sinCambios === 1 ? "" : "s"} sin cambios (ya tenían todo)`);
+            if (nuevosPendientes > 0) resumen.push(`${nuevosPendientes} empleado${nuevosPendientes === 1 ? "" : "s"} nuevo${nuevosPendientes === 1 ? "" : "s"} pendiente${nuevosPendientes === 1 ? "" : "s"} de alta (complétalos en Empleados > Importar Excel para entregar credenciales)`);
+            const textoResumen = resumen.length ? resumen.join(", ") : "No se importó ningún contrato.";
+
+            // Con errores el modal queda abierto mostrándolos: un aviso de 3 segundos no
+            // alcanza para saber qué filas corregir.
+            if (errors.length) {
+                setImportError(`${textoResumen}.\n\n${errors.length} fila(s) con problemas:\n• ${errors.join("\n• ")}`);
+                return;
+            }
+            showToast(textoResumen);
             setImportOpen(false);
             setImportFile(null);
             setImportFileName("");
@@ -2723,68 +2890,25 @@ export default function ContratosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            {
-                                label: "Contratos activos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Activo");
-                                },
-                            },
-                            {
-                                label: "Contratos inactivos",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Inactivo");
-                                },
-                            },
-                            {
-                                label: "Contratos cancelados",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Cancelado");
-                                },
-                            },
-                            {
-                                label: "Contratos en translado",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("Traslado");
-                                },
-                            },
-                            {
-                                label: "Contratos con No ingreso",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroEstado("No ingreso");
-                                },
-                            },
-                            {
-                                label: "Término fijo",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoContrato("Término Fijo");
-                                },
-                            },
-                            {
-                                label: "Prestación de servicios",
-                                apply: () => {
-                                    clearFilters();
-                                    setFiltroTipoContrato(
-                                        "Prestación de Servicios",
-                                    );
-                                },
-                            },
-                            {
-                                label: "Limpiar filtros",
-                                apply: () => clearFilters(),
-                                clear: true,
-                            },
-                        ]}
-                    />
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                        style={{
+                            border: "1px solid var(--border)",
+                            background: "var(--white)",
+                            color: "var(--text)",
+                            padding: "9px 14px",
+                            borderRadius: "var(--radius-sm)",
+                            fontWeight: 700,
+                            cursor: exporting || loading || !filtered.length ? "not-allowed" : "pointer",
+                            opacity: exporting || loading || !filtered.length ? 0.6 : 1,
+                        }}
+                        onClick={handleExportExcel}
+                        disabled={exporting || loading || !filtered.length}
+                        title="Exporta los contratos que coinciden con la búsqueda y los filtros activos"
+                    >
+                        {exporting ? "Exportando…" : "Exportar Excel"}
+                    </button>
                     <button
                         style={{
                             border: "1px solid var(--border)",
@@ -2986,8 +3110,18 @@ export default function ContratosCrud() {
                         </div>
                         <div style={{ padding: 24 }}>
                             <p style={{ margin: "0 0 12px", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                                Sube un archivo con las columnas de contrato. El sistema intentará mapear encabezados como cédula, nombres, apellidos, cargo, sede, fecha de ingreso, tipo de contrato, salario y proyecto.
+                                Sube un archivo con las columnas de contrato (el mismo formato de «Exportar Excel»: Documento, Cargo, Sede, Tipo de Contrato, Fecha de Ingreso, Salario, EPS, ARL, Centro de Costos, etc.). Este es el primer paso: después se completan los empleados en Empleados &gt; Importar Excel, que es donde reciben sus credenciales.
                             </p>
+                            <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text-muted)", lineHeight: 1.6, fontSize: "0.88rem" }}>
+                                <li>
+                                    <strong>Sin contrato:</strong> se crea el contrato completo, con sus anexos (una fila por auxilio).
+                                    Si la persona aún no es empleado, queda creada como <em>pendiente de alta</em> (sin acceso al sistema); para eso el archivo debe traer Nombres y Apellidos.
+                                </li>
+                                <li>
+                                    <strong>Ya tiene contrato:</strong> solo se rellenan los campos vacíos de su contrato vigente.
+                                    Nunca se sobrescribe un dato existente, y salario, fechas de ingreso/retiro, estado, tipo de contrato y centros de costo no se modifican.
+                                </li>
+                            </ul>
                             <label
                                 style={{
                                     display: "flex",
@@ -3016,7 +3150,7 @@ export default function ContratosCrud() {
                                 {importFileName || "Seleccionar archivo Excel"}
                             </label>
                             {importError && (
-                                <div style={{ ...S.err, marginTop: 12, whiteSpace: "pre-wrap" }}>
+                                <div style={{ ...S.err, marginTop: 12, whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto" }}>
                                     {importError}
                                 </div>
                             )}
@@ -3301,15 +3435,7 @@ export default function ContratosCrud() {
                 empleadorOpts={empleadorOpts}
                 empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
-                onFotografiaUpdated={(empleadoId, fotografia) =>
-                    setEmpleados((prev) =>
-                        prev.map((e) =>
-                            String(e.id) === String(empleadoId)
-                                ? { ...e, fotografia }
-                                : e,
-                        ),
-                    )
-                }
+                onFotografiaUpdated={handleFotografiaUpdated}
             />
 
             {empresaProyectoAlert && (
@@ -3364,16 +3490,9 @@ export default function ContratosCrud() {
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
                 restringirVistaSensible={!puedeVerInfoSensible}
-                onFotografiaUpdated={(empleadoId, fotografia) =>
-                    setEmpleados((prev) =>
-                        prev.map((e) =>
-                            String(e.id) === String(empleadoId)
-                                ? { ...e, fotografia }
-                                : e,
-                        ),
-                    )
-                }
+                onFotografiaUpdated={handleFotografiaUpdated}
             />
+
         </div>
     );
 }

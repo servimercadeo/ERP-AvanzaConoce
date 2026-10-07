@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
@@ -134,8 +135,11 @@ class User extends Authenticatable
      */
     protected static function booted(): void
     {
+        // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
+        // (th/tic) a quien todavía no tiene rol asignado; nunca cambia ni quita uno elegido.
         static::saving(function (User $user) {
-            if (!$user->isDirty('cargo') || $user->rol === 'admin') {
+            $rolElegidoAhora = $user->exists && $user->isDirty('rol');
+            if (!$user->isDirty('cargo') || $rolElegidoAhora || !in_array($user->rol, [null, 'general'], true)) {
                 return;
             }
 
@@ -145,8 +149,6 @@ class User extends Authenticatable
                 $user->rol = 'th';
             } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || str_contains($cargo, 'TIC'))) {
                 $user->rol = 'tic';
-            } else {
-                $user->rol = null;
             }
         });
     }
@@ -167,5 +169,42 @@ class User extends Authenticatable
             'tiene_cert_alturas'   => 'boolean',
             'ingresos'             => 'decimal:2',
         ];
+    }
+
+    /**
+     * Completa en memoria (sin guardar) `fotografia` de los usuarios que no la tienen en
+     * `users`: primero la del formulario de nuevos ingresos (fuente actual) y si no, la de
+     * candidatos (fuente antigua). Resuelto en dos consultas para toda la colección.
+     *
+     * @param  iterable<User|null>  $users
+     */
+    public static function completarFotografias(iterable $users): void
+    {
+        $sinFoto = collect($users)->filter(fn ($u) => $u && !$u->fotografia && $u->cedula);
+        if ($sinFoto->isEmpty()) {
+            return;
+        }
+
+        $cedulas = $sinFoto->pluck('cedula')->unique()->values()->all();
+        // `union` (no `merge`): las cédulas son claves numéricas y `merge` las renumeraría.
+        // Ante la misma cédula gana la de respuestas_ingresos (lado izquierdo).
+        $fotos = DB::table('respuestas_ingresos')
+            ->whereIn('documento', $cedulas)
+            ->whereNotNull('fotografia')->where('fotografia', '!=', '')
+            ->orderBy('id')
+            ->pluck('fotografia', 'documento')
+            ->union(
+                DB::table('candidatos')
+                    ->whereIn('identificacion', $cedulas)
+                    ->whereNotNull('fotografia')->where('fotografia', '!=', '')
+                    ->orderBy('id')
+                    ->pluck('fotografia', 'identificacion')
+            );
+
+        foreach ($sinFoto as $user) {
+            if ($foto = $fotos->get($user->cedula)) {
+                $user->fotografia = $foto;
+            }
+        }
     }
 }

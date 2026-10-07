@@ -28,7 +28,8 @@ return new class extends Migration
             });
         }
 
-        $indices = collect(DB::select('SHOW INDEX FROM inventario_productos'))->pluck('Key_name')->unique();
+        $prefix = DB::getTablePrefix();
+        $indices = collect(DB::select("SHOW INDEX FROM `{$prefix}inventario_productos`"))->pluck('Key_name')->unique();
 
         if (!$indices->contains('inventario_productos_tipo_producto_id_index')) {
             Schema::table('inventario_productos', function (Blueprint $table) {
@@ -44,7 +45,7 @@ return new class extends Migration
             });
         }
 
-        $indices = collect(DB::select('SHOW INDEX FROM inventario_productos'))->pluck('Key_name')->unique();
+        $indices = collect(DB::select("SHOW INDEX FROM `{$prefix}inventario_productos`"))->pluck('Key_name')->unique();
         if (!$indices->contains('inventario_productos_unico')) {
             Schema::table('inventario_productos', function (Blueprint $table) {
                 $table->unique(['tipo_producto_id', 'sede_id', 'talla'], 'inventario_productos_unico');

@@ -73,6 +73,35 @@ class InventarioDotacionAccesoTest extends TestCase
         $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertExactJson(['DIRECTV']);
     }
 
+    public function test_el_admin_ve_y_gestiona_todo_el_inventario_aunque_su_empresa_este_restringida(): void
+    {
+        $empresaId = DB::table('empresas')->insertGetId([
+            'nombre' => 'SERVIMERCADEO COL', 'pais' => 'Colombia', 'activo' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actuarComo('admin', ['empresa_id' => $empresaId]);
+
+        $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertJsonCount(4);
+        $proyectos = collect($this->getJson('/api/inventario-dotacion')->assertOk()->json())->pluck('proyecto')->unique()->sort()->values()->all();
+        $this->assertSame(collect(self::TODAS)->sort()->values()->all(), $proyectos);
+        $this->assertContains('CAMISA SYM TIGO HOME', $this->getJson('/api/inventario-dotacion/filtros')->assertOk()->json('prendas'));
+
+        // También puede editar un proyecto que no es de su empresa
+        $tigo = InventarioDotacion::where('proyecto', 'SYM TIGO HOME')->first();
+        $this->putJson("/api/inventario-dotacion/{$tigo->id}", ['cantidad' => 15])->assertOk();
+        $this->assertSame(15, $tigo->fresh()->cantidad);
+    }
+
+    public function test_otros_roles_de_una_empresa_restringida_siguen_limitados(): void
+    {
+        $empresaId = DB::table('empresas')->insertGetId([
+            'nombre' => 'SERVIMERCADEO COL', 'pais' => 'Colombia', 'activo' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach (['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
+            $this->actuarComo($rol, ['empresa_id' => $empresaId]);
+            $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertExactJson(['DIRECTV']);
+        }
+    }
+
     public function test_usuario_sin_empresa_o_de_empresa_no_sujeta_a_la_regla_ve_todos(): void
     {
         $this->usuarioDeEmpresa(null);

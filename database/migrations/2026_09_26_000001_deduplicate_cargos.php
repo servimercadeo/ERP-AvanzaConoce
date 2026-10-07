@@ -26,12 +26,12 @@ return new class extends Migration
             DB::table('cargos')->whereIn('id', $idsAEliminar)->delete();
         }
 
-        DB::statement('ALTER TABLE cargos ADD UNIQUE INDEX cargos_nombre_unique (nombre)');
+        DB::statement('ALTER TABLE `' . DB::getTablePrefix() . 'cargos` ADD UNIQUE INDEX cargos_nombre_unique (nombre)');
     }
 
     public function down(): void
     {
         // Los duplicados eliminados no se pueden reconstruir; solo se retira el índice.
-        DB::statement('ALTER TABLE cargos DROP INDEX cargos_nombre_unique');
+        DB::statement('ALTER TABLE `' . DB::getTablePrefix() . 'cargos` DROP INDEX cargos_nombre_unique');
     }
 };

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
-import { SearchableSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import { SearchableSelect } from "../components/SearchableSelect";
 import api from "../api/axios";
 import {
     IconSearch,
@@ -84,29 +84,14 @@ function Field({
                 {req && !disabled ? " *" : ""}
             </label>
             {opts ? (
-                <select
-                    style={{
-                        ...S.input,
-                        ...(errors[k] ? S.inputErr : {}),
-                        ...disabledStyle,
-                    }}
+                // Mismo selector con búsqueda que el formulario de requisiciones.
+                <SearchableSelect
                     value={form[k] ?? ""}
-                    onChange={onChange(k)}
+                    onChange={(v) => onChange(k)({ target: { value: v } })}
+                    options={isObjOpts ? opts : opts.map((o) => ({ value: o, label: o }))}
+                    defaultValue=""
                     disabled={disabled}
-                >
-                    <option value="">Elige</option>
-                    {isObjOpts
-                        ? opts.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                  {o.label}
-                              </option>
-                          ))
-                        : opts.map((o) => (
-                              <option key={o} value={o}>
-                                  {o}
-                              </option>
-                          ))}
-                </select>
+                />
             ) : (
                 <input
                     style={{
@@ -141,24 +126,14 @@ function Modal({
 
     useEffect(() => {
         if (open) {
-            setForm({
-                ...initial,
-                departamento: initial.id_ciudad
-                    ? options.ciudades.find((c) => c.id == initial.id_ciudad)
-                          ?.id_departamento || ""
-                    : "",
-            });
+            setForm(initial);
             setErrors({});
             setSaving(false);
         }
-    }, [initial, open, options.ciudades]);
+    }, [initial, open]);
 
     const onChange = (k) => (e) => {
-        setForm((f) => {
-            const updated = { ...f, [k]: e.target.value };
-            if (k === "departamento") updated.id_ciudad = "";
-            return updated;
-        });
+        setForm((f) => ({ ...f, [k]: e.target.value }));
     };
 
     const validate = () => {
@@ -193,23 +168,14 @@ function Modal({
         }
     };
 
-    const departamentos = useMemo(() => {
-        const deps = new Set(
-            options.ciudades.map((c) => c.id_departamento).filter(Boolean),
-        );
-        return Array.from(deps).map((d) => ({
-            value: d,
-            label: `Departamento ${d}`,
-        }));
-    }, [options.ciudades]);
+    const ciudadesOpts = useMemo(
+        () => options.ciudades.map((c) => ({ value: c.id, label: c.nombre })),
+        [options.ciudades],
+    );
 
     if (!open) return null;
 
     const fp = { form, errors, onChange, disabled: readOnly };
-
-    const ciudadesFiltradas = form.departamento
-        ? options.ciudades.filter((c) => c.id_departamento == form.departamento)
-        : options.ciudades;
 
     return (
         <div style={S.overlay} onClick={onClose}>
@@ -249,24 +215,19 @@ function Modal({
                             />
                             <Field label="Teléfonos" k="telefono" {...fp} />
                             <Field
-                                label="Departamento"
-                                k="departamento"
-                                opts={
-                                    departamentos.length > 0
-                                        ? departamentos
-                                        : [
-                                              {
-                                                  value: "1",
-                                                  label: "Sin Departamentos",
-                                              },
-                                          ]
-                                }
+                                label="Ciudad"
+                                k="id_ciudad"
+                                opts={ciudadesOpts}
+                                req
                                 {...fp}
                             />
                             <Field
                                 label="Usuario Almacenista"
                                 k="id_almacenista_mac"
-                                opts={options.users}
+                                opts={options.users.map((u) => ({
+                                    value: u.id,
+                                    label: u.label,
+                                }))}
                                 {...fp}
                             />
                         </div>
@@ -292,16 +253,6 @@ function Modal({
                                 label="Estado"
                                 k="estado"
                                 opts={options.estados}
-                                req
-                                {...fp}
-                            />
-                            <Field
-                                label="Ciudad"
-                                k="id_ciudad"
-                                opts={ciudadesFiltradas.map((c) => ({
-                                    value: c.id,
-                                    label: c.nombre,
-                                }))}
                                 req
                                 {...fp}
                             />
@@ -719,13 +670,6 @@ export default function SedesCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown presets={[
-                        { label: "Sedes activas", apply: () => { clearFilters(); setFiltroEstado("Activa"); } },
-                        { label: "Sedes inactivas", apply: () => { clearFilters(); setFiltroEstado("Inactiva"); } },
-                        { label: "Sedes principales", apply: () => { clearFilters(); setFiltroTipo("Principal"); } },
-                        { label: "Sedes secundarias", apply: () => { clearFilters(); setFiltroTipo("Secundaria"); } },
-                        { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                    ]} />
                 </div>
                 <button
                     className="btn-primary"
@@ -758,7 +702,6 @@ export default function SedesCrud() {
                                 </th>
                                 <th>Ciudad</th>
                                 <th>Nombre Sede</th>
-                                <th>Proyecto</th>
                                 <th>Dirección Sede</th>
                                 <th>Tipo sede</th>
                                 <th>Estado</th>
@@ -786,9 +729,6 @@ export default function SedesCrud() {
                                         }}
                                     >
                                         {s.nombre}
-                                    </td>
-                                    <td style={{ fontSize: "0.85rem" }}>
-                                        {s.proyecto?.nombre || "—"}
                                     </td>
                                     <td style={{ fontSize: "0.85rem" }}>
                                         {s.direccion || "—"}

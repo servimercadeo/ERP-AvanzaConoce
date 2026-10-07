@@ -11,7 +11,6 @@ import {
 } from "../components/Icons";
 
 // ── Importa aquí los CRUD de cada módulo ─────────────────────────────────
-import EmpleadosCrud from "./EmpleadosCrud";
 import VerYCrearParametrosCrud from "./VerYCrearParametrosCrud";
 // import VehiculosCrud           from './VehiculosCrud';          // Administrativo
 import SedesCrud from "./SedesCrud"; // Sedes
@@ -33,8 +32,6 @@ function resolveCrud(moduleId, archivoId) {
         /* ── ADMINISTRATIVO ─────────────────────────────────────── */
         case "administrativo":
             switch (archivoId) {
-                case "empleados":
-                    return EmpleadosCrud;
                 // case 'vehiculos':  return VehiculosCrud;
                 default:
                     return null;

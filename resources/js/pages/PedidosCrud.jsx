@@ -12,7 +12,7 @@ import {
     IconEye,
     IconFile
 } from "../components/Icons";
-import { SearchableSelect as FilterSelect, PresetFiltersDropdown } from "../components/SearchableSelect";
+import { SearchableSelect as FilterSelect } from "../components/SearchableSelect";
 
 // --- Valores estáticos para los filtros ---
 const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras", "Completado", "Rechazado"];
@@ -744,16 +744,6 @@ export default function PedidosCrud() {
                         </svg>
                         Filtros
                     </button>
-                    <PresetFiltersDropdown
-                        presets={[
-                            { label: "Pendientes de aprobación", apply: () => { clearFilters(); setFiltroEstado("Pendiente Aprobación"); } },
-                            { label: "Aprobados", apply: () => { clearFilters(); setFiltroEstado("Aprobado"); } },
-                            { label: "Enviados a compras", apply: () => { clearFilters(); setFiltroEstado("Enviado a compras"); } },
-                            { label: "Completados", apply: () => { clearFilters(); setFiltroEstado("Completado"); } },
-                            { label: "Rechazados", apply: () => { clearFilters(); setFiltroEstado("Rechazado"); } },
-                            { label: "Limpiar filtros", apply: () => clearFilters(), clear: true },
-                        ]}
-                    />
                 </div>
                 <div style={S.actionButtonGroup}>
                     <button style={S.btnSecondary} onClick={handleTrazabilidad}>

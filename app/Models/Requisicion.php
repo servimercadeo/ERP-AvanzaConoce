@@ -75,4 +75,37 @@ class Requisicion extends Model
     {
         return $this->hasMany(Candidato::class);
     }
+
+    /** Vacantes cubiertas: candidatos de la requisición con aval de contratación activo. */
+    public function vacantesCubiertas(): int
+    {
+        return $this->candidatos()->where('aval', true)->count();
+    }
+
+    /**
+     * Cierra la requisición automáticamente cuando se cubren todas sus vacantes, y la reabre
+     * ("En proceso") si una cerrada vuelve a tener vacantes libres (se quitó un aval o se
+     * aumentaron las vacantes). Las canceladas no se tocan.
+     */
+    public function actualizarEstadoPorVacantes(): void
+    {
+        if ($this->estado === 'Cancelada') {
+            return;
+        }
+
+        $completa = $this->vacantesCubiertas() >= $this->requeridas;
+
+        if ($completa && $this->estado !== 'Completada') {
+            $this->update(['estado' => 'Completada']);
+        } elseif (!$completa && $this->estado === 'Completada') {
+            $this->update(['estado' => 'En proceso']);
+        }
+    }
+
+    public static function actualizarEstadoPorVacantesDe(?int $id): void
+    {
+        if ($id) {
+            static::find($id)?->actualizarEstadoPorVacantes();
+        }
+    }
 }

@@ -10,7 +10,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic') NOT NULL DEFAULT 'consultor'");
+        DB::statement("ALTER TABLE `" . DB::getTablePrefix() . "users` MODIFY rol ENUM('admin', 'gestor', 'consultor', 'th', 'tic') NOT NULL DEFAULT 'consultor'");
 
         // Backfill: deriva el rol a partir del cargo para los usuarios ya existentes.
         DB::table('users')->where('cargo', 'like', '%TALENTO HUMANO%')->update(['rol' => 'th']);
@@ -30,6 +30,6 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('users')->whereIn('rol', ['th', 'tic'])->update(['rol' => 'consultor']);
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('admin', 'gestor', 'consultor') NOT NULL DEFAULT 'consultor'");
+        DB::statement("ALTER TABLE `" . DB::getTablePrefix() . "users` MODIFY rol ENUM('admin', 'gestor', 'consultor') NOT NULL DEFAULT 'consultor'");
     }
 };

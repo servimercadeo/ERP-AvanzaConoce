@@ -14,6 +14,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('work_orders', 'numero_wo_ibs')) {
+            return;
+        }
+
         Schema::table('work_orders', function (Blueprint $table) {
             $table->string('numero_wo_ibs', 60)->nullable()->after('numero_item');
         });

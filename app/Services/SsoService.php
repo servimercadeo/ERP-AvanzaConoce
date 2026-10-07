@@ -57,6 +57,10 @@ class SsoService
     public function validarToken(string $token): ?object
     {
         try {
+            // Tolerancia de reloj entre servidores: sin esto, un desfase de pocos segundos hace
+            // que un token recién emitido parezca "del futuro" (iat) y se rechace.
+            JWT::$leeway = 60;
+
             return JWT::decode($token, new Key($this->secret, $this->algorithm));
         } catch (ExpiredException $e) {
             Log::warning('SSO: token expirado');

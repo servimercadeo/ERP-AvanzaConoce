@@ -14,16 +14,9 @@ const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FIXED_DOCS = ["Hoja de vida", "Pruebas psicotécnicas"];
 
-// Para Indirecta ya no hay lista fija: los correos salen de los contactos del empleador
-// (Parámetros > Empleadores), filtrados por empleador + regional elegidos en el modal.
-const CORREOS_AVAL = {
-    Directa: [
-        "julianvalencia@servimercadeo.com",
-        "coordinador.th@servimercadeo.com",
-        "nomina@servimercadeo.com",
-        "coordinadora.sst@servimercadeo.com",
-    ],
-};
+// Los correos del aval salen de los contactos de los empleadores (Parámetros > Empleadores):
+// Directa = todos los contactos de los empleadores directos; Indirecta = los del empleador
+// indirecto + regional elegidos en el modal.
 
 const MESES = [
     "ENERO",
@@ -127,7 +120,6 @@ export default function CandidatosCrud() {
         fecha_correccion: "",
         fotografia: "",
     });
-    const [fotografiaFile, setFotografiaFile] = useState(null);
     const [docs, setDocs] = useState([]);
     const [docsLoading, setDocsLoading] = useState(false);
     const [uploadingDoc, setUploadingDoc] = useState(null);
@@ -139,7 +131,7 @@ export default function CandidatosCrud() {
         open: false,
         candidateId: null,
         tipo: "Directa",
-        correos: CORREOS_AVAL.Directa,
+        correos: [],
         empleadorId: "",
         regional: "",
     };
@@ -193,17 +185,19 @@ export default function CandidatosCrud() {
         queryKey: ["sedes"],
         queryFn: () => api.get("/sedes").then((r) => r.data),
     });
-    // Empleadores indirectos (con sus contactos y regional) para resolver a quién se le envía
-    // el aval cuando la vinculación es Indirecta.
-    const { data: empleadoresIndirectos = [] } = useQuery({
-        queryKey: ["empleadores-indirectos"],
-        queryFn: () =>
-            api
-                .get("/empleadores")
-                .then((r) =>
-                    (r.data ?? []).filter((e) => e.tipo === "Indirecto"),
-                ),
+    // Empleadores (con sus contactos y regional) para resolver a quién se le envía el aval.
+    const { data: empleadoresAval = [] } = useQuery({
+        queryKey: ["empleadores-aval"],
+        queryFn: () => api.get("/empleadores").then((r) => r.data ?? []),
     });
+    // Vinculación Directa: el aval va a todos los contactos de los empleadores directos
+    // (Servimercadeo y S&M), sin elegir empleador ni regional. Sin correos repetidos.
+    const contactosDirectos = empleadoresAval
+        .filter((e) => e.tipo === "Directo")
+        .flatMap((e) => e.contactos ?? [])
+        .filter(
+            (c, i, arr) => arr.findIndex((x) => x.correo === c.correo) === i,
+        );
     const loadingData = _lc || _lr || _lk;
 
     useEffect(() => {
@@ -287,6 +281,8 @@ export default function CandidatosCrud() {
             ...extra,
         }).then(() => {
             qc.invalidateQueries({ queryKey: ['candidatos'] });
+            // El aval cambia las vacantes cubiertas: la requisición puede haberse cerrado o reabierto.
+            if (field === "aval") qc.invalidateQueries({ queryKey: ['requisiciones'] });
         }).catch((err) => {
             setCandidates((prev) =>
                 prev.map((c) => (c.id === candidateId ? candidate : c)),
@@ -322,11 +318,22 @@ export default function CandidatosCrud() {
                 );
                 return;
             }
+            // Preselecciona el empleador de la requisición y el tipo de vinculación que le corresponde.
+            const empReq = empleadoresAval.find(
+                (e) =>
+                    String(e.id) === String(candidate.requisicion?.empleador_id),
+            );
+            const tipo = empReq?.tipo === "Indirecto" ? "Indirecta" : "Directa";
             setVinculacionModal({
+                ...VINCULACION_MODAL_INICIAL,
                 open: true,
                 candidateId,
-                tipo: "Directa",
-                correos: CORREOS_AVAL.Directa,
+                tipo,
+                empleadorId: tipo === "Indirecta" ? String(empReq.id) : "",
+                correos:
+                    tipo === "Directa"
+                        ? contactosDirectos.map((c) => c.correo)
+                        : [],
             });
             return;
         }
@@ -342,7 +349,6 @@ export default function CandidatosCrud() {
     };
 
     const handleAddCandidate = () => {
-        setFotografiaFile(null);
         setCandModalMode("create");
         setCandForm({
             nombres: "",
@@ -368,7 +374,6 @@ export default function CandidatosCrud() {
     };
 
     const handleEditCandidate = (c) => {
-        setFotografiaFile(null);
         setCandModalMode("edit");
         setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
         setNewDocFile(null);
@@ -623,37 +628,14 @@ export default function CandidatosCrud() {
         }
         try {
             if (candModalMode === "create") {
-                let payload;
-                if (fotografiaFile) {
-                    const fd = new FormData();
-                    Object.entries({ ...candForm, pruebas: false, aval: false }).forEach(([k, v]) => {
-                        if (v !== null && v !== undefined && v !== "") fd.append(k, v);
-                    });
-                    fd.append("fotografia", fotografiaFile);
-                    payload = fd;
-                } else {
-                    payload = { ...candForm, pruebas: false, aval: false };
-                }
+                const payload = { ...candForm, pruebas: false, aval: false };
                 const { data: created } = await api.post("/candidatos", payload);
                 setCandidates((prev) => [created, ...prev]);
             } else {
                 // eslint-disable-next-line no-unused-vars
                 const { pruebas: _p, aval: _a, ...editPayload } = candForm;
-                let payload;
-                if (fotografiaFile) {
-                    const fd = new FormData();
-                    Object.entries(editPayload).forEach(([k, v]) => {
-                        if (v !== null && v !== undefined && v !== "") fd.append(k, v);
-                    });
-                    fd.append("fotografia", fotografiaFile);
-                    fd.append("_method", "PUT");
-                    payload = fd;
-                    const { data: updated } = await api.post(`/candidatos/${candForm.id}`, payload);
-                    setCandidates((prev) => prev.map((c) => (c.id === candForm.id ? updated : c)));
-                } else {
-                    const { data: updated } = await api.put(`/candidatos/${candForm.id}`, editPayload);
-                    setCandidates((prev) => prev.map((c) => (c.id === candForm.id ? updated : c)));
-                }
+                const { data: updated } = await api.put(`/candidatos/${candForm.id}`, editPayload);
+                setCandidates((prev) => prev.map((c) => (c.id === candForm.id ? updated : c)));
             }
             setIsCandModalOpen(false);
             showToast(
@@ -765,10 +747,13 @@ export default function CandidatosCrud() {
         );
     }, [candidates, debouncedSearch]);
 
-    // Empleador elegido en el modal de vinculación Indirecta, sus regionales con contacto
-    // registrado, y los contactos que coinciden con la regional elegida (más los de
-    // "Todo a nivel nacional", que aplican sin importar la regional específica).
-    const empleadorVinc = empleadoresIndirectos.find(
+    // Indirecta: empleadores indirectos, el empleador seleccionado, sus regionales
+    // con contacto registrado, y los contactos que coinciden con la regional elegida (más los
+    // de "Todo a nivel nacional", que aplican sin importar la regional específica).
+    const empleadoresVinc = empleadoresAval.filter(
+        (e) => e.tipo === "Indirecto",
+    );
+    const empleadorVinc = empleadoresVinc.find(
         (e) => String(e.id) === String(vinculacionModal.empleadorId),
     );
     const contactosEmpleadorVinc = empleadorVinc?.contactos ?? [];
@@ -777,7 +762,10 @@ export default function CandidatosCrud() {
             contactosEmpleadorVinc.map((c) => c.regional?.nombre).filter(Boolean),
         ),
     ).sort((a, b) => a.localeCompare(b));
-    const contactosCoincidentesVinc = vinculacionModal.regional
+    const esDirectaVinc = vinculacionModal.tipo === "Directa";
+    const contactosCoincidentesVinc = esDirectaVinc
+        ? contactosDirectos
+        : vinculacionModal.regional
         ? contactosEmpleadorVinc.filter(
               (c) =>
                   c.regional?.nombre === vinculacionModal.regional ||
@@ -1317,36 +1305,6 @@ export default function CandidatosCrud() {
                                         candModalMode === "create"
                                     }
                                 />
-                                <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
-                                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text)", fontFamily: "Nunito,sans-serif" }}>
-                                        Fotografía
-                                    </label>
-                                    <label style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        padding: "6px 10px",
-                                        border: "1.5px dashed var(--border)",
-                                        borderRadius: "var(--radius-sm)",
-                                        cursor: candModalMode === "view" ? "not-allowed" : "pointer",
-                                        background: candModalMode === "view" ? "var(--bg)" : "var(--white)",
-                                        overflow: "hidden",
-                                    }}>
-                                        {fotografiaFile ? (
-                                            <img src={URL.createObjectURL(fotografiaFile)} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                        ) : candForm.fotografia ? (
-                                            <img src={`/storage/${candForm.fotografia}`} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                        ) : null}
-                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "Nunito,sans-serif", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {fotografiaFile ? fotografiaFile.name : (candForm.fotografia ? "Cambiar foto" : "Seleccionar imagen…")}
-                                        </span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            disabled={candModalMode === "view"}
-                                            style={{ display: "none" }}
-                                            onChange={(e) => setFotografiaFile(e.target.files[0] || null)}
-                                        />
-                                    </label>
-                                </div>
                             </div>
 
                             <h4
@@ -2897,7 +2855,9 @@ export default function CandidatosCrud() {
                                                     tipo: op,
                                                     correos:
                                                         op === "Directa"
-                                                            ? CORREOS_AVAL.Directa
+                                                            ? contactosDirectos.map(
+                                                                  (c) => c.correo,
+                                                              )
                                                             : [],
                                                     empleadorId: "",
                                                     regional: "",
@@ -2914,7 +2874,21 @@ export default function CandidatosCrud() {
                                 ))}
                             </div>
 
-                            {vinculacionModal.tipo === "Indirecta" && (
+                            {esDirectaVinc ? (
+                                contactosDirectos.length === 0 && (
+                                    <div
+                                        style={{
+                                            fontSize: "0.82rem",
+                                            color: "#a33",
+                                            marginTop: 16,
+                                        }}
+                                    >
+                                        Los empleadores directos no tienen
+                                        contactos registrados. Ve a Parámetros →
+                                        Empleadores para agregarlos.
+                                    </div>
+                                )
+                            ) : (
                                 <div
                                     style={{
                                         display: "flex",
@@ -2946,7 +2920,7 @@ export default function CandidatosCrud() {
                                                 }))
                                             }
                                             defaultValue=""
-                                            options={empleadoresIndirectos.map(
+                                            options={empleadoresVinc.map(
                                                 (e) => ({
                                                     value: String(e.id),
                                                     label: e.nombre,
@@ -3010,8 +2984,7 @@ export default function CandidatosCrud() {
                                 </div>
                             )}
 
-                            {(vinculacionModal.tipo === "Directa" ||
-                                vinculacionModal.regional) && (
+                            {(esDirectaVinc || vinculacionModal.regional) && (
                                 <div style={{ marginTop: 16 }}>
                                     <label
                                         style={{
@@ -3037,20 +3010,10 @@ export default function CandidatosCrud() {
                                             background: "var(--bg)",
                                         }}
                                     >
-                                        {(vinculacionModal.tipo === "Directa"
-                                            ? CORREOS_AVAL.Directa.map(
-                                                  (correo) => ({
-                                                      correo,
-                                                      label: correo,
-                                                  }),
-                                              )
-                                            : contactosCoincidentesVinc.map(
-                                                  (c) => ({
-                                                      correo: c.correo,
-                                                      label: `${c.nombre} — ${c.correo} (${c.regional?.nombre})`,
-                                                  }),
-                                              )
-                                        ).map(({ correo, label }) => {
+                                        {contactosCoincidentesVinc.map((c) => ({
+                                            correo: c.correo,
+                                            label: `${c.nombre} — ${c.correo}${!esDirectaVinc && c.regional ? ` (${c.regional.nombre})` : ""}`,
+                                        })).map(({ correo, label }) => {
                                             const checked =
                                                 vinculacionModal.correos.includes(
                                                     correo,
@@ -3362,25 +3325,16 @@ function Field({
                 )}
             </label>
             {opts ? (
-                <select
-                    style={inputStyle}
+                // Mismo selector con búsqueda que el formulario de sedes y requisiciones.
+                <SearchableSelect
                     value={form[k] ?? ""}
-                    onChange={onChange(k)}
-                    disabled={disabled}
-                >
-                    <option value="">-- Selecciona --</option>
-                    {opts.map((o) =>
-                        typeof o === "string" ? (
-                            <option key={o} value={o}>
-                                {o}
-                            </option>
-                        ) : (
-                            <option key={o.value} value={o.value}>
-                                {o.label}
-                            </option>
-                        ),
+                    onChange={(v) => onChange(k)({ target: { value: v } })}
+                    options={opts.map((o) =>
+                        typeof o === "string" ? { value: o, label: o } : o,
                     )}
-                </select>
+                    defaultValue=""
+                    disabled={disabled}
+                />
             ) : type === "textarea" ? (
                 <textarea
                     style={{ ...inputStyle, minHeight: 40, resize: "vertical" }}
