@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { SearchableSelect } from "../components/SearchableSelect";
+import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 
 const HIJOS_OPTS = ["0", "1", "2", "3", "4", "5", "6"];
 const ESCOLARIDAD_OPTS = ["PREESCOLAR", "PRIMARIA", "SECUNDARIA", "TECNICO", "TECNOLOGO", "PROFESIONAL", "POSGRADO"];
@@ -576,14 +577,14 @@ export default function RegistroNuevosIngresosForm() {
             Object.entries(form).forEach(([k, v]) => {
                 if (v !== null && v !== undefined) fd.append(k, v);
             });
-            if (fotografiaFile) fd.append("fotografia", fotografiaFile);
+            if (fotografiaFile) fd.append("fotografia", await compressImage(fotografiaFile));
 
             const res = await fetch("/api/registro-nuevos-ingresos/submit", {
                 method: "POST",
                 headers: { "X-CSRF-TOKEN": csrf ?? "", Accept: "application/json" },
                 body: fd
             });
-            if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.message ?? "Error del servidor"); }
+            if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.errors?.fotografia ? mensajeErrorFoto(b) : (b.message ?? "Error del servidor")); }
             setSubmitted(true);
         } catch (err) {
             alert("Error al enviar: " + err.message);

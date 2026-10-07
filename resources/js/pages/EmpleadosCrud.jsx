@@ -6,6 +6,8 @@ import {
 } from "../components/SearchableSelect";
 import api from "../api/axios";
 import { exportarEmpleadosExcel } from "../utils/empleadosExport";
+import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
+import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 import { ROLES_ERP } from "../utils/roles";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -713,7 +715,24 @@ function Modal({
     );
     const [saving, setSaving] = useState(false);
     const [fotografiaFile, setFotografiaFile] = useState(null);
+    const [fotoRota, setFotoRota] = useState(false);
     const isCreate = !initial?.id && !readOnly;
+
+    // Vista previa: el archivo recién elegido o la foto guardada. La URL temporal del
+    // archivo se libera al cambiarlo (antes se creaba una nueva en cada render).
+    const previewUrl = useMemo(
+        () => (fotografiaFile ? URL.createObjectURL(fotografiaFile) : null),
+        [fotografiaFile],
+    );
+    useEffect(
+        () => () => previewUrl && URL.revokeObjectURL(previewUrl),
+        [previewUrl],
+    );
+    const fotoSrc =
+        previewUrl || (form.fotografia ? `/storage/${form.fotografia}` : null);
+    // Si la foto guardada no existe en disco, se muestran las iniciales en vez del
+    // ícono de imagen rota.
+    useEffect(() => setFotoRota(false), [fotoSrc]);
 
     React.useEffect(() => {
         setForm(initial);
@@ -950,24 +969,11 @@ function Modal({
                                             overflow: "hidden",
                                         }}
                                     >
-                                        {fotografiaFile ? (
+                                        {fotoSrc && !fotoRota ? (
                                             <img
-                                                src={URL.createObjectURL(
-                                                    fotografiaFile,
-                                                )}
+                                                src={fotoSrc}
                                                 alt=""
-                                                style={{
-                                                    width: 32,
-                                                    height: 32,
-                                                    borderRadius: "50%",
-                                                    objectFit: "cover",
-                                                    flexShrink: 0,
-                                                }}
-                                            />
-                                        ) : form.fotografia ? (
-                                            <img
-                                                src={`/storage/${form.fotografia}`}
-                                                alt=""
+                                                onError={() => setFotoRota(true)}
                                                 style={{
                                                     width: 32,
                                                     height: 32,
@@ -1726,9 +1732,12 @@ export default function EmpleadosCrud() {
         if (fotografiaFile) {
             const fd = new FormData();
             Object.entries(plain).forEach(([k, v]) => {
-                if (v !== null && v !== undefined) fd.append(k, v);
+                if (v === null || v === undefined) return;
+                // FormData convierte `false` en el texto "false", que la regla `boolean`
+                // de Laravel rechaza (422); se envía como "1"/"0".
+                fd.append(k, typeof v === "boolean" ? (v ? "1" : "0") : v);
             });
-            fd.append("fotografia", fotografiaFile);
+            fd.append("fotografia", await compressImage(fotografiaFile));
             if (editTarget) fd.append("_method", "PUT");
             payload = fd;
             // No fijar Content-Type; Axios lo establece con el boundary correcto al detectar FormData
@@ -1741,13 +1750,22 @@ export default function EmpleadosCrud() {
                 const { data } = fotografiaFile
                     ? await api.post(`/empleados/${editTarget.id}`, payload)
                     : await api.put(`/empleados/${editTarget.id}`, payload);
-                setEmpleados((prev) =>
-                    prev.map((e) => (e.id === editTarget.id ? data : e)),
-                );
+                // En la caché (no solo en el estado): si no, al volver a esta pantalla
+                // React Query devolvía la lista anterior durante 5 minutos.
+                const reemplazar = (prev) =>
+                    Array.isArray(prev)
+                        ? prev.map((e) => (e.id === editTarget.id ? data : e))
+                        : prev;
+                setEmpleados(reemplazar);
+                queryClient.setQueryData(["empleados"], reemplazar);
+                if (fotografiaFile) {
+                    propagarFotoEmpleado(queryClient, data.id, data.fotografia);
+                }
                 showToast("Empleado actualizado correctamente.");
             } else {
                 const { data } = await api.post("/empleados", payload);
                 setEmpleados((prev) => [...prev, data.empleado]);
+                queryClient.invalidateQueries({ queryKey: ["empleados"], refetchType: "none" });
                 // Mostrar credenciales generadas
                 setCredenciales(data.credenciales);
                 setCredencialesOpen(true);
@@ -1756,7 +1774,9 @@ export default function EmpleadosCrud() {
             setModalOpen(false);
         } catch (err) {
             const msgs = err.response?.data?.errors;
-            const msg = msgs
+            const msg = msgs?.fotografia
+                ? mensajeErrorFoto(err.response.data)
+                : msgs
                 ? Object.values(msgs)[0][0]
                 : (err.response?.data?.message ??
                   "Error al guardar. Revisa los datos.");

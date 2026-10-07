@@ -119,8 +119,7 @@ class EmpleadoController extends Controller
                 // candidatos (fuente antigua, previa a que el campo se moviera aquí).
                 if (!$user->fotografia) {
                     $user->fotografia = $respuesta?->fotografia ?: $candidato?->fotografia;
-                }
-                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
+                }                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
                 $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
                 $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
                 $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
@@ -321,7 +320,12 @@ class EmpleadoController extends Controller
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
 
-        return response()->json($empleado->fresh()->load(['empresa', 'sedeCatalogo']));
+        // Igual que en index(): si no tiene foto propia se muestra la del formulario de
+        // ingreso, para que el avatar no desaparezca de la lista tras editar.
+        $respuesta = $empleado->fresh()->load(['empresa', 'sedeCatalogo']);
+        User::completarFotografias([$respuesta]);
+
+        return response()->json($respuesta);
     }
 
     public function updateTallas(Request $request, User $empleado)

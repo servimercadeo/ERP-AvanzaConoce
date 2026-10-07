@@ -17,6 +17,8 @@ import {
 } from "../components/Icons";
 import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "../utils/contratosImport";
 import { exportarContratosExcel } from "../utils/contratosExport";
+import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
+import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 
 const POR_PAGINA = 5;
 
@@ -791,7 +793,7 @@ function Modal({
         setFotoUploading(true);
         try {
             const fd = new FormData();
-            fd.append("fotografia", file);
+            fd.append("fotografia", await compressImage(file));
             const { data } = await api.post(
                 `/empleados/${form.empleado_id}/fotografia`,
                 fd,
@@ -799,10 +801,7 @@ function Modal({
             setFotoOverride(data.fotografia);
             onFotografiaUpdated?.(form.empleado_id, data.fotografia);
         } catch (err) {
-            setFotoError(
-                err?.response?.data?.message ??
-                    "No se pudo subir la fotografía.",
-            );
+            setFotoError(mensajeErrorFoto(err?.response?.data));
         } finally {
             setFotoUploading(false);
         }
@@ -2454,6 +2453,12 @@ export default function ContratosCrud() {
     useEffect(() => {
         if (_qEmpleados) setEmpleados(_qEmpleados);
     }, [_qEmpleados]);
+
+    // La foto vive en `users`: al actualizar la caché, los efectos de arriba la llevan
+    // al selector de empleados y a las filas de contratos, y las demás pantallas la ven
+    // al abrirse.
+    const handleFotografiaUpdated = (empleadoId, fotografia) =>
+        propagarFotoEmpleado(qc, empleadoId, fotografia);
     useEffect(() => {
         if (_qCatalogos) setCatalogs(_qCatalogos);
     }, [_qCatalogos]);
@@ -3410,15 +3415,7 @@ export default function ContratosCrud() {
                 empleadorOpts={empleadorOpts}
                 empresasOpts={empresasOpts}
                 centrosCostoCatalogo={centrosCostoCatalogo}
-                onFotografiaUpdated={(empleadoId, fotografia) =>
-                    setEmpleados((prev) =>
-                        prev.map((e) =>
-                            String(e.id) === String(empleadoId)
-                                ? { ...e, fotografia }
-                                : e,
-                        ),
-                    )
-                }
+                onFotografiaUpdated={handleFotografiaUpdated}
             />
 
             {empresaProyectoAlert && (
@@ -3473,15 +3470,7 @@ export default function ContratosCrud() {
                 centrosCostoCatalogo={centrosCostoCatalogo}
                 readOnly
                 restringirVistaSensible={!puedeVerInfoSensible}
-                onFotografiaUpdated={(empleadoId, fotografia) =>
-                    setEmpleados((prev) =>
-                        prev.map((e) =>
-                            String(e.id) === String(empleadoId)
-                                ? { ...e, fotografia }
-                                : e,
-                        ),
-                    )
-                }
+                onFotografiaUpdated={handleFotografiaUpdated}
             />
 
         </div>

@@ -298,22 +298,12 @@ class ContratoController extends Controller
                 });
         }
 
-        // Fotos de candidatos que faltan en `users.fotografia`, resueltas en bloque (sin N+1)
-        $cedulasSinFoto = $contratos->filter(fn($c) => $c->empleado && !$c->empleado->fotografia)
-            ->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
-        $fotoPorCedula = !empty($cedulasSinFoto)
-            ? DB::table('candidatos')->whereIn('identificacion', $cedulasSinFoto)
-                ->whereNotNull('fotografia')->pluck('fotografia', 'identificacion')
-            : collect();
+        // Fotos que faltan en `users.fotografia` (formulario de ingreso → candidatos),
+        // resueltas en bloque (sin N+1)
+        \App\Models\User::completarFotografias($contratos->pluck('empleado'));
 
-        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula, $fotoPorCedula) {
+        $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula) {
             $cedula = $contrato->empleado?->cedula;
-            if ($contrato->empleado && !$contrato->empleado->fotografia) {
-                $foto = $fotoPorCedula->get($cedula);
-                if ($foto) {
-                    $contrato->empleado->fotografia = $foto;
-                }
-            }
             if ($cedula && !empty($proyectoPorCedula[$cedula])) {
                 $contrato->cliente_proyecto = $proyectoPorCedula[$cedula];
             }
@@ -357,13 +347,11 @@ class ContratoController extends Controller
                     'movil' => '0000000000',
                 ]
             );
-            // Copiar fotografia del candidato si el usuario fue creado nuevo
-            if ($user->wasRecentlyCreated) {
-                $fotoCandidato = \Illuminate\Support\Facades\DB::table('candidatos')
-                    ->where('identificacion', $request->documento)
-                    ->value('fotografia');
-                if ($fotoCandidato) {
-                    $user->fotografia = $fotoCandidato;
+            // Copiar la fotografía del formulario de ingreso (o, si no hay, la del
+            // candidato) cuando el usuario todavía no tiene una
+            if (!$user->fotografia) {
+                \App\Models\User::completarFotografias([$user]);
+                if ($user->fotografia) {
                     $user->save();
                 }
             }
@@ -476,7 +464,10 @@ class ContratoController extends Controller
 
     public function show(Contrato $contrato)
     {
-        return response()->json($contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']));
+        $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo']);
+        \App\Models\User::completarFotografias([$contrato->empleado]);
+
+        return response()->json($contrato);
     }
 
     public function update(Request $request, Contrato $contrato)
