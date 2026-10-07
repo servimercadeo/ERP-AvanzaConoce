@@ -37,4 +37,27 @@ class BaseIngreso extends Model
     {
         return $this->belongsTo(Candidato::class);
     }
+
+    /**
+     * Tipo de vinculación (Directa/Indirecta) de una cédula: primero el del aval vigente en
+     * la base de ingresos (editable en Avales de contratación) y si no, el del candidato.
+     */
+    public static function tipoVinculacionDe(?string $cedula): ?string
+    {
+        if (!$cedula) {
+            return null;
+        }
+
+        return static::where('documento_identificacion', $cedula)->latest()->value('tipo_vinculacion')
+            ?: Candidato::where('identificacion', $cedula)->latest()->value('tipo_vinculacion');
+    }
+
+    /**
+     * Los indirectos no cargan documentos de contratación: con el formulario de registro
+     * ya pueden pasar a contratos y no se les envía el correo de carga de documentos.
+     */
+    public static function esIndirecta(?string $cedula): bool
+    {
+        return static::tipoVinculacionDe($cedula) === 'Indirecta';
+    }
 }

@@ -675,19 +675,21 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json(RespuestaIngreso::orderBy('created_at', 'desc')->get());
     });
 
-    // Datos consolidados para pre-cargar el formulario de creación de contrato
-    // Solo aparecen candidatos que tienen los 7 documentos obligatorios subidos
+    // Datos consolidados para pre-cargar el formulario de creación de contrato.
+    // Directos: solo aparecen con los 7 documentos obligatorios subidos.
+    // Indirectos: basta con haber llenado el formulario de registro (no cargan documentos).
     Route::get('/respuestas-ingresos/datos-contrato', function () {
         $requiredDocs = ['documento_identidad','diploma_bachiller','certificados_estudio','certificados_laborales','certificacion_eps','certificacion_pension','hoja_vida'];
         $metaPath     = storage_path('app/documentos_contratacion.json');
         $meta         = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
 
-        $conDocCompletos = array_values(array_filter(array_keys($meta), function ($doc) use ($meta, $requiredDocs) {
-            $subidos = array_keys($meta[$doc]['archivos'] ?? []);
+        $respuestas = RespuestaIngreso::orderBy('nombres')->get()->filter(function ($resp) use ($meta, $requiredDocs) {
+            if (BaseIngreso::esIndirecta($resp->documento)) {
+                return true;
+            }
+            $subidos = array_keys($meta[$resp->documento]['archivos'] ?? []);
             return count(array_diff($requiredDocs, $subidos)) === 0;
-        }));
-
-        $respuestas = RespuestaIngreso::whereIn('documento', $conDocCompletos)->orderBy('nombres')->get();
+        })->values();
 
         return $respuestas->map(function ($resp) {
             $candidato = \App\Models\Candidato::with([
@@ -930,12 +932,16 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
         $data
     );
 
-    try {
-        Mail::to($data['correo'])->send(
-            new CargaDocumentosMail($data['nombres'] . ' ' . $data['apellidos'], $data['documento'])
-        );
-    } catch (\Exception $e) {
-        Log::error('Error enviando correo de carga de documentos: ' . $e->getMessage());
+    // Solo los directos cargan documentos de contratación; los indirectos quedan listos para
+    // contrato con este formulario (ver /respuestas-ingresos/datos-contrato).
+    if (!BaseIngreso::esIndirecta($data['documento'])) {
+        try {
+            Mail::to($data['correo'])->send(
+                new CargaDocumentosMail($data['nombres'] . ' ' . $data['apellidos'], $data['documento'])
+            );
+        } catch (\Exception $e) {
+            Log::error('Error enviando correo de carga de documentos: ' . $e->getMessage());
+        }
     }
 
     return response()->json(['message' => 'Información registrada con éxito.'], 201);
