@@ -503,6 +503,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso']);
 
+    // Documentos del Empleado: otrosí, certificados, etc. ligados a un seguimiento de RH
+    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download']);
+    Route::apiResource('documentos-empleado', App\Http\Controllers\Api\DocumentoEmpleadoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['documentos-empleado' => 'documentoEmpleado']);
+
     // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
     Route::get('documentos-contratacion/employee-info', function (Request $request) {
         $cedula  = $request->query('cedula', '');
