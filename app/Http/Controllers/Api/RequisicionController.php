@@ -129,6 +129,10 @@ class RequisicionController extends Controller
             $this->validarCierre($estadoFinal, max(1, (int) $requeridasFinal), $requisicion->vacantesCubiertas());
         }
 
+        // Proyecto y empresa antes del cambio, para propagarlo solo si de verdad cambiaron.
+        $proyectoAntes = $requisicion->proyecto?->nombre;
+        $empresaAntes  = $requisicion->empresa?->nombre;
+
         $requisicion->update($data);
 
         // Cambiar el estado o las vacantes puede dejar la requisición llena (se cierra sola) o,
@@ -137,22 +141,29 @@ class RequisicionController extends Controller
             $requisicion->actualizarEstadoPorVacantes();
         }
 
-        // Propagar proyecto/empresa a los contratos de los candidatos vinculados.
-        // Se ejecuta siempre que proyecto_id o empresa_id vengan en el request (para mantener consistencia).
-        if (array_key_exists('proyecto_id', $data) || array_key_exists('empresa_id', $data)) {
-            $cedulas = $requisicion->candidatos()->pluck('identificacion')->filter()->unique();
+        // Corregir el proyecto o la empresa de la requisición corrige también los contratos
+        // que salieron de ella. Solo si el valor cambió de verdad (el formulario siempre los
+        // envía) y solo en los contratos que aún tienen el valor anterior: un contrato al que
+        // se le cambió el proyecto a mano (ej. de DIRECTV CO a ADMINISTRATIVO) no se toca.
+        $requisicion->load(['proyecto', 'empresa']);
+        $cambios = array_filter([
+            'cliente_proyecto' => [$proyectoAntes, $requisicion->proyecto?->nombre],
+            'empresa'          => [$empresaAntes, $requisicion->empresa?->nombre],
+        ], fn ($par) => $par[0] !== $par[1]);
 
-            if ($cedulas->isNotEmpty()) {
-                $empleadoIds = \App\Models\User::whereIn('cedula', $cedulas)->pluck('id');
-                if ($empleadoIds->isNotEmpty()) {
-                    $camposContrato = [];
-                    if (array_key_exists('proyecto_id', $data)) {
-                        $camposContrato['cliente_proyecto'] = $data['proyecto_id'] ? Proyecto::find($data['proyecto_id'])?->nombre : null;
-                    }
-                    if (array_key_exists('empresa_id', $data)) {
-                        $camposContrato['empresa'] = $data['empresa_id'] ? Empresa::find($data['empresa_id'])?->nombre : null;
-                    }
-                    \App\Models\Contrato::whereIn('empleado_id', $empleadoIds)->update($camposContrato);
+        if ($cambios) {
+            $cedulas = $requisicion->candidatos()->pluck('identificacion')->filter()->unique();
+            $empleadoIds = $cedulas->isNotEmpty()
+                ? \App\Models\User::whereIn('cedula', $cedulas)->pluck('id')
+                : collect();
+
+            if ($empleadoIds->isNotEmpty()) {
+                foreach ($cambios as $campo => [$antes, $despues]) {
+                    \App\Models\Contrato::whereIn('empleado_id', $empleadoIds)
+                        ->where(fn ($q) => $antes === null
+                            ? $q->whereNull($campo)->orWhere($campo, '')
+                            : $q->where($campo, $antes))
+                        ->update([$campo => $despues]);
                 }
             }
         }

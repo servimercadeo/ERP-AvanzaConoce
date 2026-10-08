@@ -282,8 +282,11 @@ class ContratoController extends Controller
 
         $contratos = $query->orderBy('created_at', 'desc')->get();
 
-        // Derivar proyecto actual desde candidatos → requisicion → proyecto (sin N+1)
-        $cedulas = $contratos->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
+        // Proyecto de la requisición del candidato (sin N+1): solo de respaldo para los
+        // contratos que no tienen proyecto. El del contrato manda: si se le cambió (ej. de
+        // DIRECTV CO a ADMINISTRATIVO), no puede volver a mostrarse el de la requisición.
+        $cedulas = $contratos->filter(fn ($c) => trim((string) $c->cliente_proyecto) === '')
+            ->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
         $proyectoPorCedula = [];
         if (!empty($cedulas)) {
             Candidato::whereIn('identificacion', $cedulas)
@@ -304,7 +307,7 @@ class ContratoController extends Controller
 
         $contratos = $contratos->map(function ($contrato) use ($proyectoPorCedula) {
             $cedula = $contrato->empleado?->cedula;
-            if ($cedula && !empty($proyectoPorCedula[$cedula])) {
+            if (trim((string) $contrato->cliente_proyecto) === '' && $cedula && !empty($proyectoPorCedula[$cedula])) {
                 $contrato->cliente_proyecto = $proyectoPorCedula[$cedula];
             }
             return $contrato;

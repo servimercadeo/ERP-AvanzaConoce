@@ -1855,10 +1855,18 @@ export default function PedidosAutomaticosCrud() {
                 .get("/empleados", { params: { con_contrato: 1 } })
                 .then((r) => r.data),
     });
-    const { data: contratos = [] } = useQuery({
+    // El proyecto del contrato decide qué dotación se ofrece: los contratos se piden siempre
+    // frescos (al volver a la pestaña y al abrir el formulario), no de una copia de hace
+    // minutos que no ve un cambio hecho en otra pestaña.
+    const { data: contratos = [], refetch: refetchContratos } = useQuery({
         queryKey: ["contratos"],
         queryFn: () => api.get("/contratos").then((r) => r.data),
+        staleTime: 0,
+        refetchOnWindowFocus: true,
     });
+    useEffect(() => {
+        if (modalOpen) refetchContratos();
+    }, [modalOpen, refetchContratos]);
     const { data: catalogos } = useQuery({
         queryKey: ["catalogos"],
         queryFn: () => api.get("/catalogos").then((r) => r.data),

@@ -209,23 +209,63 @@ class RequisicionesYCandidatosTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('proyecto_id');
     }
 
-    public function test_cambiar_el_proyecto_de_una_requisicion_actualiza_los_contratos_de_sus_candidatos(): void
+    /** Candidato de la requisición con contrato del proyecto dado. */
+    private function contratoDeCandidato(array $req, string $cedula, ?string $proyecto): int
     {
-        $this->actuarComo('th');
-        $req = $this->requisicion();
-        $emp = $this->usuario('general', ['cedula' => '9001']);
+        $emp = $this->usuario('general', ['cedula' => $cedula]);
         Candidato::create([
-            'requisicion_id' => $req['id'], 'nombres' => 'X', 'identificacion' => '9001', 'correo' => 'x@test.co',
+            'requisicion_id' => $req['id'], 'nombres' => 'X', 'identificacion' => $cedula, 'correo' => "c{$cedula}@test.co",
             'fecha_postulacion' => now()->toDateString(),
         ]);
-        $contratoId = DB::table('contratos')->insertGetId([
-            'empleado_id' => $emp->id, 'cliente_proyecto' => 'VIEJO', 'estado_contrato' => 'Activo',
+
+        return DB::table('contratos')->insertGetId([
+            'empleado_id' => $emp->id, 'cliente_proyecto' => $proyecto, 'estado_contrato' => 'Activo', 'completado' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
+    }
+
+    public function test_cambiar_el_proyecto_de_una_requisicion_corrige_los_contratos_que_salieron_de_ella(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['proyecto_id' => $this->proyectoId('TIGO EXPRESS')]);
+        $igual = $this->contratoDeCandidato($req, '9001', 'TIGO EXPRESS');
+        $sinProyecto = $this->contratoDeCandidato($req, '9002', null);
+        // A este se le cambió el proyecto a mano en Contratos: no se toca.
+        $corregido = $this->contratoDeCandidato($req, '9003', 'ADMINISTRATIVO');
 
         $this->putJson("/api/requisiciones/{$req['id']}", ['proyecto_id' => $this->proyectoId('TIGO HOME')])->assertOk();
 
-        $this->assertDatabaseHas('contratos', ['id' => $contratoId, 'cliente_proyecto' => 'TIGO HOME']);
+        $this->assertDatabaseHas('contratos', ['id' => $igual, 'cliente_proyecto' => 'TIGO HOME']);
+        $this->assertDatabaseHas('contratos', ['id' => $sinProyecto, 'cliente_proyecto' => null]);
+        $this->assertDatabaseHas('contratos', ['id' => $corregido, 'cliente_proyecto' => 'ADMINISTRATIVO']);
+    }
+
+    public function test_editar_la_requisicion_sin_cambiar_el_proyecto_no_toca_los_contratos(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['proyecto_id' => $this->proyectoId('TIGO EXPRESS')]);
+        $contrato = $this->contratoDeCandidato($req, '9004', 'ADMINISTRATIVO');
+
+        // El formulario de requisiciones siempre envía proyecto y empresa, aunque no cambien.
+        $this->putJson("/api/requisiciones/{$req['id']}", [
+            'proyecto_id' => $this->proyectoId('TIGO EXPRESS'), 'empresa_id' => null, 'requeridas' => 3,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('contratos', ['id' => $contrato, 'cliente_proyecto' => 'ADMINISTRATIVO']);
+    }
+
+    public function test_el_listado_de_contratos_muestra_el_proyecto_del_contrato_no_el_de_la_requisicion(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['proyecto_id' => $this->proyectoId('TIGO EXPRESS')]);
+        $propio = $this->contratoDeCandidato($req, '9005', 'ADMINISTRATIVO');
+        $sinProyecto = $this->contratoDeCandidato($req, '9006', null);
+
+        $lista = collect($this->getJson('/api/contratos')->assertOk()->json())->keyBy('id');
+
+        $this->assertSame('ADMINISTRATIVO', $lista[$propio]['cliente_proyecto']);
+        // Sin proyecto en el contrato, el de la requisición sirve de respaldo.
+        $this->assertSame('TIGO EXPRESS', $lista[$sinProyecto]['cliente_proyecto']);
     }
 
     public function test_requisicion_exige_numero_de_vacantes(): void
