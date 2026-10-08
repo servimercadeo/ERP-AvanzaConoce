@@ -17,7 +17,7 @@ class PermisoController extends Controller
     public function index()
     {
         return response()->json(
-            PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id'])
+            PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id'])
         );
     }
 
@@ -33,14 +33,18 @@ class PermisoController extends Controller
             'denegados.*.rol'           => 'required|string|in:' . implode(',', PermisoDenegado::ROLES_GESTIONABLES),
             'denegados.*.modulo_id'     => 'required|string|max:60',
             'denegados.*.submodulo_id'  => 'required|string|max:60',
+            // Vacío o ausente: todo el submódulo. Con valor: solo esa pestaña.
+            'denegados.*.archivo_id'    => 'nullable|string|max:80',
         ]);
 
         $filas = collect($data['denegados'] ?? [])
-            ->unique(fn ($d) => $d['rol'] . '|' . $d['modulo_id'] . '|' . $d['submodulo_id'])
+            ->map(fn ($d) => [...$d, 'archivo_id' => (string) ($d['archivo_id'] ?? PermisoDenegado::TODO_EL_SUBMODULO)])
+            ->unique(fn ($d) => $d['rol'] . '|' . $d['modulo_id'] . '|' . $d['submodulo_id'] . '|' . $d['archivo_id'])
             ->map(fn ($d) => [
                 'rol'          => $d['rol'],
                 'modulo_id'    => $d['modulo_id'],
                 'submodulo_id' => $d['submodulo_id'],
+                'archivo_id'   => $d['archivo_id'],
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ])
@@ -72,7 +76,7 @@ class PermisoController extends Controller
         ]);
 
         return response()->json(
-            PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id'])
+            PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id'])
         );
     }
 }

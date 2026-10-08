@@ -2,10 +2,26 @@
 // cualquier submódulo (ej. "Empleados" dentro de "Administrativo").
 export const SUBMODULO_RAIZ = '_modulo';
 
-// Acceso por módulo/submódulo: lista de DENEGACIÓN administrada desde el módulo Permisos
-// (ver `user.permisos_denegados`, que llega con la sesión). Por defecto todo es visible;
-// una fila en `permisos_denegados` es la excepción que lo oculta para ese rol. "admin"
-// siempre tiene acceso total (nunca llega con nada denegado).
+// Pestañas (archivos) de un submódulo, o las propias del módulo si es SUBMODULO_RAIZ.
+export function archivosDe(mod, submoduleId) {
+  if (!mod) return [];
+  if (submoduleId === SUBMODULO_RAIZ) return mod.archivos ?? [];
+  return (mod.submods ?? []).find((s) => s.id === submoduleId)?.archivos ?? [];
+}
+
+// Fila de `permisos_denegados` para ese submódulo: sin archivo_id es todo el submódulo;
+// con archivo_id, solo esa pestaña.
+function denegado(user, moduleId, submoduleId, archivoId = '') {
+  return (user.permisos_denegados ?? []).some(
+    (p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId && (p.archivo_id ?? '') === archivoId,
+  );
+}
+
+// Acceso por módulo/submódulo/pestaña: lista de DENEGACIÓN administrada desde el módulo
+// Permisos (ver `user.permisos_denegados`, que llega con la sesión). Por defecto todo es
+// visible; una fila en `permisos_denegados` es la excepción que lo oculta para ese rol.
+// "admin" siempre tiene acceso total (nunca llega con nada denegado). Un submódulo con
+// todas sus pestañas denegadas también queda oculto.
 export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user) return false;
   if (user.rol === 'admin') return true;
@@ -15,8 +31,17 @@ export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user.rol && (moduleId === 'administrativo' || moduleId === 'permisos')) {
     return false;
   }
-  const denegados = user.permisos_denegados ?? [];
-  return !denegados.some((p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId);
+  if (denegado(user, moduleId, submoduleId)) return false;
+
+  const archivos = archivosDe(ERP_MODULES.find((m) => m.id === moduleId), submoduleId);
+  return archivos.length === 0 || archivos.some((a) => !denegado(user, moduleId, submoduleId, a.id));
+}
+
+// Una pestaña es visible si su submódulo lo es y no se le denegó a ella en particular.
+export function canAccessArchivo(user, moduleId, submoduleId, archivoId) {
+  if (!canAccessSubmodule(user, moduleId, submoduleId)) return false;
+  if (!user.rol || user.rol === 'admin') return true;
+  return !denegado(user, moduleId, submoduleId, archivoId);
 }
 
 // Un módulo es visible si al menos uno de sus submódulos (o sus archivos propios, bajo

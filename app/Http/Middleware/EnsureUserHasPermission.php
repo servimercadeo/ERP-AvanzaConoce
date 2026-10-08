@@ -11,14 +11,15 @@ class EnsureUserHasPermission
 {
     /**
      * Restringe la ruta según la matriz del módulo Permisos (la misma que arma el menú):
-     * pasa si el rol del usuario tiene acceso a alguno de los módulo.submódulo dados.
-     * Uso: ->middleware('permiso:administrativo.empleados,inventarios.dotacion')
+     * pasa si el rol del usuario tiene acceso a alguno de los destinos dados, cada uno
+     * "módulo.submódulo" o "módulo.submódulo.pestaña" (la pestaña que usa esa ruta).
+     * Uso: ->middleware('permiso:administrativo.seleccion.candidatos,inventarios.dotacion')
      */
     public function handle(Request $request, Closure $next, string ...$destinos): Response
     {
         foreach ($destinos as $destino) {
-            [$modulo, $submodulo] = array_pad(explode('.', $destino, 2), 2, PermisoDenegado::SUBMODULO_RAIZ);
-            if (PermisoDenegado::permite($request->user(), $modulo, $submodulo)) {
+            [$modulo, $submodulo, $archivo] = array_pad(explode('.', $destino, 3), 3, null);
+            if (PermisoDenegado::permite($request->user(), $modulo, $submodulo ?? PermisoDenegado::SUBMODULO_RAIZ, $archivo)) {
                 return $next($request);
             }
         }

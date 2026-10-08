@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useErpModules } from '../hooks/useErpModules';
-import { canAccessSubmodule } from '../data/erpModules';
+import { canAccessSubmodule, canAccessArchivo } from '../data/erpModules';
 import {
   MODULE_ICONS,
   IconFolder,
@@ -292,11 +292,16 @@ export default function VerYCrearParametrosCrud() {
     queryFn: () => api.get('/tipos-parametro').then((r) => r.data),
   });
 
-  // Tipo de Producto vive como archivo dentro de Categoría del Producto, pero aquí se
-  // sigue listando como catálogo propio (mismo permiso que Categoría).
+  // Tipo de Producto vive como pestaña dentro de Categoría del Producto, pero aquí se
+  // sigue listando como catálogo propio; cada uno se muestra según el permiso de su pestaña.
   const catalogos = submods.flatMap((sub) =>
     sub.id === 'categoria_producto'
-      ? [sub, { id: 'tipo_producto', label: 'Tipo de Producto', icon: sub.icon }]
+      ? [
+          ...(canAccessArchivo(user, 'parametros', sub.id, 'categoria_producto_file') ? [sub] : []),
+          ...(canAccessArchivo(user, 'parametros', sub.id, 'tipo_producto_file')
+            ? [{ id: 'tipo_producto', label: 'Tipo de Producto', icon: sub.icon }]
+            : []),
+        ]
       : [sub],
   );
 

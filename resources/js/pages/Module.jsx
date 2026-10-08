@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
-import { canAccessModule, canAccessSubmodule, SUBMODULO_RAIZ } from "../data/erpModules";
+import { canAccessModule, canAccessSubmodule, canAccessArchivo, SUBMODULO_RAIZ } from "../data/erpModules";
 import { useErpModules } from "../hooks/useErpModules";
 import {
     MODULE_ICONS,
@@ -162,11 +162,17 @@ export default function Module() {
     // Los archivos propios del módulo (sin submódulo, ej. "Empleados" en
     // Administrativo) se gatean como un bloque aparte (SUBMODULO_RAIZ): puede que el
     // módulo sea visible por tener un submódulo permitido, pero sus archivos propios
-    // estén denegados puntualmente.
+    // estén denegados puntualmente (todos o solo algunas pestañas).
     const propiosVisibles = tieneArchivos && canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ);
-    const archivosDirectos = propiosVisibles ? (mod.archivos ?? []) : [];
-    const archivoActual = archivosDirectos.find((a) => a.id === tabActiva);
-    const CrudComponent = tabActiva ? resolveCrud(moduleId, tabActiva) : null;
+    const archivosDirectos = propiosVisibles
+        ? (mod.archivos ?? []).filter((a) => canAccessArchivo(user, mod.id, SUBMODULO_RAIZ, a.id))
+        : [];
+    // Si la pestaña elegida no se puede ver, se abre la primera que sí.
+    const tabVisible = archivosDirectos.some((a) => a.id === tabActiva)
+        ? tabActiva
+        : (archivosDirectos[0]?.id ?? null);
+    const archivoActual = archivosDirectos.find((a) => a.id === tabVisible);
+    const CrudComponent = tabVisible ? resolveCrud(moduleId, tabVisible) : null;
 
     return (
         <Layout>
@@ -188,7 +194,7 @@ export default function Module() {
                         )}
                         {mod.label}
                     </span>
-                    {tabActiva && archivoActual && (
+                    {tabVisible && archivoActual && (
                         <>
                             <span className="sep">›</span>
                             <span>{archivoActual.label}</span>
@@ -269,7 +275,7 @@ export default function Module() {
                         {/* ── Tab bar ── */}
                         <div className="tab-bar" style={S.tabBar}>
                             {archivosDirectos.map((archivo) => {
-                                const activa = archivo.id === tabActiva;
+                                const activa = archivo.id === tabVisible;
                                 const hasCrud = !!resolveCrud(
                                     moduleId,
                                     archivo.id,

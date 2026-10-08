@@ -266,7 +266,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('empleados', EmpleadoController::class)->only(['index', 'show'])
         ->middleware('permiso:administrativo.empleados,administrativo.admin_contratos');
 
-    Route::middleware('permiso:administrativo.admin_contratos')->group(function () {
+    Route::middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos')->group(function () {
         // Rellenar datos faltantes de contratos desde Excel, por documento/cédula (solo
         // rellena campos vacíos, nunca pisa un dato ya existente; nunca crea contratos). Lo usa
         // "Importar Excel" de Contratos para las cédulas que ya tienen contrato.
@@ -274,7 +274,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('contratos', ContratoController::class)->except(['index', 'show']);
     });
     Route::apiResource('contratos', ContratoController::class)->only(['index', 'show'])
-        ->middleware('permiso:administrativo.admin_contratos');
+        ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
 
     // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato.
     // Parametros > Centros de Costos pide el listado completo (incl. inactivos) vía ?all=1.
@@ -534,9 +534,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permiso:administrativo.seleccion,administrativo.admin_contratos')->group(function () {
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
-    Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
+    Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync'])
+        ->middleware('permiso:administrativo.seleccion.base_ingreso,administrativo.admin_contratos.avales_contratacion');
     // Anular aval: desmarca el aval del candidato y libera la vacante de la requisición
-    Route::post('base-ingresos/{baseIngreso}/anular', [BaseIngresoController::class, 'anular']);
+    Route::post('base-ingresos/{baseIngreso}/anular', [BaseIngresoController::class, 'anular'])
+        ->middleware('permiso:administrativo.admin_contratos.avales_contratacion');
     // Enviar alerta de ingreso al candidato por correo
     Route::post('base-ingresos/{baseIngreso}/alerta', function (BaseIngreso $baseIngreso) {
         if (!$baseIngreso->correo) {
@@ -551,7 +553,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Log::error('AlertaIngresoMail ERROR al enviar a ' . $baseIngreso->correo . ': ' . $e->getMessage());
             return response()->json(['message' => 'Error al enviar: ' . $e->getMessage()], 500);
         }
-    });
+    })->middleware('permiso:administrativo.admin_contratos.avales_contratacion');
     // Enlace del formulario de registro (mismo token que recibe el candidato por correo),
     // para poder copiarlo y compartirlo manualmente. Solo disponible una vez enviada la alerta.
     Route::get('base-ingresos/{baseIngreso}/alerta-link', function (BaseIngreso $baseIngreso) {
@@ -560,17 +562,18 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $token = urlencode(Crypt::encryptString($baseIngreso->documento_identificacion));
         return response()->json(['url' => rtrim(config('app.url'), '/') . '/registro-nuevos-ingresos?token=' . $token]);
-    });
+    })->middleware('permiso:administrativo.admin_contratos.avales_contratacion');
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
-        ->parameters(['base-ingresos' => 'baseIngreso']);
+        ->parameters(['base-ingresos' => 'baseIngreso'])
+        ->middleware('permiso:administrativo.seleccion.base_ingreso,administrativo.admin_contratos.avales_contratacion');
 
     // Documentos del Empleado: otrosí, certificados, etc. ligados a un seguimiento de RH
-    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download'])->middleware('permiso:administrativo.admin_contratos');
+    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download'])->middleware('permiso:administrativo.admin_contratos.Seguros_medicos');
     Route::apiResource('documentos-empleado', App\Http\Controllers\Api\DocumentoEmpleadoController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['documentos-empleado' => 'documentoEmpleado'])
-        ->middleware('permiso:administrativo.admin_contratos');
+        ->middleware('permiso:administrativo.admin_contratos.Seguros_medicos');
 
     // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
     Route::get('documentos-contratacion/employee-info', function (Request $request) {
@@ -610,7 +613,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ])
             ->values();
         return response()->json($result);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
 
     // Elimina un documento médico específico de una cédula, dentro de un evento (fecha de seguimiento)
     Route::delete('documentos-contratacion/docs-medicos', function (Request $request) {
@@ -632,7 +635,7 @@ Route::middleware('auth:sanctum')->group(function () {
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
 
     // Notifica al flujo de Power Automate con los documentos médicos recién subidos, incluyendo
     // el contenido en base64 (llamada server-to-server para evitar CORS)
@@ -686,23 +689,23 @@ Route::middleware('auth:sanctum')->group(function () {
         }
 
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
 
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
         ->parameters(['requisiciones' => 'requisicion'])
-        ->middleware('permiso:administrativo.seleccion');
+        ->middleware('permiso:administrativo.seleccion.proceso_seleccion,administrativo.seleccion.candidatos');
     Route::get('candidatos/by-doc/{doc}', function ($doc) {
         $c = \App\Models\Candidato::where('identificacion', $doc)->first(['fecha_expedicion']);
         return response()->json($c ? ['fecha_expedicion' => $c->fecha_expedicion] : null);
     });
     Route::apiResource('candidatos', CandidatoController::class)
         ->parameters(['candidatos' => 'candidato'])
-        ->middleware('permiso:administrativo.seleccion');
-    Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index'])->middleware('permiso:administrativo.seleccion');
-    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store'])->middleware('permiso:administrativo.seleccion');
-    Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download'])->middleware('permiso:administrativo.seleccion');
-    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy'])->middleware('permiso:administrativo.seleccion');
+        ->middleware('permiso:administrativo.seleccion.candidatos,administrativo.seleccion.base_ingreso');
+    Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index'])->middleware('permiso:administrativo.seleccion.candidatos');
+    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store'])->middleware('permiso:administrativo.seleccion.candidatos');
+    Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download'])->middleware('permiso:administrativo.seleccion.candidatos');
+    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy'])->middleware('permiso:administrativo.seleccion.candidatos');
 
     // Catálogos para el módulo de selección (cargos, proyectos, responsables, ciudades)
     Route::get('/seleccion/catalogos', function () {
@@ -736,7 +739,7 @@ Route::middleware('auth:sanctum')->group(function () {
         $respuestas->each(fn ($r) => $r->setAttribute('tipo_vinculacion', $tipos[$r->documento] ?? null));
 
         return response()->json($respuestas);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
 
     // Datos consolidados para pre-cargar el formulario de creación de contrato.
     // Directos: solo aparecen con los 7 documentos obligatorios subidos.
@@ -845,7 +848,7 @@ Route::middleware('auth:sanctum')->group(function () {
                     : null,
             ];
         });
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos');
 
     // Documentos de contratación por candidato (admin)
     Route::get('/documentos-contratacion/{documento}', function ($documento) {
@@ -853,7 +856,7 @@ Route::middleware('auth:sanctum')->group(function () {
         if (!file_exists($metaPath)) return response()->json(null);
         $meta = json_decode(file_get_contents($metaPath), true) ?: [];
         return response()->json($meta[$documento] ?? null);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
 
     Route::get('/documentos-contratacion/{documento}/{tipo}/download', function ($documento, $tipo, Request $request) {
         $metaPath = storage_path('app/documentos_contratacion.json');
@@ -869,7 +872,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ]);
         }
         return response()->download($filePath, $archivo['nombre_original']);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
 
     Route::delete('/documentos-contratacion/{documento}/{tipo}', function ($documento, $tipo) {
         $metaPath = storage_path('app/documentos_contratacion.json');
@@ -882,7 +885,7 @@ Route::middleware('auth:sanctum')->group(function () {
         unset($meta[$documento]['archivos'][$tipo]);
         file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
 
     Route::delete('/respuestas-ingresos/{id}', function ($id) {
         $respuesta = RespuestaIngreso::find($id);
@@ -891,7 +894,7 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $respuesta->delete();
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos');
+    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
 
     }); // fin Selección / Administración de Contratos
 });

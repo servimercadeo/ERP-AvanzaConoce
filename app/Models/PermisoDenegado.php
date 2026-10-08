@@ -11,7 +11,7 @@ class PermisoDenegado extends Model
 
     protected $table = 'permisos_denegados';
 
-    protected $fillable = ['rol', 'modulo_id', 'submodulo_id'];
+    protected $fillable = ['rol', 'modulo_id', 'submodulo_id', 'archivo_id'];
 
     public function auditoriaProceso(): string
     {
@@ -20,7 +20,8 @@ class PermisoDenegado extends Model
 
     public function auditoriaNombreRegistro(): string
     {
-        return "{$this->rol} · {$this->modulo_id}/{$this->submodulo_id}";
+        $archivo = $this->archivo_id ? "/{$this->archivo_id}" : '';
+        return "{$this->rol} · {$this->modulo_id}/{$this->submodulo_id}{$archivo}";
     }
 
     public const ROLES_GESTIONABLES = ['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'];
@@ -28,15 +29,19 @@ class PermisoDenegado extends Model
     /** submodulo_id de los archivos que cuelgan directo del módulo (igual que el frontend). */
     public const SUBMODULO_RAIZ = '_modulo';
 
+    /** archivo_id de la denegación de todo el submódulo (no de una sola pestaña). */
+    public const TODO_EL_SUBMODULO = '';
+
     /** Módulos que un usuario todavía sin rol no puede ver (igual que canAccessSubmodule). */
     private const SIN_ROL_DENEGADOS = ['administrativo', 'permisos'];
 
     /**
-     * ¿El usuario puede usar este módulo/submódulo? Misma regla que el menú
-     * (resources/js/data/erpModules.js): admin todo; sin rol, todo menos Administrativo y
-     * Permisos; el resto, todo lo que no esté denegado a su rol en la matriz.
+     * ¿El usuario puede usar este módulo/submódulo (o una pestaña suya, si se da $archivo)?
+     * Misma regla que el menú (resources/js/data/erpModules.js): admin todo; sin rol, todo
+     * menos Administrativo y Permisos; el resto, todo lo que no esté denegado a su rol en la
+     * matriz. Una pestaña queda cerrada si se le denegó a ella o a todo su submódulo.
      */
-    public static function permite(?User $user, string $modulo, string $submodulo): bool
+    public static function permite(?User $user, string $modulo, string $submodulo, ?string $archivo = null): bool
     {
         if (!$user) {
             return false;
@@ -51,6 +56,7 @@ class PermisoDenegado extends Model
         return !static::where('rol', $user->rol)
             ->where('modulo_id', $modulo)
             ->where('submodulo_id', $submodulo)
+            ->whereIn('archivo_id', array_unique([self::TODO_EL_SUBMODULO, $archivo ?? self::TODO_EL_SUBMODULO]))
             ->exists();
     }
 }
