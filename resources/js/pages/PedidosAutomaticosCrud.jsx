@@ -681,7 +681,7 @@ function Modal({
     if (!open) return null;
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 860 }}
                 onClick={(e) => e.stopPropagation()}
@@ -2595,7 +2595,6 @@ export default function PedidosAutomaticosCrud() {
             {globalModal && (
                 <div
                     style={S.overlay}
-                    onClick={() => !globalSaving && setGlobalModal(false)}
                 >
                     <div
                         style={{ ...S.modal, maxWidth: 480 }}
@@ -2776,7 +2775,7 @@ export default function PedidosAutomaticosCrud() {
             )}
 
             {confirmDelete && (
-                <div style={S.overlay} onClick={() => setConfirmDelete(null)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 440 }}
                         onClick={(e) => e.stopPropagation()}

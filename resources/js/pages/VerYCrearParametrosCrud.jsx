@@ -82,7 +82,7 @@ function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
   };
 
   return (
-    <div style={S.overlay} onClick={onClose}>
+    <div style={S.overlay}>
       <div style={S.modal} onClick={(e) => e.stopPropagation()}>
         <div style={S.modalHeaderGreen}>
           <span style={S.modalTitleWhite}>{editTarget ? 'Editar Tipo de Parámetro' : 'Nuevo Tipo de Parámetro'}</span>
@@ -238,7 +238,7 @@ function ValoresParametroPanel({ tipo }) {
       </div>
 
       {modalOpen && (
-        <div style={S.overlay} onClick={() => setModalOpen(false)}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={(e) => e.stopPropagation()}>
             <div style={S.modalHeaderGreen}>
               <span style={S.modalTitleWhite}>{editTarget ? 'Editar Valor' : 'Nuevo Valor'}</span>

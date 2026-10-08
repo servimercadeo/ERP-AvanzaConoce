@@ -25,7 +25,7 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>Productos pendientes — {categoria}</span>
@@ -76,7 +76,7 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
 
 function VerOrdenModal({ orden, onClose, onImprimir, imprimiendo }) {
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>Orden {orden.codigo}</span>

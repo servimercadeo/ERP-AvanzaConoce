@@ -40,7 +40,7 @@ class InventarioDotacionController extends Controller
 
         return $user->contratos()
             ->whereNotNull('empresa')
-            ->orderByRaw("estado_contrato = 'Activo' desc")
+            ->orderByRaw("estado_contrato = 'Vigente' desc")
             ->orderByDesc('fecha_ingreso')
             ->value('empresa');
     }

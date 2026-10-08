@@ -59,7 +59,7 @@ function FormModal({ open, onClose, onSave, editTarget }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>
@@ -189,7 +189,7 @@ function ContactoFormModal({
     };
 
     return (
-        <div style={{ ...S.overlay, zIndex: 5100 }} onClick={onClose}>
+        <div style={{ ...S.overlay, zIndex: 5100 }}>
             <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>
@@ -289,7 +289,7 @@ function ContactosModal({
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 860 }}
                 onClick={(e) => e.stopPropagation()}

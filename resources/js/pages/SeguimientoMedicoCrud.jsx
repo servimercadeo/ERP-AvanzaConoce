@@ -30,7 +30,7 @@ const MONTH_KEYS_SET = new Set(["ene","feb","mar","abr","may","jun","jul","ago",
 
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
-    { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
+    { id: "concepto_medico",  label: "PostSeguimiento",       tipo: "CONCEPTO_MEDICO" },
     { id: "examen_periodico", label: "Examen Periódico",      tipo: "EXAMEN_PERIODICO" },
     { id: "examen_retiro",    label: "Examen de Retiro",      tipo: "EXAMEN_DE_RETIRO" },
     { id: "incapacidad",      label: "Incapacidad",           tipo: "INCAPACIDAD" },
@@ -90,6 +90,11 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
     const [eventoDocIdx, setEventoDocIdx]         = useState(0);
+    const [extraNombre, setExtraNombre]           = useState("");
+    const [extraArchivo, setExtraArchivo]         = useState(null);
+    const [subiendoExtra, setSubiendoExtra]       = useState(false);
+    const [extraError, setExtraError]             = useState("");
+    const [extraInputKey, setExtraInputKey]       = useState(0);
     const [docForm, setDocForm]                   = useState(DOC_EMPLEADO_VACIO);
     const [docArchivo, setDocArchivo]             = useState(null);
     const [guardandoDoc, setGuardandoDoc]         = useState(false);
@@ -146,6 +151,10 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
         if (!open || !contrato) return;
         const ced = contrato.empleado?.cedula ?? "";
         setDocsMed(DOCS_MED_INIT());
+        setExtraNombre("");
+        setExtraArchivo(null);
+        setExtraError("");
+        setExtraInputKey(k => k + 1);
         if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
         api.get("/documentos-contratacion/docs-medicos", { params: { cedula: ced, evento: eventoFecha } })
             .then(r => setDocsSubidos(r.data ?? {}))
@@ -210,6 +219,53 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
         setUploadingMed(false);
     };
 
+    const docsExtra = docsSubidos.extras ?? [];
+
+    const recargarDocsSubidos = () =>
+        api.get("/documentos-contratacion/docs-medicos", { params: { cedula, evento: eventoFecha } })
+            .then(r => setDocsSubidos(r.data ?? {}))
+            .catch(() => {});
+
+    const handleAgregarExtra = async () => {
+        if (!extraNombre.trim() || !extraArchivo || subiendoExtra || !cedula || !eventoFecha) return;
+        setSubiendoExtra(true);
+        setExtraError("");
+        const tipo = `extra_${Date.now()}`;
+        try {
+            const fd = new FormData();
+            fd.append("documento", cedula);
+            fd.append("tipo", tipo);
+            fd.append("nombre", extraNombre.trim());
+            fd.append("archivo", extraArchivo);
+            fd.append("evento", eventoFecha);
+            await api.post("/documentos-contratacion/upload", fd);
+            api.post("/documentos-contratacion/notificar-seguimiento-medico", {
+                documento:        cedula,
+                nombres:          emp?.nombres   ?? "",
+                apellidos:        emp?.apellidos ?? "",
+                fechaSeguimiento: eventoFecha,
+                evento:           eventoFecha,
+                tipos:            [tipo],
+            }).catch(() => {});
+            setExtraNombre("");
+            setExtraArchivo(null);
+            setExtraInputKey(k => k + 1);
+            await recargarDocsSubidos();
+        } catch (err) {
+            setExtraError(err?.response?.data?.message ?? err.message);
+        } finally {
+            setSubiendoExtra(false);
+        }
+    };
+
+    const handleBorrarExtra = async (extra) => {
+        if (!confirm(`¿Eliminar el archivo "${extra.nombre}"?`)) return;
+        await api.delete("/documentos-contratacion/docs-medicos", {
+            data: { cedula, tipo: extra.tipo, evento: eventoFecha },
+        });
+        await recargarDocsSubidos();
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -271,7 +327,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     const handleDescargarDoc = (d) => window.open(`/api/documentos-empleado/${d.id}/download`, "_blank");
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 980 }} onClick={e => e.stopPropagation()}>
 
                 {/* Cabecera verde */}
@@ -575,6 +631,17 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                 </div>
                                             );
                                         })}
+                                        {docsExtra.map(extra => (
+                                            <div key={extra.tipo} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#f0fdf4", borderRadius: "var(--radius-sm)", border: "1.5px solid #27ae60" }}>
+                                                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text)", flex: 1 }}>{extra.nombre}</span>
+                                                <span style={{ color: "#27ae60", fontSize: "0.78rem" }}>✓ Subido el {extra.uploaded_at?.split(" ")[0] ?? ""}</span>
+                                                {!readOnly && (
+                                                    <button onClick={() => handleBorrarExtra(extra)} style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                                                        Borrar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                     {!readOnly && (
                                         <button
@@ -584,6 +651,37 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                         >
                                             {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
                                         </button>
+                                    )}
+                                    {!readOnly && (
+                                        <div style={{ marginTop: 22, padding: "14px 16px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--primary)", marginBottom: 10 }}>Agregar archivo</div>
+                                            <div style={S.grid2}>
+                                                <div style={S.formGroup}>
+                                                    <label style={S.label}>Nombre del archivo</label>
+                                                    <input
+                                                        style={S.input}
+                                                        value={extraNombre}
+                                                        onChange={e => setExtraNombre(e.target.value)}
+                                                        placeholder="Ej: Recomendaciones ARL"
+                                                    />
+                                                </div>
+                                                <div style={S.formGroup}>
+                                                    <label style={S.label}>Archivo</label>
+                                                    <input key={extraInputKey} type="file" onChange={e => setExtraArchivo(e.target.files[0] ?? null)} />
+                                                </div>
+                                            </div>
+                                            {extraError && <div style={{ ...S.err, marginTop: 8 }}>{extraError}</div>}
+                                            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                                                <button
+                                                    className="btn-primary"
+                                                    onClick={handleAgregarExtra}
+                                                    disabled={subiendoExtra || !extraNombre.trim() || !extraArchivo}
+                                                    style={{ opacity: (subiendoExtra || !extraNombre.trim() || !extraArchivo) ? 0.6 : 1 }}
+                                                >
+                                                    {subiendoExtra ? "Subiendo…" : "+ Agregar archivo"}
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
                                     </>
                                     )}
@@ -748,7 +846,7 @@ export default function SeguimientoMedicoCrud() {
     /* ── Queries ── */
     const { data: contratos = [], isLoading } = useQuery({
         queryKey: ["contratos-seguimiento"],
-        queryFn:  () => api.get("/contratos", { params: { estado: "Activo" } }).then(r => r.data),
+        queryFn:  () => api.get("/contratos", { params: { estado: "Vigente" } }).then(r => r.data),
         staleTime: 30_000,
     });
     const { data: _qEmp } = useQuery({ queryKey: ["empleados"],           queryFn: () => api.get("/empleados").then(r => r.data) });

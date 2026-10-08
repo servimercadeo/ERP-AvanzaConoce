@@ -512,7 +512,7 @@ export default function BaseIngresoCrud() {
       )}
 
       {isModalOpen && (
-        <div style={S.overlay} onClick={() => setIsModalOpen(false)}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
 
             <div style={S.modalHeader}>
@@ -600,7 +600,7 @@ export default function BaseIngresoCrud() {
       )}
 
       {alertDlg.open && (
-        <div style={{ ...S.overlay, zIndex: 6100 }} onClick={() => setAlertDlg({ open: false, title: '', msg: '' })}>
+        <div style={{ ...S.overlay, zIndex: 6100 }}>
           <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{alertDlg.title}</span>
@@ -616,7 +616,7 @@ export default function BaseIngresoCrud() {
       )}
 
       {confirmDlg.open && (
-        <div style={{ ...S.overlay, zIndex: 6000 }} onClick={handleConfirmCancel}>
+        <div style={{ ...S.overlay, zIndex: 6000 }}>
           <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', boxShadow: '0 16px 60px rgba(26,155,140,0.28)', width: '100%', maxWidth: 400, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div style={S.modalHeader}>
               <span style={{ ...S.modalTitle, fontSize: '1rem' }}>{confirmDlg.title}</span>

@@ -57,7 +57,7 @@ function FormModal({ open, onClose, onSave, editTarget, categoriasOpciones }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>

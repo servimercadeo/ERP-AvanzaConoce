@@ -1120,7 +1120,6 @@ export default function CandidatosCrud() {
             {isCandModalOpen && (
                 <div
                     style={S.overlay}
-                    onClick={() => setIsCandModalOpen(false)}
                 >
                     <div
                         style={{ ...S.modal, maxWidth: 960 }}
@@ -1927,7 +1926,6 @@ export default function CandidatosCrud() {
             {isProcModalOpen && (
                 <div
                     style={S.overlay}
-                    onClick={() => setIsProcModalOpen(false)}
                 >
                     <div
                         style={{ ...S.modal, maxWidth: 960 }}
@@ -2778,9 +2776,6 @@ export default function CandidatosCrud() {
             {vinculacionModal.open && (
                 <div
                     style={{ ...S.overlay, zIndex: 6100 }}
-                    onClick={() =>
-                        setVinculacionModal(VINCULACION_MODAL_INICIAL)
-                    }
                 >
                     <div
                         style={{
@@ -3108,9 +3103,6 @@ export default function CandidatosCrud() {
             {alertDlg.open && (
                 <div
                     style={{ ...S.overlay, zIndex: 6100 }}
-                    onClick={() =>
-                        setAlertDlg({ open: false, title: "", msg: "" })
-                    }
                 >
                     <div
                         style={{
@@ -3174,7 +3166,6 @@ export default function CandidatosCrud() {
             {confirmDlg.open && (
                 <div
                     style={{ ...S.overlay, zIndex: 6000 }}
-                    onClick={handleConfirmCancel}
                 >
                     <div
                         style={{

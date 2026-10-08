@@ -178,7 +178,7 @@ function Modal({
     const fp = { form, errors, onChange, disabled: readOnly };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 960 }}
                 onClick={(e) => e.stopPropagation()}
@@ -885,7 +885,7 @@ export default function SedesCrud() {
 
             {/* Modal de Filtros Avanzados */}
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 500 }}
                         onClick={(e) => e.stopPropagation()}
@@ -990,7 +990,7 @@ export default function SedesCrud() {
             />
 
             {deleteTarget && (
-                <div style={S.overlay} onClick={() => setDeleteTarget(null)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 400 }}
                         onClick={(e) => e.stopPropagation()}

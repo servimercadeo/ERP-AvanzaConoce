@@ -66,7 +66,7 @@ function NuevaAsignacionModal({ usuarios, onClose, onSaved }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Nueva Asignación</span>

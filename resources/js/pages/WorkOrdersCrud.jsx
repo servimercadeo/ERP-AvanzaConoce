@@ -184,7 +184,7 @@ function ImportModal({ onClose, onImported }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Importar Work Orders desde Excel</span>
@@ -262,7 +262,7 @@ function ImportModal({ onClose, onImported }) {
 /* ─── Modal confirmar eliminación ─────────────────────────────────────── */
 function DeleteModal({ item, onClose, onConfirm, deleting }) {
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, color: "#c0392b" }}>Eliminar Work Order</span>
@@ -347,7 +347,7 @@ function CampoSoloLectura({ label, valor, span }) {
 
 function VerModal({ item, onClose }) {
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Work Order {item.numero_wo}</span>

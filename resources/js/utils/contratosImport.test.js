@@ -29,7 +29,7 @@ test("mapea columnas de Excel con nombres distintos al payload de contrato", () 
     assert.equal(payload.sede, "Principal");
     assert.equal(payload.fecha_ingreso, "2026-07-01");
     assert.equal(payload.tipo_contrato, "Término Fijo");
-    assert.equal(payload.estado_contrato, "Activo");
+    assert.equal(payload.estado_contrato, "Vigente");
     assert.equal(payload.salario, 3500000);
     assert.equal(payload.lps_afiliado, "Sura");
     assert.equal(payload.arl, "Colpatria");

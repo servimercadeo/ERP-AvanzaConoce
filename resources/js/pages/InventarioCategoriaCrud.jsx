@@ -71,7 +71,7 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>{isEdit ? "Editar item" : "Nuevo item"}</span>
@@ -334,7 +334,7 @@ function ImportModal({ categoria, esGeneral, tiposProducto, sedes, onClose, onIm
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Importar desde Excel</span>
@@ -391,7 +391,7 @@ function ImportModal({ categoria, esGeneral, tiposProducto, sedes, onClose, onIm
 /* ─── Modal confirmar eliminación ─────────────────────────────────────── */
 function DeleteModal({ item, onClose, onConfirm, deleting }) {
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, color: "#c0392b" }}>Eliminar item</span>

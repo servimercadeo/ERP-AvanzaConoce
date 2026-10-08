@@ -331,7 +331,7 @@ export default function SeleccionCrud() {
 
       {/* Modal Requisición */}
       {modal && (
-        <div style={S.overlay} onClick={() => setModal(false)}>
+        <div style={S.overlay}>
           <div style={S.modal} onClick={e => e.stopPropagation()}>
             <div style={S.mHead}>
               <span style={S.mTitle}>{mode === 'create' ? 'Registrar nueva requisición' : mode === 'edit' ? 'Editar requisición' : 'Detalles de la requisición'}</span>

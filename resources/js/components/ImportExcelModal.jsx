@@ -131,7 +131,7 @@ export default function ImportExcelModal({
     };
 
     return (
-        <div style={S.overlay} onClick={handleClose}>
+        <div style={S.overlay}>
             <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeaderGreen}>
                     <span style={S.modalTitleWhite}>{titulo}</span>

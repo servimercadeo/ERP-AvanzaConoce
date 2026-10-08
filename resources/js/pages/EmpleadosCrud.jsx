@@ -867,7 +867,7 @@ function Modal({
     const fp = { form, errors, onChange, disabled: readOnly };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 960 }}
                 onClick={(e) => e.stopPropagation()}
@@ -1321,7 +1321,7 @@ function CredencialesModal({ open, credenciales, onClose }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 480 }}
                 onClick={(e) => e.stopPropagation()}
@@ -2235,7 +2235,7 @@ export default function EmpleadosCrud() {
 
             {/* Modal de filtros */}
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 900 }}
                         onClick={(e) => e.stopPropagation()}

@@ -34,7 +34,14 @@ const CAMPOS_IMPORT_LABEL = {
 };
 
 const TIPOS_CUENTA = ["Ahorros", "Corriente"];
-const ESTADOS_CONTRATO = ["Activo", "Inactivo", "Cancelado", "Traslado", "No ingreso"];
+const ESTADOS_CONTRATO = ["Vigente", "Finalizado", "Traslado", "Finalizado traslado", "No ingreso"];
+
+const COLORES_ESTADO = {
+    "Vigente":             ["#e0f7f4", "#0d6e5a"],
+    "Traslado":            ["#e8f0ff", "#1a4fa8"],
+    "Finalizado":          ["#fff3e0", "#e67e22"],
+    "Finalizado traslado": ["#f3e8ff", "#7b3fb5"],
+};
 const TIPOS_CONTRATO = [
     "Término Fijo",
     "Término Indefinido",
@@ -78,7 +85,7 @@ const MESES = [
 
 const DOCS_MEDICOS = [
     { id: "examen_ingreso",   label: "Examen de Ingreso",     tipo: "EXAMEN_DE_INGRESO" },
-    { id: "concepto_medico",  label: "Concepto Médico",       tipo: "CONCEPTO_MEDICO" },
+    { id: "concepto_medico",  label: "PostSeguimiento",       tipo: "CONCEPTO_MEDICO" },
     { id: "examen_periodico", label: "Examen Periódico",      tipo: "EXAMEN_PERIODICO" },
     { id: "examen_retiro",    label: "Examen de Retiro",      tipo: "EXAMEN_DE_RETIRO" },
     { id: "incapacidad",      label: "Incapacidad",           tipo: "INCAPACIDAD" },
@@ -109,7 +116,7 @@ const EMPTY_FORM = {
     banco: "",
     tipo_cuenta: "",
     cuenta_bancaria: "",
-    estado_contrato: "Activo",
+    estado_contrato: "Vigente",
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
@@ -1029,7 +1036,7 @@ function Modal({
     const fp = { form, errors, onChange, disabled: readOnly };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 960 }}
                 onClick={(e) => e.stopPropagation()}
@@ -2603,16 +2610,10 @@ export default function ContratosCrud() {
     const stats = useMemo(
         () => ({
             total: contratos.length,
-            activos: contratos.filter((c) => c.estado_contrato === "Activo")
-                .length,
-            inactivos: contratos.filter((c) => c.estado_contrato === "Inactivo")
-                .length,
-            cancelados: contratos.filter(
-                (c) => c.estado_contrato === "Cancelado",
-            ).length,
-            translados: contratos.filter(
-                (c) => c.estado_contrato === "Traslado",
-            ).length,
+            vigentes: contratos.filter((c) => c.estado_contrato === "Vigente").length,
+            finalizados: contratos.filter((c) => c.estado_contrato === "Finalizado").length,
+            traslados: contratos.filter((c) => c.estado_contrato === "Traslado").length,
+            finalizadosTraslado: contratos.filter((c) => c.estado_contrato === "Finalizado traslado").length,
         }),
         [contratos],
     );
@@ -2837,27 +2838,27 @@ export default function ContratosCrud() {
                 </div>
                 <div className="stat-card">
                     <div className="stat-num" style={{ color: "#27ae60" }}>
-                        {stats.activos}
+                        {stats.vigentes}
                     </div>
-                    <div className="stat-label">Activos</div>
+                    <div className="stat-label">Vigentes</div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-num" style={{ color: "#f39c12" }}>
-                        {stats.inactivos}
+                        {stats.finalizados}
                     </div>
-                    <div className="stat-label">Inactivos</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-num" style={{ color: "#e74c3c" }}>
-                        {stats.cancelados}
-                    </div>
-                    <div className="stat-label">Cancelados</div>
+                    <div className="stat-label">Finalizados</div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-num" style={{ color: "#3498db" }}>
-                        {stats.translados}
+                        {stats.traslados}
                     </div>
                     <div className="stat-label">Traslados</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num" style={{ color: "#7b3fb5" }}>
+                        {stats.finalizadosTraslado}
+                    </div>
+                    <div className="stat-label">Finalizados traslado</div>
                 </div>
             </div>
 
@@ -3024,24 +3025,7 @@ export default function ContratosCrud() {
                                     <td>
                                         <span
                                             style={S.badge(
-                                                c.estado_contrato === "Activo"
-                                                    ? "#e0f7f4"
-                                                    : c.estado_contrato ===
-                                                        "Traslado"
-                                                      ? "#e8f0ff"
-                                                      : c.estado_contrato ===
-                                                          "Inactivo"
-                                                        ? "#fff3e0"
-                                                        : "#fce8e8",
-                                                c.estado_contrato === "Activo"
-                                                    ? "#0d6e5a"
-                                                    : c.estado_contrato ===
-                                                        "Traslado"
-                                                      ? "#1a4fa8"
-                                                      : c.estado_contrato ===
-                                                          "Inactivo"
-                                                        ? "#e67e22"
-                                                        : "#a33",
+                                                ...(COLORES_ESTADO[c.estado_contrato] ?? ["#fce8e8", "#a33"]),
                                             )}
                                         >
                                             {c.estado_contrato}
@@ -3098,7 +3082,7 @@ export default function ContratosCrud() {
             </div>
 
             {importOpen && (
-                <div style={S.overlay} onClick={() => setImportOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 560 }}
                         onClick={(e) => e.stopPropagation()}
@@ -3240,7 +3224,7 @@ export default function ContratosCrud() {
             )}
 
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{
                             ...S.modal,
@@ -3440,7 +3424,7 @@ export default function ContratosCrud() {
             />
 
             {empresaProyectoAlert && (
-                <div style={S.overlay} onClick={() => setEmpresaProyectoAlert(null)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 460 }}
                         onClick={(e) => e.stopPropagation()}
