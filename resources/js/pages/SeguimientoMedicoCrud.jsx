@@ -334,7 +334,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                 <div style={S.modalHeaderGreen}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={S.modalTitleWhite}>
-                            {readOnly ? "Ver" : "Editar"} Seguimiento Médico
+                            {readOnly ? "Ver" : "Editar"} Seguimiento
                         </span>
                         <span style={{ color: "rgba(255,255,255,0.78)", fontSize: "0.85rem", fontFamily: "Nunito,sans-serif" }}>
                             {nombre}{cedula ? ` · CC ${cedula}` : ""}
@@ -892,7 +892,7 @@ export default function SeguimientoMedicoCrud() {
         const { data: updated } = await api.put(`/contratos/${id}`, { ...base, ...payload });
         qc.setQueryData(["contratos-seguimiento"], (old = []) => old.map(c => c.id === id ? updated : c));
         qc.invalidateQueries({ queryKey: ["contratos"] });
-        showToast("Seguimiento médico actualizado.");
+        showToast("Seguimiento actualizado.");
     };
 
     return (

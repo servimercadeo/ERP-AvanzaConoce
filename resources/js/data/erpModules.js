@@ -116,7 +116,7 @@ export const ERP_MODULES = [
           { id: 'avales_contratacion', label: 'Avales de Contratación' },
           { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
-          { id: 'Seguros_medicos', label: 'Seguimiento Medico' },
+          { id: 'Seguros_medicos', label: 'Seguimiento' },
           { id: 'centros_costos_catalogo', label: 'Centros de Costos' },
           // { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           // { id: 'empleadores', label: 'Empleadores' },

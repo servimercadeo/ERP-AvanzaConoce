@@ -1253,7 +1253,7 @@ function Modal({
                             ["principal",         "Información Principal"],
                             ["seguridad",         "Seguridad Social"],
                             ["costos",            "Costos y Anexos"],
-                            ["Seguimiento_medico","Seguimiento Médico"],
+                            ["Seguimiento_medico","Seguimiento"],
                             ["doc_medicos",       "Documentos Médicos"],
                         ]
                     ).map(([key, lbl]) => (
@@ -1627,7 +1627,7 @@ function Modal({
                                             marginTop: 32,
                                         }}
                                     >
-                                        EVENTOS DE SEGUIMIENTO MÉDICO
+                                        EVENTOS DE SEGUIMIENTO
                                     </div>
                                     {eventosMedicos.length === 0 && (
                                         <p
@@ -2034,7 +2034,7 @@ function Modal({
                                 </div>
                             ) : eventosMedicos.length === 0 ? (
                                 <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
-                                    Registra primero un evento en la pestaña "Seguimiento Médico". Los documentos se asocian a un evento.
+                                    Registra primero un evento en la pestaña "Seguimiento". Los documentos se asocian a un evento.
                                 </div>
                             ) : (
                                 <>
@@ -2055,7 +2055,7 @@ function Modal({
                                     </div>
                                     {!eventoFecha ? (
                                         <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
-                                            Este evento no tiene "Fecha Ingreso a Seguimiento". Complétala en la pestaña "Seguimiento Médico" y guarda antes de subir documentos.
+                                            Este evento no tiene "Fecha Ingreso a Seguimiento". Complétala en la pestaña "Seguimiento" y guarda antes de subir documentos.
                                         </div>
                                     ) : (
                                     <>
