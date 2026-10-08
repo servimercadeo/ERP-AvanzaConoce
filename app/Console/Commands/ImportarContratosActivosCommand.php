@@ -42,13 +42,15 @@ class ImportarContratosActivosCommand extends Command
     ];
 
     private const ESTADO_MAP = [
-        'activo' => 'Activo',
-        'vigente' => 'Activo',
-        'inactivo' => 'Inactivo',
-        'no vigente' => 'Inactivo',
-        'cancelado' => 'Cancelado',
+        'activo' => 'Vigente',
+        'vigente' => 'Vigente',
+        'inactivo' => 'Finalizado',
+        'no vigente' => 'Finalizado',
+        'finalizado' => 'Finalizado',
+        'cancelado' => 'Finalizado',
         'traslado' => 'Traslado',
         'transladado' => 'Traslado',
+        'finalizado traslado' => 'Finalizado traslado',
     ];
 
     // CSV trae "DIRECTV COL"; el resto de la app (EmpresaProyectoRules, DotacionAutoPedidoService)
@@ -464,7 +466,7 @@ class ImportarContratosActivosCommand extends Command
     {
         $raw = trim($raw);
         if ($raw === '') {
-            return 'Activo';
+            return 'Vigente';
         }
 
         return self::ESTADO_MAP[$this->comparable($raw)] ?? $raw;

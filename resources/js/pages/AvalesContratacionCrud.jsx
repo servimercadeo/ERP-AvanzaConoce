@@ -724,7 +724,7 @@ export default function AvalesContratacionCrud() {
             )}
 
             {isModalOpen && (
-                <div style={S.overlay} onClick={() => setIsModalOpen(false)}>
+                <div style={S.overlay}>
                     <div style={S.modal} onClick={(e) => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>
@@ -945,7 +945,7 @@ export default function AvalesContratacionCrud() {
 
             {/* Confirm Dialog */}
             {confirmDlg.open && (
-                <div style={S.overlay} onClick={handleConfirmCancel}>
+                <div style={S.overlay}>
                     <div
                         style={{
                             background: "var(--white)",

@@ -150,16 +150,18 @@ function normalizeContratoType(value) {
 }
 
 function normalizeEstado(value) {
-    if (!value && value !== 0) return "Activo";
+    if (!value && value !== 0) return "Vigente";
     const clean = normalizeComparable(String(value));
     const map = {
-        activo: "Activo",
-        vigente: "Activo",
-        inactivo: "Inactivo",
-        "no vigente": "Inactivo",
-        cancelado: "Cancelado",
+        activo: "Vigente",
+        vigente: "Vigente",
+        inactivo: "Finalizado",
+        "no vigente": "Finalizado",
+        finalizado: "Finalizado",
+        cancelado: "Finalizado",
         traslado: "Traslado",
         transladado: "Traslado",
+        "finalizado traslado": "Finalizado traslado",
     };
     return map[clean] || String(value).trim();
 }

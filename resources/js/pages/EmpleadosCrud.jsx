@@ -183,7 +183,8 @@ const matchOpt = (val, opts) => {
 // autocompletar un alta, del que trae el candidato.
 const esProyectoDirectv = (form) => {
     const contratos = form.contratos ?? [];
-    const vigente = contratos.find((c) => c.estado_contrato === "Activo") ?? contratos[0];
+    // "Vigente" (antes "Activo").
+    const vigente = contratos.find((c) => ["Vigente", "Activo"].includes(c.estado_contrato)) ?? contratos[0];
     const proyecto = form.cliente_proyecto || vigente?.cliente_proyecto || "";
     return /^DIRECTV/i.test(String(proyecto).trim());
 };
@@ -901,7 +902,7 @@ function Modal({
     const fp = { form, errors, onChange, disabled: readOnly };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
@@ -1361,7 +1362,7 @@ function CredencialesModal({ open, credenciales, onClose }) {
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: 480 }}
                 onClick={(e) => e.stopPropagation()}
@@ -2329,7 +2330,7 @@ export default function EmpleadosCrud() {
 
             {/* Modal de filtros */}
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                         onClick={(e) => e.stopPropagation()}

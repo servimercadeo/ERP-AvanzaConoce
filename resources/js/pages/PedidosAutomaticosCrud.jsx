@@ -71,7 +71,8 @@ const contratoVigenteDe = (contratos, empleadoId) => {
     const reciente = (a, b) =>
         String(b.fecha_ingreso ?? "").localeCompare(String(a.fecha_ingreso ?? "")) || (b.id ?? 0) - (a.id ?? 0);
     return (
-        suyos.filter((c) => c.estado_contrato === "Activo").sort(reciente)[0] ??
+        // "Vigente" (antes "Activo").
+        suyos.filter((c) => ["Vigente", "Activo"].includes(c.estado_contrato)).sort(reciente)[0] ??
         suyos.sort(reciente)[0] ??
         null
     );
@@ -711,7 +712,7 @@ function Modal({
     if (!open) return null;
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div
                 style={{ ...S.modal, maxWidth: "min(1400px, 96vw)" }}
                 onClick={(e) => e.stopPropagation()}
@@ -2656,7 +2657,6 @@ export default function PedidosAutomaticosCrud() {
             {globalModal && (
                 <div
                     style={S.overlay}
-                    onClick={() => !globalSaving && setGlobalModal(false)}
                 >
                     <div
                         style={{ ...S.modal, maxWidth: 480 }}
@@ -2837,7 +2837,7 @@ export default function PedidosAutomaticosCrud() {
             )}
 
             {confirmDelete && (
-                <div style={S.overlay} onClick={() => setConfirmDelete(null)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: 440 }}
                         onClick={(e) => e.stopPropagation()}

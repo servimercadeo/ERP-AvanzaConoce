@@ -599,6 +599,16 @@ Route::middleware('auth:sanctum')->group(function () {
                 'nombre_original' => $archivos[$tipo]['nombre_original'] ?? null,
             ] : null;
         }
+        // Archivos adicionales con nombre libre ("Agregar archivo"), tipo "extra_*"
+        $result['extras'] = collect($archivos)
+            ->filter(fn ($a, $tipo) => str_starts_with($tipo, 'extra_'))
+            ->map(fn ($a, $tipo) => [
+                'tipo'            => $tipo,
+                'nombre'          => $a['nombre'] ?? $a['nombre_original'] ?? $tipo,
+                'uploaded_at'     => $a['uploaded_at'] ?? null,
+                'nombre_original' => $a['nombre_original'] ?? null,
+            ])
+            ->values();
         return response()->json($result);
     })->middleware('permiso:administrativo.admin_contratos');
 
@@ -909,6 +919,7 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
         'tipo'      => 'required|string|max:120',
         'archivo'   => 'required|file|max:10240',
         'evento'    => 'nullable|string|max:20',
+        'nombre'    => 'nullable|string|max:150',
     ]);
 
     $documento = $request->input('documento');
@@ -934,6 +945,9 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
         'nombre_original' => $file->getClientOriginalName(),
         'uploaded_at'     => now()->toDateTimeString(),
     ];
+    if ($request->filled('nombre')) {
+        $archivo['nombre'] = $request->input('nombre');
+    }
     if ($evento) {
         $meta[$documento]['archivos_eventos'][$evento][$tipo] = $archivo;
     } else {

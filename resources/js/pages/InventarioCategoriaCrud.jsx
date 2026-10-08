@@ -25,6 +25,8 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+    const categoriaSeleccionada = tiposProducto.find((t) => String(t.id) === String(form.tipo_producto_id))?.categoria;
+
     const resizeSeries = (n) => {
         setSeriesForm((prev) => {
             const next = prev.slice(0, Math.max(0, n));
@@ -69,13 +71,18 @@ function ItemModal({ item, tiposProducto, sedes, empresas, esGeneral, onClose, o
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>{isEdit ? "Editar item" : "Nuevo item"}</span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
                 </div>
                 <div style={S.modalBody}>
+                    {categoriaSeleccionada && (
+                        <div style={S.avisoCategoria}>
+                            Categoría: <strong>{categoriaSeleccionada}</strong>
+                        </div>
+                    )}
                     <div className="form-grid" style={S.grid2}>
                         <div style={{ ...S.formGroup, gridColumn: "span 2" }}>
                             <label style={S.label}>Producto *</label>
@@ -327,7 +334,7 @@ function ImportModal({ categoria, esGeneral, tiposProducto, sedes, onClose, onIm
     };
 
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, fontSize: "1rem" }}>Importar desde Excel</span>
@@ -384,7 +391,7 @@ function ImportModal({ categoria, esGeneral, tiposProducto, sedes, onClose, onIm
 /* ─── Modal confirmar eliminación ─────────────────────────────────────── */
 function DeleteModal({ item, onClose, onConfirm, deleting }) {
     return (
-        <div style={S.overlay} onClick={onClose}>
+        <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
                     <span style={{ fontWeight: 800, color: "#c0392b" }}>Eliminar item</span>
@@ -846,6 +853,7 @@ const S = {
     modal: { background: "var(--white)", borderRadius: "var(--radius)", boxShadow: "0 8px 40px rgba(0,0,0,0.22)", width: "100%", fontFamily: "Nunito,sans-serif", maxHeight: "92vh", display: "flex", flexDirection: "column" },
     modalHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px 14px", borderBottom: "1.5px solid var(--border)", flexShrink: 0 },
     modalBody: { padding: "18px 22px", overflowY: "auto", flex: 1 },
+    avisoCategoria: { marginBottom: 16, padding: "10px 14px", background: "#e8f8f5", color: "var(--primary-dark)", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif" },
     modalFooter: { display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 22px 18px", borderTop: "1.5px solid var(--border)", flexShrink: 0 },
     grid2: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(230px, 100%), 1fr))", gap: 14 },
     formGroup: { display: "flex", flexDirection: "column", gap: 5 },

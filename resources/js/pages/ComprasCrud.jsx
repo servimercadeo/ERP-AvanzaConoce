@@ -311,7 +311,7 @@ export default function ComprasCrud() {
 
             {/* --- Modal Filtros --- */}
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)", maxHeight: "none", overflow: "visible" }} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>Filtros de Búsqueda</span>
@@ -378,7 +378,7 @@ export default function ComprasCrud() {
 
             {/* --- Modal Ver Detalle --- */}
             {verTarget && (
-                <div style={S.overlay} onClick={() => setVerTarget(null)}>
+                <div style={S.overlay}>
                     <div style={S.modal} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>Detalles de Pedido {verTarget.codigo}</span>

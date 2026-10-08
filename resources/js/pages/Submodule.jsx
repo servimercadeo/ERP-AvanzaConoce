@@ -328,11 +328,6 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
             case 'proyectos_file': return ProyectosCrud;
             default: return null;
           }
-        case 'tipo_producto':
-          switch (archivoId) {
-            case 'tipo_producto_file': return TiposProductoCrud;
-            default: return null;
-          }
         case 'clases_pedido':
           switch (archivoId) {
             case 'clases_pedido_file': return ClasesPedidoCrud;
@@ -346,6 +341,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'categoria_producto':
           switch (archivoId) {
             case 'categoria_producto_file': return CategoriaProductoCrud;
+            case 'tipo_producto_file': return TiposProductoCrud;
             default: return null;
           }
         case 'proveedores':

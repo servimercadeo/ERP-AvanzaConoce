@@ -222,7 +222,8 @@ class PedidoAutomaticoController extends Controller
         }
 
         return \App\Models\Contrato::where('empleado_id', $data['empleado_id'])
-            ->orderByRaw("estado_contrato = 'Activo' DESC")
+            // "Vigente" (antes "Activo", ver migración renombrar_estados_contrato).
+            ->orderByRaw("estado_contrato IN ('Vigente', 'Activo') DESC")
             ->orderByDesc('fecha_ingreso')->orderByDesc('id')
             ->first();
     }

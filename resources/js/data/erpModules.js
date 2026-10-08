@@ -116,7 +116,7 @@ export const ERP_MODULES = [
           { id: 'avales_contratacion', label: 'Avales de Contratación' },
           { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
           { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
-          { id: 'Seguros_medicos', label: 'Seguimiento Medico' },
+          { id: 'Seguros_medicos', label: 'Seguimiento' },
           { id: 'centros_costos_catalogo', label: 'Centros de Costos' },
           // { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           // { id: 'empleadores', label: 'Empleadores' },
@@ -514,14 +514,6 @@ export const ERP_MODULES = [
         desc: 'Catálogo de categorías de producto. Crear una nueva genera su propio módulo en Inventarios',
         archivos: [
           { id: 'categoria_producto_file', label: 'Categoría del Producto' },
-        ]
-      },
-      {
-        id: 'tipo_producto',
-        label: 'Tipo de Producto',
-        icon: 'productos',
-        desc: 'Catálogo de tipos de producto',
-        archivos: [
           { id: 'tipo_producto_file', label: 'Tipo de Producto' },
         ]
       },

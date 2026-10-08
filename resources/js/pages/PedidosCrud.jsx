@@ -1051,7 +1051,7 @@ export default function PedidosCrud() {
 
             {/* --- Modal Detalle de Pedido de Dotación (solo lectura) --- */}
             {dotacionDetalle && (
-                <div style={S.overlay} onClick={() => setDotacionDetalle(null)}>
+                <div style={S.overlay}>
                     <div style={S.modal} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>
@@ -1126,7 +1126,7 @@ export default function PedidosCrud() {
 
             {/* --- Modal Revisión de Stock / Traslado (pedidos de Dotación) --- */}
             {revisionPedido && (
-                <div style={S.overlay} onClick={() => setRevisionPedido(null)}>
+                <div style={S.overlay}>
                     <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={e => e.stopPropagation()}>
                         <div style={S.modalHeader}>
                             <span style={S.modalTitle}>
@@ -1320,7 +1320,7 @@ export default function PedidosCrud() {
 
             {/* --- Modal Filtros de Búsqueda --- */}
             {filterOpen && (
-                <div style={S.overlay} onClick={() => setFilterOpen(false)}>
+                <div style={S.overlay}>
                     <div
                         style={{ ...S.modal, maxWidth: "min(1400px, 96vw)", maxHeight: "none", overflow: "visible" }}
                         onClick={e => e.stopPropagation()}
