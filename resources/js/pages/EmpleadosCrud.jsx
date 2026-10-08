@@ -46,14 +46,26 @@ const EST_CIVIL = [
     "Viudo/a",
     "Por definir",
 ];
+// Escolaridad del formulario de registro de nuevos ingresos -> opción de esta lista.
+const ESCOLARIDAD_DESDE_REGISTRO = {
+    PREESCOLAR: "Preescolar",
+    PRIMARIA: "Primaria",
+    SECUNDARIA: "Bachillerato",
+    TECNICO: "Técnico",
+    TECNOLOGO: "Tecnólogo",
+    PROFESIONAL: "Universitario",
+    POSGRADO: "Posgrado",
+};
 const ESCOLARIDAD = [
     "Sin estudios",
+    "Preescolar",
     "Primaria",
     "Bachillerato",
     "Técnico",
     "Tecnólogo",
     "Universitario",
     "Especialización",
+    "Posgrado",
     "Maestría",
     "Doctorado",
 ];
@@ -163,6 +175,16 @@ const matchOpt = (val, opts) => {
             .trim();
     const nVal = norm(val);
     return opts.find((o) => norm(o) === nVal) ?? null;
+};
+
+// "Código Directv" solo aplica a empleados del proyecto DIRECTV (que es exclusivo de
+// Servimercadeo, ver EmpresaProyectoRules). El proyecto sale del contrato vigente o, al
+// autocompletar un alta, del que trae el candidato.
+const esProyectoDirectv = (form) => {
+    const contratos = form.contratos ?? [];
+    const vigente = contratos.find((c) => c.estado_contrato === "Activo") ?? contratos[0];
+    const proyecto = form.cliente_proyecto || vigente?.cliente_proyecto || "";
+    return /^DIRECTV/i.test(String(proyecto).trim());
 };
 
 const toForm = (emp, catalogs = {}) => ({
@@ -759,6 +781,7 @@ function Modal({
             ...f,
             // Identificación
             cedula: v(c.cedula, f.cedula),
+            fotografia: v(c.fotografia, f.fotografia),
             nombres: v(c.nombres, f.nombres),
             apellidos: v(c.apellidos, f.apellidos),
             email: v(c.email, f.email),
@@ -769,14 +792,22 @@ function Modal({
             fecha_nacimiento: v(c.fecha_nacimiento, f.fecha_nacimiento),
             lugar_nacimiento: v(c.lugar_nacimiento, f.lugar_nacimiento),
             estado_civil: v(
-                matchOpt(c.estado_civil, EST_CIVIL),
+                matchOpt(c.estado_civil, EST_CIVIL) ?? c.estado_civil,
                 f.estado_civil,
             ),
+            // El formulario de registro usa otra lista (PREESCOLAR, SECUNDARIA,
+            // PROFESIONAL...): se traduce a la de Empleados.
             nivel_escolaridad: v(
-                matchOpt(c.nivel_escolaridad, ESCOLARIDAD),
+                matchOpt(
+                    ESCOLARIDAD_DESDE_REGISTRO[String(c.nivel_escolaridad ?? "").toUpperCase()] ??
+                        c.nivel_escolaridad,
+                    ESCOLARIDAD,
+                ) ?? c.nivel_escolaridad,
                 f.nivel_escolaridad,
             ),
             profesion: v(c.profesion, f.profesion),
+            raza: v(c.raza, f.raza),
+            tipo_funcionario: v(c.tipo_funcionario, f.tipo_funcionario),
             direccion_residencia: v(
                 c.direccion_residencia,
                 f.direccion_residencia,
@@ -813,6 +844,8 @@ function Modal({
             empleador: v(c.empleador, f.empleador),
             jefe_inmediato: v(c.jefe_inmediato, f.jefe_inmediato),
             empresa_id: v(c.empresa_id, f.empresa_id),
+            // Solo para decidir si se muestra "Código Directv" (no se guarda en el empleado).
+            cliente_proyecto: v(c.cliente_proyecto, f.cliente_proyecto),
             ingresos: v(c.ingresos, f.ingresos),
             // Contacto de emergencia
             contacto_emergencia_nombre: v(
@@ -1220,11 +1253,13 @@ function Modal({
                                     req
                                     {...fp}
                                 />
-                                <Field
-                                    label="Código Directv"
-                                    k="codigo_directv"
-                                    {...fp}
-                                />
+                                {esProyectoDirectv(form) && (
+                                    <Field
+                                        label="Código Directv"
+                                        k="codigo_directv"
+                                        {...fp}
+                                    />
+                                )}
                                 <Field
                                     label="Tipo de funcionario (rol)"
                                     k="rol"
@@ -1309,10 +1344,14 @@ function CredencialesModal({ open, credenciales, onClose }) {
     const [copiado, setCopiado] = useState(false);
     if (!open || !credenciales) return null;
 
+    // Si la persona ya existe en AvanzaConoce, entra con su misma contraseña de allá.
+    const deAvanza = !!credenciales.de_avanza;
     const copiar = () => {
         navigator.clipboard
             .writeText(
-                `Email: ${credenciales.email}\nContraseña: ${credenciales.password}`,
+                deAvanza
+                    ? `Email: ${credenciales.email}\nContraseña: la misma que usa en AvanzaConoce`
+                    : `Email: ${credenciales.email}\nContraseña: ${credenciales.password}`,
             )
             .then(() => {
                 setCopiado(true);
@@ -1343,9 +1382,9 @@ function CredencialesModal({ open, credenciales, onClose }) {
                             lineHeight: 1.6,
                         }}
                     >
-                        Guarda estas credenciales y compártelas con el empleado.
-                        La contraseña no podrá recuperarse después de cerrar
-                        esta ventana.
+                        {deAvanza
+                            ? "El empleado ya tiene usuario en AvanzaConoce: entra al ERP con su correo y la misma contraseña que usa allá. Si la cambia o la resetea en AvanzaConoce, se actualiza también aquí."
+                            : "Guarda estas credenciales y compártelas con el empleado. La contraseña no podrá recuperarse después de cerrar esta ventana."}
                     </p>
                     <div
                         style={{
@@ -1389,19 +1428,30 @@ function CredencialesModal({ open, credenciales, onClose }) {
                                     textTransform: "uppercase",
                                 }}
                             >
-                                Contraseña temporal
+                                {deAvanza ? "Contraseña" : "Contraseña temporal"}
                             </span>
                             <div
-                                style={{
-                                    fontFamily: "monospace",
-                                    fontSize: "1.3rem",
-                                    color: "var(--primary)",
-                                    fontWeight: 800,
-                                    letterSpacing: 3,
-                                    marginTop: 4,
-                                }}
+                                style={
+                                    deAvanza
+                                        ? {
+                                              fontSize: "1rem",
+                                              color: "var(--primary)",
+                                              fontWeight: 700,
+                                              marginTop: 4,
+                                          }
+                                        : {
+                                              fontFamily: "monospace",
+                                              fontSize: "1.3rem",
+                                              color: "var(--primary)",
+                                              fontWeight: 800,
+                                              letterSpacing: 3,
+                                              marginTop: 4,
+                                          }
+                                }
                             >
-                                {credenciales.password}
+                                {deAvanza
+                                    ? "La misma que usa en AvanzaConoce"
+                                    : credenciales.password}
                             </div>
                         </div>
                     </div>

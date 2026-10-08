@@ -135,7 +135,7 @@ class IngresoDePersonalTest extends TestCase
             'nivel_escolaridad' => 'Bachiller', 'profesion' => 'Ninguna', 'ciudad' => 'Pereira', 'barrio' => 'Centro',
             'direccion' => 'Calle 1 # 2-3', 'estrato' => '3', 'correo' => 'pedro@test.co', 'celular' => '3001234567',
             'emergencia_nombre' => 'Wilma', 'emergencia_telefono' => '3009998877', 'emergencia_parentesco' => 'Esposa',
-            'eps' => 'SURA', 'afp' => 'PORVENIR', 'talla_camisa' => 'M', 'talla_pantalon' => '32', 'talla_zapatos' => '41',
+            'eps' => 'SURA', 'afp' => 'PORVENIR', 'fondo_cesantias' => 'PORVENIR', 'talla_camisa' => 'M', 'talla_pantalon' => '32', 'talla_zapatos' => '41',
         ], $extra);
     }
 
@@ -154,6 +154,14 @@ class IngresoDePersonalTest extends TestCase
 
         $this->assertSame(1, RespuestaIngreso::where('documento', '5551234')->count());
         $this->assertSame('XL', RespuestaIngreso::where('documento', '5551234')->value('talla_camisa'));
+    }
+
+    public function test_el_formulario_rechaza_el_correo_de_otra_persona(): void
+    {
+        $this->postJson('/api/registro-nuevos-ingresos/submit', $this->formulario())->assertCreated();
+
+        $this->postJson('/api/registro-nuevos-ingresos/submit', $this->formulario(['documento' => '5559999']))
+            ->assertStatus(422)->assertJsonValidationErrors('correo');
     }
 
     public function test_el_formulario_valida_campos_obligatorios_y_la_fotografia(): void

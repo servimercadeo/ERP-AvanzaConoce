@@ -180,7 +180,9 @@ class User extends Authenticatable
      */
     public static function completarFotografias(iterable $users): void
     {
-        $sinFoto = collect($users)->filter(fn ($u) => $u && !$u->fotografia && $u->cedula);
+        // Una ruta guardada cuyo archivo ya no existe (p. ej. importada de otro sistema)
+        // cuenta como "sin foto": si no, nunca se buscaría la del formulario de ingreso.
+        $sinFoto = collect($users)->filter(fn ($u) => $u && $u->cedula && !self::fotoExiste($u->fotografia));
         if ($sinFoto->isEmpty()) {
             return;
         }
@@ -206,5 +208,11 @@ class User extends Authenticatable
                 $user->fotografia = $foto;
             }
         }
+    }
+
+    /** true si la ruta apunta a un archivo que existe en el disco público. */
+    public static function fotoExiste(?string $ruta): bool
+    {
+        return $ruta !== null && $ruta !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists($ruta);
     }
 }

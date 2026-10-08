@@ -44,12 +44,38 @@ class BaseIngreso extends Model
      */
     public static function tipoVinculacionDe(?string $cedula): ?string
     {
-        if (!$cedula) {
-            return null;
+        return $cedula ? (static::tiposVinculacionDe([$cedula])[$cedula] ?? null) : null;
+    }
+
+    /**
+     * Igual que tipoVinculacionDe() pero para muchas cédulas en dos consultas.
+     *
+     * @return array<string, string|null>  cédula => tipo de vinculación
+     */
+    public static function tiposVinculacionDe(array $cedulas): array
+    {
+        $cedulas = array_values(array_unique(array_filter(array_map('strval', $cedulas))));
+        if (!$cedulas) {
+            return [];
         }
 
-        return static::where('documento_identificacion', $cedula)->latest()->value('tipo_vinculacion')
-            ?: Candidato::where('identificacion', $cedula)->latest()->value('tipo_vinculacion');
+        // Por cédula queda el registro más reciente (el último en el orden ascendente).
+        $deAval = static::whereIn('documento_identificacion', $cedulas)
+            ->orderBy('created_at')->orderBy('id')
+            ->get(['documento_identificacion', 'tipo_vinculacion'])
+            ->keyBy('documento_identificacion');
+        $deCandidato = Candidato::whereIn('identificacion', $cedulas)
+            ->orderBy('created_at')->orderBy('id')
+            ->get(['identificacion', 'tipo_vinculacion'])
+            ->keyBy('identificacion');
+
+        $tipos = [];
+        foreach ($cedulas as $cedula) {
+            $tipos[$cedula] = $deAval->get($cedula)?->tipo_vinculacion
+                ?: $deCandidato->get($cedula)?->tipo_vinculacion;
+        }
+
+        return $tipos;
     }
 
     /**

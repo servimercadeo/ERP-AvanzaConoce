@@ -86,6 +86,36 @@ class ContratosTest extends TestCase
         $this->assertSame('7770002@avanzaconoce.com', User::where('cedula', '7770002')->value('email'));
     }
 
+    public function test_el_empleado_nuevo_toma_los_datos_reales_y_no_inventa_rellenos(): void
+    {
+        DB::table('respuestas_ingresos')->insert([
+            'documento' => '7770003', 'nombres' => 'ANA', 'apellidos' => 'REAL', 'fecha_nacimiento' => '1995-03-04',
+            'lugar_nacimiento' => 'Pereira', 'estado_civil' => 'Soltero', 'numero_hijos' => '1', 'rh' => 'O+',
+            'nivel_escolaridad' => 'PROFESIONAL', 'profesion' => 'Ingeniera', 'ciudad' => 'PEREIRA', 'barrio' => 'Centro',
+            'direccion' => 'Calle 1', 'estrato' => '3', 'correo' => 'ana.real@test.co', 'celular' => '300 123 4567',
+            'emergencia_nombre' => 'Luis', 'emergencia_telefono' => '3109998877', 'emergencia_parentesco' => 'PADRE O MADRE',
+            'eps' => 'SURA', 'afp' => 'PORVENIR', 'talla_camisa' => 'M', 'talla_pantalon' => '8', 'talla_zapatos' => '37',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Sin correo en el contrato: se usa el real del formulario de ingreso.
+        $this->postJson('/api/contratos', $this->payload([
+            'empleado_id' => null, 'documento' => '7770003', 'nombres' => 'Ana', 'apellidos' => 'Real',
+            'cargo' => null, 'sede' => null, 'tipo_vinculacion' => null, 'lps_afiliado' => null, 'arl' => null,
+        ]))->assertCreated();
+
+        $u = User::where('cedula', '7770003')->first();
+        $this->assertSame('ana.real@test.co', $u->email);
+        $this->assertSame('3001234567', $u->movil);
+        $this->assertSame('SURA', $u->eps);
+        $this->assertSame('Pereira', $u->lugar_nacimiento);
+        $this->assertSame('Luis', $u->contacto_emergencia_nombre);
+        // Lo que no existe queda vacío, no con rellenos inventados.
+        $this->assertNull($u->genero);
+        $this->assertNull($u->arl);
+        $this->assertNull($u->sede);
+    }
+
     public function test_empleado_es_obligatorio_y_debe_existir(): void
     {
         $this->postJson('/api/contratos', $this->payload(['empleado_id' => null]))->assertStatus(422)->assertJsonValidationErrors('empleado_id');

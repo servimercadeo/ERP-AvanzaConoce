@@ -64,6 +64,20 @@ class Candidato extends Model
         'entv_prom'           => 'float',
     ];
 
+    protected static function booted(): void
+    {
+        // El lugar de trabajo y la fecha de ingreso son los de la requisición mientras no se
+        // elija otro valor.
+        static::saving(function (Candidato $candidato) {
+            if (!$candidato->requisicion_id || ($candidato->lugar_trabajo && $candidato->fecha_programacion_ingreso)) {
+                return;
+            }
+            $req = Requisicion::find($candidato->requisicion_id);
+            $candidato->lugar_trabajo              = $candidato->lugar_trabajo ?: $req?->sede?->nombre;
+            $candidato->fecha_programacion_ingreso = $candidato->fecha_programacion_ingreso ?: $req?->fecha_ingreso;
+        });
+    }
+
     public function requisicion()
     {
         return $this->belongsTo(Requisicion::class);

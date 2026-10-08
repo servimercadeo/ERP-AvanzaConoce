@@ -200,15 +200,7 @@ class PedidoAutomaticoController extends Controller
 
             $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario']);
 
-            $emp = $pedidoAutomatico->empleado;
-            if ($emp && !$emp->fotografia) {
-                $emp->fotografia = DB::table('respuestas_ingresos')
-                    ->where('documento', $emp->cedula)
-                    ->value('fotografia')
-                    ?: DB::table('candidatos')
-                        ->where('identificacion', $emp->cedula)
-                        ->value('fotografia');
-            }
+            \App\Models\User::completarFotografias([$pedidoAutomatico->empleado]);
 
             return response()->json($pedidoAutomatico);
         });

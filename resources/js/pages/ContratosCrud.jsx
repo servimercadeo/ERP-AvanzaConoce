@@ -780,9 +780,13 @@ function Modal({
     const onChange = (k) => (e) =>
         setForm((f) => ({ ...f, [k]: e.target.value }));
 
-    const empleadoActual = empleados.find(
-        (e) => String(e.id) === String(form.empleado_id),
-    );
+    // Si el empleado aún no está en la lista cargada (p. ej. se acaba de crear con el
+    // contrato), se usa el que viene con el propio contrato.
+    const empleadoActual =
+        empleados.find((e) => String(e.id) === String(form.empleado_id)) ??
+        (initial?.empleado && String(initial.empleado.id) === String(form.empleado_id)
+            ? initial.empleado
+            : undefined);
     const fotografiaActual = fotoOverride || empleadoActual?.fotografia || null;
 
     const handleFotoChange = async (e) => {
@@ -1273,7 +1277,10 @@ function Modal({
                                     <SearchableSelect
                                         label="Empleado"
                                         k="empleado_id"
-                                        opts={empleados.map((e) => ({
+                                        opts={(empleadoActual && !empleados.some((e) => e.id === empleadoActual.id)
+                                            ? [...empleados, empleadoActual]
+                                            : empleados
+                                        ).map((e) => ({
                                             value: e.id,
                                             label: `${e.nombres} ${e.apellidos} (${e.cedula})`,
                                             cargo: e.cargo,
@@ -2630,12 +2637,20 @@ export default function ContratosCrud() {
                 );
                 qc.invalidateQueries({ queryKey: ["contratos"] });
                 qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+                // Crear/importar un contrato puede crear al empleado: la lista de empleados (de la que
+                // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
+                qc.invalidateQueries({ queryKey: ["empleados"] });
+                qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
                 showToast("Contrato actualizado.");
             } else {
                 const { data } = await api.post("/contratos", form);
                 setContratos((prev) => [data, ...prev]);
                 qc.invalidateQueries({ queryKey: ["contratos"] });
                 qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+                // Crear/importar un contrato puede crear al empleado: la lista de empleados (de la que
+                // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
+                qc.invalidateQueries({ queryKey: ["empleados"] });
+                qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
                 showToast(
                     data.pedido_automatico
                         ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado (${data.pedido_automatico.estado}).`
@@ -2645,8 +2660,11 @@ export default function ContratosCrud() {
             setModalOpen(false);
         } catch (err) {
             const proyectoMsg = err?.response?.data?.errors?.cliente_proyecto?.[0];
+            const empresaMsg = err?.response?.data?.errors?.empresa?.[0];
             if (proyectoMsg) {
-                setEmpresaProyectoAlert(proyectoMsg);
+                setEmpresaProyectoAlert({ tipo: "proyecto", msg: proyectoMsg });
+            } else if (empresaMsg) {
+                setEmpresaProyectoAlert({ tipo: "empleador", msg: empresaMsg });
             } else {
                 showToast(
                     err?.response?.data?.message ?? "Error al guardar el contrato.",
@@ -2801,6 +2819,10 @@ export default function ContratosCrud() {
 
             qc.invalidateQueries({ queryKey: ["contratos"] });
             qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+            // Crear/importar un contrato puede crear al empleado: la lista de empleados (de la que
+            // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
+            qc.invalidateQueries({ queryKey: ["empleados"] });
+            qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
 
             const resumen = [];
             if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} creado${created === 1 ? "" : "s"}`);
@@ -3447,7 +3469,11 @@ export default function ContratosCrud() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={S.modalHeaderGreen}>
-                            <span style={S.modalTitleWhite}>Actualiza el proyecto</span>
+                            <span style={S.modalTitleWhite}>
+                                {empresaProyectoAlert.tipo === "empleador"
+                                    ? "Revisa el empleador y la empresa"
+                                    : "Actualiza el proyecto"}
+                            </span>
                             <button
                                 style={S.closeBtnWhite}
                                 onClick={() => setEmpresaProyectoAlert(null)}
@@ -3456,15 +3482,26 @@ export default function ContratosCrud() {
                             </button>
                         </div>
                         <div style={S.modalBody}>
-                            <p style={{ margin: 0 }}>
-                                Cada empresa solo puede asignarse a ciertos proyectos.
-                                Para guardar este cambio, actualiza también el campo{" "}
-                                <strong>Cliente / Proyecto</strong> (pestaña
-                                "Información Principal") para que coincida con la
-                                empresa seleccionada.
-                            </p>
+                            {empresaProyectoAlert.tipo === "empleador" ? (
+                                <p style={{ margin: 0 }}>
+                                    Los empleadores directos (Servimercadeo y S&amp;M
+                                    Servicios y Mercadeo) solo pueden ir con su propia
+                                    empresa. Para guardar, ajusta el{" "}
+                                    <strong>Empleador</strong> o la{" "}
+                                    <strong>Empresa</strong> (pestaña "Información
+                                    Principal") para que coincidan.
+                                </p>
+                            ) : (
+                                <p style={{ margin: 0 }}>
+                                    Cada empresa solo puede asignarse a ciertos proyectos.
+                                    Para guardar este cambio, actualiza también el campo{" "}
+                                    <strong>Cliente / Proyecto</strong> (pestaña
+                                    "Información Principal") para que coincida con la
+                                    empresa seleccionada.
+                                </p>
+                            )}
                             <p style={{ marginTop: 12, marginBottom: 0, color: "#64748b" }}>
-                                {empresaProyectoAlert}
+                                {empresaProyectoAlert.msg}
                             </p>
                         </div>
                         <div style={S.modalFooter}>

@@ -34,9 +34,20 @@ class RequisicionesYCandidatosTest extends TestCase
         return (int) DB::table('proyectos')->where('nombre', $nombre)->value('id');
     }
 
+    private ?array $ubicacion = null;
+
+    /** Sede y regional, obligatorias al crear una requisición. */
+    private function ubicacion(): array
+    {
+        return $this->ubicacion ??= [
+            'regional_id' => DB::table('regionales')->insertGetId(['nombre' => $this->unico('REGIONAL'), 'created_at' => now(), 'updated_at' => now()]),
+            'sede_id'     => DB::table('sedes')->insertGetId(['nombre' => $this->unico('SEDE'), 'created_at' => now(), 'updated_at' => now()]),
+        ];
+    }
+
     private function requisicion(array $extra = []): array
     {
-        return $this->postJson('/api/requisiciones', array_merge(['fecha_solicitud' => '2026-09-01', 'requeridas' => 1], $extra))
+        return $this->postJson('/api/requisiciones', array_merge(['fecha_solicitud' => '2026-09-01', 'requeridas' => 1], $this->ubicacion(), $extra))
             ->assertCreated()->json();
     }
 
@@ -85,11 +96,50 @@ class RequisicionesYCandidatosTest extends TestCase
 
         $this->postJson('/api/requisiciones', [
             'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('TIGO HOME'),
-        ])->assertStatus(422)->assertJsonValidationErrors('proyecto_id');
+        ] + $this->ubicacion())->assertStatus(422)->assertJsonValidationErrors('proyecto_id');
 
         $this->postJson('/api/requisiciones', [
             'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('DIRECTV CO'),
-        ])->assertCreated();
+        ] + $this->ubicacion())->assertCreated();
+
+        // Servimercadeo también tiene personal administrativo.
+        $administrativo = $this->proyectoId('ADMINISTRATIVO') ?: DB::table('proyectos')->insertGetId([
+            'nombre' => 'ADMINISTRATIVO', 'activo' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->postJson('/api/requisiciones', [
+            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $administrativo,
+        ] + $this->ubicacion())->assertCreated();
+    }
+
+    public function test_requisicion_exige_la_empresa_del_empleador_directo(): void
+    {
+        $this->actuarComo('th');
+        $sym = $this->empresa('Servicios y Mercadeo COL');
+        // empleadores.id no es autoincremental: se asigna a mano.
+        $servimercadeo = (int) DB::table('empleadores')->max('id') + 1;
+        $temporal = $servimercadeo + 1;
+        DB::table('empleadores')->insert([
+            ['id' => $servimercadeo, 'nombre' => 'SERVIMERCADEO', 'tipo' => 'Directo', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $temporal, 'nombre' => 'STAFFING', 'tipo' => 'Indirecto', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->postJson('/api/requisiciones', [
+            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $sym, 'empleador_id' => $servimercadeo,
+        ] + $this->ubicacion())->assertStatus(422)->assertJsonValidationErrors('empresa_id');
+
+        $req = $this->requisicion(['empresa_id' => $sym, 'empleador_id' => $temporal]);
+
+        // Al editar se valida contra lo ya guardado: cambiar solo el empleador también se bloquea.
+        $this->putJson("/api/requisiciones/{$req['id']}", ['empleador_id' => $servimercadeo])
+            ->assertStatus(422)->assertJsonValidationErrors('empresa_id');
+    }
+
+    public function test_requisicion_exige_sede_y_regional(): void
+    {
+        $this->actuarComo('th');
+
+        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01', 'requeridas' => 1])
+            ->assertStatus(422)->assertJsonValidationErrors(['sede_id', 'regional_id']);
     }
 
     public function test_al_editar_se_valida_contra_la_empresa_ya_guardada(): void
@@ -139,7 +189,7 @@ class RequisicionesYCandidatosTest extends TestCase
         $cerrar = fn () => $this->putJson("/api/requisiciones/{$req['id']}", ['estado' => 'Completada']);
 
         // No puede nacer cerrada.
-        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'estado' => 'Completada'])
+        $this->postJson('/api/requisiciones', ['fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'estado' => 'Completada'] + $this->ubicacion())
             ->assertStatus(422)->assertJsonValidationErrors('estado');
 
         // 1 de 2 vacantes cubiertas (el candidato sin aval no cuenta).
@@ -255,7 +305,26 @@ class RequisicionesYCandidatosTest extends TestCase
         $id = $this->postJson('/api/candidatos/registro', $this->registro(['token' => $tokenAbierta]))->assertCreated()->json('id');
         $this->assertSame($abierta['id'], Candidato::find($id)->requisicion_id);
 
-        $this->postJson('/api/candidatos/registro', $this->registro(['token' => $tokenCompletada]))->assertStatus(409);
+        $this->postJson('/api/candidatos/registro', $this->registro([
+            'token' => $tokenCompletada, 'documento' => '7654321', 'correo' => 'otra@test.co',
+        ]))->assertStatus(409);
+    }
+
+    public function test_registro_rechaza_cedula_y_correo_ya_registrados(): void
+    {
+        $this->postJson('/api/candidatos/registro', $this->registro())->assertCreated();
+
+        // Misma cédula: ya está registrado.
+        $this->postJson('/api/candidatos/registro', $this->registro(['correo' => 'nuevo@test.co']))
+            ->assertStatus(422)->assertJsonValidationErrors('documento');
+
+        // Otra cédula con el correo de otra persona.
+        $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654321']))
+            ->assertStatus(422)->assertJsonValidationErrors('correo');
+
+        // Otra cédula y otro correo: se registra.
+        $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654321', 'correo' => 'otra@test.co']))
+            ->assertCreated();
     }
 
     public function test_catalogos_del_formulario_publico_incluyen_el_negocio_de_la_requisicion(): void

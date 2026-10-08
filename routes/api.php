@@ -73,6 +73,7 @@ Route::post('/candidatos/registro', function (Request $request) {
         'edad'             => 'required|integer|min:14|max:80',
         'genero'           => 'nullable|string|max:30',
         'fecha_expedicion' => 'required|date',
+        'lugar_expedicion' => 'nullable|string|max:150',
         'ciudad_id'        => 'required|exists:ciudades,id',
         'celular'          => 'required|string|max:15',
         'correo'           => 'required|email|max:160',
@@ -80,26 +81,43 @@ Route::post('/candidatos/registro', function (Request $request) {
         'token'            => 'nullable|string|max:40',
     ]);
 
+    // Cada persona se registra una sola vez y con su propio correo.
+    if ($msg = \App\Services\IdentidadUnica::cedulaDeOtroCandidato($data['documento'])) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['documento' => $msg]);
+    }
+    if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['correo'], $data['documento'])) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['correo' => $msg]);
+    }
+
     $requisicionId = null;
+    $sedeRequisicion = null;
+    $fechaIngresoRequisicion = null;
     if (!empty($data['token'])) {
         $req = DB::table('requisiciones')
-            ->where('registro_token', $data['token'])
-            ->select('id', 'estado')
+            ->leftJoin('sedes', 'requisiciones.sede_id', '=', 'sedes.id')
+            ->where('requisiciones.registro_token', $data['token'])
+            ->select('requisiciones.id', 'requisiciones.estado', 'requisiciones.fecha_ingreso', 'sedes.nombre as sede')
             ->first();
         if ($req) {
             if (in_array($req->estado, ['Completada', 'Cancelada'])) {
                 return response()->json(['message' => 'Esta requisición ya no está disponible.'], 409);
             }
             $requisicionId = $req->id;
+            // Lugar de trabajo y fecha de ingreso del candidato: los de la requisición.
+            $sedeRequisicion = $req->sede;
+            $fechaIngresoRequisicion = $req->fecha_ingreso;
         }
     }
 
     $candidato = DB::table('candidatos')->insertGetId([
         'requisicion_id'   => $requisicionId,
+        'lugar_trabajo'    => $sedeRequisicion,
+        'fecha_programacion_ingreso' => $fechaIngresoRequisicion,
         'nombres'          => strtoupper(trim($data['nombres'] . ' ' . $data['apellidos'])),
         'tipo_documento'   => 'Cédula de Ciudadanía',
         'identificacion'   => $data['documento'],
         'fecha_expedicion' => $data['fecha_expedicion'],
+        'lugar_expedicion' => isset($data['lugar_expedicion']) ? mb_strtoupper(trim($data['lugar_expedicion']), 'UTF-8') : null,
         'edad'             => $data['edad'],
         'genero'           => $data['genero'] ?? null,
         'ciudad_id'        => $data['ciudad_id'],
@@ -148,7 +166,6 @@ Route::get('/catalogos', function () {
         'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
         'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        // Si la migración aún no corrió en un entorno, el selector queda vacío en vez de romper /catalogos.
         'areas_empresa'     => \Illuminate\Support\Facades\Schema::hasTable('area_empresa')
                                     ? DB::table('area_empresa')->orderBy('nombre')->pluck('nombre')
                                     : [],
@@ -676,7 +693,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Respuestas del formulario de nuevos ingresos
     Route::get('/respuestas-ingresos', function () {
-        return response()->json(RespuestaIngreso::orderBy('created_at', 'desc')->get());
+        $respuestas = RespuestaIngreso::orderBy('created_at', 'desc')->get();
+
+        // Los indirectos no cargan documentos de contratación: el listado lo usa para no
+        // ofrecerles la carpeta de documentos.
+        $tipos = BaseIngreso::tiposVinculacionDe($respuestas->pluck('documento')->all());
+        $respuestas->each(fn ($r) => $r->setAttribute('tipo_vinculacion', $tipos[$r->documento] ?? null));
+
+        return response()->json($respuestas);
     });
 
     // Datos consolidados para pre-cargar el formulario de creación de contrato.
@@ -954,6 +978,11 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
         'talla_zapatos'           => 'required|string|max:20',
         'fotografia'              => 'nullable|image|max:5120',
     ]);
+
+    // El correo no puede ser de otra persona (reenviar el formulario con la misma cédula sí).
+    if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['correo'], $data['documento'])) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['correo' => $msg]);
+    }
 
     if ($request->hasFile('fotografia')) {
         $data['fotografia'] = $request->file('fotografia')->store('respuestas-ingreso/fotos', 'public');

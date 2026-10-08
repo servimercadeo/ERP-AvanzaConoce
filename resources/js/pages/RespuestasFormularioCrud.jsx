@@ -426,18 +426,21 @@ export default function RespuestasFormularioCrud() {
                                             >
                                                 <IconEye size={15} />
                                             </button>
-                                            <button
-                                                style={S.actionBtn(
-                                                    "#e8f0fb",
-                                                    "#2563eb",
-                                                )}
-                                                title="Ver documentos de contratación"
-                                                onClick={() =>
-                                                    handleOpenDocs(row)
-                                                }
-                                            >
-                                                <IconFolder size={15} />
-                                            </button>
+                                            {/* Los indirectos no cargan documentos de contratación. */}
+                                            {row.tipo_vinculacion !== "Indirecta" && (
+                                                <button
+                                                    style={S.actionBtn(
+                                                        "#e8f0fb",
+                                                        "#2563eb",
+                                                    )}
+                                                    title="Ver documentos de contratación"
+                                                    onClick={() =>
+                                                        handleOpenDocs(row)
+                                                    }
+                                                >
+                                                    <IconFolder size={15} />
+                                                </button>
+                                            )}
                                             <button
                                                 style={S.actionBtn(
                                                     "#fce8e8",

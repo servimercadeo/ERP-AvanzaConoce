@@ -13,7 +13,7 @@ use Tests\TestCase;
 /**
  * Inventarios > Dotación > Inventario de dotación, con la regla de visibilidad por empresa:
  *   SERVICIOS Y MERCADEO COL -> TIGO EXPRESS / TIGO HOME / ADMINISTRATIVO
- *   SERVIMERCADEO COL        -> DIRECTV
+ *   SERVIMERCADEO COL        -> DIRECTV / ADMINISTRATIVO
  *   sin empresa / otra       -> todos
  */
 class InventarioDotacionAccesoTest extends TestCase
@@ -66,11 +66,11 @@ class InventarioDotacionAccesoTest extends TestCase
             ->assertExactJson(['SYM TIGO EXPRESS', 'SYM TIGO HOME', 'SYM ADMINISTRATIVO']);
     }
 
-    public function test_servimercadeo_ve_solo_directv(): void
+    public function test_servimercadeo_ve_directv_y_administrativo(): void
     {
         $this->usuarioDeEmpresa('SERVIMERCADEO COL');
 
-        $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertExactJson(['DIRECTV']);
+        $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->json());
     }
 
     public function test_el_admin_ve_y_gestiona_todo_el_inventario_aunque_su_empresa_este_restringida(): void
@@ -98,7 +98,7 @@ class InventarioDotacionAccesoTest extends TestCase
         ]);
         foreach (['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
             $this->actuarComo($rol, ['empresa_id' => $empresaId]);
-            $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertExactJson(['DIRECTV']);
+            $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->json());
         }
     }
 
@@ -119,7 +119,7 @@ class InventarioDotacionAccesoTest extends TestCase
             'fecha_ingreso' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertExactJson(['DIRECTV']);
+        $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->json());
     }
 
     public function test_el_listado_filtrado_solo_trae_proyectos_permitidos(): void
@@ -129,7 +129,7 @@ class InventarioDotacionAccesoTest extends TestCase
         $proyectos = collect($this->getJson('/api/inventario-dotacion?proyecto=Todos&per_page=50')->assertOk()->json('data'))
             ->pluck('proyecto')->unique()->values()->all();
 
-        $this->assertSame(['DIRECTV'], $proyectos);
+        $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $proyectos);
     }
 
     /**
@@ -146,7 +146,7 @@ class InventarioDotacionAccesoTest extends TestCase
         $proyectos = collect($this->getJson('/api/inventario-dotacion')->assertOk()->json())
             ->pluck('proyecto')->unique()->values()->all();
 
-        $this->assertSame(['DIRECTV'], $proyectos);
+        $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $proyectos);
     }
 
     public function test_la_cache_del_catalogo_no_filtra_datos_entre_usuarios_de_distinta_empresa(): void

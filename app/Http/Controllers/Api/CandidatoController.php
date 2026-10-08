@@ -8,6 +8,8 @@ use App\Models\BaseIngreso;
 use App\Models\Candidato;
 use App\Models\EmpleadorContacto;
 use App\Models\Requisicion;
+use App\Services\IdentidadUnica;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -66,6 +68,14 @@ class CandidatoController extends Controller
             'genero'            => 'nullable|string|max:30',
             'fotografia'        => 'nullable|max:5120',
         ]);
+
+        // Cada persona se registra una sola vez y con su propio correo.
+        if ($msg = IdentidadUnica::cedulaDeOtroCandidato($data['identificacion'])) {
+            throw ValidationException::withMessages(['identificacion' => $msg]);
+        }
+        if ($msg = IdentidadUnica::correoDeOtraPersona($data['correo'], $data['identificacion'])) {
+            throw ValidationException::withMessages(['correo' => $msg]);
+        }
 
         if ($request->hasFile('fotografia')) {
             $data['fotografia'] = $request->file('fotografia')->store('candidatos/fotos', 'public');
@@ -168,6 +178,17 @@ class CandidatoController extends Controller
             'auxilio_alimentacion'     => 'nullable|numeric',
             'fotografia'               => 'nullable|max:5120',
         ]);
+
+        // Al editar: la cédula y el correo siguen sin poder ser de otra persona.
+        $cedulaFinal = $data['identificacion'] ?? $candidato->identificacion;
+        if (array_key_exists('identificacion', $data)
+            && ($msg = IdentidadUnica::cedulaDeOtroCandidato($cedulaFinal, $candidato->id))) {
+            throw ValidationException::withMessages(['identificacion' => $msg]);
+        }
+        if (array_key_exists('correo', $data)
+            && ($msg = IdentidadUnica::correoDeOtraPersona($data['correo'], $cedulaFinal))) {
+            throw ValidationException::withMessages(['correo' => $msg]);
+        }
 
         if ($request->hasFile('fotografia')) {
             $data['fotografia'] = $request->file('fotografia')->store('candidatos/fotos', 'public');

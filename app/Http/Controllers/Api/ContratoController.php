@@ -320,16 +320,46 @@ class ContratoController extends Controller
             // hasta que Empleados (formulario o Importar Excel) completa su ficha y le
             // entrega credenciales. Mientras tanto no puede iniciar sesión (AuthController).
             $documento = trim((string) $request->documento);
-            // Si el correo ya es de otra persona, se usa el autogenerado en vez de fallar
-            // por el índice único de `users.email`.
-            $correo = trim((string) $request->correo);
-            $duenoCorreo = $correo === '' ? null : \App\Models\User::where('email', $correo)->first();
-            if ($correo === '' || ($duenoCorreo && (string) $duenoCorreo->cedula !== $documento)) {
-                $correo = $documento . '@avanzaconoce.com';
-            }
+            // Solo datos reales: los del contrato, el formulario de ingreso y el candidato
+            // (el del aval vigente). Lo que no exista queda vacío para completarlo en Empleados.
+            $respuesta = RespuestaIngreso::where('documento', $documento)->latest()->first();
+            $candidato = \App\Models\Candidato::where('identificacion', $documento)
+                ->orderByDesc('aval')->latest()->orderByDesc('id')->first();
+            $generosValidos = ['Masculino', 'Femenino', 'Otro', 'No binario', 'Prefiero no decir'];
+
+            // Correo real que no sea de otra persona. `users.email` es obligatorio y único: si
+            // no hay ninguno, se guarda uno técnico "{cédula}@avanzaconoce.com" que nunca se
+            // muestra como dato (Empleados lo deja vacío para escribir el real al dar el alta).
+            $correo = collect([$request->correo, $respuesta?->correo, $candidato?->correo])
+                ->map(fn ($c) => trim((string) $c))
+                ->first(function ($c) use ($documento) {
+                    if ($c === '') return false;
+                    $dueno = \App\Models\User::where('email', $c)->first();
+                    return !$dueno || (string) $dueno->cedula === $documento;
+                }) ?? $documento . '@avanzaconoce.com';
+            $movil = preg_replace('/\D/', '', (string) ($respuesta?->celular ?: $candidato?->celular));
+
             $user = \App\Models\User::firstOrCreate(
                 ['cedula' => $documento],
                 [
+                    'fecha_expedicion' => $candidato?->fecha_expedicion,
+                    'fecha_nacimiento' => $respuesta?->fecha_nacimiento,
+                    'lugar_nacimiento' => $respuesta?->lugar_nacimiento,
+                    'estado_civil' => $respuesta?->estado_civil,
+                    'nivel_escolaridad' => $respuesta?->nivel_escolaridad,
+                    'profesion' => $respuesta?->profesion,
+                    'direccion_residencia' => $respuesta?->direccion,
+                    'estrato' => $respuesta?->estrato,
+                    'barrio' => $respuesta?->barrio,
+                    'numero_hijos' => $respuesta?->numero_hijos,
+                    'rh' => $respuesta?->rh,
+                    'talla_camisa' => $respuesta?->talla_camisa,
+                    'talla_pantalon' => $respuesta?->talla_pantalon,
+                    'talla_zapatos' => $respuesta?->talla_zapatos,
+                    'fondo_pensiones' => $request->fondo_pensiones ?: $respuesta?->afp,
+                    'contacto_emergencia_nombre' => $respuesta?->emergencia_nombre,
+                    'contacto_emergencia_telefono' => $respuesta?->emergencia_telefono,
+                    'contacto_emergencia_parentesco' => $respuesta?->emergencia_parentesco,
                     'nombres' => mb_strtoupper($request->nombres ?? '', 'UTF-8'),
                     'apellidos' => mb_strtoupper($request->apellidos ?? '', 'UTF-8'),
                     'name' => trim(mb_strtoupper($request->nombres ?? '', 'UTF-8') . ' ' . mb_strtoupper($request->apellidos ?? '', 'UTF-8')),
@@ -337,21 +367,25 @@ class ContratoController extends Controller
                     // Nunca la cédula como contraseña: las credenciales reales se generan al dar el alta.
                     'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(40)),
                     'pendiente_alta' => true,
-                    'sede' => $request->sede ?? 'Principal',
-                    'cargo' => mb_strtoupper($request->cargo ?? '', 'UTF-8') ?: 'SIN ASIGNAR',
                     'estado_empleado' => 'Activo',
-                    'tipo_vinculacion' => $request->tipo_vinculacion ?? 'Indefinido',
-                    'eps' => $request->lps_afiliado ?? 'Sin asignar',
-                    'arl' => $request->arl ?? 'Sin asignar',
-                    'genero' => 'No especificado',
-                    'movil' => '0000000000',
+                    'sede' => $request->sede ?: ($candidato?->lugar_trabajo ?: null),
+                    'cargo' => mb_strtoupper((string) $request->cargo, 'UTF-8') ?: null,
+                    'tipo_vinculacion' => $request->tipo_vinculacion ?: ($candidato?->tipo_vinculacion ?: null),
+                    'empleador' => $request->empleador ?: null,
+                    'jefe_inmediato' => $request->jefe_inmediato ?: null,
+                    'ingresos' => $request->salario ?: ($candidato?->salario_basico ?: null),
+                    'eps' => $request->lps_afiliado ?: ($respuesta?->eps ?: null),
+                    'arl' => $request->arl ?: ($candidato?->arl ?: null),
+                    'caja_compensacion' => $request->caja_compensacion ?: ($candidato?->caja_compensacion ?: null),
+                    'genero' => in_array($candidato?->genero, $generosValidos, true) ? $candidato->genero : null,
+                    'movil' => $movil !== '' ? $movil : null,
                 ]
             );
             // Copiar la fotografía del formulario de ingreso (o, si no hay, la del
             // candidato) cuando el usuario todavía no tiene una
-            if (!$user->fotografia) {
+            if (!\App\Models\User::fotoExiste($user->fotografia)) {
                 \App\Models\User::completarFotografias([$user]);
-                if ($user->fotografia) {
+                if ($user->isDirty('fotografia')) {
                     $user->save();
                 }
             }
@@ -400,6 +434,9 @@ class ContratoController extends Controller
 
         if ($msg = EmpresaProyectoRules::validar($data['empresa'] ?? null, $data['cliente_proyecto'] ?? null)) {
             throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
+        }
+        if ($msg = EmpresaProyectoRules::validarEmpleador($data['empleador'] ?? null, $data['empresa'] ?? null)) {
+            throw ValidationException::withMessages(['empresa' => $msg]);
         }
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
@@ -515,6 +552,10 @@ class ContratoController extends Controller
         $proyectoFinal = array_key_exists('cliente_proyecto', $data) ? $data['cliente_proyecto'] : $contrato->cliente_proyecto;
         if ($msg = EmpresaProyectoRules::validar($empresaFinal, $proyectoFinal)) {
             throw ValidationException::withMessages(['cliente_proyecto' => $msg]);
+        }
+        $empleadorFinal = array_key_exists('empleador', $data) ? $data['empleador'] : $contrato->empleador;
+        if ($msg = EmpresaProyectoRules::validarEmpleador($empleadorFinal, $empresaFinal)) {
+            throw ValidationException::withMessages(['empresa' => $msg]);
         }
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
@@ -703,6 +744,7 @@ class ContratoController extends Controller
             'sede' => ImportacionExcelValidador::sede($valor),
             // La misma regla empresa ↔ proyecto que exigen store() y update().
             'cliente_proyecto' => EmpresaProyectoRules::validar($contrato->empresa, $valor) === null ? $valor : null,
+            'empleador' => EmpresaProyectoRules::validarEmpleador($valor, $contrato->empresa) === null ? $valor : null,
             default => $valor,
         };
     }

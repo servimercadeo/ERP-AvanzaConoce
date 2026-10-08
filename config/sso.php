@@ -13,4 +13,10 @@ return [
      | Ejemplo prod:   https://avanzaconoce.com
      */
     'avanzaconoce_api_url' => env('AVANZACONOCE_API_URL', ''),
+
+    /*
+     | Tabla de usuarios de AvanzaConoce en la misma base de datos (sin el prefijo `erp_`
+     | del ERP). De ahí se toma la contraseña al dar de alta a un empleado que ya existe allá.
+     */
+    'avanzaconoce_users_table' => env('AVANZACONOCE_USERS_TABLE', 'users'),
 ];

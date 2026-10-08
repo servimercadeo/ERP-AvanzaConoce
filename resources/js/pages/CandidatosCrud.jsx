@@ -374,9 +374,30 @@ export default function CandidatosCrud() {
         setIsCandModalOpen(true);
     };
 
+    // Datos que el candidato toma de su requisición mientras no se elija otro valor:
+    // la sede (lugar de trabajo) y la fecha estimada de ingreso.
+    const datosDeRequisicion = (requisicionId) => {
+        const r = requisitions.find((x) => String(x.id) === String(requisicionId));
+        return {
+            lugar_trabajo: r?.sede?.nombre ?? "",
+            fecha_programacion_ingreso: r?.fecha_ingreso ?? "",
+        };
+    };
+    const conDatosDeRequisicion = (c) => {
+        const deReq = datosDeRequisicion(c.requisicion_id);
+        return {
+            lugar_trabajo: c.lugar_trabajo || deReq.lugar_trabajo,
+            fecha_programacion_ingreso: c.fecha_programacion_ingreso || deReq.fecha_programacion_ingreso,
+        };
+    };
+
     const handleEditCandidate = (c) => {
         setCandModalMode("edit");
-        setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
+        setCandForm({
+            ...c,
+            ...interviewDateFrom(c.fecha_postulacion),
+            ...conDatosDeRequisicion(c),
+        });
         setNewDocFile(null);
         setDocsLoading(true);
         setDocs([]);
@@ -590,7 +611,11 @@ export default function CandidatosCrud() {
 
     const handleViewCandidate = (c) => {
         setCandModalMode("view");
-        setCandForm({ ...c, ...interviewDateFrom(c.fecha_postulacion) });
+        setCandForm({
+            ...c,
+            ...interviewDateFrom(c.fecha_postulacion),
+            ...conDatosDeRequisicion(c),
+        });
         setIsCandModalOpen(true);
     };
 
@@ -1331,10 +1356,19 @@ export default function CandidatosCrud() {
                                     }))}
                                     form={candForm}
                                     onChange={(k) => (e) =>
-                                        setCandForm((p) => ({
-                                            ...p,
-                                            [k]: e.target.value,
-                                        }))
+                                        setCandForm((p) => {
+                                            // Sede y fecha de ingreso siguen a la requisición, salvo
+                                            // que se haya elegido a mano un valor distinto al de la anterior.
+                                            const anterior = datosDeRequisicion(p.requisicion_id);
+                                            const nueva = datosDeRequisicion(e.target.value);
+                                            const siguen = {};
+                                            for (const campo of Object.keys(nueva)) {
+                                                if (nueva[campo] && (!p[campo] || p[campo] === anterior[campo])) {
+                                                    siguen[campo] = nueva[campo];
+                                                }
+                                            }
+                                            return { ...p, [k]: e.target.value, ...siguen };
+                                        })
                                     }
                                     disabled={candModalMode === "view"}
                                 />

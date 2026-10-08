@@ -90,6 +90,9 @@ class BaseIngresoController extends Controller
         if ($msg = EmpresaProyectoRules::validar($data['empresa'] ?? null, $data['proyecto'] ?? null)) {
             throw ValidationException::withMessages(['proyecto' => $msg]);
         }
+        if ($msg = EmpresaProyectoRules::validarEmpleador($data['empleador'] ?? null, $data['empresa'] ?? null)) {
+            throw ValidationException::withMessages(['empleador' => $msg]);
+        }
 
         $ingreso = BaseIngreso::create($data);
         $ingreso->load([
@@ -156,6 +159,11 @@ class BaseIngresoController extends Controller
         $proyectoFinal = array_key_exists('proyecto', $data) ? $data['proyecto'] : $baseIngreso->proyecto;
         if ($msg = EmpresaProyectoRules::validar($empresaFinal, $proyectoFinal)) {
             throw ValidationException::withMessages(['proyecto' => $msg]);
+        }
+        // En Avales la empresa no se edita (viene de la requisición): solo el empleador.
+        $empleadorFinal = array_key_exists('empleador', $data) ? $data['empleador'] : $baseIngreso->empleador;
+        if ($msg = EmpresaProyectoRules::validarEmpleador($empleadorFinal, $empresaFinal)) {
+            throw ValidationException::withMessages(['empleador' => $msg]);
         }
 
         $baseIngreso->update($data);

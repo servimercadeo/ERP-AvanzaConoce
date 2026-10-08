@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Contrato;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
+use App\Services\CredencialesAvanzaConoce;
+use App\Services\IdentidadUnica;
 use App\Services\ImportacionExcelValidador;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmpleadoController extends Controller
 {
@@ -117,9 +119,11 @@ class EmpleadoController extends Controller
                 // Fotografía: si users no tiene, buscar primero en respuestas_ingresos (el
                 // formulario de ingreso es donde se captura hoy) y si tampoco hay, en
                 // candidatos (fuente antigua, previa a que el campo se moviera aquí).
-                if (!$user->fotografia) {
-                    $user->fotografia = $respuesta?->fotografia ?: $candidato?->fotografia;
-                }                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
+                // Una ruta cuyo archivo ya no existe cuenta como "sin foto".
+                if (!User::fotoExiste($user->fotografia)) {
+                    $user->fotografia = $respuesta?->fotografia ?: $candidato?->fotografia ?: $user->fotografia;
+                }
+                $user->talla_camisa   = $user->talla_camisa   ?: ($respuesta?->talla_camisa   ?? null);
                 $user->talla_pantalon = $user->talla_pantalon ?: ($respuesta?->talla_pantalon ?? null);
                 $user->talla_zapatos  = $user->talla_zapatos  ?: ($respuesta?->talla_zapatos  ?? null);
                 $user->profesion      = $user->profesion      ?: ($respuesta?->profesion      ?? null);
@@ -202,10 +206,19 @@ class EmpleadoController extends Controller
             $userByEmail = User::where('email', $request->email)->first();
         }
 
+        // Un correo que ya es de OTRA persona (otra cédula) no es un duplicado del mismo
+        // empleado: fusionarlos le pasaría los contratos a esa persona y borraría a este.
+        if ($userByEmail && $request->cedula && $userByEmail->cedula
+            && (string) $userByEmail->cedula !== (string) $request->cedula) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'email' => "El correo {$request->email} ya está registrado para otro empleado (cédula {$userByEmail->cedula}). Usa otro correo.",
+            ]);
+        }
+
         $existingId = null;
         if ($userByCedula && $userByEmail && $userByCedula->id !== $userByEmail->id) {
             // Re-link contracts to userByEmail
-            \App\Models\Contrato::where('empleado_id', $userByCedula->id)
+            Contrato::where('empleado_id', $userByCedula->id)
                 ->update(['empleado_id' => $userByEmail->id]);
             
             // Delete the duplicate userByCedula
@@ -219,6 +232,10 @@ class EmpleadoController extends Controller
         }
 
         $data = $request->validate($this->rules($existingId, $existingId ? User::find($existingId) : null));
+        // El correo tampoco puede ser de otra persona en candidatos o formularios de ingreso.
+        if ($msg = IdentidadUnica::correoDeOtraPersona($data['email'] ?? null, $data['cedula'] ?? null)) {
+            throw ValidationException::withMessages(['email' => $msg]);
+        }
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
@@ -231,7 +248,7 @@ class EmpleadoController extends Controller
 
         if ($existingId) {
             $empleado = User::find($existingId);
-            if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+            if ($empleado->rol === 'admin' && Auth::user()?->rol !== 'admin') {
                 $data['rol'] = 'admin';
             }
 
@@ -243,8 +260,10 @@ class EmpleadoController extends Controller
                 $data['activo']         = true;
                 $data['pendiente_alta'] = false;
 
-                $plainPassword     = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
-                $data['password']  = Hash::make($plainPassword);
+                // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
+                $credenciales     = CredencialesAvanzaConoce::paraAlta($data['cedula'] ?? $empleado->cedula);
+                $plainPassword    = $credenciales['mostrar'];
+                $data['password'] = $credenciales['hash'];
 
                 $empleado->update($data);
                 app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
@@ -256,6 +275,7 @@ class EmpleadoController extends Controller
                     'credenciales' => [
                         'email'    => $empleado->email,
                         'password' => $plainPassword,
+                        'de_avanza' => $credenciales['de_avanza'],
                     ],
                 ], 201);
             }
@@ -274,9 +294,10 @@ class EmpleadoController extends Controller
         $data['rol']    = $data['rol'] ?? 'general';
         $data['activo'] = true;
 
-        // Contraseña temporal de 10 caracteres: 2 mayúsculas + 5 minúsculas + 3 dígitos
-        $plainPassword  = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
-        $data['password'] = Hash::make($plainPassword);
+        // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
+        $credenciales     = CredencialesAvanzaConoce::paraAlta($data['cedula'] ?? null);
+        $plainPassword    = $credenciales['mostrar'];
+        $data['password'] = $credenciales['hash'];
 
         $empleado = User::create($data);
 
@@ -287,6 +308,7 @@ class EmpleadoController extends Controller
             'credenciales' => [
                 'email'    => $empleado->email,
                 'password' => $plainPassword,
+                'de_avanza' => $credenciales['de_avanza'],
             ],
         ], 201);
     }
@@ -302,10 +324,13 @@ class EmpleadoController extends Controller
         // responde 422. Antes se "fusionaba": se borraba al empleado editado y se sobrescribía
         // al otro, así que un error de tipeo en el correo eliminaba a una persona real.
         $data = $request->validate($this->rules($empleado->id, $empleado));
+        if ($msg = IdentidadUnica::correoDeOtraPersona($data['email'] ?? null, $data['cedula'] ?? $empleado->cedula)) {
+            throw ValidationException::withMessages(['email' => $msg]);
+        }
 
         $this->normalizarNombres($data);
         $data['name'] = trim($data['nombres'] . ' ' . $data['apellidos']);
-        if ($empleado->rol === 'admin' && auth()->user()?->rol !== 'admin') {
+        if ($empleado->rol === 'admin' && Auth::user()?->rol !== 'admin') {
             $data['rol'] = 'admin';
         }
 
@@ -355,7 +380,7 @@ class EmpleadoController extends Controller
 
     public function updateFotografia(Request $request, User $empleado)
     {
-        $data = $request->validate([
+        $request->validate([
             'fotografia' => 'required|image|max:5120',
         ]);
 
@@ -508,9 +533,10 @@ class EmpleadoController extends Controller
                     $user->rol            = $user->rol ?: 'general';
                     $user->activo         = true;
                     $user->pendiente_alta = false;
-                    $plainPassword = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
-                    $user->password = Hash::make($plainPassword);
-                    $credenciales = ['email' => $user->email, 'password' => $plainPassword];
+                    // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
+                    $nuevas = CredencialesAvanzaConoce::paraAlta($user->cedula);
+                    $user->password = $nuevas['hash'];
+                    $credenciales = ['email' => $user->email, 'password' => $nuevas['mostrar'], 'de_avanza' => $nuevas['de_avanza']];
                     $seDioDeAlta = true;
                 }
 
@@ -638,7 +664,7 @@ class EmpleadoController extends Controller
             $query->orderBy('nombres')->limit(30);
         } else {
             // Sin búsqueda: los 5 usuarios con el contrato más reciente
-            $latestContrato = \App\Models\Contrato::select('created_at')
+            $latestContrato = Contrato::select('created_at')
                 ->whereColumn('empleado_id', 'users.id')
                 ->where('completado', true)
                 ->orderByDesc('created_at')
@@ -649,28 +675,34 @@ class EmpleadoController extends Controller
         return response()->json(
             $query->get()->map(function ($user) {
                 $toDate = fn($v) => $v ? \Carbon\Carbon::parse($v)->format('Y-m-d') : null;
+                // Primer valor real entre las fuentes, en orden de prioridad. Los rellenos con
+                // que se crea el usuario desde Contratos ("0000000000", "Sin asignar", el
+                // correo @avanzaconoce.com...) no cuentan como dato.
+                $dato = fn (...$valores) => collect($valores)->first(fn ($v) => !self::esRelleno($v));
 
                 // 1. Último contrato vigente
-                $contrato = \App\Models\Contrato::where('empleado_id', $user->id)
+                $contrato = Contrato::where('empleado_id', $user->id)
                     ->where('completado', true)
                     ->latest()
                     ->first();
 
-                // 2. Candidato vinculado por cédula
+                // 2. Candidato vinculado por cédula: si la cédula pasó por varias
+                //    requisiciones, el del aval vigente (el más reciente), no el más antiguo.
                 $candidato = $user->cedula
-                    ? \App\Models\Candidato::with(['requisicion.empresa', 'requisicion.empleador'])
+                    ? \App\Models\Candidato::with(['requisicion.empresa', 'requisicion.empleador', 'requisicion.proyecto', 'requisicion.cargo'])
                         ->where('identificacion', $user->cedula)
+                        ->orderByDesc('aval')->latest()->orderByDesc('id')
                         ->first()
                     : null;
 
                 // 3. Base de ingresos del candidato
                 $ingreso = $candidato
-                    ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->first()
+                    ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->latest()->first()
                     : null;
 
                 // 4. Respuesta de ingreso (formulario personal del empleado)
                 $respuesta = $user->cedula
-                    ? \App\Models\RespuestaIngreso::where('documento', $user->cedula)->first()
+                    ? \App\Models\RespuestaIngreso::where('documento', $user->cedula)->latest()->first()
                     : null;
 
                 $req = $candidato?->requisicion;
@@ -679,54 +711,87 @@ class EmpleadoController extends Controller
                     // ── Identificación
                     'user_id'          => $user->id,
                     'cedula'           => $user->cedula,
-                    'nombres'          => $user->nombres           ?? $respuesta?->nombres  ?? $user->name,
-                    'apellidos'        => $user->apellidos         ?? $respuesta?->apellidos ?? '',
-                    'email'            => $user->email             ?? $respuesta?->correo   ?? $candidato?->correo ?? $ingreso?->correo,
-                    'movil'            => $user->movil             ?? $respuesta?->celular  ?? $candidato?->celular ?? $ingreso?->telefono,
-                    'genero'           => $user->genero,
-                    'fecha_expedicion' => $toDate($user->fecha_expedicion ?? $candidato?->fecha_expedicion),
+                    // Foto del usuario; si no tiene (o el archivo ya no existe), la del
+                    // formulario de ingreso o la del candidato.
+                    'fotografia'       => User::fotoExiste($user->fotografia)
+                        ? $user->fotografia
+                        : ($respuesta?->fotografia ?: $candidato?->fotografia ?: null),
+                    'nombres'          => $dato($user->nombres, $respuesta?->nombres, $user->name),
+                    'apellidos'        => $dato($user->apellidos, $respuesta?->apellidos) ?? '',
+                    // El correo real que no use ya otro empleado (users.email es único). Si
+                    // solo existe el técnico {cédula}@avanzaconoce.com, el campo queda vacío
+                    // para escribir el real al dar el alta.
+                    'email'            => collect([$user->email, $respuesta?->correo, $candidato?->correo, $ingreso?->correo])
+                        ->first(fn ($c) => !self::esRelleno($c)
+                            && !User::where('email', $c)->where('id', '!=', $user->id)->exists()),
+                    'movil'            => $dato($user->movil, $respuesta?->celular, $candidato?->celular, $ingreso?->telefono),
+                    'genero'           => $dato($user->genero, $candidato?->genero),
+                    'fecha_expedicion' => $toDate($dato($user->fecha_expedicion, $candidato?->fecha_expedicion)),
 
-                    // ── Datos personales (respuesta_ingreso > user)
-                    'fecha_nacimiento'     => $toDate($respuesta?->fecha_nacimiento  ?? $user->fecha_nacimiento),
-                    'lugar_nacimiento'     => $respuesta?->lugar_nacimiento          ?? $user->lugar_nacimiento,
-                    'estado_civil'         => $respuesta?->estado_civil              ?? $user->estado_civil,
-                    'nivel_escolaridad'    => $respuesta?->nivel_escolaridad         ?? $user->nivel_escolaridad,
-                    'profesion'            => $respuesta?->profesion                 ?? $user->profesion,
-                    'direccion_residencia' => $respuesta?->direccion                 ?? $user->direccion_residencia,
-                    'estrato'              => $respuesta?->estrato                   ?? $user->estrato,
-                    'barrio'               => $respuesta?->barrio                    ?? $user->barrio,
-                    'numero_hijos'         => $respuesta?->numero_hijos              ?? $user->numero_hijos,
-                    'rh'                   => $respuesta?->rh                        ?? $user->rh,
-                    'talla_camisa'         => $user->talla_camisa    ?? $respuesta?->talla_camisa,
-                    'talla_pantalon'       => $user->talla_pantalon  ?? $respuesta?->talla_pantalon,
-                    'talla_zapatos'        => $user->talla_zapatos   ?? $respuesta?->talla_zapatos,
+                    // ── Datos personales (formulario de ingreso > user)
+                    'fecha_nacimiento'     => $toDate($dato($respuesta?->fecha_nacimiento, $user->fecha_nacimiento)),
+                    'lugar_nacimiento'     => $dato($respuesta?->lugar_nacimiento, $user->lugar_nacimiento),
+                    'estado_civil'         => $dato($respuesta?->estado_civil, $user->estado_civil),
+                    'nivel_escolaridad'    => $dato($respuesta?->nivel_escolaridad, $user->nivel_escolaridad),
+                    'profesion'            => $dato($respuesta?->profesion, $user->profesion),
+                    'direccion_residencia' => $dato($respuesta?->direccion, $user->direccion_residencia),
+                    'estrato'              => $dato($respuesta?->estrato, $user->estrato),
+                    'barrio'               => $dato($respuesta?->barrio, $user->barrio),
+                    'numero_hijos'         => $dato($respuesta?->numero_hijos, $user->numero_hijos),
+                    'rh'                   => $dato($respuesta?->rh, $user->rh),
+                    'raza'                 => $dato($user->raza),
+                    'talla_camisa'         => $dato($user->talla_camisa, $respuesta?->talla_camisa),
+                    'talla_pantalon'       => $dato($user->talla_pantalon, $respuesta?->talla_pantalon),
+                    'talla_zapatos'        => $dato($user->talla_zapatos, $respuesta?->talla_zapatos),
 
-                    // ── Seguridad social (contrato > respuesta > candidato > user)
-                    'eps'              => $respuesta?->eps              ?? $contrato?->lps_afiliado ?? $user->eps,
-                    'arl'              => $contrato?->arl               ?? $candidato?->arl         ?? $user->arl,
-                    'fondo_pensiones'  => $contrato?->fondo_pensiones   ?? $respuesta?->afp         ?? $user->fondo_pensiones,
-                    'caja_compensacion'=> $contrato?->caja_compensacion ?? $candidato?->caja_compensacion ?? $user->caja_compensacion,
+                    // ── Seguridad social (contrato > formulario de ingreso > candidato > user)
+                    'eps'              => $dato($contrato?->lps_afiliado, $respuesta?->eps, $user->eps),
+                    'arl'              => $dato($contrato?->arl, $candidato?->arl, $user->arl),
+                    'fondo_pensiones'  => $dato($contrato?->fondo_pensiones, $respuesta?->afp, $user->fondo_pensiones),
+                    'caja_compensacion'=> $dato($contrato?->caja_compensacion, $candidato?->caja_compensacion, $user->caja_compensacion),
 
-                    // ── Datos laborales (contrato > ingreso > user)
-                    'cargo'            => $contrato?->cargo           ?? $ingreso?->cargo         ?? $user->cargo,
-                    'sede'             => $contrato?->sede            ?? $user->sede,
-                    'tipo_vinculacion' => $contrato?->tipo_vinculacion ?? $candidato?->tipo_vinculacion ?? $ingreso?->tipo_ingreso,
-                    'tipo_funcionario' => $user->tipo_funcionario,
-                    'empleador'        => $contrato?->empleador       ?? $ingreso?->empleador     ?? $req?->empleador?->nombre ?? $user->empleador,
-                    'jefe_inmediato'   => $contrato?->jefe_inmediato  ?? $ingreso?->lider_inmediato ?? $user->jefe_inmediato,
+                    // ── Datos laborales (contrato > aval > requisición > user)
+                    'cargo'            => $dato($contrato?->cargo, $ingreso?->cargo, $req?->cargo?->nombre, $user->cargo),
+                    'sede'             => $dato($contrato?->sede, $ingreso?->lugar_trabajo, $candidato?->lugar_trabajo, $user->sede),
+                    'tipo_vinculacion' => $dato($contrato?->tipo_vinculacion, $ingreso?->tipo_vinculacion, $candidato?->tipo_vinculacion, $user->tipo_vinculacion),
+                    'tipo_funcionario' => $dato($user->tipo_funcionario),
+                    'empleador'        => $dato($contrato?->empleador, $ingreso?->empleador, $req?->empleador?->nombre, $user->empleador),
+                    'jefe_inmediato'   => $dato($contrato?->jefe_inmediato, $ingreso?->lider_inmediato, $req?->responsable, $user->jefe_inmediato),
                     'empresa_id'       => $user->empresa_id           ?? $req?->empresa_id,
-                    'empresa_nombre'   => $user->empresa?->nombre     ?? $ingreso?->empresa       ?? $req?->empresa?->nombre,
-                    'ingresos'         => $contrato?->salario         ?? $ingreso?->salario_basico ?? $candidato?->salario_basico,
+                    // Proyecto del contrato: Empleados muestra "Código Directv" solo en DIRECTV.
+                    'cliente_proyecto' => $dato($contrato?->cliente_proyecto, $req?->proyecto?->nombre),
+                    'empresa_nombre'   => $dato($contrato?->empresa, $user->empresa?->nombre, $ingreso?->empresa, $req?->empresa?->nombre),
+                    'ingresos'         => $dato($contrato?->salario, $ingreso?->salario_basico, $candidato?->salario_basico, $user->ingresos),
 
-                    // ── Contacto de emergencia (respuesta > user)
-                    'contacto_emergencia_nombre'      => $respuesta?->emergencia_nombre      ?? $user->contacto_emergencia_nombre,
-                    'contacto_emergencia_telefono'    => $respuesta?->emergencia_telefono    ?? $user->contacto_emergencia_telefono,
-                    'contacto_emergencia_parentesco'  => $respuesta?->emergencia_parentesco  ?? $user->contacto_emergencia_parentesco,
+                    // ── Contacto de emergencia (formulario de ingreso > user)
+                    'contacto_emergencia_nombre'      => $dato($respuesta?->emergencia_nombre, $user->contacto_emergencia_nombre),
+                    'contacto_emergencia_telefono'    => $dato($respuesta?->emergencia_telefono, $user->contacto_emergencia_telefono),
+                    'contacto_emergencia_parentesco'  => $dato($respuesta?->emergencia_parentesco, $user->contacto_emergencia_parentesco),
                 ];
             })
         );
     }
 
+
+    /**
+     * Valores de relleno con que Contratos crea al usuario "pendiente de alta" cuando aún no
+     * hay datos reales (ver ContratoController::crearContratoYEmpleado). No son datos del
+     * empleado: el autocompletado los salta para usar el formulario de ingreso o el candidato.
+     */
+    private const RELLENOS = ['0000000000', 'NO ESPECIFICADO', 'SIN ASIGNAR', 'INDEFINIDO', 'PRINCIPAL'];
+
+    public static function esRelleno(mixed $valor): bool
+    {
+        if ($valor === null || $valor === '') {
+            return true;
+        }
+        if (!is_string($valor)) {
+            return false;
+        }
+        $v = mb_strtoupper(trim($valor), 'UTF-8');
+
+        return $v === '' || in_array($v, self::RELLENOS, true) || str_ends_with($v, '@AVANZACONOCE.COM');
+    }
 
     private function normalizarNombres(array &$data): void
     {
@@ -745,7 +810,7 @@ class EmpleadoController extends Controller
     private function rolesAsignables(?User $empleado): array
     {
         $roles = \App\Models\PermisoDenegado::ROLES_GESTIONABLES;
-        if (auth()->user()?->rol === 'admin' || $empleado?->rol === 'admin') {
+        if (Auth::user()?->rol === 'admin' || $empleado?->rol === 'admin') {
             $roles[] = 'admin';
         }
 
@@ -759,7 +824,7 @@ class EmpleadoController extends Controller
         // (EmpleadoSyncService::CAMPOS_CONTRATO).
         return [
             // Obligatorios
-            'cedula'           => 'required|string|max:20',
+            'cedula'           => ['required', 'string', 'max:20', Rule::unique('users', 'cedula')->ignore($ignoreId)],
             'apellidos'        => 'required|string|max:150',
             'nombres'          => 'required|string|max:150',
             'genero'           => 'required|string|max:50',

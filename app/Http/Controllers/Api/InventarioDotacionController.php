@@ -48,7 +48,7 @@ class InventarioDotacionController extends Controller
     /**
      * Tabs de dotación (claves de PROYECTO_DOTACION_A_PROYECTO) que el usuario puede ver/gestionar,
      * según la empresa a la que pertenece (misma regla que EmpresaProyectoRules usa para
-     * contratos/empleados: SYM ve TIGO EXPRESS/TIGO HOME/ADMINISTRATIVO, Servimercadeo ve DIRECTV).
+     * contratos/empleados: SYM ve todo menos DIRECTV, Servimercadeo ve DIRECTV y ADMINISTRATIVO).
      * Si el usuario no tiene empresa asignada, o su empresa no está sujeta a la regla, ve todas.
      * El admin siempre ve y gestiona el inventario completo, sin importar su empresa.
      */
@@ -60,15 +60,16 @@ class InventarioDotacionController extends Controller
             return $todas;
         }
 
-        $proyectosEmpresa = EmpresaProyectoRules::proyectosPermitidos($this->empresaUsuario($user));
-        if ($proyectosEmpresa === null) {
+        $empresa = $this->empresaUsuario($user);
+        if (!EmpresaProyectoRules::restringida($empresa)) {
             return $todas;
         }
 
-        return array_values(array_filter(
-            $todas,
-            fn ($tab) => in_array(InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$tab] ?? null, $proyectosEmpresa, true)
-        ));
+        // Un tab sin proyecto mapeado no se le muestra a un usuario con empresa restringida.
+        return array_values(array_filter($todas, function ($tab) use ($empresa) {
+            $proyecto = InventarioDotacion::PROYECTO_DOTACION_A_PROYECTO[$tab] ?? null;
+            return $proyecto !== null && EmpresaProyectoRules::permite($empresa, $proyecto);
+        }));
     }
 
     /** Tabs visibles para el usuario logueado (usado por GET inventario-dotacion/proyectos). */

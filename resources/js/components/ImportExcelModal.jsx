@@ -64,7 +64,7 @@ export default function ImportExcelModal({
                         { titulo: columnaClave.titulo, tipo: "texto", ancho: 14, valor: (d) => d[columnaClave.campo] },
                         { titulo: "Nombre", tipo: "texto", ancho: 32, valor: (d) => d.nombre },
                         { titulo: "Usuario (email)", tipo: "texto", ancho: 32, valor: (d) => d.credenciales.email },
-                        { titulo: "Contraseña temporal", tipo: "texto", ancho: 20, valor: (d) => d.credenciales.password },
+                        { titulo: "Contraseña", tipo: "texto", ancho: 20, valor: (d) => d.credenciales.password },
                     ],
                     filas: conCredenciales,
                 },

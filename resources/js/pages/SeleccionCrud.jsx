@@ -107,10 +107,11 @@ export default function SeleccionCrud() {
       setErrors(prev => ({ ...prev, [k]: undefined, ...(k === 'sede_id' ? { regional_id: undefined } : {}) }));
     }
     // Cambiar proyecto o empresa puede resolver el choque de EmpresaProyectoRules: limpiar ese error.
-    if (k === 'proyecto_id' || k === 'empresa_id') {
+    // Igual con empleador o empresa y la regla empleador directo -> su empresa.
+    if (k === 'proyecto_id' || k === 'empresa_id' || k === 'empleador_id') {
       setErrors(prev => {
-        if (!prev.proyecto_id && !prev._general) return prev;
-        const { proyecto_id, _general, ...rest } = prev;
+        if (!prev.proyecto_id && !prev.empresa_id && !prev._general) return prev;
+        const { proyecto_id, empresa_id, _general, ...rest } = prev;
         return rest;
       });
     }
@@ -363,9 +364,9 @@ export default function SeleccionCrud() {
               <button style={S.mClose} onClick={() => setModal(false)}><IconClose size={13}/></button>
             </div>
             <div style={S.mBody}>
-              {(errors._general || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id) && (
+              {(errors._general || errors.empresa_id || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id) && (
                 <div style={S.errorBanner}>
-                  {errors._general || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id}
+                  {errors._general || errors.empresa_id || errors.proyecto_id || errors.estado || errors.requeridas || errors.sede_id || errors.regional_id}
                 </div>
               )}
               <div className="form-grid" style={S.g3}>
@@ -404,7 +405,7 @@ export default function SeleccionCrud() {
                 </SField>
 
                 {/* Empresa – SearchableSelect */}
-                <SField l="Empresa" req={!isRO(mode)} err={errors.proyecto_id}>
+                <SField l="Empresa" req={!isRO(mode)} err={errors.proyecto_id || errors.empresa_id}>
                   <SearchableSelect
                     key={`emp-${form.empresa_id ?? ''}`}
                     value={form.empresa_id ?? ''}
