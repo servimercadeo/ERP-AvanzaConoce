@@ -127,6 +127,24 @@ class IngresoDePersonalTest extends TestCase
         $this->assertNotSoftDeleted($ingreso);
     }
 
+    public function test_la_consulta_de_contratos_funciona_con_el_prefijo_de_produccion(): void
+    {
+        // En producción las tablas llevan prefijo (erp_contratos, erp_users): ningún SQL
+        // crudo puede nombrar "contratos." o "users." a mano.
+        $conexion = DB::connection();
+        $prefijo = $conexion->getTablePrefix();
+        $conexion->setTablePrefix('erp_');
+        try {
+            $sql = collect($conexion->pretend(fn () => BaseIngreso::conContrato([new BaseIngreso(['documento_identificacion' => '1'])])))
+                ->pluck('query')->implode(' ');
+        } finally {
+            $conexion->setTablePrefix($prefijo);
+        }
+
+        $this->assertStringContainsString('`erp_contratos`.`created_at`', $sql);
+        $this->assertDoesNotMatchRegularExpression('/(?<![`_])\b(users|contratos)\./', $sql);
+    }
+
     public function test_un_contrato_anterior_al_aval_reingreso_no_impide_anular(): void
     {
         $this->actuarComo('th');

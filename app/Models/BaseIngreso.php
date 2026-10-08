@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class BaseIngreso extends Model
 {
@@ -101,8 +102,11 @@ class BaseIngreso extends Model
             ->join('users', 'contratos.empleado_id', '=', 'users.id')
             ->whereIn('users.cedula', $cedulas)
             ->groupBy('users.cedula')
-            ->selectRaw('users.cedula, MAX(contratos.created_at) as ultimo')
-            ->pluck('ultimo', 'users.cedula');
+            ->select('users.cedula')
+            // wrap() agrega el prefijo de las tablas (en producción erp_contratos): escrito
+            // a mano en el SQL crudo, "contratos.created_at" no existe allá.
+            ->selectRaw('MAX(' . DB::getQueryGrammar()->wrap('contratos.created_at') . ') as ultimo')
+            ->pluck('ultimo', 'cedula');
 
         return $ingresos->mapWithKeys(function (BaseIngreso $i) use ($ultimoContrato) {
             $ultimo = $ultimoContrato->get((string) $i->documento_identificacion);
