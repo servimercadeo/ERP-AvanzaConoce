@@ -236,6 +236,9 @@ class EmpleadoController extends Controller
         if ($msg = IdentidadUnica::correoDeOtraPersona($data['email'] ?? null, $data['cedula'] ?? null)) {
             throw ValidationException::withMessages(['email' => $msg]);
         }
+        if ($msg = IdentidadUnica::telefonoDeOtraPersona($data['movil'] ?? null, $data['cedula'] ?? null, $existingId)) {
+            throw ValidationException::withMessages(['movil' => $msg]);
+        }
 
         $this->normalizarNombres($data);
         $data['name']   = trim($data['nombres'] . ' ' . $data['apellidos']);
@@ -324,8 +327,11 @@ class EmpleadoController extends Controller
         // responde 422. Antes se "fusionaba": se borraba al empleado editado y se sobrescribía
         // al otro, así que un error de tipeo en el correo eliminaba a una persona real.
         $data = $request->validate($this->rules($empleado->id, $empleado));
-        if ($msg = IdentidadUnica::correoDeOtraPersona($data['email'] ?? null, $data['cedula'] ?? $empleado->cedula)) {
+        if ($msg = IdentidadUnica::correoDeOtraPersona($data['email'] ?? null, $data['cedula'] ?? $empleado->cedula, $empleado->id)) {
             throw ValidationException::withMessages(['email' => $msg]);
+        }
+        if ($msg = IdentidadUnica::telefonoDeOtraPersona($data['movil'] ?? null, $data['cedula'] ?? $empleado->cedula, $empleado->id)) {
+            throw ValidationException::withMessages(['movil' => $msg]);
         }
 
         $this->normalizarNombres($data);
@@ -689,7 +695,7 @@ class EmpleadoController extends Controller
                 // 2. Candidato vinculado por cédula: si la cédula pasó por varias
                 //    requisiciones, el del aval vigente (el más reciente), no el más antiguo.
                 $candidato = $user->cedula
-                    ? \App\Models\Candidato::with(['requisicion.empresa', 'requisicion.empleador', 'requisicion.proyecto', 'requisicion.cargo'])
+                    ? \App\Models\Candidato::with(['empleador', 'requisicion.empresa', 'requisicion.empleador', 'requisicion.proyecto', 'requisicion.cargo'])
                         ->where('identificacion', $user->cedula)
                         ->orderByDesc('aval')->latest()->orderByDesc('id')
                         ->first()
@@ -755,7 +761,7 @@ class EmpleadoController extends Controller
                     'sede'             => $dato($contrato?->sede, $ingreso?->lugar_trabajo, $candidato?->lugar_trabajo, $user->sede),
                     'tipo_vinculacion' => $dato($contrato?->tipo_vinculacion, $ingreso?->tipo_vinculacion, $candidato?->tipo_vinculacion, $user->tipo_vinculacion),
                     'tipo_funcionario' => $dato($user->tipo_funcionario),
-                    'empleador'        => $dato($contrato?->empleador, $ingreso?->empleador, $req?->empleador?->nombre, $user->empleador),
+                    'empleador'        => $dato($contrato?->empleador, $ingreso?->empleador, $candidato?->empleadorNombre(), $user->empleador),
                     'jefe_inmediato'   => $dato($contrato?->jefe_inmediato, $ingreso?->lider_inmediato, $req?->responsable, $user->jefe_inmediato),
                     'empresa_id'       => $user->empresa_id           ?? $req?->empresa_id,
                     // Proyecto del contrato: Empleados muestra "Código Directv" solo en DIRECTV.

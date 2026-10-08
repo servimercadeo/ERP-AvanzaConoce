@@ -25,7 +25,7 @@ class Candidato extends Model
         'requisicion_id', 'nombres', 'tipo_documento', 'identificacion',
         'fecha_expedicion', 'lugar_expedicion', 'edad', 'ciudad_id', 'correo', 'celular',
         'fecha_postulacion', 'fuente', 'fuente_especifica', 'estado',
-        'pruebas', 'aval', 'tipo_vinculacion', 'correos_aval', 'fecha_aval', 'negocio', 'observaciones',
+        'pruebas', 'aval', 'tipo_vinculacion', 'empleador_id', 'correos_aval', 'fecha_aval', 'negocio', 'observaciones',
         // Assessment
         'asmt_ejercicio', 'asmt_nombre_ejercicio',
         'asmt_claridad_mensaje', 'asmt_conviccion_energia', 'asmt_adaptabilidad_escucha',
@@ -78,6 +78,12 @@ class Candidato extends Model
         });
     }
 
+    /** Correo en minúsculas y sin espacios (ver IdentidadUnica). */
+    public function setCorreoAttribute($value): void
+    {
+        $this->attributes['correo'] = $value === null ? null : \App\Services\IdentidadUnica::normalizarCorreo($value);
+    }
+
     public function requisicion()
     {
         return $this->belongsTo(Requisicion::class);
@@ -86,6 +92,21 @@ class Candidato extends Model
     public function ciudad()
     {
         return $this->belongsTo(Ciudad::class);
+    }
+
+    /** Empleador elegido al dar el aval (directo o indirecto según la vinculación). */
+    public function empleador()
+    {
+        return $this->belongsTo(Empleador::class);
+    }
+
+    /**
+     * Nombre del empleador del candidato: el del aval; las requisiciones antiguas, que
+     * todavía traían empleador, sirven de respaldo.
+     */
+    public function empleadorNombre(): ?string
+    {
+        return $this->empleador?->nombre ?: $this->requisicion?->empleador?->nombre;
     }
 
     public function documentos()

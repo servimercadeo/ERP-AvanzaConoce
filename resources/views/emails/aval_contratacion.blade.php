@@ -80,7 +80,7 @@
       {{-- Líder inmediato --}}
       <td>{{ $baseIngreso?->lider_inmediato ?? $candidato->requisicion?->responsable ?? '-' }}</td>
       {{-- Empleador --}}
-      <td>{{ $baseIngreso?->empleador ?? $candidato->requisicion?->empleador?->nombre ?? '-' }}</td>
+      <td>{{ $baseIngreso?->empleador ?: ($candidato->empleadorNombre() ?: '-') }}</td>
       {{-- Fecha programación ingreso --}}
       @php $fpi = $baseIngreso?->fecha_programacion_ingreso ?? $candidato->fecha_programacion_ingreso; @endphp
       <td>{{ $fpi ? \Carbon\Carbon::parse($fpi)->format('d/m/Y') : '-' }}</td>

@@ -27,6 +27,9 @@ class UserController extends Controller
             'password' => ['required', Password::min(8)],
             'rol'      => 'sometimes|in:admin,th,tic,operaciones,financiera,supervisores,general',
         ]);
+        if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['email'], null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['email' => $msg]);
+        }
 
         $usuario = $this->sync->crearEnErpYSincronizar($data);
 

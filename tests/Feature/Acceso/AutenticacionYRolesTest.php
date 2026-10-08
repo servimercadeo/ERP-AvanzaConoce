@@ -40,6 +40,18 @@ class AutenticacionYRolesTest extends TestCase
             ->assertJsonValidationErrors('email');
     }
 
+    public function test_el_login_trae_los_permisos_del_rol_igual_que_api_user(): void
+    {
+        $this->usuario('operaciones', ['email' => 'ope@test.co']);
+
+        $login = $this->postJson('/login', ['email' => 'ope@test.co', 'password' => 'password'])->assertOk();
+
+        // Sin esto el menú mostraría todos los módulos hasta recargar la página.
+        $denegados = collect($login->json('user.permisos_denegados'));
+        $this->assertTrue($denegados->contains(fn ($p) => $p['modulo_id'] === 'administrativo' && $p['submodulo_id'] === 'empleados'));
+        $this->assertEquals($this->getJson('/api/user')->json(), $login->json('user'));
+    }
+
     public function test_api_user_devuelve_permisos_denegados_solo_de_su_rol(): void
     {
         PermisoDenegado::query()->delete();
@@ -153,6 +165,14 @@ class AutenticacionYRolesTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('email');
         $this->postJson('/api/users', ['name' => 'X', 'email' => 'otro@test.co', 'password' => 'corta'])
             ->assertStatus(422)->assertJsonValidationErrors('password');
+
+        // Tampoco el correo de un candidato del proceso de selección, ni en otra forma de escribirlo.
+        \Illuminate\Support\Facades\DB::table('candidatos')->insert([
+            'nombres' => 'CANDIDATA', 'identificacion' => '555', 'correo' => 'candidata@test.co',
+            'fecha_postulacion' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->postJson('/api/users', ['name' => 'X', 'email' => ' Candidata@Test.co', 'password' => 'Password123'])
+            ->assertStatus(422)->assertJsonValidationErrors('email');
     }
 
     public function test_si_avanzaconoce_falla_el_usuario_igual_queda_creado_en_el_erp(): void

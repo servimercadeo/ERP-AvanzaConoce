@@ -6,8 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Mail\AvalContratacionMail;
 use App\Models\BaseIngreso;
 use App\Models\Candidato;
-use App\Models\EmpleadorContacto;
+use App\Models\Empleador;
 use App\Models\Requisicion;
+use App\Services\EmpresaProyectoRules;
 use App\Services\IdentidadUnica;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class CandidatoController extends Controller
             'requisicion.empresa',
             'requisicion.cargo',
             'requisicion.empleador',
+            'empleador',
             'ciudad',
             'documentos' => fn($q) => $q->whereIn('nombre', ['Hoja de vida', 'Pruebas psicotécnicas'])
                                         ->select(['id', 'candidato_id', 'nombre']),
@@ -69,12 +71,17 @@ class CandidatoController extends Controller
             'fotografia'        => 'nullable|max:5120',
         ]);
 
-        // Cada persona se registra una sola vez y con su propio correo.
-        if ($msg = IdentidadUnica::cedulaDeOtroCandidato($data['identificacion'])) {
+        // Cada persona se registra una sola vez, con su propio correo y celular, y sin ser
+        // ya un empleado activo.
+        if ($msg = IdentidadUnica::cedulaDeOtroCandidato($data['identificacion'])
+            ?? IdentidadUnica::cedulaDeEmpleadoActivo($data['identificacion'])) {
             throw ValidationException::withMessages(['identificacion' => $msg]);
         }
         if ($msg = IdentidadUnica::correoDeOtraPersona($data['correo'], $data['identificacion'])) {
             throw ValidationException::withMessages(['correo' => $msg]);
+        }
+        if ($msg = IdentidadUnica::telefonoDeOtraPersona($data['celular'] ?? null, $data['identificacion'])) {
+            throw ValidationException::withMessages(['celular' => $msg]);
         }
 
         if ($request->hasFile('fotografia')) {
@@ -130,6 +137,7 @@ class CandidatoController extends Controller
             'pruebas'                  => 'nullable|boolean',
             'aval'                     => 'nullable|boolean',
             'tipo_vinculacion'         => 'nullable|string|in:Directa,Indirecta',
+            'empleador_id'             => 'nullable|exists:empleadores,id',
             'correos_aval'             => 'nullable|array',
             'correos_aval.*'           => 'email',
             'fecha_aval'               => 'nullable|date',
@@ -188,6 +196,10 @@ class CandidatoController extends Controller
         if (array_key_exists('correo', $data)
             && ($msg = IdentidadUnica::correoDeOtraPersona($data['correo'], $cedulaFinal))) {
             throw ValidationException::withMessages(['correo' => $msg]);
+        }
+        if (array_key_exists('celular', $data)
+            && ($msg = IdentidadUnica::telefonoDeOtraPersona($data['celular'], $cedulaFinal))) {
+            throw ValidationException::withMessages(['celular' => $msg]);
         }
 
         if ($request->hasFile('fotografia')) {
@@ -268,19 +280,36 @@ class CandidatoController extends Controller
                 $tipoVinculacion = $data['tipo_vinculacion'] ?? $candidato->tipo_vinculacion;
                 $correosAval     = $data['correos_aval'] ?? [];
 
-                // Los destinatarios salen de los contactos registrados en Parámetros > Empleadores
-                // (tabla `empleador_contactos`) de un empleador del tipo que corresponde a la
-                // vinculación. El frontend ya filtra por empleador+regional; esto solo evita que
-                // llegue un correo que no está en el catálogo.
+                // El empleador del candidato se elige al dar el aval (ya no en la requisición):
+                // directo para la vinculación Directa, indirecto para la Indirecta.
                 $tipoEmpleador = ['Directa' => 'Directo', 'Indirecta' => 'Indirecto'][$tipoVinculacion] ?? null;
-                $correosPermitidos = $tipoEmpleador
-                    ? EmpleadorContacto::whereHas('empleador', fn ($q) => $q->where('tipo', $tipoEmpleador))
-                        ->pluck('correo')->all()
-                    : [];
+                $empleador = Empleador::find($data['empleador_id'] ?? null);
+                if (!$empleador) {
+                    return response()->json(
+                        ['message' => 'Selecciona el empleador del candidato para dar el aval.'],
+                        422
+                    );
+                }
+                if ($empleador->tipo !== $tipoEmpleador) {
+                    return response()->json(
+                        ['message' => "El empleador {$empleador->nombre} no es " . mb_strtolower((string) $tipoEmpleador) . ': no corresponde a la vinculación ' . $tipoVinculacion . '.'],
+                        422
+                    );
+                }
+                // Empleador directo => la empresa de la requisición debe ser la suya.
+                $empresaAval = $requisicionAval?->empresa?->nombre;
+                if ($msg = EmpresaProyectoRules::validarEmpleador($empleador->nombre, $empresaAval)) {
+                    return response()->json(['message' => $msg], 422);
+                }
+
+                // Los destinatarios salen de los contactos registrados en Parámetros > Empleadores
+                // (tabla `empleador_contactos`) del empleador elegido. El frontend ya los filtra;
+                // esto solo evita que llegue un correo que no está en el catálogo.
+                $correosPermitidos = $empleador->contactos()->pluck('correo')->all();
 
                 if (array_diff($correosAval, $correosPermitidos)) {
                     return response()->json(
-                        ['message' => 'Los correos seleccionados no corresponden a la lista de destinatarios de ' . $tipoVinculacion . '.'],
+                        ['message' => 'Los correos seleccionados no corresponden a los contactos del empleador ' . $empleador->nombre . '.'],
                         422
                     );
                 }
@@ -293,6 +322,7 @@ class CandidatoController extends Controller
         // Si se está desactivando el aval, forzar estado = Entrevista sin importar lo que venga del frontend
         if ($avalAntes && array_key_exists('aval', $data) && !$data['aval']) {
             $data['estado'] = 'Entrevista';
+            $data['empleador_id'] = null;
         }
 
         $candidato->update($data);
@@ -333,7 +363,7 @@ class CandidatoController extends Controller
             }
         }
 
-        return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'ciudad']));
+        return response()->json($candidato->load(['requisicion.cargo', 'requisicion.proyecto', 'requisicion.empresa', 'ciudad']));
     }
 
     public function destroy(Candidato $candidato)

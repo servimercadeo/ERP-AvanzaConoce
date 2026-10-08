@@ -2641,6 +2641,8 @@ export default function ContratosCrud() {
                 // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
                 qc.invalidateQueries({ queryKey: ["empleados"] });
                 qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
+                // El aval con contrato ya no muestra "Anular aval".
+                qc.invalidateQueries({ queryKey: ["base-ingresos"] });
                 showToast("Contrato actualizado.");
             } else {
                 const { data } = await api.post("/contratos", form);
@@ -2651,6 +2653,8 @@ export default function ContratosCrud() {
                 // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
                 qc.invalidateQueries({ queryKey: ["empleados"] });
                 qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
+                // El aval con contrato ya no muestra "Anular aval".
+                qc.invalidateQueries({ queryKey: ["base-ingresos"] });
                 showToast(
                     data.pedido_automatico
                         ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado (${data.pedido_automatico.estado}).`
@@ -2823,6 +2827,8 @@ export default function ContratosCrud() {
             // salen nombre y foto al ver/editar) y la de candidatos para contrato deben recargarse.
             qc.invalidateQueries({ queryKey: ["empleados"] });
             qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
+            // El aval con contrato ya no muestra "Anular aval".
+            qc.invalidateQueries({ queryKey: ["base-ingresos"] });
 
             const resumen = [];
             if (created > 0) resumen.push(`${created} contrato${created === 1 ? "" : "s"} creado${created === 1 ? "" : "s"}`);

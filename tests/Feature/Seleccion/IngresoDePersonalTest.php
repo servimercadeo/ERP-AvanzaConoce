@@ -103,6 +103,41 @@ class IngresoDePersonalTest extends TestCase
         $this->assertSame(0, BaseIngreso::where('candidato_id', $c->id)->count());
     }
 
+    private function contratoPara(string $cedula, ?string $creado = null): void
+    {
+        $empleado = $this->usuario('general', ['cedula' => $cedula]);
+        $contrato = \App\Models\Contrato::create(['empleado_id' => $empleado->id, 'cargo' => 'ASESOR', 'estado_contrato' => 'Activo']);
+        if ($creado) {
+            $contrato->forceFill(['created_at' => $creado])->saveQuietly();
+        }
+    }
+
+    public function test_con_contrato_creado_el_aval_no_se_puede_anular(): void
+    {
+        $this->actuarComo('th');
+        $ingreso = $this->ingreso();
+
+        $this->getJson('/api/base-ingresos')->assertOk()->assertJsonPath('0.tiene_contrato', false);
+
+        $this->contratoPara('5551234');
+
+        $this->getJson('/api/base-ingresos')->assertOk()->assertJsonPath('0.tiene_contrato', true);
+        $this->postJson("/api/base-ingresos/{$ingreso->id}/anular")->assertStatus(422)
+            ->assertJsonPath('message', 'Este aval no se puede anular: el empleado ya tiene contrato creado.');
+        $this->assertNotSoftDeleted($ingreso);
+    }
+
+    public function test_un_contrato_anterior_al_aval_reingreso_no_impide_anular(): void
+    {
+        $this->actuarComo('th');
+        $this->contratoPara('5551234', now()->subYear()->toDateTimeString());
+        $ingreso = $this->ingreso();
+
+        $this->getJson('/api/base-ingresos')->assertOk()->assertJsonPath('0.tiene_contrato', false);
+        $this->postJson("/api/base-ingresos/{$ingreso->id}/anular")->assertOk();
+        $this->assertSoftDeleted($ingreso);
+    }
+
     public function test_alerta_de_ingreso_se_envia_por_correo_y_se_marca(): void
     {
         $this->actuarComo('th');
@@ -302,10 +337,30 @@ class IngresoDePersonalTest extends TestCase
             $this->subir($tipo, '5551234')->assertCreated();
         }
         $this->subir('hoja_vida', '888')->assertCreated(); // incompleto
+        $this->ingreso();
+        $this->ingreso(['documento_identificacion' => '888', 'correo' => 'otro@test.co']);
 
         $docs = collect($this->getJson('/api/respuestas-ingresos/datos-contrato')->assertOk()->json())->pluck('documento');
 
         $this->assertSame(['5551234'], $docs->all());
+    }
+
+    public function test_datos_para_contrato_excluye_a_quien_no_tiene_aval_o_ya_tiene_contrato(): void
+    {
+        $this->actuarComo('th');
+        // Tres indirectos con el formulario lleno (no necesitan documentos).
+        foreach (['101' => 'a', '202' => 'b', '303' => 'c'] as $cedula => $c) {
+            RespuestaIngreso::create(collect($this->formulario(['documento' => (string) $cedula, 'correo' => "$c@test.co"]))->except('fotografia')->all());
+        }
+        $this->ingreso(['documento_identificacion' => '101', 'correo' => 'a@test.co', 'tipo_vinculacion' => 'Indirecta']); // listo
+        $anulado = $this->ingreso(['documento_identificacion' => '202', 'correo' => 'b@test.co', 'tipo_vinculacion' => 'Indirecta']);
+        $this->postJson("/api/base-ingresos/{$anulado->id}/anular")->assertOk();                                          // sin aval
+        $this->ingreso(['documento_identificacion' => '303', 'correo' => 'c@test.co', 'tipo_vinculacion' => 'Indirecta']);
+        $this->contratoPara('303');                                                                                         // ya con contrato
+
+        $docs = collect($this->getJson('/api/respuestas-ingresos/datos-contrato')->assertOk()->json())->pluck('documento');
+
+        $this->assertSame(['101'], $docs->all());
     }
 
     public function test_listar_y_eliminar_respuestas_del_formulario(): void

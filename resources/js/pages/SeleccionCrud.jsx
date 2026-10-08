@@ -107,8 +107,8 @@ export default function SeleccionCrud() {
       setErrors(prev => ({ ...prev, [k]: undefined, ...(k === 'sede_id' ? { regional_id: undefined } : {}) }));
     }
     // Cambiar proyecto o empresa puede resolver el choque de EmpresaProyectoRules: limpiar ese error.
-    // Igual con empleador o empresa y la regla empleador directo -> su empresa.
-    if (k === 'proyecto_id' || k === 'empresa_id' || k === 'empleador_id') {
+    // (El empleador ya no va en la requisición: se elige al dar el aval en Candidatos.)
+    if (k === 'proyecto_id' || k === 'empresa_id') {
       setErrors(prev => {
         if (!prev.proyecto_id && !prev.empresa_id && !prev._general) return prev;
         const { proyecto_id, empresa_id, _general, ...rest } = prev;
@@ -126,7 +126,6 @@ export default function SeleccionCrud() {
   const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
   const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
-  const empleadoresOpts  = (catalogs.empleadores || []).map(e => ({ value: String(e.id), label: e.nombre }));
   const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
   // Sedes de la ciudad de operación; si la ciudad no tiene sedes registradas, se muestran todas.
   const sedesCiudad      = (catalogs.sedes || []).filter(s => form.ciudad_id && String(s.id_ciudad) === String(form.ciudad_id));
@@ -163,7 +162,6 @@ export default function SeleccionCrud() {
         tipo_solicitud:              row.tipo_solicitud || '',
         proyecto_id:                 row.proyecto_id != null ? String(row.proyecto_id) : '',
         empresa_id:                  row.empresa_id  != null ? String(row.empresa_id)  : '',
-        empleador_id:                row.empleador_id != null ? String(row.empleador_id) : '',
         fecha_ingreso:               row.fecha_ingreso || '',
         pais:                        row.pais || 'Colombia',
         fecha_cierre:                row.fecha_cierre || '',
@@ -194,7 +192,6 @@ export default function SeleccionCrud() {
         requeridas:             parseInt(form.requeridas) || null,
         proyecto_id:            form.proyecto_id    || null,
         empresa_id:             form.empresa_id     || null,
-        empleador_id:           form.empleador_id   || null,
         tipo_solicitud:         form.tipo_solicitud,
         responsable:            form.nombre_responsable,
         proceso:                form.proceso,
@@ -411,18 +408,6 @@ export default function SeleccionCrud() {
                     value={form.empresa_id ?? ''}
                     onChange={chVal('empresa_id')}
                     options={empresasOpts}
-                    defaultValue=""
-                    disabled={isRO(mode)}
-                  />
-                </SField>
-
-                {/* Empleador – SearchableSelect */}
-                <SField l="Empleador">
-                  <SearchableSelect
-                    key={`empl-${form.empleador_id ?? ''}`}
-                    value={form.empleador_id ?? ''}
-                    onChange={chVal('empleador_id')}
-                    options={empleadoresOpts}
                     defaultValue=""
                     disabled={isRO(mode)}
                   />

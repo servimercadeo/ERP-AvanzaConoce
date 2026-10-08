@@ -15,9 +15,21 @@ const getTodayStr = () => new Date().toISOString().slice(0, 10);
 
 const FIXED_DOCS = ["Hoja de vida", "Pruebas psicotécnicas"];
 
-// Los correos del aval salen de los contactos de los empleadores (Parámetros > Empleadores):
-// Directa = todos los contactos de los empleadores directos; Indirecta = los del empleador
-// indirecto + regional elegidos en el modal.
+// El empleador del candidato se elige al dar el aval (ya no en la requisición):
+// Directa = un empleador directo (el que corresponde a la empresa de la requisición) y sus
+// contactos; Indirecta = un empleador indirecto + regional y los contactos de esa regional.
+// Los correos del aval salen de los contactos de Parámetros > Empleadores.
+
+// Empleador directo => prefijo de la empresa que le corresponde (igual que EmpresaProyectoRules.php).
+const EMPRESA_DE_EMPLEADOR_DIRECTO = {
+    "SERVIMERCADEO": "SERVIMERCADEO",
+    "S&M SERVICIOS Y MERCADEO": "SERVICIOS Y MERCADEO",
+};
+const directoPermitidoParaEmpresa = (empleador, empresa) => {
+    const prefijo = EMPRESA_DE_EMPLEADOR_DIRECTO[(empleador?.nombre ?? "").trim().toUpperCase()];
+    if (!prefijo || !empresa) return true;
+    return empresa.trim().toUpperCase().startsWith(prefijo);
+};
 
 const MESES = [
     "ENERO",
@@ -191,14 +203,40 @@ export default function CandidatosCrud() {
         queryKey: ["empleadores-aval"],
         queryFn: () => api.get("/empleadores").then((r) => r.data ?? []),
     });
-    // Vinculación Directa: el aval va a todos los contactos de los empleadores directos
-    // (Servimercadeo y S&M), sin elegir empleador ni regional. Sin correos repetidos.
-    const contactosDirectos = empleadoresAval
-        .filter((e) => e.tipo === "Directo")
-        .flatMap((e) => e.contactos ?? [])
-        .filter(
+    // Contactos de un empleador sin correos repetidos.
+    const contactosDe = (empleadorId) =>
+        (empleadoresAval.find((e) => String(e.id) === String(empleadorId))
+            ?.contactos ?? []
+        ).filter(
             (c, i, arr) => arr.findIndex((x) => x.correo === c.correo) === i,
         );
+    // Empleadores directos que admite la empresa de la requisición del candidato.
+    const directosParaCandidato = (candidate) =>
+        empleadoresAval.filter(
+            (e) =>
+                e.tipo === "Directo" &&
+                directoPermitidoParaEmpresa(
+                    e,
+                    candidate?.requisicion?.empresa?.nombre,
+                ),
+        );
+    // Al elegir Directa se preselecciona el directo cuando solo hay uno posible.
+    const datosVinculacion = (candidate, tipo, empleadorId = "") => {
+        if (tipo === "Directa" && !empleadorId) {
+            const directos = directosParaCandidato(candidate);
+            if (directos.length === 1) empleadorId = String(directos[0].id);
+        }
+        return {
+            tipo,
+            empleadorId,
+            regional: "",
+            // Directa: todos los contactos del empleador; Indirecta: los de la regional elegida.
+            correos:
+                tipo === "Directa" && empleadorId
+                    ? contactosDe(empleadorId).map((c) => c.correo)
+                    : [],
+        };
+    };
     const loadingData = _lc || _lr || _lk;
 
     useEffect(() => {
@@ -264,7 +302,10 @@ export default function CandidatosCrud() {
                 extra.fecha_aval = val
                     ? new Date().toISOString().slice(0, 10)
                     : null;
-                if (!val) extra.tipo_vinculacion = null;
+                if (!val) {
+                    extra.tipo_vinculacion = null;
+                    extra.empleador_id = null;
+                }
             }
         }
 
@@ -319,22 +360,26 @@ export default function CandidatosCrud() {
                 );
                 return;
             }
-            // Preselecciona el empleador de la requisición y el tipo de vinculación que le corresponde.
+            // Las requisiciones antiguas traían empleador: se usa para preseleccionar.
             const empReq = empleadoresAval.find(
                 (e) =>
                     String(e.id) === String(candidate.requisicion?.empleador_id),
             );
             const tipo = empReq?.tipo === "Indirecto" ? "Indirecta" : "Directa";
+            const empleadorPrevio =
+                empReq &&
+                (tipo === "Indirecta" ||
+                    directoPermitidoParaEmpresa(
+                        empReq,
+                        candidate.requisicion?.empresa?.nombre,
+                    ))
+                    ? String(empReq.id)
+                    : "";
             setVinculacionModal({
                 ...VINCULACION_MODAL_INICIAL,
                 open: true,
                 candidateId,
-                tipo,
-                empleadorId: tipo === "Indirecta" ? String(empReq.id) : "",
-                correos:
-                    tipo === "Directa"
-                        ? contactosDirectos.map((c) => c.correo)
-                        : [],
+                ...datosVinculacion(candidate, tipo, empleadorPrevio),
             });
             return;
         }
@@ -344,6 +389,7 @@ export default function CandidatosCrud() {
     const handleConfirmVinculacion = () => {
         doToggleField(vinculacionModal.candidateId, "aval", {
             tipo_vinculacion: vinculacionModal.tipo,
+            empleador_id: vinculacionModal.empleadorId || null,
             correos_aval: vinculacionModal.correos,
         });
         setVinculacionModal(VINCULACION_MODAL_INICIAL);
@@ -773,12 +819,17 @@ export default function CandidatosCrud() {
         );
     }, [candidates, debouncedSearch]);
 
-    // Indirecta: empleadores indirectos, el empleador seleccionado, sus regionales
-    // con contacto registrado, y los contactos que coinciden con la regional elegida (más los
-    // de "Todo a nivel nacional", que aplican sin importar la regional específica).
-    const empleadoresVinc = empleadoresAval.filter(
-        (e) => e.tipo === "Indirecto",
+    // Empleadores del tipo de vinculación elegido (los directos, solo los de la empresa de
+    // la requisición). Indirecta: además sus regionales con contacto registrado, y los
+    // contactos que coinciden con la regional elegida (más los de "Todo a nivel nacional",
+    // que aplican sin importar la regional específica).
+    const candidatoVinc = candidates.find(
+        (x) => x.id === vinculacionModal.candidateId,
     );
+    const esDirectaVinc = vinculacionModal.tipo === "Directa";
+    const empleadoresVinc = esDirectaVinc
+        ? directosParaCandidato(candidatoVinc)
+        : empleadoresAval.filter((e) => e.tipo === "Indirecto");
     const empleadorVinc = empleadoresVinc.find(
         (e) => String(e.id) === String(vinculacionModal.empleadorId),
     );
@@ -788,9 +839,8 @@ export default function CandidatosCrud() {
             contactosEmpleadorVinc.map((c) => c.regional?.nombre).filter(Boolean),
         ),
     ).sort((a, b) => a.localeCompare(b));
-    const esDirectaVinc = vinculacionModal.tipo === "Directa";
     const contactosCoincidentesVinc = esDirectaVinc
-        ? contactosDirectos
+        ? contactosDe(vinculacionModal.empleadorId)
         : vinculacionModal.regional
         ? contactosEmpleadorVinc.filter(
               (c) =>
@@ -2887,15 +2937,10 @@ export default function CandidatosCrud() {
                                             onChange={() =>
                                                 setVinculacionModal((p) => ({
                                                     ...p,
-                                                    tipo: op,
-                                                    correos:
-                                                        op === "Directa"
-                                                            ? contactosDirectos.map(
-                                                                  (c) => c.correo,
-                                                              )
-                                                            : [],
-                                                    empleadorId: "",
-                                                    regional: "",
+                                                    ...datosVinculacion(
+                                                        candidatoVinc,
+                                                        op,
+                                                    ),
                                                 }))
                                             }
                                             style={{
@@ -2909,29 +2954,14 @@ export default function CandidatosCrud() {
                                 ))}
                             </div>
 
-                            {esDirectaVinc ? (
-                                contactosDirectos.length === 0 && (
-                                    <div
-                                        style={{
-                                            fontSize: "0.82rem",
-                                            color: "#a33",
-                                            marginTop: 16,
-                                        }}
-                                    >
-                                        Los empleadores directos no tienen
-                                        contactos registrados. Ve a Parámetros →
-                                        Empleadores para agregarlos.
-                                    </div>
-                                )
-                            ) : (
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 12,
-                                        marginTop: 16,
-                                    }}
-                                >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 12,
+                                    marginTop: 16,
+                                }}
+                            >
                                     <div>
                                         <label
                                             style={{
@@ -2942,16 +2972,19 @@ export default function CandidatosCrud() {
                                                 marginBottom: 6,
                                             }}
                                         >
-                                            Empleador
+                                            Empleador{" "}
+                                            {esDirectaVinc ? "directo" : "indirecto"}
                                         </label>
                                         <SearchableSelect
                                             value={vinculacionModal.empleadorId}
                                             onChange={(v) =>
                                                 setVinculacionModal((p) => ({
                                                     ...p,
-                                                    empleadorId: v,
-                                                    regional: "",
-                                                    correos: [],
+                                                    ...datosVinculacion(
+                                                        candidatoVinc,
+                                                        p.tipo,
+                                                        v,
+                                                    ),
                                                 }))
                                             }
                                             defaultValue=""
@@ -2963,6 +2996,7 @@ export default function CandidatosCrud() {
                                             )}
                                         />
                                     </div>
+                                    {!esDirectaVinc && (
                                     <div>
                                         <label
                                             style={{
@@ -3002,8 +3036,22 @@ export default function CandidatosCrud() {
                                             )}
                                         />
                                     </div>
+                                    )}
+                                    {esDirectaVinc &&
+                                        empleadoresVinc.length === 0 && (
+                                            <div
+                                                style={{
+                                                    fontSize: "0.82rem",
+                                                    color: "#a33",
+                                                }}
+                                            >
+                                                No hay empleadores directos para
+                                                la empresa de la requisición. Ve
+                                                a Parámetros → Empleadores.
+                                            </div>
+                                        )}
                                     {vinculacionModal.empleadorId &&
-                                        regionalesEmpleadorVinc.length === 0 && (
+                                        contactosEmpleadorVinc.length === 0 && (
                                             <div
                                                 style={{
                                                     fontSize: "0.82rem",
@@ -3016,10 +3064,11 @@ export default function CandidatosCrud() {
                                                 agregarlos.
                                             </div>
                                         )}
-                                </div>
-                            )}
+                            </div>
 
-                            {(esDirectaVinc || vinculacionModal.regional) && (
+                            {(esDirectaVinc
+                                ? !!vinculacionModal.empleadorId
+                                : !!vinculacionModal.regional) && (
                                 <div style={{ marginTop: 16 }}>
                                     <label
                                         style={{
@@ -3129,7 +3178,10 @@ export default function CandidatosCrud() {
                                         ? { opacity: 0.5, cursor: "default" }
                                         : {}),
                                 }}
-                                disabled={vinculacionModal.correos.length === 0}
+                                disabled={
+                                    !vinculacionModal.empleadorId ||
+                                    vinculacionModal.correos.length === 0
+                                }
                                 onClick={handleConfirmVinculacion}
                             >
                                 Confirmar aval

@@ -25,7 +25,7 @@
 <body>
     <div class="wrapper">
         <div class="header">
-            <h1>S&amp;M Servicios y Mercadeo S.A.S.</h1>
+            <h1>{{ $empresa['nombre'] }}</h1>
             <p>Proceso de Contratación</p>
         </div>
 
@@ -60,7 +60,7 @@
 
             <div style="margin-top: 28px; background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 16px 20px;">
                 <p style="margin: 0; font-size: 0.88rem; color: #92400e; line-height: 1.6;">
-                    <strong>Importante:</strong> Encontrarás adjunta en este correo la <strong>Hoja de Vida SYM</strong>.
+                    <strong>Importante:</strong> Encontrarás adjunta en este correo la <strong>Hoja de Vida {{ $empresa['corto'] }}</strong>.
                     Por favor diligencie este documento con toda tu información y envíalo de vuelta al correo que te llegará a continuación para continuar con el proceso de contratación.
                 </p>
             </div>
@@ -68,7 +68,7 @@
 
         <div class="footer">
             <p>
-                Este correo fue enviado por S&amp;M Servicios y Mercadeo S.A.S.<br>
+                Este correo fue enviado por {{ $empresa['nombre'] }}<br>
                 Si tienes dudas, comunícate con el área de Recursos Humanos.<br>
                 No respondas a este correo, es un envío automático.
             </p>

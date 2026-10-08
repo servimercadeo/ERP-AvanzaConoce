@@ -36,4 +36,10 @@ class RespuestaIngreso extends Model
         'talla_zapatos',
         'fotografia',
     ];
+
+    /** Correo en minúsculas y sin espacios (ver IdentidadUnica). */
+    public function setCorreoAttribute($value): void
+    {
+        $this->attributes['correo'] = $value === null ? null : \App\Services\IdentidadUnica::normalizarCorreo($value);
+    }
 }

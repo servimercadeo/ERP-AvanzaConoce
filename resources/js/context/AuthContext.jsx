@@ -18,6 +18,31 @@ export function AuthProvider({ children }) {
         });
     }, []);
 
+    // Los permisos (rol y `permisos_denegados`) viajan con el usuario: se vuelven a pedir
+    // cada minuto y al volver a la pestaña, para que un check activado o desactivado en el
+    // módulo Permisos se refleje sin cerrar sesión. Solo se actualiza si algo cambió.
+    const haySesion = !!user;
+    useEffect(() => {
+        if (!haySesion) return;
+        const refrescar = () => {
+            api.get("/user")
+                .then((res) =>
+                    setUser((prev) =>
+                        JSON.stringify(prev) === JSON.stringify(res.data)
+                            ? prev
+                            : res.data,
+                    ),
+                )
+                .catch(() => {});
+        };
+        const intervalo = setInterval(refrescar, 60000);
+        window.addEventListener("focus", refrescar);
+        return () => {
+            clearInterval(intervalo);
+            window.removeEventListener("focus", refrescar);
+        };
+    }, [haySesion]);
+
     const login = async (email, password) => {
         // Paso 1: obtener cookie CSRF de Sanctum
         await api.get("/sanctum/csrf-cookie", { baseURL: "/" });

@@ -210,6 +210,26 @@ class User extends Authenticatable
         }
     }
 
+    /** Correo en minúsculas y sin espacios (ver IdentidadUnica). */
+    public function setEmailAttribute($value): void
+    {
+        $this->attributes['email'] = $value === null ? null : \App\Services\IdentidadUnica::normalizarCorreo($value);
+    }
+
+    /**
+     * Lo que el frontend recibe del usuario en sesión (login y /api/user). Incluye
+     * "permisos_denegados" para armar el menú: las excepciones (módulo/submódulo) que el
+     * módulo Permisos le oculta a su rol. "admin" nunca tiene nada denegado.
+     */
+    public function datosDeSesion(): array
+    {
+        return array_merge($this->only('id', 'name', 'email', 'rol', 'sede_id'), [
+            'permisos_denegados' => (!$this->rol || $this->rol === 'admin')
+                ? []
+                : PermisoDenegado::where('rol', $this->rol)->get(['modulo_id', 'submodulo_id'])->toArray(),
+        ]);
+    }
+
     /** true si la ruta apunta a un archivo que existe en el disco público. */
     public static function fotoExiste(?string $ruta): bool
     {

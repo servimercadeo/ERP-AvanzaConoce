@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Empleador;
 use App\Models\Empresa;
 use App\Models\Proyecto;
 use App\Models\Requisicion;
@@ -70,7 +69,6 @@ class RequisicionController extends Controller
         ]);
 
         $this->validarEmpresaProyecto($data['empresa_id'] ?? null, $data['proyecto_id'] ?? null);
-        $this->validarEmpleadorEmpresa($data['empleador_id'] ?? null, $data['empresa_id'] ?? null);
         // Una requisición nueva aún no tiene candidatos con aval: no puede nacer Completada.
         $this->validarCierre($data['estado'] ?? null, $data['requeridas'], 0);
 
@@ -121,8 +119,6 @@ class RequisicionController extends Controller
         $empresaIdFinal  = array_key_exists('empresa_id', $data) ? $data['empresa_id'] : $requisicion->empresa_id;
         $proyectoIdFinal = array_key_exists('proyecto_id', $data) ? $data['proyecto_id'] : $requisicion->proyecto_id;
         $this->validarEmpresaProyecto($empresaIdFinal, $proyectoIdFinal);
-        $empleadorIdFinal = array_key_exists('empleador_id', $data) ? $data['empleador_id'] : $requisicion->empleador_id;
-        $this->validarEmpleadorEmpresa($empleadorIdFinal, $empresaIdFinal);
 
         // Solo se valida al pasar a Completada a mano, para no bloquear la edición de
         // requisiciones que ya estaban cerradas antes de esta regla.
@@ -186,16 +182,6 @@ class RequisicionController extends Controller
 
         if ($msg = EmpresaProyectoRules::validar($empresaNombre, $proyectoNombre)) {
             throw ValidationException::withMessages(['proyecto_id' => $msg]);
-        }
-    }
-
-    private function validarEmpleadorEmpresa(?int $empleadorId, ?int $empresaId): void
-    {
-        $empleadorNombre = $empleadorId ? Empleador::find($empleadorId)?->nombre : null;
-        $empresaNombre   = $empresaId ? Empresa::find($empresaId)?->nombre : null;
-
-        if ($msg = EmpresaProyectoRules::validarEmpleador($empleadorNombre, $empresaNombre)) {
-            throw ValidationException::withMessages(['empresa_id' => $msg]);
         }
     }
 }

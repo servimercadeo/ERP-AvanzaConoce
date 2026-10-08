@@ -111,27 +111,85 @@ class RequisicionesYCandidatosTest extends TestCase
         ] + $this->ubicacion())->assertCreated();
     }
 
-    public function test_requisicion_exige_la_empresa_del_empleador_directo(): void
+    /** Empleador (empleadores.id no es autoincremental: se asigna a mano). */
+    private function nuevoEmpleador(string $nombre, string $tipo, array $correos = []): int
+    {
+        $id = (int) DB::table('empleadores')->max('id') + 1;
+        DB::table('empleadores')->insert(['id' => $id, 'nombre' => $nombre, 'tipo' => $tipo, 'created_at' => now(), 'updated_at' => now()]);
+        foreach ($correos as $correo) {
+            DB::table('empleador_contactos')->insert(['empleador_id' => $id, 'nombre' => 'Contacto', 'correo' => $correo, 'created_at' => now(), 'updated_at' => now()]);
+        }
+
+        return $id;
+    }
+
+    private ?int $empleadorDirecto = null;
+
+    private function empleadorId(): int
+    {
+        return $this->empleadorDirecto ??= $this->nuevoEmpleador($this->unico('DIRECTO'), 'Directo');
+    }
+
+    public function test_la_requisicion_ya_no_valida_ni_pide_empleador(): void
     {
         $this->actuarComo('th');
         $sym = $this->empresa('Servicios y Mercadeo COL');
-        // empleadores.id no es autoincremental: se asigna a mano.
-        $servimercadeo = (int) DB::table('empleadores')->max('id') + 1;
-        $temporal = $servimercadeo + 1;
-        DB::table('empleadores')->insert([
-            ['id' => $servimercadeo, 'nombre' => 'SERVIMERCADEO', 'tipo' => 'Directo', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => $temporal, 'nombre' => 'STAFFING', 'tipo' => 'Indirecto', 'created_at' => now(), 'updated_at' => now()],
+
+        // El empleador se elige al dar el aval: la requisición se crea sin él.
+        $this->requisicion(['empresa_id' => $sym]);
+    }
+
+    public function test_el_aval_exige_empleador_del_tipo_de_vinculacion_y_de_la_empresa(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['empresa_id' => $this->empresa('Servicios y Mercadeo COL')]);
+        $c = $this->candidato(['requisicion_id' => $req['id'], 'pruebas' => true]);
+        $this->subirDocumentos($c);
+
+        $servimercadeo = $this->nuevoEmpleador('SERVIMERCADEO', 'Directo', ['nomina@servi.co']);
+        $sym = $this->nuevoEmpleador('S&M SERVICIOS Y MERCADEO', 'Directo', ['nomina@sym.co']);
+        $temporal = $this->nuevoEmpleador('STAFFING', 'Indirecto', ['contacto@staffing.co']);
+        $aval = fn (string $tipo, ?int $empleador, array $correos) => $this->putJson("/api/candidatos/{$c->id}", [
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000,
+            'tipo_vinculacion' => $tipo, 'empleador_id' => $empleador, 'correos_aval' => $correos,
         ]);
 
-        $this->postJson('/api/requisiciones', [
-            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $sym, 'empleador_id' => $servimercadeo,
-        ] + $this->ubicacion())->assertStatus(422)->assertJsonValidationErrors('empresa_id');
+        $aval('Directa', null, [])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Selecciona el empleador'));
+        $aval('Directa', $temporal, [])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'no es directo'));
+        $aval('Indirecta', $sym, [])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'no es indirecto'));
+        // La requisición es de Servicios y Mercadeo: el directo debe ser S&M, no Servimercadeo.
+        $aval('Directa', $servimercadeo, ['nomina@servi.co'])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Servicios y Mercadeo'));
+        // Los correos deben ser contactos del empleador elegido.
+        $aval('Directa', $sym, ['nomina@servi.co'])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'contactos'));
+        Mail::assertNothingSent();
 
-        $req = $this->requisicion(['empresa_id' => $sym, 'empleador_id' => $temporal]);
+        $aval('Directa', $sym, ['nomina@sym.co'])->assertOk();
+        $this->assertSame($sym, (int) $c->fresh()->empleador_id);
+        Mail::assertSent(\App\Mail\AvalContratacionMail::class, fn ($m) => $m->hasTo('nomina@sym.co'));
 
-        // Al editar se valida contra lo ya guardado: cambiar solo el empleador también se bloquea.
-        $this->putJson("/api/requisiciones/{$req['id']}", ['empleador_id' => $servimercadeo])
-            ->assertStatus(422)->assertJsonValidationErrors('empresa_id');
+        // Sincronizar avales lleva el empleador del candidato a la base de ingresos.
+        $this->postJson('/api/base-ingresos/sync')->assertOk();
+        $this->assertSame('S&M SERVICIOS Y MERCADEO', \App\Models\BaseIngreso::where('candidato_id', $c->id)->value('empleador'));
+
+        // Quitar el aval borra el empleador elegido.
+        $this->putJson("/api/candidatos/{$c->id}", ['aval' => false])->assertOk();
+        $this->assertNull($c->fresh()->empleador_id);
+    }
+
+    public function test_aval_indirecto_con_empleador_temporal(): void
+    {
+        $this->actuarComo('th');
+        $req = $this->requisicion(['empresa_id' => $this->empresa('Servimercadeo COL')]);
+        $c = $this->candidato(['requisicion_id' => $req['id'], 'pruebas' => true]);
+        $this->subirDocumentos($c);
+        $temporal = $this->nuevoEmpleador('JOB AND TALENT', 'Indirecto', ['rrhh@job.co']);
+
+        $this->putJson("/api/candidatos/{$c->id}", [
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000,
+            'tipo_vinculacion' => 'Indirecta', 'empleador_id' => $temporal, 'correos_aval' => ['rrhh@job.co'],
+        ])->assertOk();
+
+        $this->assertSame($temporal, (int) $c->fresh()->empleador_id);
     }
 
     public function test_requisicion_exige_sede_y_regional(): void
@@ -224,7 +282,7 @@ class RequisicionesYCandidatosTest extends TestCase
             $this->subirDocumentos($c);
 
             return [$c, $this->putJson("/api/candidatos/{$c->id}", [
-                'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+                'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa', 'empleador_id' => $this->empleadorId(),
                 'correos_aval' => [],
             ])];
         };
@@ -268,10 +326,50 @@ class RequisicionesYCandidatosTest extends TestCase
 
     private function registro(array $extra = []): array
     {
+        // Cada cédula con su propio celular (no se puede repetir entre personas).
+        $documento = $extra['documento'] ?? '1234567';
+
         return array_merge([
-            'documento' => '1234567', 'nombres' => 'juan', 'apellidos' => 'perez', 'edad' => 25, 'genero' => 'Masculino',
-            'fecha_expedicion' => '2015-05-05', 'ciudad_id' => $this->ciudadId(), 'celular' => '3001112233', 'correo' => 'juan@test.co',
+            'documento' => $documento, 'nombres' => 'juan', 'apellidos' => 'perez', 'edad' => 25, 'genero' => 'Masculino',
+            'fecha_expedicion' => '2015-05-05', 'ciudad_id' => $this->ciudadId(),
+            'celular' => '300' . str_pad(substr($documento, -7), 7, '0', STR_PAD_LEFT), 'correo' => 'juan@test.co',
         ], $extra);
+    }
+
+    public function test_el_celular_no_se_puede_repetir_entre_personas(): void
+    {
+        $this->postJson('/api/candidatos/registro', $this->registro(['celular' => '3217085555']))->assertCreated();
+
+        // Mismo número con indicativo y espacios: es el mismo.
+        $this->postJson('/api/candidatos/registro', $this->registro([
+            'documento' => '7654321', 'correo' => 'otra@test.co', 'celular' => '+57 321 708 5555',
+        ]))->assertStatus(422)->assertJsonValidationErrors('celular');
+
+        // También contra empleados.
+        $this->usuario('general', ['cedula' => '5550001', 'movil' => '3104445566']);
+        $this->postJson('/api/candidatos/registro', $this->registro([
+            'documento' => '7654321', 'correo' => 'otra@test.co', 'celular' => '3104445566',
+        ]))->assertStatus(422)->assertJsonValidationErrors('celular');
+
+        // En vivo, en el paso 2 del formulario.
+        $this->postJson('/api/registro/validar-identidad', ['documento' => '7654321', 'celular' => '3217085555'])
+            ->assertOk()->assertJsonStructure(['errors' => ['celular']]);
+        // Los rellenos no cuentan.
+        $this->usuario('general', ['cedula' => '5550002', 'movil' => '0000000000']);
+        $this->postJson('/api/registro/validar-identidad', ['documento' => '7654321', 'celular' => '0000000000'])
+            ->assertOk()->assertJsonPath('errors', []);
+    }
+
+    public function test_la_cedula_de_un_empleado_activo_no_se_registra_como_candidato(): void
+    {
+        $this->usuario('general', ['cedula' => '7654321', 'activo' => true, 'estado_empleado' => 'Activo']);
+        $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654321', 'correo' => 'otra@test.co']))
+            ->assertStatus(422)->assertJsonValidationErrors('documento');
+
+        // Un empleado inactivo sí puede volver a postularse (reingreso).
+        $this->usuario('general', ['cedula' => '7654322', 'activo' => true, 'estado_empleado' => 'Inactivo']);
+        $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654322', 'correo' => 'reingreso@test.co']))
+            ->assertCreated();
     }
 
     public function test_registro_publico_de_candidato_no_requiere_sesion_y_queda_en_entrevista_sin_aval(): void
@@ -325,6 +423,51 @@ class RequisicionesYCandidatosTest extends TestCase
         // Otra cédula y otro correo: se registra.
         $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654321', 'correo' => 'otra@test.co']))
             ->assertCreated();
+    }
+
+    public function test_el_correo_repetido_se_detecta_sin_importar_mayusculas_ni_espacios(): void
+    {
+        $this->postJson('/api/candidatos/registro', $this->registro(['correo' => '  Ana.Ruiz@Test.CO ']))->assertCreated();
+        $this->assertDatabaseHas('candidatos', ['correo' => 'ana.ruiz@test.co']);
+
+        $this->postJson('/api/candidatos/registro', $this->registro(['documento' => '7654321', 'correo' => 'ANA.RUIZ@test.co']))
+            ->assertStatus(422)->assertJsonValidationErrors('correo');
+    }
+
+    public function test_el_formulario_valida_cedula_y_correo_en_el_mismo_paso(): void
+    {
+        $this->postJson('/api/candidatos/registro', $this->registro())->assertCreated();
+        $registrado = $this->registro();
+
+        // Paso 1: cédula ya registrada.
+        $this->postJson('/api/registro/validar-identidad', ['documento' => $registrado['documento']])
+            ->assertOk()->assertJsonStructure(['errors' => ['documento']]);
+        // Paso 2: correo de otra persona.
+        $this->postJson('/api/registro/validar-identidad', ['documento' => '7654321', 'correo' => $registrado['correo']])
+            ->assertOk()->assertJsonPath('errors.correo', fn ($m) => str_contains($m, 'ya está registrado'));
+        // Datos libres: sin errores.
+        $this->postJson('/api/registro/validar-identidad', ['documento' => '7654321', 'correo' => 'libre@test.co'])
+            ->assertOk()->assertJsonPath('errors', []);
+    }
+
+    public function test_un_candidato_no_puede_usar_el_correo_de_un_usuario_sin_cedula(): void
+    {
+        $this->usuario('admin', ['email' => 'jefe@test.co', 'cedula' => null]);
+
+        $this->postJson('/api/candidatos/registro', $this->registro(['correo' => 'jefe@test.co']))
+            ->assertStatus(422)->assertJsonValidationErrors('correo');
+    }
+
+    public function test_avales_no_aceptan_el_correo_de_otra_persona(): void
+    {
+        $this->actuarComo('th');
+        $this->postJson('/api/candidatos/registro', $this->registro())->assertCreated();
+        $ingreso = \App\Models\BaseIngreso::create(['documento_identificacion' => '7654321', 'nombre_completo' => 'OTRA PERSONA', 'correo' => 'otra@test.co']);
+
+        $this->putJson("/api/base-ingresos/{$ingreso->id}", ['correo' => $this->registro()['correo']])
+            ->assertStatus(422)->assertJsonValidationErrors('correo');
+        $this->putJson("/api/base-ingresos/{$ingreso->id}", ['correo' => 'Otra.Nueva@test.co'])->assertOk();
+        $this->assertSame('otra.nueva@test.co', $ingreso->fresh()->correo);
     }
 
     public function test_catalogos_del_formulario_publico_incluyen_el_negocio_de_la_requisicion(): void
@@ -394,7 +537,7 @@ class RequisicionesYCandidatosTest extends TestCase
         $this->subirDocumentos($c);
 
         $this->putJson("/api/candidatos/{$c->id}", [
-            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa', 'empleador_id' => $this->empleadorId(),
             'correos_aval' => [],
         ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Entrevista'));
     }
@@ -406,7 +549,7 @@ class RequisicionesYCandidatosTest extends TestCase
         $this->subirDocumentos($c);
 
         $r = $this->putJson("/api/candidatos/{$c->id}", [
-            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa', 'empleador_id' => $this->empleadorId(),
             'correos_aval' => [],
         ]);
         $r->assertOk();
@@ -421,39 +564,11 @@ class RequisicionesYCandidatosTest extends TestCase
         $this->subirDocumentos($c);
 
         $this->putJson("/api/candidatos/{$c->id}", [
-            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
+            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa', 'empleador_id' => $this->empleadorId(),
             'correos_aval' => ['intruso@otro.com'],
-        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'destinatarios'));
+        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'contactos'));
 
         Mail::assertNothingSent();
-    }
-
-    public function test_aval_directo_solo_acepta_contactos_de_empleadores_directos(): void
-    {
-        $this->actuarComo('th');
-        $c = $this->candidato(['pruebas' => true]);
-        $this->subirDocumentos($c);
-
-        $idDirecto = (int) DB::table('empleadores')->max('id') + 1;
-        DB::table('empleadores')->insert([
-            ['id' => $idDirecto, 'nombre' => $this->unico('DIRECTO'), 'tipo' => 'Directo', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => $idDirecto + 1, 'nombre' => $this->unico('INDIRECTO'), 'tipo' => 'Indirecto', 'created_at' => now(), 'updated_at' => now()],
-        ]);
-        DB::table('empleador_contactos')->insert([
-            ['empleador_id' => $idDirecto, 'nombre' => 'Nómina', 'correo' => 'nomina@directo.co', 'created_at' => now(), 'updated_at' => now()],
-            ['empleador_id' => $idDirecto + 1, 'nombre' => 'Temporal', 'correo' => 'contacto@temporal.co', 'created_at' => now(), 'updated_at' => now()],
-        ]);
-        $aval = fn (array $correos) => $this->putJson("/api/candidatos/{$c->id}", [
-            'aval' => true, 'tasa_riesgo_arl' => 'I', 'salario_basico' => 1500000, 'tipo_vinculacion' => 'Directa',
-            'correos_aval' => $correos,
-        ]);
-
-        // Un contacto de un empleador Indirecto no sirve para vinculación Directa.
-        $aval(['contacto@temporal.co'])->assertStatus(422);
-        Mail::assertNothingSent();
-
-        $aval(['nomina@directo.co'])->assertOk();
-        Mail::assertSent(\App\Mail\AvalContratacionMail::class, fn ($m) => $m->hasTo('nomina@directo.co'));
     }
 
     public function test_quitar_el_aval_regresa_al_candidato_a_entrevista(): void

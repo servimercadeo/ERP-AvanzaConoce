@@ -26,7 +26,8 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return response()->json([
-            'user' => Auth::user()->only('id', 'name', 'email', 'rol', 'sede_id'),
+            // Con sus permisos: sin ellos el menú mostraría todo hasta recargar la página.
+            'user' => Auth::user()->datosDeSesion(),
         ]);
     }
 

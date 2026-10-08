@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { SearchableSelect } from "../components/SearchableSelect";
 import SelectBuscable from "../components/SelectBuscable";
+import { EMPRESA_SYM, empresaDesdeApi } from "../utils/empresaProceso";
 
 const EMPTY = {
     documento: "",
@@ -576,6 +577,8 @@ export default function RegistroCandidatosForm() {
     const [proyectos, setProyectos] = useState([]);
     const [catalogosLoading, setCatalogosLoading] = useState(true);
     const [registroEstado, setRegistroEstado] = useState(null);
+    // Empresa de la requisición (S&M o Servimercadeo): la que se nombra en el formulario.
+    const [empresa, setEmpresa] = useState(EMPRESA_SYM);
     
     // Estados para consentimiento de datos y privacidad
     const [consentAccepted, setConsentAccepted] = useState(false);
@@ -598,6 +601,7 @@ export default function RegistroCandidatosForm() {
                     setForm((p) => ({ ...p, negocio: data.negocio }));
                 }
                 setRegistroEstado(data.estado ?? null);
+                setEmpresa(empresaDesdeApi(data.empresa));
             })
             .catch(() => {})
             .finally(() => setCatalogosLoading(false));
@@ -648,19 +652,57 @@ export default function RegistroCandidatosForm() {
         return e;
     };
 
-    const handleNextStep = () => {
-        const stepErrors = validateStep(step);
+    const irAlPrimerError = () =>
+        setTimeout(() => {
+            const firstError = document.querySelector('[data-error="true"]');
+            if (firstError) {
+                firstError.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                });
+            }
+        }, 50);
+
+    // Cédula (paso 1) y correo (paso 2) no pueden ser de otra persona: se revisan en el
+    // servidor en el mismo paso, sin esperar al envío final.
+    const [validandoIdentidad, setValidandoIdentidad] = useState(false);
+    const erroresDeIdentidad = async (stepNum) => {
+        try {
+            const res = await fetch("/api/registro/validar-identidad", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN":
+                        document.querySelector('meta[name="csrf-token"]')?.content ?? "",
+                },
+                body: JSON.stringify({
+                    documento: form.documento.trim(),
+                    correo: stepNum === 2 ? form.correo.trim() : null,
+                    celular: stepNum === 2 ? form.celular.trim() : null,
+                }),
+            });
+            if (!res.ok) return {};
+            const { errors = {} } = await res.json();
+            const delPaso = stepNum === 1 ? ["documento"] : ["celular", "correo"];
+            return Object.fromEntries(
+                delPaso.filter((k) => errors[k]).map((k) => [k, errors[k]]),
+            );
+        } catch {
+            return {}; // Sin conexión: el envío final vuelve a validar.
+        }
+    };
+
+    const handleNextStep = async () => {
+        let stepErrors = validateStep(step);
+        if (Object.keys(stepErrors).length === 0 && (step === 1 || step === 2)) {
+            setValidandoIdentidad(true);
+            stepErrors = await erroresDeIdentidad(step);
+            setValidandoIdentidad(false);
+        }
         if (Object.keys(stepErrors).length > 0) {
             setErrors(stepErrors);
-            setTimeout(() => {
-                const firstError = document.querySelector('[data-error="true"]');
-                if (firstError) {
-                    firstError.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center",
-                    });
-                }
-            }, 50);
+            irAlPrimerError();
             return;
         }
         setErrors({});
@@ -721,6 +763,14 @@ export default function RegistroCandidatosForm() {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
+                // Cédula o correo ya registrados: se marca el campo y se vuelve a su paso.
+                const campos = ["documento", "celular", "correo"].filter((k) => body.errors?.[k]);
+                if (res.status === 422 && campos.length > 0) {
+                    setErrors(Object.fromEntries(campos.map((k) => [k, body.errors[k][0]])));
+                    setStep(body.errors.documento ? 1 : 2);
+                    irAlPrimerError();
+                    return;
+                }
                 throw new Error(body.message ?? "Error del servidor");
             }
             setSubmitted(true);
@@ -802,7 +852,7 @@ export default function RegistroCandidatosForm() {
                     </p>
                     <div style={{ height: 1.5, background: "var(--border, #c5e8e3)", width: "60px", margin: "0 auto 24px" }} />
                     <p style={{ fontSize: "0.85rem", color: "var(--text-muted, #5a7a75)", margin: 0, fontStyle: "italic" }}>
-                        S&amp;M Servicios y Mercadeo S.A.S.
+                        {empresa.nombre}
                     </p>
                 </div>
             </div>
@@ -827,7 +877,7 @@ export default function RegistroCandidatosForm() {
                     </p>
                     <div style={{ height: 1.5, background: "#fde8e8", width: "60px", margin: "0 auto 24px" }} />
                     <p style={{ fontSize: "0.85rem", color: "var(--text-muted, #5a7a75)", margin: 0, fontStyle: "italic" }}>
-                        S&amp;M Servicios y Mercadeo S.A.S.
+                        {empresa.nombre}
                     </p>
                 </div>
                 <style>{`
@@ -924,13 +974,13 @@ export default function RegistroCandidatosForm() {
                 <div className="modal-overlay">
                     <div className="modal-alert-card">
                         <div className="modal-header-brand">
-                            S&amp;M
+                            {empresa.sigla}
                         </div>
                         <h2 style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 800, fontSize: "1.25rem", color: "var(--primary, #1a9b8c)", margin: "0 0 12px", lineHeight: 1.3 }}>
                             Autorización de Tratamiento de Datos
                         </h2>
                         <p style={{ color: "var(--text-muted, #5a7a75)", fontSize: "0.88rem", lineHeight: 1.6, margin: "0 0 20px" }}>
-                            Para iniciar tu postulación en <strong>S&amp;M Servicios y Mercadeo S.A.S.</strong>, es obligatorio revisar y autorizar el tratamiento de tus datos personales, de acuerdo con la Ley 1581 de 2012 y nuestras políticas oficiales.
+                            Para iniciar tu postulación en <strong>{empresa.nombre}</strong>, es obligatorio revisar y autorizar el tratamiento de tus datos personales, de acuerdo con la Ley 1581 de 2012 y nuestras políticas oficiales.
                         </p>
 
                         <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted, #5a7a75)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
@@ -1062,7 +1112,7 @@ export default function RegistroCandidatosForm() {
                                 boxShadow: "0 4px 10px rgba(0,0,0,0.03)",
                             }}
                         >
-                            S&amp;M
+                            {empresa.sigla}
                         </div>
                         <div style={{ flexGrow: 1 }}>
                             <h1
@@ -1107,7 +1157,7 @@ export default function RegistroCandidatosForm() {
                             maxWidth: "640px"
                         }}
                     >
-                        ¡Te damos la bienvenida a S&amp;M Servicios y Mercadeo S.A.S.! Completa este formulario interactivo de selección para registrar tus datos, programar pruebas y continuar en el proceso.
+                        ¡Te damos la bienvenida a {empresa.nombre}! Completa este formulario interactivo de selección para registrar tus datos, programar pruebas y continuar en el proceso.
                     </p>
                 </div>
             </div>
@@ -1371,8 +1421,9 @@ export default function RegistroCandidatosForm() {
                                         type="button"
                                         className="btn-modern-primary"
                                         onClick={handleNextStep}
+                                        disabled={validandoIdentidad}
                                     >
-                                        Continuar
+                                        {validandoIdentidad ? "Validando…" : "Continuar"}
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                             <line x1="5" y1="12" x2="19" y2="12" />
                                             <polyline points="12 5 19 12 12 19" />
@@ -1485,8 +1536,9 @@ export default function RegistroCandidatosForm() {
                                         type="button"
                                         className="btn-modern-primary"
                                         onClick={handleNextStep}
+                                        disabled={validandoIdentidad}
                                     >
-                                        Continuar
+                                        {validandoIdentidad ? "Validando…" : "Continuar"}
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                             <line x1="5" y1="12" x2="19" y2="12" />
                                             <polyline points="12 5 19 12 12 19" />

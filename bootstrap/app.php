@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+            // Acceso según la matriz del módulo Permisos (módulo.submódulo).
+            'permiso' => \App\Http\Middleware\EnsureUserHasPermission::class,
         ]);
         // El contenedor solo es alcanzable a través de Traefik (nunca directo desde
         // internet), así que confiar en cualquier origen es seguro aquí: sin esto, Laravel

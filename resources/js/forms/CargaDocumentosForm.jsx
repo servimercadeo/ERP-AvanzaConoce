@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { EMPRESA_SYM, empresaDesdeApi } from '../utils/empresaProceso';
 
 const FLOW_URL = 'https://251096727969e82c98eb7eaa0a0fc8.e6.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4bb66ac2b8b24182ac8839ce4c0d2e71/triggers/manual/paths/invoke/?api-version=1&tenantId=tId&environmentName=25109672-7969-e82c-98eb-7eaa0a0fc8e6&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=i1FhI0V6l809I8aDprH8YGBMAPwRdWfDsp_NiuW8KXo';
 
@@ -19,7 +20,7 @@ const DOCS_LIST = [
     { id: 'certificados_laborales',   label: 'Certificados Laborales',          tipo: 'CERTIFICADOS_LABORALES',      Icon: IcoCertLaboral, required: true },
     { id: 'certificacion_eps',        label: 'Certificación EPS',               tipo: 'CERTIFICADO_EPS',             Icon: IcoEps,         required: true },
     { id: 'certificacion_pension',    label: 'Certificación Fondo Pensiones',   tipo: 'CERTIFICADO_FONDO_PENSIONES', Icon: IcoPension,     required: true },
-    { id: 'hoja_vida',                label: 'Formato Hoja de Vida S&M',        tipo: 'HOJA_DE_VIDA',                Icon: IcoHojaVida,    required: true },
+    { id: 'hoja_vida',                label: 'Formato Hoja de Vida',            tipo: 'HOJA_DE_VIDA',                Icon: IcoHojaVida,    required: true },
     { id: 'documentos_beneficiarios', label: 'Documentos Beneficiarios',        tipo: 'DOCUMENTOS_BENEFICIARIOS',    Icon: IcoBenef,       required: false },
 ];
 
@@ -369,6 +370,8 @@ export default function CargaDocumentosForm() {
     const [documento, setDocumento]         = useState('');
     const [docError, setDocError]           = useState('');
     const [candidatoInfo, setCandidatoInfo] = useState({ nombre: '', correo: '' });
+    // Empresa de la requisición (S&M o Servimercadeo): la de su formato de hoja de vida.
+    const [empresa, setEmpresa]             = useState(EMPRESA_SYM);
     const [submitting, setSubmitting]       = useState(false);
     const [estados, setEstados] = useState(
         Object.fromEntries(DOCS_LIST.map(d => [d.id, { status: 'idle', name: null, fileObj: null, error: null }]))
@@ -386,6 +389,7 @@ export default function CargaDocumentosForm() {
                     if (data?.documento) {
                         setDocumento(data.documento);
                         setCandidatoInfo({ nombre: data.nombre ?? '', correo: data.correo ?? '' });
+                        setEmpresa(empresaDesdeApi(data.empresa));
                     }
                 })
                 .catch(() => {});
@@ -502,7 +506,7 @@ export default function CargaDocumentosForm() {
 
                 {/* Header */}
                 <div className="cdf-header">
-                    <div className="cdf-logo-badge">S&amp;M</div>
+                    <div className="cdf-logo-badge">{empresa.sigla}</div>
                     <h1>CARGUE DE DOCUMENTOS</h1>
                     <p className="cdf-header-sub">
                         <span className="cdf-dot" />
@@ -557,7 +561,7 @@ export default function CargaDocumentosForm() {
                                 <div className="cdf-card-top">
                                     <span className="cdf-card-emoji"><doc.Icon /></span>
                                     <div className="cdf-card-info">
-                                        <div className="cdf-card-label">{doc.label}</div>
+                                        <div className="cdf-card-label">{doc.id === 'hoja_vida' ? `${doc.label} ${empresa.corto}` : doc.label}</div>
                                         <span className={`cdf-card-badge ${doc.required ? 'cdf-badge-req' : 'cdf-badge-opt'}`}>
                                             {doc.required ? 'OBLIGATORIO' : 'OPCIONAL'}
                                         </span>

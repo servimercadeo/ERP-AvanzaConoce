@@ -267,7 +267,8 @@ export default function BaseIngresoCrud() {
       // desactualizado si luego se reasigna al candidato una requisición distinta.
       proyecto:                 req.proyecto?.nombre || p.proyecto,
       empresa:                  req.empresa?.nombre                    || p.empresa,
-      empleador:                req.empleador?.nombre                  || p.empleador,
+      // Empleador elegido al dar el aval; las requisiciones antiguas lo traían.
+      empleador:                c.empleador?.nombre || req.empleador?.nombre || p.empleador,
       lider_inmediato:          req.responsable                        || p.lider_inmediato,
       tipo_vinculacion:         c.tipo_vinculacion                    || p.tipo_vinculacion,
       fecha_aval:               c.fecha_aval                          || p.fecha_aval,

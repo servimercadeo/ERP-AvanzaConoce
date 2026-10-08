@@ -73,4 +73,94 @@ class PermisosTest extends TestCase
 
         $this->assertSame(1, PermisoDenegado::count());
     }
+
+    // ── Los checks de la matriz controlan el acceso real a los datos (no solo el menú) ──
+
+    /** Guarda la matriz como lo hace el módulo Permisos: quita o agrega denegaciones. */
+    private function guardarMatriz(callable $cambio): void
+    {
+        $this->actuarComo('admin');
+        $filas = PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id'])
+            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id'));
+        $this->putJson('/api/permisos', ['denegados' => $cambio($filas)->values()->all()])->assertOk();
+    }
+
+    private function sin($filas, string $rol, string $modulo, ?string $submodulo = null)
+    {
+        return $filas->reject(fn ($f) => $f['rol'] === $rol && $f['modulo_id'] === $modulo
+            && ($submodulo === null || $f['submodulo_id'] === $submodulo));
+    }
+
+    public function test_activar_administrativo_a_otro_rol_le_da_acceso_a_sus_datos(): void
+    {
+        // Por defecto Operaciones no tiene Administrativo.
+        $this->actuarComo('operaciones');
+        $this->getJson('/api/empleados')->assertForbidden();
+        $this->getJson('/api/requisiciones')->assertForbidden();
+
+        $this->guardarMatriz(fn ($f) => $this->sin($f, 'operaciones', 'administrativo', 'empleados'));
+
+        $this->actuarComo('operaciones');
+        // El menú (que sale de /api/user) ya no se lo oculta.
+        $denegados = collect($this->getJson('/api/user')->assertOk()->json('permisos_denegados'));
+        $this->assertFalse($denegados->contains(fn ($p) => $p['modulo_id'] === 'administrativo' && $p['submodulo_id'] === 'empleados'));
+        $this->assertTrue($denegados->contains(fn ($p) => $p['modulo_id'] === 'administrativo' && $p['submodulo_id'] === 'seleccion'));
+        $this->getJson('/api/empleados')->assertOk();
+        // Solo lo activado: Selección y Contratos siguen cerrados.
+        $this->getJson('/api/requisiciones')->assertForbidden();
+        $this->getJson('/api/contratos')->assertForbidden();
+    }
+
+    public function test_desactivar_un_submodulo_le_cierra_sus_datos_a_ese_rol(): void
+    {
+        $this->actuarComo('th');
+        $this->getJson('/api/requisiciones')->assertOk();
+        $this->getJson('/api/candidatos')->assertOk();
+
+        $this->guardarMatriz(fn ($f) => $f->push(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'seleccion']));
+
+        $this->actuarComo('th');
+        $this->getJson('/api/requisiciones')->assertForbidden();
+        $this->getJson('/api/candidatos')->assertForbidden();
+        // Lo compartido con Administración de Contratos (que sigue activo) se mantiene.
+        $this->getJson('/api/base-ingresos')->assertOk();
+        $this->getJson('/api/contratos')->assertOk();
+        // Otro rol no se ve afectado.
+        $this->actuarComo('tic');
+        $this->getJson('/api/requisiciones')->assertOk();
+    }
+
+    public function test_desactivar_contratos_y_empleados_cierra_esas_apis(): void
+    {
+        $this->guardarMatriz(fn ($f) => $f
+            ->push(['rol' => 'tic', 'modulo_id' => 'administrativo', 'submodulo_id' => 'admin_contratos'])
+            ->push(['rol' => 'tic', 'modulo_id' => 'administrativo', 'submodulo_id' => 'empleados']));
+
+        $this->actuarComo('tic');
+        $this->getJson('/api/contratos')->assertForbidden();
+        $this->getJson('/api/empleados')->assertForbidden();
+        $this->getJson('/api/respuestas-ingresos')->assertForbidden();
+        $this->getJson('/api/requisiciones')->assertOk();
+    }
+
+    public function test_activar_permisos_a_un_rol_le_deja_gestionar_la_matriz_y_no_la_auditoria(): void
+    {
+        $this->guardarMatriz(fn ($f) => $this->sin($f, 'th', 'permisos', 'roles_permisos'));
+
+        $this->actuarComo('th');
+        $this->getJson('/api/permisos')->assertOk();
+        $this->getJson('/api/auditoria')->assertForbidden();
+
+        $this->guardarMatriz(fn ($f) => $this->sin($f, 'th', 'permisos'));
+        $this->actuarComo('th');
+        $this->getJson('/api/auditoria')->assertOk();
+    }
+
+    public function test_admin_siempre_tiene_acceso_aunque_la_matriz_niegue_todo(): void
+    {
+        $this->actuarComo('admin');
+        foreach (['/api/empleados', '/api/contratos', '/api/requisiciones', '/api/permisos', '/api/auditoria'] as $ruta) {
+            $this->getJson($ruta)->assertOk();
+        }
+    }
 }

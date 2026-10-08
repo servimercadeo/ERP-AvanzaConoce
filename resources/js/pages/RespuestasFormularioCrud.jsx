@@ -35,7 +35,7 @@ const DOCS_LIST = [
         label: "Certificación Fondo Pensiones",
         required: true,
     },
-    { id: "hoja_vida", label: "Formato Hoja de Vida S&M", required: true },
+    { id: "hoja_vida", label: "Formato Hoja de Vida", required: true },
     {
         id: "documentos_beneficiarios",
         label: "Documentos Beneficiarios",

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BaseIngreso;
 use App\Services\EmpresaProyectoRules;
+use App\Services\IdentidadUnica;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -29,7 +30,8 @@ class BaseIngresoController extends Controller
         $ingreso->empresa          = $req?->empresa?->nombre;
         $ingreso->proyecto         = $req?->proyecto?->nombre;
         $ingreso->lider_inmediato  = $req?->responsable;
-        $ingreso->empleador        = $req?->empleador?->nombre;
+        // El empleador lo eligió quien dio el aval (Candidatos); las requisiciones antiguas lo traían.
+        $ingreso->empleador        = $c->empleadorNombre() ?: $ingreso->empleador;
 
         return $ingreso;
     }
@@ -41,6 +43,7 @@ class BaseIngresoController extends Controller
             'candidato.requisicion.proyecto',
             'candidato.requisicion.empresa',
             'candidato.requisicion.empleador',
+            'candidato.empleador',
         ]);
 
         if ($request->search) {
@@ -54,6 +57,10 @@ class BaseIngresoController extends Controller
 
         $ingresos = $query->orderBy('created_at', 'desc')->get();
         $ingresos->transform(fn($i) => $this->resolveFromRequisicion($i));
+
+        // Con contrato ya creado el aval no se puede anular (el botón se oculta).
+        $conContrato = BaseIngreso::conContrato($ingresos);
+        $ingresos->each(fn ($i) => $i->setAttribute('tiene_contrato', $conContrato[$i->id] ?? false));
 
         return response()->json($ingresos);
     }
@@ -93,6 +100,12 @@ class BaseIngresoController extends Controller
         if ($msg = EmpresaProyectoRules::validarEmpleador($data['empleador'] ?? null, $data['empresa'] ?? null)) {
             throw ValidationException::withMessages(['empleador' => $msg]);
         }
+        if ($msg = IdentidadUnica::correoDeOtraPersona($data['correo'] ?? null, $data['documento_identificacion'])) {
+            throw ValidationException::withMessages(['correo' => $msg]);
+        }
+        if ($msg = IdentidadUnica::telefonoDeOtraPersona($data['telefono'] ?? null, $data['documento_identificacion'])) {
+            throw ValidationException::withMessages(['telefono' => $msg]);
+        }
 
         $ingreso = BaseIngreso::create($data);
         $ingreso->load([
@@ -100,6 +113,7 @@ class BaseIngresoController extends Controller
             'candidato.requisicion.proyecto',
             'candidato.requisicion.empresa',
             'candidato.requisicion.empleador',
+            'candidato.empleador',
         ]);
 
         if ($ingreso->documento_identificacion) {
@@ -121,6 +135,7 @@ class BaseIngresoController extends Controller
             'candidato.requisicion.proyecto',
             'candidato.requisicion.empresa',
             'candidato.requisicion.empleador',
+            'candidato.empleador',
         ]);
 
         return response()->json($this->resolveFromRequisicion($baseIngreso));
@@ -165,13 +180,33 @@ class BaseIngresoController extends Controller
         if ($msg = EmpresaProyectoRules::validarEmpleador($empleadorFinal, $empresaFinal)) {
             throw ValidationException::withMessages(['empleador' => $msg]);
         }
+        if (array_key_exists('correo', $data) && ($msg = IdentidadUnica::correoDeOtraPersona(
+            $data['correo'], $data['documento_identificacion'] ?? $baseIngreso->documento_identificacion
+        ))) {
+            throw ValidationException::withMessages(['correo' => $msg]);
+        }
+        if (array_key_exists('telefono', $data) && ($msg = IdentidadUnica::telefonoDeOtraPersona(
+            $data['telefono'], $data['documento_identificacion'] ?? $baseIngreso->documento_identificacion
+        ))) {
+            throw ValidationException::withMessages(['telefono' => $msg]);
+        }
 
         $baseIngreso->update($data);
+
+        // El empleador editado en Avales queda también en el candidato, que es de donde lo
+        // toman las demás pantallas.
+        if (array_key_exists('empleador', $data) && $baseIngreso->candidato) {
+            $baseIngreso->candidato->update([
+                'empleador_id' => $data['empleador'] ? \App\Models\Empleador::where('nombre', $data['empleador'])->value('id') : null,
+            ]);
+        }
+
         $baseIngreso->load([
             'candidato.requisicion.cargo',
             'candidato.requisicion.proyecto',
             'candidato.requisicion.empresa',
             'candidato.requisicion.empleador',
+            'candidato.empleador',
         ]);
 
         if ($baseIngreso->documento_identificacion) {
@@ -193,6 +228,12 @@ class BaseIngresoController extends Controller
      */
     public function anular(BaseIngreso $baseIngreso)
     {
+        if ($baseIngreso->tieneContrato()) {
+            return response()->json([
+                'message' => 'Este aval no se puede anular: el empleado ya tiene contrato creado.',
+            ], 422);
+        }
+
         $candidato = $baseIngreso->candidato;
 
         DB::transaction(function () use ($baseIngreso, $candidato) {
@@ -322,7 +363,7 @@ class BaseIngresoController extends Controller
                 'empresa'          => $req && $req->empresa   ? $req->empresa->nombre   : $ingreso->empresa,
                 'proyecto'         => $req && $req->proyecto ? $req->proyecto->nombre : $ingreso->proyecto,
                 'lider_inmediato'  => $req ? ($req->responsable ?? $ingreso->lider_inmediato) : $ingreso->lider_inmediato,
-                'empleador'        => $req && $req->empleador ? $req->empleador->nombre : $ingreso->empleador,
+                'empleador'        => $c->empleadorNombre() ?: $ingreso->empleador,
                 'tipo_vinculacion' => $c->tipo_vinculacion    ?? $ingreso->tipo_vinculacion,
                 'nombre_completo'  => $c->nombres             ?? $ingreso->nombre_completo,
                 'telefono'         => $c->celular             ?? $ingreso->telefono,
@@ -347,7 +388,7 @@ class BaseIngresoController extends Controller
                 'tipo_vinculacion'           => $c->tipo_vinculacion,
                 'lugar_trabajo'              => $c->lugar_trabajo ?: $req?->sede?->nombre,
                 'lider_inmediato'            => $req ? $req->responsable : null,
-                'empleador'                  => $req ? ($req->empleador ? $req->empleador->nombre : null) : null,
+                'empleador'                  => $c->empleadorNombre(),
                 'fecha_programacion_ingreso' => $c->fecha_programacion_ingreso ?? now()->toDateString(),
                 'fecha_correccion'           => $c->fecha_correccion,
                 'estado'                     => 'activa',

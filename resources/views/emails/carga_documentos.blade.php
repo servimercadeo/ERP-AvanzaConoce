@@ -25,7 +25,7 @@
 <body>
     <div class="wrapper">
         <div class="header">
-            <h1>S&amp;M Servicios y Mercadeo S.A.S.</h1>
+            <h1>{{ $empresa['nombre'] }}</h1>
             <p>Proceso de Contratación</p>
         </div>
 
@@ -45,7 +45,7 @@
                     • Certificados laborales<br>
                     • Certificación EPS<br>
                     • Certificación Fondo de Pensiones<br>
-                    • Formato Hoja de Vida S&amp;M (si aplica)
+                    • Formato Hoja de Vida {{ $empresa['corto'] }} (si aplica)
                 </p>
             </div>
 
@@ -65,7 +65,7 @@
 
         <div class="footer">
             <p>
-                Este correo fue enviado por S&amp;M Servicios y Mercadeo S.A.S.<br>
+                Este correo fue enviado por {{ $empresa['nombre'] }}<br>
                 Si tienes dudas, comunícate con el área de Recursos Humanos.<br>
                 No respondas a este correo, es un envío automático.
             </p>

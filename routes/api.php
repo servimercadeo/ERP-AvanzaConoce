@@ -61,8 +61,27 @@ Route::get('/registro/catalogos', function (Request $request) {
         'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
         'negocio'         => $negocio,
         'estado'          => $estado,
+        // Empresa de la requisición: la que se muestra en el formulario (S&M o Servimercadeo).
+        'empresa'         => \App\Services\EmpresaDelProceso::deToken($request->get('token')),
     ]);
 });
+
+// Valida cédula y correo del formulario de registro en el mismo paso en que se escriben
+// (sin esperar al envío final). Mismas reglas que /candidatos/registro.
+Route::post('/registro/validar-identidad', function (Request $request) {
+    $data = $request->validate([
+        'documento' => 'nullable|string|max:30',
+        'correo'    => 'nullable|string|max:160',
+        'celular'   => 'nullable|string|max:30',
+    ]);
+
+    return response()->json(['errors' => array_filter([
+        'documento' => \App\Services\IdentidadUnica::cedulaDeOtroCandidato($data['documento'] ?? null)
+            ?? \App\Services\IdentidadUnica::cedulaDeEmpleadoActivo($data['documento'] ?? null),
+        'correo'    => \App\Services\IdentidadUnica::correoDeOtraPersona($data['correo'] ?? null, $data['documento'] ?? null),
+        'celular'   => \App\Services\IdentidadUnica::telefonoDeOtraPersona($data['celular'] ?? null, $data['documento'] ?? null),
+    ])]);
+})->middleware('throttle:30,1');
 
 // Registro público de candidatos desde el formulario externo
 Route::post('/candidatos/registro', function (Request $request) {
@@ -81,12 +100,17 @@ Route::post('/candidatos/registro', function (Request $request) {
         'token'            => 'nullable|string|max:40',
     ]);
 
-    // Cada persona se registra una sola vez y con su propio correo.
-    if ($msg = \App\Services\IdentidadUnica::cedulaDeOtroCandidato($data['documento'])) {
+    // Cada persona se registra una sola vez, con su propio correo y celular, y sin ser ya un
+    // empleado activo.
+    if ($msg = \App\Services\IdentidadUnica::cedulaDeOtroCandidato($data['documento'])
+        ?? \App\Services\IdentidadUnica::cedulaDeEmpleadoActivo($data['documento'])) {
         throw \Illuminate\Validation\ValidationException::withMessages(['documento' => $msg]);
     }
     if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['correo'], $data['documento'])) {
         throw \Illuminate\Validation\ValidationException::withMessages(['correo' => $msg]);
+    }
+    if ($msg = \App\Services\IdentidadUnica::telefonoDeOtraPersona($data['celular'], $data['documento'])) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['celular' => $msg]);
     }
 
     $requisicionId = null;
@@ -122,7 +146,7 @@ Route::post('/candidatos/registro', function (Request $request) {
         'genero'           => $data['genero'] ?? null,
         'ciudad_id'        => $data['ciudad_id'],
         'celular'          => $data['celular'],
-        'correo'           => $data['correo'],
+        'correo'           => \App\Services\IdentidadUnica::normalizarCorreo($data['correo']),
         'negocio'          => $data['negocio'] ?? null,
         'fuente'           => 'Fase Inicial',
         'fuente_especifica'=> 'Pendiente de Aval',
@@ -208,9 +232,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Preferencias personales de apariencia por usuario
     Route::get('/user/preferences',  [UserPreferenceController::class, 'show']);
     Route::post('/user/preferences', [UserPreferenceController::class, 'update']);
-    // "permisos_denegados" viaja con el usuario para que el frontend arme su propio menú
-    // sin una segunda petición: son las excepciones explícitas (módulo/submódulo) que se
-    // le ocultan a su rol desde el módulo Permisos. "admin" nunca tiene nada denegado.
     // Catálogo simple de personas para asignar (Asignación de Pedidos / Asignación de
     // Inventario): cualquier usuario activo del ERP, sin datos sensibles.
     Route::get('/usuarios-catalogo', function () {
@@ -222,42 +243,38 @@ Route::middleware('auth:sanctum')->group(function () {
         );
     });
 
-    Route::get('/user', function (Request $r) {
-        $u = $r->user();
-        $rol = $u->rol;
-
-        return array_merge(
-            $u->only('id', 'name', 'email', 'rol', 'sede_id'),
-            [
-                'permisos_denegados' => (!$rol || $rol === 'admin')
-                    ? []
-                    : App\Models\PermisoDenegado::where('rol', $rol)->get(['modulo_id', 'submodulo_id']),
-            ]
-        );
-    });
+    // Usuario en sesión con sus "permisos_denegados" (ver User::datosDeSesion).
+    Route::get('/user', fn (Request $r) => $r->user()->datosDeSesion());
 
     // Admin del ERP crea un usuario → se replica en AvanzaConoce
     Route::post('/users', [UserController::class, 'store'])->middleware('role:admin');
 
-    // Módulo Administrativo: solo TIC, Talento Humano y admin.
-    Route::middleware('role:admin,th,tic')->group(function () {
+    // Módulo Administrativo: el acceso sale de la matriz del módulo Permisos (lo mismo que
+    // ve cada rol en el menú). Contratos también lee empleados. Los contratos y empleados
+    // (salarios, datos personales) no se abren a otros módulos aunque los consulten.
+    Route::middleware('permiso:administrativo.empleados')->group(function () {
         // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
         Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
         // Importación masiva de datos personales desde Excel, por cédula (solo rellena
         // campos vacíos, nunca pisa un dato ya existente).
         Route::post('empleados/importar-datos-personales', [EmpleadoController::class, 'importarDatosPersonales']);
-        // CRUD completo de empleados
-        Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas']);
         Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
-        Route::apiResource('empleados', EmpleadoController::class);
+        Route::apiResource('empleados', EmpleadoController::class)->except(['index', 'show']);
+    });
+    Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas'])
+        ->middleware('permiso:administrativo.empleados');
+    Route::apiResource('empleados', EmpleadoController::class)->only(['index', 'show'])
+        ->middleware('permiso:administrativo.empleados,administrativo.admin_contratos');
 
+    Route::middleware('permiso:administrativo.admin_contratos')->group(function () {
         // Rellenar datos faltantes de contratos desde Excel, por documento/cédula (solo
         // rellena campos vacíos, nunca pisa un dato ya existente; nunca crea contratos). Lo usa
         // "Importar Excel" de Contratos para las cédulas que ya tienen contrato.
         Route::post('contratos/importar-datos-faltantes', [ContratoController::class, 'importarDatosFaltantes']);
-        // CRUD completo de contratos
-        Route::apiResource('contratos', ContratoController::class);
+        Route::apiResource('contratos', ContratoController::class)->except(['index', 'show']);
     });
+    Route::apiResource('contratos', ContratoController::class)->only(['index', 'show'])
+        ->middleware('permiso:administrativo.admin_contratos');
 
     // Catálogo de centros de costo (código + nombre), usado para asignar un centro de costo a un contrato.
     // Parametros > Centros de Costos pide el listado completo (incl. inactivos) vía ?all=1.
@@ -428,13 +445,16 @@ Route::middleware('auth:sanctum')->group(function () {
         ->only(['index', 'destroy'])
         ->parameters(['work-orders' => 'workOrder']);
 
-    // Módulo Permisos: qué rol ve qué módulo/submódulo. Solo admin administra la matriz
-    // completa (el resto de usuarios solo recibe lo suyo, ya incluido en /user).
-    Route::middleware('role:admin')->group(function () {
+    // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
+    // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo
+    // suyo, ya incluido en /user).
+    Route::middleware('permiso:permisos.roles_permisos')->group(function () {
         Route::get('permisos', [App\Http\Controllers\Api\PermisoController::class, 'index']);
         Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync']);
+    });
 
-        // Auditoría del Sistema (Permisos > Auditoría): solo admin puede ver el rastro.
+    // Auditoría del Sistema (Permisos > Auditoría).
+    Route::middleware('permiso:permisos.auditoria')->group(function () {
         Route::get('auditoria', [App\Http\Controllers\Api\AuditoriaController::class, 'index']);
         Route::get('auditoria/procesos', [App\Http\Controllers\Api\AuditoriaController::class, 'procesos']);
     });
@@ -507,9 +527,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update']);
     Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle']);
 
-    // Selección, candidatos, base de ingresos y documentos de contratación:
-    // solo TIC, Talento Humano y admin.
-    Route::middleware('role:admin,th,tic')->group(function () {
+    // Selección, candidatos, base de ingresos y documentos de contratación: según la matriz
+    // del módulo Permisos. El grupo pide Selección o Administración de Contratos (lo que
+    // comparten, como la base de ingresos y los catálogos); cada ruta propia de uno solo de
+    // los dos lo pide aparte.
+    Route::middleware('permiso:administrativo.seleccion,administrativo.admin_contratos')->group(function () {
 
     // Sincronizar candidatos avalados y con pruebas a base de ingresos
     Route::post('base-ingresos/sync', [BaseIngresoController::class, 'sync']);
@@ -544,10 +566,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['base-ingresos' => 'baseIngreso']);
 
     // Documentos del Empleado: otrosí, certificados, etc. ligados a un seguimiento de RH
-    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download']);
+    Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download'])->middleware('permiso:administrativo.admin_contratos');
     Route::apiResource('documentos-empleado', App\Http\Controllers\Api\DocumentoEmpleadoController::class)
         ->only(['index', 'store', 'update', 'destroy'])
-        ->parameters(['documentos-empleado' => 'documentoEmpleado']);
+        ->parameters(['documentos-empleado' => 'documentoEmpleado'])
+        ->middleware('permiso:administrativo.admin_contratos');
 
     // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
     Route::get('documentos-contratacion/employee-info', function (Request $request) {
@@ -557,7 +580,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'nombre' => $ingreso?->nombre_completo ?? '',
             'correo' => $ingreso?->correo          ?? '',
         ]);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // Devuelve los documentos médicos ya subidos para una cédula, ligados a un evento (fecha de seguimiento)
     Route::get('documentos-contratacion/docs-medicos', function (Request $request) {
@@ -577,7 +600,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ] : null;
         }
         return response()->json($result);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // Elimina un documento médico específico de una cédula, dentro de un evento (fecha de seguimiento)
     Route::delete('documentos-contratacion/docs-medicos', function (Request $request) {
@@ -599,7 +622,7 @@ Route::middleware('auth:sanctum')->group(function () {
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
         return response()->json(null, 204);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // Notifica al flujo de Power Automate con los documentos médicos recién subidos, incluyendo
     // el contenido en base64 (llamada server-to-server para evitar CORS)
@@ -653,21 +676,23 @@ Route::middleware('auth:sanctum')->group(function () {
         }
 
         return response()->json(null, 204);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
-        ->parameters(['requisiciones' => 'requisicion']);
+        ->parameters(['requisiciones' => 'requisicion'])
+        ->middleware('permiso:administrativo.seleccion');
     Route::get('candidatos/by-doc/{doc}', function ($doc) {
         $c = \App\Models\Candidato::where('identificacion', $doc)->first(['fecha_expedicion']);
         return response()->json($c ? ['fecha_expedicion' => $c->fecha_expedicion] : null);
     });
     Route::apiResource('candidatos', CandidatoController::class)
-        ->parameters(['candidatos' => 'candidato']);
-    Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index']);
-    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store']);
-    Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download']);
-    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy']);
+        ->parameters(['candidatos' => 'candidato'])
+        ->middleware('permiso:administrativo.seleccion');
+    Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index'])->middleware('permiso:administrativo.seleccion');
+    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store'])->middleware('permiso:administrativo.seleccion');
+    Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download'])->middleware('permiso:administrativo.seleccion');
+    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy'])->middleware('permiso:administrativo.seleccion');
 
     // Catálogos para el módulo de selección (cargos, proyectos, responsables, ciudades)
     Route::get('/seleccion/catalogos', function () {
@@ -701,7 +726,7 @@ Route::middleware('auth:sanctum')->group(function () {
         $respuestas->each(fn ($r) => $r->setAttribute('tipo_vinculacion', $tipos[$r->documento] ?? null));
 
         return response()->json($respuestas);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // Datos consolidados para pre-cargar el formulario de creación de contrato.
     // Directos: solo aparecen con los 7 documentos obligatorios subidos.
@@ -711,7 +736,21 @@ Route::middleware('auth:sanctum')->group(function () {
         $metaPath     = storage_path('app/documentos_contratacion.json');
         $meta         = file_exists($metaPath) ? (json_decode(file_get_contents($metaPath), true) ?: []) : [];
 
-        $respuestas = RespuestaIngreso::orderBy('nombres')->get()->filter(function ($resp) use ($meta, $requiredDocs) {
+        $respuestas = RespuestaIngreso::orderBy('nombres')->get();
+
+        // Solo quien tiene aval vigente (los anulados quedan borrados) y todavía no tiene
+        // contrato creado desde ese aval.
+        $avales = BaseIngreso::whereIn('documento_identificacion', $respuestas->pluck('documento')->filter()->unique()->values())
+            ->orderBy('created_at')->orderBy('id')
+            ->get()
+            ->keyBy('documento_identificacion');
+        $conContrato = BaseIngreso::conContrato($avales->values());
+
+        $respuestas = $respuestas->filter(function ($resp) use ($meta, $requiredDocs, $avales, $conContrato) {
+            $aval = $avales->get($resp->documento);
+            if (!$aval || ($conContrato[$aval->id] ?? false)) {
+                return false;
+            }
             if (BaseIngreso::esIndirecta($resp->documento)) {
                 return true;
             }
@@ -729,6 +768,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'requisicion.proyecto',
                 'requisicion.empresa',
                 'requisicion.empleador',
+                'empleador',
             ])->where('identificacion', $resp->documento)
                 ->orderByDesc('aval')->latest()->first();
 
@@ -782,7 +822,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'cargo'                    => $req?->cargo?->nombre,
                 'empresa'                  => $req?->empresa?->nombre,
                 'cliente_proyecto'         => $req?->proyecto?->nombre,
-                'empleador'                => $ingreso?->empleador ?: $req?->empleador?->nombre,
+                'empleador'                => $ingreso?->empleador ?: $candidato?->empleadorNombre(),
                 'jefe_inmediato'           => $ingreso?->lider_inmediato ?: $req?->responsable,
                 'area_empresa'             => $areaPorProceso[mb_strtoupper((string) $req?->proceso)] ?? null,
                 'requisicion'              => $req?->nro_identificacion_proceso,
@@ -795,7 +835,7 @@ Route::middleware('auth:sanctum')->group(function () {
                     : null,
             ];
         });
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     // Documentos de contratación por candidato (admin)
     Route::get('/documentos-contratacion/{documento}', function ($documento) {
@@ -803,7 +843,7 @@ Route::middleware('auth:sanctum')->group(function () {
         if (!file_exists($metaPath)) return response()->json(null);
         $meta = json_decode(file_get_contents($metaPath), true) ?: [];
         return response()->json($meta[$documento] ?? null);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     Route::get('/documentos-contratacion/{documento}/{tipo}/download', function ($documento, $tipo, Request $request) {
         $metaPath = storage_path('app/documentos_contratacion.json');
@@ -819,7 +859,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ]);
         }
         return response()->download($filePath, $archivo['nombre_original']);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     Route::delete('/documentos-contratacion/{documento}/{tipo}', function ($documento, $tipo) {
         $metaPath = storage_path('app/documentos_contratacion.json');
@@ -832,7 +872,7 @@ Route::middleware('auth:sanctum')->group(function () {
         unset($meta[$documento]['archivos'][$tipo]);
         file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         return response()->json(null, 204);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
     Route::delete('/respuestas-ingresos/{id}', function ($id) {
         $respuesta = RespuestaIngreso::find($id);
@@ -841,9 +881,9 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $respuesta->delete();
         return response()->json(null, 204);
-    });
+    })->middleware('permiso:administrativo.admin_contratos');
 
-    }); // fin role:admin,th,tic
+    }); // fin Selección / Administración de Contratos
 });
 
 // Resuelve el token cifrado del link de carga de documentos
@@ -855,6 +895,7 @@ Route::get('/carga-documentos/resolve-token', function (Request $request) {
             'documento' => $documento,
             'nombre'    => $ingreso?->nombre_completo ?? '',
             'correo'    => $ingreso?->correo ?? '',
+            'empresa'   => \App\Services\EmpresaDelProceso::deCedula($documento),
         ]);
     } catch (\Exception) {
         return response()->json(['error' => 'Token inválido.'], 400);
@@ -912,7 +953,7 @@ Route::post('/documentos-contratacion/upload', function (Request $request) {
         if ($ingreso && $ingreso->correo) {
             try {
                 $primerNombre = explode(' ', trim($ingreso->nombre_completo))[0] ?? $ingreso->nombre_completo;
-                Mail::to($ingreso->correo)->send(new DocumentosCompletadosMail($primerNombre));
+                Mail::to($ingreso->correo)->send(new DocumentosCompletadosMail($primerNombre, $documento));
                 $meta[$documento]['email_completado_enviado'] = true;
                 file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             } catch (\Exception $e) {
@@ -942,6 +983,7 @@ Route::get('/registro-nuevos-ingresos/prefill', function (Request $request) {
             'correo'    => $ingreso->correo ?? '',
             'celular'   => $ingreso->telefono ?? '',
             'ciudad'    => strtoupper($ingreso->ciudad ?? ''),
+            'empresa'   => \App\Services\EmpresaDelProceso::deCedula($cedula),
         ]);
     } catch (\Exception) {
         return response()->json(null, 400);
@@ -979,9 +1021,13 @@ Route::post('/registro-nuevos-ingresos/submit', function (Request $request) {
         'fotografia'              => 'nullable|image|max:5120',
     ]);
 
-    // El correo no puede ser de otra persona (reenviar el formulario con la misma cédula sí).
+    // El correo y el celular no pueden ser de otra persona (reenviar el formulario con la
+    // misma cédula sí).
     if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['correo'], $data['documento'])) {
         throw \Illuminate\Validation\ValidationException::withMessages(['correo' => $msg]);
+    }
+    if ($msg = \App\Services\IdentidadUnica::telefonoDeOtraPersona($data['celular'], $data['documento'])) {
+        throw \Illuminate\Validation\ValidationException::withMessages(['celular' => $msg]);
     }
 
     if ($request->hasFile('fotografia')) {

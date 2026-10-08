@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
+import { EMPRESA_SYM, empresaDesdeApi } from "../utils/empresaProceso";
 
 const HIJOS_OPTS = ["0", "1", "2", "3", "4", "5", "6"];
 const ESCOLARIDAD_OPTS = ["PREESCOLAR", "PRIMARIA", "SECUNDARIA", "TECNICO", "TECNOLOGO", "PROFESIONAL", "POSGRADO"];
@@ -460,6 +461,8 @@ export default function RegistroNuevosIngresosForm() {
     const [consentChecked, setConsentChecked] = useState(false);
     const [consentDeclined, setConsentDeclined] = useState(false);
     const [prefillLoading, setPrefillLoading] = useState(false);
+    // Empresa de la requisición (S&M o Servimercadeo): la que se nombra en el formulario.
+    const [empresa, setEmpresa] = useState(EMPRESA_SYM);
     const [ciudades, setCiudades] = useState([]);
     const [epsOpts, setEpsOpts] = useState([]);
     const [fondosOpts, setFondosOpts] = useState([]);
@@ -497,6 +500,7 @@ export default function RegistroNuevosIngresosForm() {
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (!data) return;
+                setEmpresa(empresaDesdeApi(data.empresa));
                 setForm(prev => ({
                     ...prev,
                     documento: data.documento || prev.documento,
@@ -627,7 +631,7 @@ export default function RegistroNuevosIngresosForm() {
                         Tus datos han sido registrados exitosamente. Nos pondremos en contacto contigo pronto para continuar con el proceso de contratación.
                     </p>
                     <div style={{ height: 1.5, background: "var(--border)", width: 60, margin: "0 auto 24px" }} />
-                    <p style={{ fontSize: "0.83rem", color: "var(--text-muted)", fontStyle: "italic", margin: 0 }}>S&amp;M Servicios y Mercadeo S.A.S.</p>
+                    <p style={{ fontSize: "0.83rem", color: "var(--text-muted)", fontStyle: "italic", margin: 0 }}>{empresa.nombre}</p>
                 </div>
             </div>
         );
@@ -655,7 +659,7 @@ export default function RegistroNuevosIngresosForm() {
                 {/* ── Header ── */}
                 <div className="rni-header">
                     <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 18, position: "relative", zIndex: 1 }}>
-                        <div className="rni-logo-badge">S&amp;M</div>
+                        <div className="rni-logo-badge">{empresa.sigla}</div>
                         <div>
                             <h1 style={{ fontFamily: "'Poppins',sans-serif", fontWeight: 800, fontSize: "1.35rem", margin: "0 0 6px", letterSpacing: "0.03em" }}>
                                 REGISTRO DE NUEVOS INGRESOS
@@ -669,7 +673,7 @@ export default function RegistroNuevosIngresosForm() {
                         </div>
                     </div>
                     <p style={{ margin: 0, fontSize: "0.88rem", opacity: 0.88, lineHeight: 1.65, fontFamily: "'Nunito',sans-serif", position: "relative", zIndex: 1 }}>
-                        ¡Te damos la bienvenida a S&amp;M Servicios y Mercadeo S.A.S.! Completa este formulario para registrar tus datos y continuar en el proceso. Asegúrate de diligenciarlo <strong>sin errores</strong>.
+                        ¡Te damos la bienvenida a {empresa.nombre}! Completa este formulario para registrar tus datos y continuar en el proceso. Asegúrate de diligenciarlo <strong>sin errores</strong>.
                     </p>
                 </div>
 
@@ -711,14 +715,14 @@ export default function RegistroNuevosIngresosForm() {
                                 </h3>
                             </div>
                             <p style={{ fontSize: "0.88rem", lineHeight: 1.75, color: "var(--text-muted)", marginBottom: 22 }}>
-                                En cumplimiento de la Ley Estatutaria 1581 de 2012, S&amp;M Servicios y Mercadeo S.A.S. informa que los datos aportados en este formulario serán tratados de forma segura con fines exclusivos de selección y vinculación laboral. Sus datos no serán cedidos a terceros sin su previo consentimiento.
+                                En cumplimiento de la Ley Estatutaria 1581 de 2012, {empresa.nombre} informa que los datos aportados en este formulario serán tratados de forma segura con fines exclusivos de selección y vinculación laboral. Sus datos no serán cedidos a terceros sin su previo consentimiento.
                             </p>
                             <div className="rni-consent-box">
                                 <div className={`rni-checkbox ${consentChecked ? "checked" : ""}`} onClick={() => setConsentChecked(!consentChecked)}>
                                     {consentChecked && <IcoCheck />}
                                 </div>
                                 <div style={{ fontSize: "0.84rem", lineHeight: 1.65, color: "var(--text)", fontWeight: 600 }}>
-                                    Autorizo de manera libre y expresa a S&amp;M Servicios y Mercadeo S.A.S. para el tratamiento de mis datos personales de acuerdo con las finalidades descritas.
+                                    Autorizo de manera libre y expresa a {empresa.nombre} para el tratamiento de mis datos personales de acuerdo con las finalidades descritas.
                                 </div>
                             </div>
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 14 }}>

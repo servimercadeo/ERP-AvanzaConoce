@@ -33,6 +33,12 @@ class BaseIngreso extends Model
         'alerta_enviada'             => 'boolean',
     ];
 
+    /** Correo en minúsculas y sin espacios (ver IdentidadUnica). */
+    public function setCorreoAttribute($value): void
+    {
+        $this->attributes['correo'] = $value === null ? null : \App\Services\IdentidadUnica::normalizarCorreo($value);
+    }
+
     public function candidato()
     {
         return $this->belongsTo(Candidato::class);
@@ -76,6 +82,38 @@ class BaseIngreso extends Model
         }
 
         return $tipos;
+    }
+
+    /**
+     * Ingresos (de la colección) a los que ya se les creó contrato: un contrato del
+     * empleado con esa cédula creado desde el aval. Los contratos anteriores al aval
+     * (un reingreso) no cuentan.
+     *
+     * @param  iterable<BaseIngreso>  $ingresos
+     * @return array<int, bool>  id del ingreso => tiene contrato
+     */
+    public static function conContrato(iterable $ingresos): array
+    {
+        $ingresos = collect($ingresos);
+        $cedulas = $ingresos->pluck('documento_identificacion')->filter()->map(fn ($c) => (string) $c)->unique()->values();
+
+        $ultimoContrato = $cedulas->isEmpty() ? collect() : Contrato::query()
+            ->join('users', 'contratos.empleado_id', '=', 'users.id')
+            ->whereIn('users.cedula', $cedulas)
+            ->groupBy('users.cedula')
+            ->selectRaw('users.cedula, MAX(contratos.created_at) as ultimo')
+            ->pluck('ultimo', 'users.cedula');
+
+        return $ingresos->mapWithKeys(function (BaseIngreso $i) use ($ultimoContrato) {
+            $ultimo = $ultimoContrato->get((string) $i->documento_identificacion);
+
+            return [$i->id => $ultimo !== null && (!$i->created_at || $ultimo >= $i->created_at->toDateTimeString())];
+        })->all();
+    }
+
+    public function tieneContrato(): bool
+    {
+        return static::conContrato([$this])[$this->id] ?? false;
     }
 
     /**
