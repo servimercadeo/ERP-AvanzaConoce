@@ -159,8 +159,72 @@ class EmpleadosTest extends TestCase
         $this->getJson('/api/empleados')->assertOk()->assertJsonFragment(['id' => $id]);
         $this->getJson("/api/empleados/$id")->assertOk()->assertJsonPath('cedula', '4001');
         $this->putJson("/api/empleados/$id", $this->payload(['sede' => 'OTRA SEDE']))->assertOk();
-        $this->deleteJson("/api/empleados/$id")->assertNoContent();
+        $this->deleteJson("/api/empleados/$id")->assertOk()->assertJsonPath('message', 'Empleado eliminado por completo.');
         $this->assertDatabaseMissing('users', ['id' => $id]);
+    }
+
+    public function test_eliminar_un_empleado_lo_borra_por_completo_y_devuelve_el_inventario(): void
+    {
+        $emp = $this->usuario('general', ['cedula' => '4500']);
+        $contrato = \App\Models\Contrato::create(['empleado_id' => $emp->id, 'cargo' => 'ASESOR', 'estado_contrato' => 'Activo']);
+
+        // Dotación en proceso (ya descontada del inventario).
+        $camisa = \App\Models\InventarioDotacion::create([
+            'proyecto' => 'SYM TIGO HOME', 'prenda' => 'CAMISA', 'genero' => 'Masculino', 'talla' => 'M',
+            'precio' => 1000, 'cantidad' => 10, 'stock_minimo' => 0,
+        ]);
+        $pedido = \App\Models\PedidoAutomatico::create(['codigo' => '90001', 'contrato_id' => $contrato->id, 'empleado_id' => $emp->id, 'estado' => 'Activo']);
+        $pedido->asignarItems([['inventario_dotacion_id' => $camisa->id, 'cantidad' => 3]]);
+        $this->assertSame(7, $camisa->fresh()->cantidad);
+
+        // Equipo asignado sin devolver.
+        $equipo = $this->inventario($this->tipoProducto(), $this->sede(), 4);
+        $equipo->decrement('cantidad');
+        \App\Models\AsignacionInventario::create([
+            'inventario_producto_id' => $equipo->id, 'user_id' => $emp->id, 'cantidad' => 1, 'fecha_asignacion' => now()->toDateString(),
+        ]);
+
+        // Su proceso de selección.
+        $req = \App\Models\Requisicion::create([
+            'nro_identificacion_proceso' => $this->unico('PROC'), 'nro_identificacion' => $this->unico('REQ'),
+            'fecha_solicitud' => '2026-10-01', 'requeridas' => 1, 'estado' => 'Completada',
+        ]);
+        $cand = \App\Models\Candidato::create([
+            'nombres' => 'X', 'identificacion' => '4500', 'correo' => 'x4500@test.co', 'fecha_postulacion' => '2026-10-01',
+            'requisicion_id' => $req->id, 'pruebas' => true, 'aval' => true,
+        ]);
+        \App\Models\BaseIngreso::create(['candidato_id' => $cand->id, 'documento_identificacion' => '4500', 'nombre_completo' => 'X']);
+        RespuestaIngreso::create([
+            'documento' => '4500', 'nombres' => 'X', 'apellidos' => 'Y', 'fecha_nacimiento' => '1990-01-01', 'lugar_nacimiento' => 'P',
+            'estado_civil' => 'S', 'numero_hijos' => '0', 'rh' => 'O+', 'nivel_escolaridad' => 'B', 'profesion' => 'N', 'ciudad' => 'P',
+            'barrio' => 'C', 'direccion' => 'D', 'estrato' => '3', 'correo' => 'x4500@test.co', 'celular' => '3004500000', 'emergencia_nombre' => 'E',
+            'emergencia_telefono' => '300', 'emergencia_parentesco' => 'P', 'eps' => 'E', 'afp' => 'A',
+            'talla_camisa' => 'S', 'talla_pantalon' => '28', 'talla_zapatos' => '38',
+        ]);
+
+        $this->deleteJson("/api/empleados/{$emp->id}")->assertOk()
+            ->assertJsonPath('eliminado.contratos', 1)->assertJsonPath('eliminado.pedidos_dotacion', 1)
+            ->assertJsonPath('eliminado.candidatos', 1);
+
+        $this->assertDatabaseMissing('users', ['id' => $emp->id]);
+        $this->assertDatabaseMissing('contratos', ['id' => $contrato->id]);
+        $this->assertDatabaseMissing('pedidos_automaticos', ['id' => $pedido->id]);
+        $this->assertDatabaseMissing('asignaciones_inventario', ['user_id' => $emp->id]);
+        $this->assertDatabaseMissing('candidatos', ['identificacion' => '4500']);
+        $this->assertDatabaseMissing('base_ingresos', ['documento_identificacion' => '4500']);
+        $this->assertDatabaseMissing('respuestas_ingresos', ['documento' => '4500']);
+        // Lo que tenía vuelve al inventario y la vacante se libera.
+        $this->assertSame(10, $camisa->fresh()->cantidad);
+        $this->assertSame(4, $equipo->fresh()->cantidad);
+        $this->assertNotSame('Completada', $req->fresh()->estado);
+    }
+
+    public function test_nadie_puede_eliminarse_a_si_mismo(): void
+    {
+        $yo = $this->actuarComo('admin', ['cedula' => '4600']);
+
+        $this->deleteJson("/api/empleados/{$yo->id}")->assertStatus(422);
+        $this->assertDatabaseHas('users', ['id' => $yo->id]);
     }
 
     public function test_actualizar_tallas_tambien_actualiza_las_respuestas_del_formulario(): void

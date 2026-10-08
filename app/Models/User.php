@@ -135,6 +135,12 @@ class User extends Authenticatable
      */
     protected static function booted(): void
     {
+        // Sus contratos se borran en cascada en la base (sin eventos de Contrato): sus
+        // pedidos de dotación no entregados se anulan antes, mientras aún se le encuentran.
+        static::deleting(function (User $user) {
+            PedidoAutomatico::anularSinContrato($user->id, aunqueTengaContrato: true);
+        });
+
         // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
         // (th/tic) a quien todavía no tiene rol asignado; nunca cambia ni quita uno elegido.
         static::saving(function (User $user) {

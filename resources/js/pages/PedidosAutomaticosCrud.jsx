@@ -64,6 +64,19 @@ const proyectoInventarioDe = (nombreProyecto) =>
         ? (PROYECTO_A_INVENTARIO[nombreProyecto] ?? "SYM ADMINISTRATIVO")
         : null;
 
+// Contrato vigente del empleado: el activo más reciente (si no hay activo, el más reciente).
+// De él salen el proyecto y la sede de la dotación que se le puede asignar.
+const contratoVigenteDe = (contratos, empleadoId) => {
+    const suyos = contratos.filter((c) => String(c.empleado_id) === String(empleadoId));
+    const reciente = (a, b) =>
+        String(b.fecha_ingreso ?? "").localeCompare(String(a.fecha_ingreso ?? "")) || (b.id ?? 0) - (a.id ?? 0);
+    return (
+        suyos.filter((c) => c.estado_contrato === "Activo").sort(reciente)[0] ??
+        suyos.sort(reciente)[0] ??
+        null
+    );
+};
+
 const EMPTY_FORM = {
     empleado_id: "",
     contrato_id: "",
@@ -291,6 +304,7 @@ function InventarioItemSelect({
     generoEmpleado,
     tallasEmpleado,
     proyecto,
+    sedeId,
 }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
@@ -302,9 +316,14 @@ function InventarioItemSelect({
 
     const filtered = useMemo(() => {
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        let base = inventarioFlat.filter((i) => i.cantidad > 0);
+        // Sin proyecto (empleado sin contrato) no se ofrece nada: nunca la dotación de todos.
+        if (!proyecto) return [];
+        let base = inventarioFlat.filter((i) => i.cantidad > 0 && i.proyecto === proyecto);
 
-        if (proyecto) base = base.filter((i) => i.proyecto === proyecto);
+        // Género del empleado ("Otro" o sin registrar: ambos).
+        if (generoEmpleado && ["masculino", "femenino"].includes(generoEmpleado.toLowerCase())) {
+            base = base.filter((i) => i.genero?.toLowerCase() === generoEmpleado.toLowerCase());
+        }
 
         // Filtro talla: para cada ítem, buscar la talla que le corresponde según la prenda
         if (tallasEmpleado) {
@@ -315,14 +334,19 @@ function InventarioItemSelect({
             });
         }
 
+        // La sede del contrato primero; la misma prenda en otras sedes queda después.
+        base = [...base].sort(
+            (a, b) => (String(b.sede_id) === String(sedeId)) - (String(a.sede_id) === String(sedeId)),
+        );
+
         if (!words.length) return base.slice(0, 80);
         return base
             .filter((i) => {
-                const txt = `${i.prenda} ${i.genero} ${i.talla}`.toLowerCase();
+                const txt = `${i.prenda} ${i.genero} ${i.talla} ${i.sede_nombre ?? ""}`.toLowerCase();
                 return words.every((w) => txt.includes(w));
             })
             .slice(0, 80);
-    }, [query, inventarioFlat, generoEmpleado, tallasEmpleado]);
+    }, [query, inventarioFlat, generoEmpleado, tallasEmpleado, proyecto, sedeId]);
 
     useEffect(() => {
         const h = (e) => {
@@ -344,7 +368,8 @@ function InventarioItemSelect({
     };
 
     const label = selected
-        ? `${selected.prenda} · ${selected.genero} · T:${selected.talla} (${selected.cantidad} disp.)`
+        ? `${selected.prenda} · ${selected.genero} · T:${selected.talla}` +
+          `${selected.sede_nombre ? ` · ${selected.sede_nombre}` : ""} (${selected.cantidad} disp.)`
         : "";
 
     const dropdown =
@@ -371,7 +396,7 @@ function InventarioItemSelect({
                     <div style={{ ...S.dropdownEmpty, padding: '14px 16px', lineHeight: 1.5 }}>
                         {proyecto
                             ? <>Sin dotación para <strong>{proyecto}</strong>. Agrega items en <em>Inventario de dotación</em>.</>
-                            : 'Sin stock disponible'}
+                            : 'El empleado no tiene contrato, o su contrato no tiene proyecto asignado (revísalo en Contratos): no se le puede asignar dotación.'}
                     </div>
                 ) : (
                     filtered.map((i) => (
@@ -410,6 +435,7 @@ function InventarioItemSelect({
                                 }}
                             >
                                 {i.genero} · T:{i.talla}
+                                {i.sede_nombre ? ` · ${i.sede_nombre}` : ""}
                             </span>
                             <span
                                 style={{
@@ -629,8 +655,12 @@ function Modal({
         (c) => String(c.empleado_id) === String(form.empleado_id),
     );
 
-    const proyectoEmpleado = contratosFiltrados[0]?.cliente_proyecto ?? null;
+    const contratoPedido =
+        contratosFiltrados.find((c) => String(c.id) === String(form.contrato_id)) ??
+        contratoVigenteDe(contratos, form.empleado_id);
+    const proyectoEmpleado = contratoPedido?.cliente_proyecto ?? null;
     const proyectoInventarioEmpleado = proyectoInventarioDe(proyectoEmpleado);
+    const sedeContratoId = contratoPedido?.sede_id ?? null;
 
     const generoEmpleado = useMemo(() => {
         const emp = empleados.find(
@@ -723,11 +753,7 @@ function Modal({
                                         empleados={empleados}
                                         value={form.empleado_id}
                                         onChange={async (v) => {
-                                            const contrato = contratos.filter(
-                                                (c) =>
-                                                    String(c.empleado_id) ===
-                                                    String(v),
-                                            )[0];
+                                            const contrato = contratoVigenteDe(contratos, v);
                                             setForm((f) => ({
                                                 ...f,
                                                 empleado_id: v,
@@ -834,8 +860,9 @@ function Modal({
                                             alignItems: "center",
                                         }}
                                     >
-                                        {contratosFiltrados[0]
-                                            ? `C.C. ${contratosFiltrados[0].empleado?.cedula ?? "—"} · ${contratosFiltrados[0].tipo_contrato ?? "—"} · ${dateOnly(contratosFiltrados[0].fecha_ingreso)}`
+                                        {/* El contrato del que sale la dotación: su proyecto decide qué prendas se ofrecen. */}
+                                        {contratoPedido
+                                            ? `${contratoPedido.cliente_proyecto || "Sin proyecto"} · ${contratoPedido.empresa ?? "—"} · ${contratoPedido.tipo_contrato ?? "—"} · ${dateOnly(contratoPedido.fecha_ingreso)}`
                                             : "Sin contrato vinculado"}
                                     </div>
                                 </div>
@@ -1195,6 +1222,14 @@ function Modal({
 
                     {activeTab === "items" && (
                         <>
+                            {contratoPedido && (
+                                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 12 }}>
+                                    Dotación del proyecto <strong>{proyectoInventarioEmpleado ?? "—"}</strong>, según
+                                    el contrato del empleado (proyecto <strong>{contratoPedido.cliente_proyecto || "sin proyecto"}</strong>,
+                                    empresa <strong>{contratoPedido.empresa ?? "—"}</strong>). Si no corresponde, corrige el
+                                    contrato en <em>Contratos</em>.
+                                </div>
+                            )}
                             {proyectoEmpleado && !readOnly && (() => {
                                 const hayStock = inventarioAjustado.some(
                                     (i) => i.proyecto === proyectoInventarioEmpleado && i.cantidad > 0
@@ -1268,9 +1303,22 @@ function Modal({
                                             String(i.id) ===
                                             String(it.inventario_dotacion_id),
                                     );
+                                    // Tope = stock real + lo que este mismo pedido ya
+                                    // tiene de esa prenda (al guardar se devuelve y se
+                                    // vuelve a descontar).
                                     const maxDisp = invRow
                                         ? invRow.cantidad
                                         : Infinity;
+                                    const stockReal =
+                                        inventarioFlat.find(
+                                            (i) =>
+                                                String(i.id) ===
+                                                String(it.inventario_dotacion_id),
+                                        )?.cantidad ?? null;
+                                    const yaEnPedido =
+                                        invRow && stockReal !== null
+                                            ? invRow.cantidad - stockReal
+                                            : 0;
 
                                     const displayInv =
                                         it._inv ||
@@ -1314,8 +1362,10 @@ function Modal({
                                                 </div>
                                             ) : (
                                                 <InventarioItemSelect
+                                                    // Stock real del inventario: lo que ya tiene
+                                                    // este pedido no se suma a lo disponible.
                                                     inventarioFlat={
-                                                        inventarioAjustado
+                                                        inventarioFlat
                                                     }
                                                     value={
                                                         it.inventario_dotacion_id
@@ -1331,6 +1381,7 @@ function Modal({
                                                         tallasEmpleado
                                                     }
                                                     proyecto={proyectoInventarioEmpleado}
+                                                    sedeId={sedeContratoId}
                                                 />
                                             )}
                                             <div
@@ -1349,7 +1400,9 @@ function Modal({
                                                 >
                                                     Cantidad
                                                     {invRow && !readOnly
-                                                        ? ` (máx ${maxDisp})`
+                                                        ? yaEnPedido > 0
+                                                            ? ` (máx ${maxDisp}: ${stockReal} en stock + ${yaEnPedido} ya en este pedido)`
+                                                            : ` (máx ${maxDisp})`
                                                         : ""}
                                                 </label>
                                                 <input

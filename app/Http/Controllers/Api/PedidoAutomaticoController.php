@@ -39,7 +39,7 @@ class PedidoAutomaticoController extends Controller
         $data = $request->validate([
             'empleado_id'  => 'required|exists:users,id',
             'contrato_id'  => 'nullable|exists:contratos,id',
-            'estado'       => 'nullable|string',
+            'estado'       => ['nullable', 'string', \Illuminate\Validation\Rule::in(PedidoAutomatico::ESTADOS)],
             'fecha_pedido' => 'nullable|date',
             'notas'        => 'nullable|string',
             'codigo'       => 'nullable|string|max:10|unique:pedidos_automaticos,codigo',
@@ -47,6 +47,12 @@ class PedidoAutomaticoController extends Controller
             'items.*.inventario_dotacion_id' => 'required|exists:inventario_dotacion,id',
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
+        if (!\App\Models\Contrato::where('empleado_id', $data['empleado_id'])->exists()) {
+            return response()->json(['message' => 'El empleado no tiene contrato: no se le puede crear un pedido de dotación.'], 422);
+        }
+        if ($msg = PedidoAutomatico::prendasDeOtroProyecto($this->contratoDelPedido($data), $data['items'] ?? [])) {
+            return response()->json(['message' => $msg], 422);
+        }
 
         try {
             return DB::transaction(function () use ($data) {
@@ -57,7 +63,7 @@ class PedidoAutomaticoController extends Controller
                 $pedido = PedidoAutomatico::create($data);
 
                 if (!empty($data['items'])) {
-                    if ($data['estado'] === 'Activo') {
+                    if (PedidoAutomatico::descuentaStock($data['estado'])) {
                         $pedido->asignarItems($data['items']);
                     } else {
                         $this->guardarItemsSinDescontar($pedido, $data['items']);
@@ -86,7 +92,7 @@ class PedidoAutomaticoController extends Controller
         $data = $request->validate([
             'empleado_id'  => 'required|exists:users,id',
             'contrato_id'  => 'nullable|exists:contratos,id',
-            'estado'       => 'nullable|string',
+            'estado'       => ['nullable', 'string', \Illuminate\Validation\Rule::in(PedidoAutomatico::ESTADOS)],
             'fecha_pedido' => 'nullable|date',
             'notas'        => 'nullable|string',
             'items'        => 'nullable|array',
@@ -94,58 +100,18 @@ class PedidoAutomaticoController extends Controller
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
 
+        if ($msg = PedidoAutomatico::prendasDeOtroProyecto($this->contratoDelPedido($data), $data['items'] ?? [])) {
+            return response()->json(['message' => $msg], 422);
+        }
+
         try {
             return DB::transaction(function () use ($data, $pedidoAutomatico) {
-                $estadoAnterior = $pedidoAutomatico->estado;
-                $nuevoEstado    = $data['estado'] ?? $estadoAnterior;
-
-                if ($estadoAnterior === 'Activo' && $nuevoEstado === 'Cancelado') {
-                    // Restaurar todo el inventario y limpiar items
-                    $this->restaurarInventario($pedidoAutomatico);
-                    $pedidoAutomatico->items()->delete();
-
-                } elseif ($estadoAnterior === 'Activo' && $nuevoEstado === 'Activo') {
-                    // Edición de items activos: restaurar anteriores y descontar nuevos
-                    $this->restaurarInventario($pedidoAutomatico);
-                    $pedidoAutomatico->items()->delete();
-                    if (!empty($data['items'])) {
-                        $pedidoAutomatico->asignarItems($data['items']);
-                    }
-
-                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Activo') {
-                    // Primera activación: descontar items del payload
-                    $pedidoAutomatico->items()->delete();
-                    if (!empty($data['items'])) {
-                        $pedidoAutomatico->asignarItems($data['items']);
-                    }
-
-                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Pendiente') {
-                    // Edición sin activar: guardar items sin tocar inventario
-                    $pedidoAutomatico->items()->delete();
-                    if (!empty($data['items'])) {
-                        $this->guardarItemsSinDescontar($pedidoAutomatico, $data['items']);
-                    }
-
-                } elseif ($estadoAnterior === 'Pendiente' && $nuevoEstado === 'Cancelado') {
-                    // Cancelar antes de activar: solo limpiar items (inventario nunca fue descontado)
-                    $pedidoAutomatico->items()->delete();
-
-                } elseif ($estadoAnterior === 'Completado' && $nuevoEstado === 'Cancelado') {
-                    // Revertir un pedido completado: restaurar inventario y desvincular del global
-                    $this->restaurarInventario($pedidoAutomatico);
-                    $pedidoAutomatico->items()->delete();
-                    $data['pedido_global_id'] = null;
-
-                } elseif ($estadoAnterior === 'Completado' && $nuevoEstado === 'Completado') {
-                    // Edición de items de un pedido ya completado: restaurar anteriores y
-                    // descontar nuevos, igual que la edición de un pedido Activo (antes esta
-                    // combinación no tenía rama y el cambio de items se descartaba en silencio).
-                    $this->restaurarInventario($pedidoAutomatico);
-                    $pedidoAutomatico->items()->delete();
-                    if (!empty($data['items'])) {
-                        $pedidoAutomatico->asignarItems($data['items']);
-                    }
-                }
+                // Estado y prendas con el inventario cuadrado (ver PedidoAutomatico::cambiarEstado).
+                $pedidoAutomatico->cambiarEstado(
+                    $data['estado'] ?? $pedidoAutomatico->estado,
+                    array_key_exists('items', $data) ? ($data['items'] ?? []) : null,
+                );
+                unset($data['estado'], $data['items']);
 
                 $pedidoAutomatico->update($data);
 
@@ -214,16 +180,14 @@ class PedidoAutomaticoController extends Controller
             'estado'       => 'required|string|in:Activo,Enviar a compras,Devolución,Devolución usada',
         ]);
 
-        return DB::transaction(function () use ($data) {
+        try {
+            return DB::transaction(function () use ($data) {
             $pedidos = PedidoAutomatico::whereIn('id', $data['ids'])
                 ->lockForUpdate()
                 ->get();
 
             foreach ($pedidos as $pedido) {
-                if ($data['estado'] === 'Devolución' && $pedido->estado !== 'Devolución') {
-                    $this->restaurarInventario($pedido);
-                }
-                $pedido->update(['estado' => $data['estado']]);
+                $pedido->cambiarEstado($data['estado']);
             }
 
             return response()->json(
@@ -231,13 +195,16 @@ class PedidoAutomaticoController extends Controller
                     ->with(['empleado', 'contrato', 'items.inventario'])
                     ->get()
             );
-        });
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function destroy(PedidoAutomatico $pedidoAutomatico)
     {
         return DB::transaction(function () use ($pedidoAutomatico) {
-            if (in_array($pedidoAutomatico->estado, ['Activo', 'Completado'])) {
+            if (in_array($pedidoAutomatico->estado, ['Activo', 'Completado', 'Enviar a compras'], true)) {
                 $this->restaurarInventario($pedidoAutomatico);
             }
             $pedidoAutomatico->delete();
@@ -246,6 +213,19 @@ class PedidoAutomaticoController extends Controller
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /** El contrato indicado o, si no viene, el vigente del empleado (activo más reciente). */
+    private function contratoDelPedido(array $data): ?\App\Models\Contrato
+    {
+        if (!empty($data['contrato_id'])) {
+            return \App\Models\Contrato::find($data['contrato_id']);
+        }
+
+        return \App\Models\Contrato::where('empleado_id', $data['empleado_id'])
+            ->orderByRaw("estado_contrato = 'Activo' DESC")
+            ->orderByDesc('fecha_ingreso')->orderByDesc('id')
+            ->first();
+    }
 
     private function guardarItemsSinDescontar(PedidoAutomatico $pedido, array $items): void
     {
@@ -259,10 +239,6 @@ class PedidoAutomaticoController extends Controller
 
     private function restaurarInventario(PedidoAutomatico $pedido): void
     {
-        foreach ($pedido->items()->with('inventario')->get() as $item) {
-            if ($item->inventario) {
-                $item->inventario->increment('cantidad', $item->cantidad);
-            }
-        }
+        $pedido->restaurarInventario();
     }
 }

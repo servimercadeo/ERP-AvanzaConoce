@@ -82,6 +82,16 @@ class Contrato extends Model
         return $this->belongsTo(User::class, 'empleado_id');
     }
 
+    protected static function booted(): void
+    {
+        // Sin contrato no hay dotación: los pedidos no entregados del empleado se anulan.
+        static::deleted(function (Contrato $contrato) {
+            if ($contrato->empleado_id) {
+                PedidoAutomatico::anularSinContrato($contrato->empleado_id);
+            }
+        });
+    }
+
     public function regional()
     {
         return $this->belongsTo(Regional::class);

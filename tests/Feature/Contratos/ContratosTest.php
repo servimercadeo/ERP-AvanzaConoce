@@ -248,6 +248,38 @@ class ContratosTest extends TestCase
         $pedido = PedidoAutomatico::where('contrato_id', $r->json('id'))->first();
         $this->assertSame(2, $pedido->items()->count(), 'Solo polo y carnet: el pantalón no tenía stock.');
         $this->assertSame(0, $pantalon->fresh()->cantidad);
+        // Se avisa qué faltó, en la respuesta y en las notas del pedido.
+        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'Pantalon Comercial'));
+        $this->assertStringContainsString('Faltaron: Pantalon Comercial', $pedido->notas);
+    }
+
+    public function test_sin_ninguna_prenda_disponible_no_se_crea_el_pedido_y_se_explica(): void
+    {
+        foreach ($this->prepararDotacionDirectv() as $item) {
+            if ($item instanceof InventarioDotacion) {
+                $item->update(['cantidad' => 0]);
+            }
+        }
+
+        $r = $this->postJson('/api/contratos', $this->payload([
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
+        ]))->assertCreated()->assertJsonPath('pedido_automatico', null);
+
+        $r->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no se pudo asignar ninguna prenda')
+            && str_contains($m, 'Polo Gris Administrativa') && str_contains($m, 'hay 0'));
+        $this->assertDatabaseCount('pedidos_automaticos', 0);
+    }
+
+    public function test_un_cargo_sin_dotacion_definida_explica_por_que_no_hay_pedido(): void
+    {
+        $this->prepararDotacionDirectv();
+
+        $this->postJson('/api/contratos', $this->payload([
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'CARGO SIN REGLA', 'sede' => 'SEDE DTV',
+        ]))->assertCreated()->assertJsonPath('pedido_automatico', null)
+            ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no tiene dotación definida'));
+
+        $this->assertDatabaseCount('pedidos_automaticos', 0);
     }
 
     public function test_contrato_no_ingreso_no_genera_pedido(): void

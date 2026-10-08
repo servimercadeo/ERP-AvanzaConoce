@@ -20,6 +20,7 @@ import {
     IconSearch,
     IconEye,
     IconEdit,
+    IconTrash,
     IconClose,
     IconEmptySearch,
     IconLoading,
@@ -1724,6 +1725,38 @@ export default function EmpleadosCrud() {
         setTimeout(() => setToast(null), 3000);
     };
 
+    // Eliminar borra al empleado por completo (ver EliminacionEmpleado.php): por eso se
+    // explica todo lo que se va y se pide confirmar escribiendo su cédula.
+    const [eliminandoId, setEliminandoId] = useState(null);
+    const handleDelete = async (emp) => {
+        const nombre = `${emp.nombres ?? ""} ${emp.apellidos ?? ""}`.trim() || emp.name;
+        const escrito = window.prompt(
+            `Vas a eliminar POR COMPLETO a ${nombre} (C.C. ${emp.cedula}).\n\n` +
+                "Se borran: sus contratos, pedidos de dotación, equipos asignados, documentos " +
+                "y todo su proceso de selección (candidato, aval y formulario de ingreso).\n" +
+                "Lo que tenía pendiente o asignado vuelve al inventario.\n\n" +
+                "Esta acción no se puede deshacer. Para confirmar, escribe su cédula:",
+        );
+        if (escrito === null) return;
+        if (escrito.trim() !== String(emp.cedula)) {
+            showToast("La cédula no coincide: no se eliminó nada.");
+            return;
+        }
+        setEliminandoId(emp.id);
+        try {
+            await api.delete(`/empleados/${emp.id}`);
+            setEmpleados((prev) => prev.filter((e) => e.id !== emp.id));
+            ["empleados", "contratos", "candidatos", "base-ingresos", "pedidos-automaticos", "candidatos-contrato"].forEach(
+                (key) => queryClient.invalidateQueries({ queryKey: [key] }),
+            );
+            showToast(`${nombre} eliminado por completo.`);
+        } catch (err) {
+            showToast(err.response?.data?.message ?? "No se pudo eliminar el empleado.");
+        } finally {
+            setEliminandoId(null);
+        }
+    };
+
     // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
     // la página actual.
     const handleExportExcel = async () => {
@@ -2124,6 +2157,17 @@ export default function EmpleadosCrud() {
                                                 onClick={() => openEdit(emp)}
                                             >
                                                 <IconEdit />
+                                            </button>
+                                            <button
+                                                style={{
+                                                    ...S.actionBtn("#fee2e2", "#991b1b"),
+                                                    opacity: eliminandoId === emp.id ? 0.5 : 1,
+                                                }}
+                                                title="Eliminar por completo"
+                                                disabled={eliminandoId === emp.id}
+                                                onClick={() => handleDelete(emp)}
+                                            >
+                                                <IconTrash />
                                             </button>
                                         </div>
                                     </td>

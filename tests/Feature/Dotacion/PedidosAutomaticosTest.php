@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dotacion;
 
+use App\Models\Contrato;
 use App\Models\InventarioDotacion;
 use App\Models\PedidoAutomatico;
 use App\Models\User;
@@ -28,6 +29,8 @@ class PedidosAutomaticosTest extends TestCase
         Cache::store('file')->forget('inventario-dotacion:flat');
         $this->actuarComo('general');
         $this->empleado = $this->usuario('general', ['nombres' => 'Ana', 'apellidos' => 'Pérez', 'cedula' => '1001']);
+        // Sin contrato no hay dotación.
+        Contrato::create(['empleado_id' => $this->empleado->id, 'cargo' => 'ASESOR', 'estado_contrato' => 'Activo']);
 
         $this->camisa = $this->prenda('CAMISA', 'M', 10);
         $this->pantalon = $this->prenda('PANTALON', '32', 5);
@@ -202,5 +205,107 @@ class PedidosAutomaticosTest extends TestCase
         $this->crear()->assertCreated();
         $this->getJson("/api/pedidos-automaticos/ultimo-empleado/{$this->empleado->id}")
             ->assertOk()->assertJsonCount(2, 'items');
+    }
+
+    // ── Pedidos de quien se queda sin contrato ──
+
+    public function test_no_se_crea_un_pedido_para_un_empleado_sin_contrato(): void
+    {
+        $sinContrato = $this->usuario('general', ['cedula' => '1002']);
+
+        $this->crear(['empleado_id' => $sinContrato->id])->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'no tiene contrato'));
+        $this->assertSame(10, $this->camisa->fresh()->cantidad);
+    }
+
+    public function test_al_borrar_el_contrato_sus_pedidos_se_anulan_y_el_stock_vuelve(): void
+    {
+        $activo = $this->crear()->assertCreated()->json('id');
+        $pendiente = $this->crear(['estado' => 'Pendiente'])->assertCreated()->json('id');
+        $this->assertSame(8, $this->camisa->fresh()->cantidad);
+
+        $this->actuarComo('th');
+        $contrato = Contrato::where('empleado_id', $this->empleado->id)->firstOrFail();
+        $this->deleteJson("/api/contratos/{$contrato->id}")->assertNoContent();
+
+        $this->assertDatabaseMissing('pedidos_automaticos', ['id' => $activo]);
+        $this->assertDatabaseMissing('pedidos_automaticos', ['id' => $pendiente]);
+        $this->assertDatabaseMissing('pedido_automatico_items', ['pedido_automatico_id' => $activo]);
+        // Las prendas del pedido en proceso vuelven al inventario.
+        $this->assertSame(10, $this->camisa->fresh()->cantidad);
+        $this->assertSame(5, $this->pantalon->fresh()->cantidad);
+    }
+
+    public function test_si_le_queda_otro_contrato_los_pedidos_se_conservan(): void
+    {
+        $pedido = $this->crear()->assertCreated()->json('id');
+        Contrato::create(['empleado_id' => $this->empleado->id, 'cargo' => 'ASESOR', 'estado_contrato' => 'Activo']);
+
+        Contrato::where('empleado_id', $this->empleado->id)->oldest('id')->firstOrFail()->delete();
+
+        $this->assertDatabaseHas('pedidos_automaticos', ['id' => $pedido]);
+        $this->assertSame(8, $this->camisa->fresh()->cantidad);
+    }
+
+    public function test_los_pedidos_entregados_se_conservan_aunque_no_haya_contrato(): void
+    {
+        $pedido = PedidoAutomatico::findOrFail($this->crear()->assertCreated()->json('id'));
+        $pedido->update(['estado' => 'Completado']);
+
+        Contrato::where('empleado_id', $this->empleado->id)->delete();
+        PedidoAutomatico::anularSinContrato();
+
+        $this->assertDatabaseHas('pedidos_automaticos', ['id' => $pedido->id]);
+        $this->assertSame(8, $this->camisa->fresh()->cantidad, 'Las prendas entregadas no vuelven al stock.');
+    }
+
+    public function test_al_borrar_el_empleado_sus_pedidos_se_anulan_y_el_stock_vuelve(): void
+    {
+        $pedido = $this->crear()->assertCreated()->json('id');
+
+        $this->empleado->delete();
+
+        $this->assertDatabaseMissing('pedidos_automaticos', ['id' => $pedido]);
+        $this->assertSame(10, $this->camisa->fresh()->cantidad);
+    }
+
+    public function test_la_limpieza_elimina_los_pedidos_huerfanos_existentes(): void
+    {
+        // Como los de producción: el contrato se borró antes de esta regla (sin eventos).
+        $pedido = $this->crear()->assertCreated()->json('id');
+        \Illuminate\Support\Facades\DB::table('contratos')->where('empleado_id', $this->empleado->id)->delete();
+        $this->assertDatabaseHas('pedidos_automaticos', ['id' => $pedido]);
+
+        $this->assertSame(1, PedidoAutomatico::anularSinContrato());
+
+        $this->assertDatabaseMissing('pedidos_automaticos', ['id' => $pedido]);
+        $this->assertSame(10, $this->camisa->fresh()->cantidad);
+    }
+
+    public function test_a_un_empleado_de_directv_solo_se_le_asigna_dotacion_de_directv(): void
+    {
+        $dtv = $this->usuario('general', ['cedula' => '1003']);
+        Contrato::create(['empleado_id' => $dtv->id, 'cargo' => 'ASESOR COMERCIAL', 'estado_contrato' => 'Activo', 'cliente_proyecto' => 'DIRECTV CO']);
+        $poloDtv = InventarioDotacion::create([
+            'proyecto' => 'DIRECTV', 'prenda' => 'POLO', 'genero' => 'Masculino', 'talla' => 'M',
+            'precio' => 1000, 'cantidad' => 5, 'stock_minimo' => 0,
+        ]);
+
+        // La camisa del setUp es de SYM TIGO HOME: no le corresponde.
+        $this->postJson('/api/pedidos-automaticos', [
+            'empleado_id' => $dtv->id, 'items' => [['inventario_dotacion_id' => $this->camisa->id, 'cantidad' => 1]],
+        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'solo se le puede asignar dotación de DIRECTV'));
+        $this->assertSame(10, $this->camisa->fresh()->cantidad);
+
+        $id = $this->postJson('/api/pedidos-automaticos', [
+            'empleado_id' => $dtv->id, 'items' => [['inventario_dotacion_id' => $poloDtv->id, 'cantidad' => 1]],
+        ])->assertCreated()->json('id');
+        $this->assertSame(4, $poloDtv->fresh()->cantidad);
+
+        // Tampoco al editar.
+        $this->putJson("/api/pedidos-automaticos/{$id}", [
+            'empleado_id' => $dtv->id, 'estado' => 'Activo', 'items' => [['inventario_dotacion_id' => $this->camisa->id, 'cantidad' => 1]],
+        ])->assertStatus(422);
+        $this->assertSame(4, $poloDtv->fresh()->cantidad);
     }
 }

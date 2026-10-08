@@ -46,9 +46,17 @@ class PedidosGlobalesYCronogramaTest extends TestCase
             'estado_contrato' => 'Activo', 'fecha_ingreso' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now(),
         ]);
 
+        // Cada empleado recibe dotación de su propio proyecto.
+        $prenda = \App\Models\PedidoAutomatico::proyectoInventarioDe($proyecto) === $this->camisa->proyecto
+            ? $this->camisa
+            : InventarioDotacion::firstOrCreate(
+                ['proyecto' => \App\Models\PedidoAutomatico::proyectoInventarioDe($proyecto), 'prenda' => 'CAMISA', 'genero' => 'Masculino', 'talla' => 'M'],
+                ['precio' => 1000, 'cantidad' => 20, 'stock_minimo' => 0],
+            );
+
         $id = $this->postJson('/api/pedidos-automaticos', [
             'empleado_id' => $emp->id, 'contrato_id' => $contratoId,
-            'items' => [['inventario_dotacion_id' => $this->camisa->id, 'cantidad' => 1]],
+            'items' => [['inventario_dotacion_id' => $prenda->id, 'cantidad' => 1]],
         ])->assertCreated()->json('id');
 
         return PedidoAutomatico::find($id);

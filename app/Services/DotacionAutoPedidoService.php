@@ -13,12 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 class DotacionAutoPedidoService
 {
-    private const PROYECTO_A_INVENTARIO = [
-        'TIGO EXPRESS' => 'SYM TIGO EXPRESS',
-        'TIGO HOME'    => 'SYM TIGO HOME',
-        'DIRECTV CO'   => 'DIRECTV',
-        'DIRECTV ECU'  => 'DIRECTV',
-    ];
+    // Proyecto del contrato => proyecto del inventario: ver PedidoAutomatico::PROYECTO_A_INVENTARIO.
 
     // El kit administrativo (SYM ADMINISTRATIVO) no tiene dotación repartida por sede: en
     // proyecto_sede solo está vinculado a las sedes de Pereira (así viene de
@@ -39,36 +34,49 @@ class DotacionAutoPedidoService
     ];
 
     /**
+     * Por qué no se generó el pedido (para mostrarlo al crear el contrato), o null si se
+     * generó. Si se generó pero faltaron prendas, quedan en $faltantes.
+     */
+    public ?string $motivoSinPedido = null;
+
+    /** @var string[] prendas que no se pudieron asignar (sin talla, sin existencia o sin stock) */
+    public array $faltantes = [];
+
+    /**
      * Genera (si aplica) el pedido automático de dotación para un contrato recién creado,
      * según el proyecto/cargo del empleado. Se crea en estado "Activo" y descuenta el
      * inventario de inmediato (igual que un pedido manual activo); si luego se cancela o
      * se elimina, el inventario se restaura automáticamente (mismo flujo que cualquier
      * pedido Activo, ver PedidoAutomaticoController::update/destroy).
-     * Devuelve null si el proyecto/cargo no está cubierto por ninguna regla.
+     * Devuelve null (con el motivo en $motivoSinPedido) si el proyecto/cargo no tiene
+     * dotación o si no se pudo asignar ninguna prenda: no se crean pedidos vacíos.
      */
     public function generarPedidoParaContrato(Contrato $contrato): ?PedidoAutomatico
     {
+        $this->motivoSinPedido = null;
+        $this->faltantes = [];
+
         $empleado = User::find($contrato->empleado_id);
         if (!$empleado) {
-            return null;
+            return $this->sinPedido('el contrato no tiene empleado.');
         }
 
         $this->completarTallasDesdeRespuestaIngreso($empleado);
 
-        $proyecto = self::PROYECTO_A_INVENTARIO[$contrato->cliente_proyecto] ?? 'SYM ADMINISTRATIVO';
+        $proyecto = PedidoAutomatico::proyectoInventarioDe($contrato->cliente_proyecto) ?? 'SYM ADMINISTRATIVO';
         $cargo    = mb_strtoupper(trim($contrato->cargo ?? ''), 'UTF-8');
         $genero   = in_array($empleado->genero, ['Masculino', 'Femenino'], true) ? $empleado->genero : 'Masculino';
 
         $reglas = $this->resolverReglas($proyecto, $cargo, $genero, $empleado);
 
         if (empty($reglas)) {
-            return null;
+            return $this->sinPedido("el cargo \"{$contrato->cargo}\" del proyecto \"{$contrato->cliente_proyecto}\" no tiene dotación definida.");
         }
 
         $sedeCentral = Sede::where('nombre', self::SEDE_CENTRAL_ADMINISTRATIVA)->value('id');
         if (!$sedeCentral) {
             Log::error('DotacionAutoPedidoService: no se encontró la sede central administrativa "' . self::SEDE_CENTRAL_ADMINISTRATIVA . '"; no se genera pedido automático para el contrato ' . $contrato->id . '.');
-            return null;
+            return $this->sinPedido('no existe la sede central ' . self::SEDE_CENTRAL_ADMINISTRATIVA . ' en el inventario.');
         }
 
         $sedeContrato = $contrato->sede_id ?: ($contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null);
@@ -79,7 +87,7 @@ class DotacionAutoPedidoService
         if (!$sedeContrato) {
             Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}.");
             if (!$tieneLineaAdministrativa) {
-                return null;
+                return $this->sinPedido("no se encontró la sede \"{$contrato->sede}\" del contrato en el inventario de dotación.");
             }
         }
         if (!$tieneLineaNoAdministrativa) {
@@ -87,26 +95,36 @@ class DotacionAutoPedidoService
         }
 
         return DB::transaction(function () use ($contrato, $reglas, $sedeCentral, $sedeContrato) {
+            // Primero las prendas que sí se pueden asignar; sin ninguna no se crea el pedido.
+            $asignables = [];
+            foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
+                $sedeId = $proyecto === 'SYM ADMINISTRATIVO' ? $sedeCentral : $sedeContrato;
+                if (!$sedeId) {
+                    $this->faltantes[] = "{$prenda} (sin sede en el inventario)";
+                    continue;
+                }
+
+                $inv = $this->buscarItemConStock($proyecto, $sedeId, $prenda, $genero, $talla, $cantidad);
+                if ($inv) {
+                    $asignables[] = [$inv, $cantidad];
+                }
+            }
+
+            if (!$asignables) {
+                return $this->sinPedido('no se pudo asignar ninguna prenda: ' . implode('; ', $this->faltantes) . '.');
+            }
+
             $pedido = PedidoAutomatico::create([
                 'codigo'       => PedidoAutomatico::generarCodigo(),
                 'contrato_id'  => $contrato->id,
                 'empleado_id'  => $contrato->empleado_id,
                 'estado'       => 'Activo',
                 'fecha_pedido' => now()->toDateString(),
-                'notas'        => 'Generado automáticamente al crear el contrato.',
+                'notas'        => 'Generado automáticamente al crear el contrato.'
+                    . ($this->faltantes ? ' Faltaron: ' . implode('; ', $this->faltantes) . '.' : ''),
             ]);
 
-            foreach ($reglas as [$proyecto, $prenda, $genero, $talla, $cantidad]) {
-                $sedeId = $proyecto === 'SYM ADMINISTRATIVO' ? $sedeCentral : $sedeContrato;
-                if (!$sedeId) {
-                    continue;
-                }
-
-                $inv = $this->buscarItemConStock($proyecto, $sedeId, $prenda, $genero, $talla, $cantidad);
-                if (!$inv) {
-                    continue;
-                }
-
+            foreach ($asignables as [$inv, $cantidad]) {
                 $pedido->items()->create([
                     'inventario_dotacion_id' => $inv->id,
                     'cantidad'               => $cantidad,
@@ -116,6 +134,14 @@ class DotacionAutoPedidoService
 
             return $pedido;
         });
+    }
+
+    private function sinPedido(string $motivo): null
+    {
+        $this->motivoSinPedido = 'No se generó el pedido automático de dotación: ' . $motivo;
+        Log::info('DotacionAutoPedidoService: ' . $this->motivoSinPedido);
+
+        return null;
     }
 
     private function completarTallasDesdeRespuestaIngreso(User $empleado): void
@@ -137,6 +163,7 @@ class DotacionAutoPedidoService
 
         if (!$talla) {
             Log::info("DotacionAutoPedidoService: talla no registrada para el empleado, no se asigna {$descripcion}.");
+            $this->faltantes[] = "{$prenda} (el empleado no tiene la talla registrada)";
             return null;
         }
 
@@ -150,11 +177,13 @@ class DotacionAutoPedidoService
 
         if (!$inv) {
             Log::info("DotacionAutoPedidoService: no se encontró en inventario {$descripcion}, talla {$talla}.");
+            $this->faltantes[] = "{$prenda} talla {$talla} (no existe en el inventario de la sede)";
             return null;
         }
 
         if ($inv->cantidad < $cantidad) {
             Log::info("DotacionAutoPedidoService: stock insuficiente para {$descripcion}, talla {$talla} (disponible {$inv->cantidad}, solicitado {$cantidad}).");
+            $this->faltantes[] = "{$prenda} talla {$talla} (hay {$inv->cantidad}, se necesitan {$cantidad})";
             return null;
         }
 

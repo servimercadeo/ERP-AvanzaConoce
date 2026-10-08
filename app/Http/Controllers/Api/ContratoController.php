@@ -481,20 +481,31 @@ class ContratoController extends Controller
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($contrato);
 
         $pedidoAutomatico = null;
+        $motivoSinPedido = null;
+        $faltantes = [];
         if ($contrato->estado_contrato !== 'No ingreso') {
+            $dotacion = app(\App\Services\DotacionAutoPedidoService::class);
             try {
-                $pedidoAutomatico = app(\App\Services\DotacionAutoPedidoService::class)->generarPedidoParaContrato($contrato);
+                $pedidoAutomatico = $dotacion->generarPedidoParaContrato($contrato);
+                $motivoSinPedido = $dotacion->motivoSinPedido;
+                $faltantes = $dotacion->faltantes;
             } catch (\Throwable $e) {
                 Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
                     'error' => $e->getMessage(),
                 ]);
+                $motivoSinPedido = 'No se generó el pedido automático de dotación por un error inesperado. Créalo manualmente en Pedidos automáticos.';
             }
+        } else {
+            $motivoSinPedido = 'No se generó el pedido automático de dotación: el contrato está como "No ingreso".';
         }
 
         $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo'])->toArray();
         $contratoData['pedido_automatico'] = $pedidoAutomatico
             ? ['id' => $pedidoAutomatico->id, 'codigo' => $pedidoAutomatico->codigo, 'estado' => $pedidoAutomatico->estado]
             : null;
+        // Para el mensaje al crear: por qué no hubo pedido, o qué prendas faltaron.
+        $contratoData['pedido_automatico_motivo'] = $motivoSinPedido;
+        $contratoData['pedido_automatico_faltantes'] = $faltantes;
 
         return response()->json($contratoData, 201);
     }
@@ -604,7 +615,16 @@ class ContratoController extends Controller
 
     public function destroy(Contrato $contrato)
     {
+        $empleado = $contrato->empleado;
         $contrato->delete();
+
+        // El usuario que se creó solo para este contrato (alta pendiente) y se queda sin
+        // contratos no tiene uso: se elimina. Su proceso de selección se conserva para
+        // poder volver a crearle el contrato.
+        if ($empleado && $empleado->pendiente_alta && !$empleado->contratos()->exists()) {
+            $empleado->delete();
+        }
+
         return response()->json(null, 204);
     }
 

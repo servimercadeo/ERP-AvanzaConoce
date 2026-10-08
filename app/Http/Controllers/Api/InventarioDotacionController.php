@@ -467,6 +467,17 @@ class InventarioDotacionController extends Controller
             return response()->json(['message' => $error], 403);
         }
 
+        // Una prenda que está en pedidos no se puede borrar (la base lo impide): se avisa en
+        // vez de responder con un error del servidor.
+        $codigos = \App\Models\PedidoAutomatico::whereHas('items', fn ($q) => $q->where('inventario_dotacion_id', $inventarioDotacion->id))
+            ->orderBy('codigo')->limit(5)->pluck('codigo');
+        if ($codigos->isNotEmpty()) {
+            return response()->json([
+                'message' => "No se puede eliminar {$inventarioDotacion->prenda} talla {$inventarioDotacion->talla}: está en pedidos de dotación (#"
+                    . $codigos->implode(', #') . '). Deja su cantidad en 0 si ya no se usa.',
+            ], 422);
+        }
+
         $inventarioDotacion->delete();
         $this->olvidarCacheFlat();
         return response()->json(null, 204);

@@ -648,9 +648,15 @@ class EmpleadoController extends Controller
 
     public function destroy(User $empleado)
     {
-        $empleado->delete();
+        if ($empleado->id === Auth::id()) {
+            return response()->json(['message' => 'No puedes eliminar tu propio usuario.'], 422);
+        }
 
-        return response()->json(null, 204);
+        // Se borra por completo: contratos, dotación, equipos asignados, documentos y su
+        // proceso de selección (ver EliminacionEmpleado).
+        $eliminado = \App\Services\EliminacionEmpleado::eliminar($empleado);
+
+        return response()->json(['message' => 'Empleado eliminado por completo.', 'eliminado' => $eliminado]);
     }
 
     public function candidatosListos(\Illuminate\Http\Request $request)

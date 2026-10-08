@@ -479,12 +479,38 @@ export default function ProductosDotacion() {
 
     const debouncedSearch = useDebounce(search, 300);
 
+    const { data: proyectos = [] } = useQuery({
+        queryKey: ['inventario-dotacion-proyectos'],
+        queryFn: () => api.get('/inventario-dotacion/proyectos').then(r => r.data),
+        staleTime: 10 * 60 * 1000,
+    });
+
+    const { data: sedesPorProyecto = {} } = useQuery({
+        queryKey: ['sedes-por-proyecto-dotacion', proyectos],
+        queryFn: () => fetchSedesPorProyecto(proyectos),
+        enabled: proyectos.length > 0,
+    });
+
+    const sedesTab = sedesPorProyecto[proyectoTab] ?? [];
+
+    // La sede del usuario solo filtra si esa sede tiene dotación del proyecto abierto (ej.
+    // una sede de TIGO no tiene dotación de DIRECTV): si no, se ven todas las sedes. Mientras
+    // cargan las sedes del proyecto no se filtra por una que quizá no le corresponde.
+    const sedesCargadas = Object.prototype.hasOwnProperty.call(sedesPorProyecto, proyectoTab);
+    const sedeFiltroEfectivo =
+        sedeFiltro === 'Todas' || (sedesCargadas && sedesTab.some(s => String(s.id) === String(sedeFiltro)))
+            ? sedeFiltro
+            : 'Todas';
+    useEffect(() => {
+        if (sedesCargadas && sedeFiltro !== sedeFiltroEfectivo) setSedeFiltro(sedeFiltroEfectivo);
+    }, [sedesCargadas, sedeFiltro, sedeFiltroEfectivo]);
+
     // La página vuelve a 1 cada vez que cambia cualquier filtro.
-    useEffect(() => { setPage(1); }, [proyectoTab, sedeFiltro, prendaFiltro, generoFiltro, tallaFiltro, debouncedSearch]);
+    useEffect(() => { setPage(1); }, [proyectoTab, sedeFiltroEfectivo, prendaFiltro, generoFiltro, tallaFiltro, debouncedSearch]);
 
     const filtrosActivos = {
         proyecto: proyectoTab,
-        sede_id: sedeFiltro,
+        sede_id: sedeFiltroEfectivo,
         prenda: prendaFiltro,
         genero: generoFiltro,
         talla: tallaFiltro,
@@ -499,11 +525,6 @@ export default function ProductosDotacion() {
 
     const filtrados = pagina?.data ?? [];
 
-    const { data: proyectos = [] } = useQuery({
-        queryKey: ['inventario-dotacion-proyectos'],
-        queryFn: () => api.get('/inventario-dotacion/proyectos').then(r => r.data),
-        staleTime: 10 * 60 * 1000,
-    });
 
     // Si la pestaña activa no está entre las que la empresa del usuario puede ver
     // (ej. el valor inicial por defecto), se cambia a la primera pestaña disponible.
@@ -513,13 +534,6 @@ export default function ProductosDotacion() {
         }
     }, [proyectos, proyectoTab]);
 
-    const { data: sedesPorProyecto = {} } = useQuery({
-        queryKey: ['sedes-por-proyecto-dotacion', proyectos],
-        queryFn: () => fetchSedesPorProyecto(proyectos),
-        enabled: proyectos.length > 0,
-    });
-
-    const sedesTab = sedesPorProyecto[proyectoTab] ?? [];
 
     const { data: stats = { total: 0, bajoStock: 0, porProyecto: {} } } = useQuery({
         queryKey: ['inventario-dotacion-resumen'],
@@ -527,8 +541,8 @@ export default function ProductosDotacion() {
     });
 
     const { data: opcionesFiltro = { prendas: [], tallas: [] } } = useQuery({
-        queryKey: ['inventario-dotacion-filtros', proyectoTab, sedeFiltro, prendaFiltro, generoFiltro],
-        queryFn: () => api.get('/inventario-dotacion/filtros', { params: { proyecto: proyectoTab, sede_id: sedeFiltro, prenda: prendaFiltro, genero: generoFiltro } }).then(r => r.data),
+        queryKey: ['inventario-dotacion-filtros', proyectoTab, sedeFiltroEfectivo, prendaFiltro, generoFiltro],
+        queryFn: () => api.get('/inventario-dotacion/filtros', { params: { proyecto: proyectoTab, sede_id: sedeFiltroEfectivo, prenda: prendaFiltro, genero: generoFiltro } }).then(r => r.data),
     });
 
     const prendasDisponibles = ['Todos', ...opcionesFiltro.prendas];
@@ -700,7 +714,7 @@ export default function ProductosDotacion() {
                 <div style={{ maxWidth: 320, marginBottom: 14 }}>
                     <label style={{ ...S.label, display: 'block', marginBottom: 4 }}>Sede</label>
                     <SearchableSelect
-                        value={sedeFiltro}
+                        value={sedeFiltroEfectivo}
                         onChange={setSedeFiltro}
                         defaultValue="Todas"
                         options={[{ label: 'Todas las sedes', value: 'Todas' }, ...sedesTab.map(s => ({ label: s.nombre, value: s.id }))]}

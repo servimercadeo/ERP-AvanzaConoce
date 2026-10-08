@@ -2537,9 +2537,9 @@ export default function ContratosCrud() {
         };
     }, [modalOpen, viewOpen, filterOpen]);
 
-    const showToast = (msg) => {
+    const showToast = (msg, ms = 3000) => {
         setToast(msg);
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), ms);
     };
 
     const filtered = useMemo(
@@ -2657,8 +2657,12 @@ export default function ContratosCrud() {
                 qc.invalidateQueries({ queryKey: ["base-ingresos"] });
                 showToast(
                     data.pedido_automatico
-                        ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado (${data.pedido_automatico.estado}).`
-                        : "Contrato creado. No se generó pedido automático (proyecto/cargo sin regla de dotación).",
+                        ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado.` +
+                          (data.pedido_automatico_faltantes?.length
+                              ? ` Faltaron: ${data.pedido_automatico_faltantes.join("; ")}.`
+                              : "")
+                        : `Contrato creado. ${data.pedido_automatico_motivo ?? "No se generó el pedido automático de dotación."}`,
+                    data.pedido_automatico && !data.pedido_automatico_faltantes?.length ? 4000 : 10000,
                 );
             }
             setModalOpen(false);
