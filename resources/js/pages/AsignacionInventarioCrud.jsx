@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -169,6 +170,8 @@ function NuevaAsignacionModal({ usuarios, onClose, onSaved }) {
 }
 
 export default function AsignacionInventarioCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [filtro, setFiltro] = useState("activas");
     const [modalOpen, setModalOpen] = useState(false);
@@ -259,9 +262,9 @@ export default function AsignacionInventarioCrud() {
                         </button>
                     ))}
                 </div>
-                <button style={S.btnPrimary} onClick={() => setModalOpen(true)} disabled={usuarios.length === 0}>
+                {puede.crear && <button style={S.btnPrimary} onClick={() => setModalOpen(true)} disabled={usuarios.length === 0}>
                     + Nueva Asignación
-                </button>
+                </button>}
             </div>
 
             <div style={S.tableWrap}>
@@ -312,7 +315,7 @@ export default function AsignacionInventarioCrud() {
                                             >
                                                 ✉ Enviar acta
                                             </button>
-                                            {a.activa && (
+                                            {a.activa && puede.editar && (
                                                 <button
                                                     style={S.btnSecondary}
                                                     disabled={devolviendoId === a.id}

@@ -5,14 +5,42 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\InventarioProducto;
 use App\Models\InventarioProductoSerie;
+use App\Models\PermisoDenegado;
 use App\Models\Sede;
 use App\Models\TipoProducto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class InventarioProductoController extends Controller
 {
+    /** Pestaña de Inventarios de cada categoría construida a mano (las demás se generan). */
+    private const PESTANAS_CATEGORIA = [
+        'Activos'      => 'inventarios.inv_activos.inventario_activos',
+        'Materiales'   => 'inventarios.inv_materiales.inventario_materiales',
+        'Equipos'      => 'inventarios.inv_equipos.inventario_equipos',
+        'EPP'          => 'inventarios.inv_epp.inventario_epp',
+        'Herramientas' => 'inventarios.inv_herramientas.inventario_herramientas',
+    ];
+
+    /**
+     * Una misma ruta sirve a todas las pestañas de inventario: la acción se pide en la
+     * pestaña de la categoría del producto o en Inventario General (que las muestra todas).
+     * Las categorías nuevas usan el mismo id que les arma el menú (useErpModules.js: slugCategoria).
+     */
+    private function autorizar(Request $request, string $accion, ?string $categoria): void
+    {
+        $destinos = ['inventarios.inv_general.inventario_general'];
+        if ($categoria) {
+            $slug = 'inv_' . (trim(preg_replace('/[^a-z0-9]+/', '_', Str::lower(Str::ascii($categoria))), '_') ?: 'categoria');
+            $destinos[] = self::PESTANAS_CATEGORIA[$categoria] ?? "inventarios.{$slug}.{$slug}_file";
+        }
+        if (!PermisoDenegado::permiteAlguno($request->user(), $accion, $destinos)) {
+            abort(403, "No tienes permiso para {$accion} en este módulo.");
+        }
+    }
+
     public function index(Request $request)
     {
         $query = InventarioProducto::with(['tipoProducto', 'sede', 'series', 'empresa']);
@@ -79,6 +107,7 @@ class InventarioProductoController extends Controller
             'series'           => 'nullable|array',
             'series.*'         => 'string|max:100|distinct',
         ]);
+        $this->autorizar($request, 'crear', TipoProducto::find($data['tipo_producto_id'])?->categoria);
         $talla = trim($data['talla'] ?? '');
         $empresaId = $data['empresa_id'] ?? null;
 
@@ -140,6 +169,7 @@ class InventarioProductoController extends Controller
      */
     public function update(Request $request, InventarioProducto $inventarioProducto)
     {
+        $this->autorizar($request, 'editar', $inventarioProducto->tipoProducto?->categoria);
         $data = $request->validate([
             'precio'       => 'nullable|integer|min:0',
             'cantidad'     => 'required|integer|min:0',
@@ -180,8 +210,9 @@ class InventarioProductoController extends Controller
         });
     }
 
-    public function destroy(InventarioProducto $inventarioProducto)
+    public function destroy(Request $request, InventarioProducto $inventarioProducto)
     {
+        $this->autorizar($request, 'eliminar', $inventarioProducto->tipoProducto?->categoria);
         $inventarioProducto->delete();
         return response()->json(null, 204);
     }

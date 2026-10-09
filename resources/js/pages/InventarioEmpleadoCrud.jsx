@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { IconSearch, IconEmptySearch, IconLoading } from "../components/Icons";
 
@@ -12,6 +13,8 @@ import { IconSearch, IconEmptySearch, IconLoading } from "../components/Icons";
  * Asignación de Inventario).
  */
 export default function InventarioEmpleadoCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [userId, setUserId] = useState("");
     const [filtro, setFiltro] = useState("activas");
@@ -157,9 +160,9 @@ export default function InventarioEmpleadoCrud() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             {empleadoElegido && <span style={S.empleadoNombre}>{empleadoElegido.name}</span>}
-                            <button style={S.btnSecondary} onClick={handleExport} disabled={asignaciones.length === 0}>
+                            {puede.exportar && <button style={S.btnSecondary} onClick={handleExport} disabled={asignaciones.length === 0}>
                                 Exportar
-                            </button>
+                            </button>}
                         </div>
                     </div>
 
@@ -211,7 +214,7 @@ export default function InventarioEmpleadoCrud() {
                                                     >
                                                         ✉ Enviar acta
                                                     </button>
-                                                    {a.activa && (
+                                                    {a.activa && puede.editar && (
                                                         <button
                                                             style={S.btnSecondary}
                                                             disabled={devolviendoId === a.id}

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { PestanaContext, useAcciones } from "../hooks/useAcciones";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useErpModules } from '../hooks/useErpModules';
-import { canAccessSubmodule } from '../data/erpModules';
+import { canAccessSubmodule, canAccessArchivo } from '../data/erpModules';
 import {
   MODULE_ICONS,
   IconFolder,
@@ -116,6 +117,7 @@ function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
 /* ── CRUD genérico de los valores dentro de un Tipo de Parámetro creado por
    el usuario (solo nombre/descripción, igual de simple que ese tipo). ── */
 function ValoresParametroPanel({ tipo }) {
+  const puede = useAcciones();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -196,9 +198,9 @@ function ValoresParametroPanel({ tipo }) {
     <div>
       {toast && <div style={S.toast}>{toast}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={abrirCrear}>
+        {puede.crear && <button className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={abrirCrear}>
           <IconPlus size={14} /> Nuevo Valor
-        </button>
+        </button>}
       </div>
 
       <div style={S.tableWrap}>
@@ -222,12 +224,12 @@ function ValoresParametroPanel({ tipo }) {
                   <td style={{ color: 'var(--text-muted)' }}>{v.descripcion || '—'}</td>
                   <td>
                     <div style={S.actions}>
-                      <button style={S.actionBtn('var(--primary-light)', 'var(--primary-dark)')} title="Editar" onClick={() => abrirEditar(v)}>
+                      {puede.editar && <button style={S.actionBtn('var(--primary-light)', 'var(--primary-dark)')} title="Editar" onClick={() => abrirEditar(v)}>
                         <IconEdit size={14} />
-                      </button>
-                      <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => handleDelete(v)}>
+                      </button>}
+                      {puede.eliminar && <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => handleDelete(v)}>
                         <IconTrash size={14} />
-                      </button>
+                      </button>}
                     </div>
                   </td>
                 </tr>
@@ -270,7 +272,15 @@ function ValoresParametroPanel({ tipo }) {
   );
 }
 
+// Pestaña de Parametros que le corresponde a cada catálogo (Tipo de Producto vive dentro de
+// Categoría del Producto).
+const pestanaDe = (sub) => (sub.id === 'tipo_producto'
+  ? { moduleId: 'parametros', submoduleId: 'categoria_producto', archivoId: 'tipo_producto_file' }
+  : { moduleId: 'parametros', submoduleId: sub.id, archivoId: sub.archivos?.[0]?.id });
+
 export default function VerYCrearParametrosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
   const { user } = useAuth();
   const erpModules = useErpModules();
   const qc = useQueryClient();
@@ -292,11 +302,16 @@ export default function VerYCrearParametrosCrud() {
     queryFn: () => api.get('/tipos-parametro').then((r) => r.data),
   });
 
-  // Tipo de Producto vive como archivo dentro de Categoría del Producto, pero aquí se
-  // sigue listando como catálogo propio (mismo permiso que Categoría).
+  // Tipo de Producto vive como pestaña dentro de Categoría del Producto, pero aquí se
+  // sigue listando como catálogo propio; cada uno se muestra según el permiso de su pestaña.
   const catalogos = submods.flatMap((sub) =>
     sub.id === 'categoria_producto'
-      ? [sub, { id: 'tipo_producto', label: 'Tipo de Producto', icon: sub.icon }]
+      ? [
+          ...(canAccessArchivo(user, 'parametros', sub.id, 'categoria_producto_file') ? [sub] : []),
+          ...(canAccessArchivo(user, 'parametros', sub.id, 'tipo_producto_file')
+            ? [{ id: 'tipo_producto', label: 'Tipo de Producto', icon: sub.icon }]
+            : []),
+        ]
       : [sub],
   );
 
@@ -344,7 +359,10 @@ export default function VerYCrearParametrosCrud() {
             <p style={S.descSeccion}>{subActual.desc}</p>
           </div>
           <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
-            <Componente />
+            {/* Cada catálogo responde a los permisos de su propia pestaña en Parametros. */}
+            <PestanaContext.Provider value={pestanaDe(subActual)}>
+              <Componente />
+            </PestanaContext.Provider>
           </Suspense>
         </>
       ) : tipoParamActual ? (
@@ -361,7 +379,7 @@ export default function VerYCrearParametrosCrud() {
       ) : (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <button
+            {puede.crear && <button
               className="btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               onClick={() => {
@@ -370,7 +388,7 @@ export default function VerYCrearParametrosCrud() {
               }}
             >
               <IconPlus size={14} /> Nuevo Tipo de Parámetro
-            </button>
+            </button>}
           </div>
           <div style={S.lista}>
             {filasLista.map((fila, i) => (
@@ -385,20 +403,20 @@ export default function VerYCrearParametrosCrud() {
                 <span style={S.filaLabel}>{fila.label}</span>
                 {fila.dinamico && (
                   <div style={{ display: 'flex', gap: 6, marginRight: 4 }}>
-                    <button
+                    {puede.editar && <button
                       style={S.actionBtn('var(--primary-light)', 'var(--primary-dark)')}
                       title="Editar tipo"
                       onClick={(e) => handleEditarTipo(e, Number(fila.id.replace('dinamico_', '')))}
                     >
                       <IconEdit size={13} />
-                    </button>
-                    <button
+                    </button>}
+                    {puede.eliminar && <button
                       style={S.actionBtn('#fce8e8', '#a33')}
                       title="Eliminar tipo"
                       onClick={(e) => handleEliminarTipo(e, fila.id.replace('dinamico_', ''))}
                     >
                       <IconTrash size={13} />
-                    </button>
+                    </button>}
                   </div>
                 )}
                 <span style={S.filaFlecha}>›</span>

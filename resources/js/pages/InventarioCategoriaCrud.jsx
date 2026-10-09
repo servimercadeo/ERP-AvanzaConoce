@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconEdit, IconTrash, IconClose, IconEmptySearch, IconSearch, IconLoading } from "../components/Icons";
 import { SearchableSelect } from "../components/SearchableSelect";
 import SelectBuscable from "../components/SelectBuscable";
@@ -417,6 +418,8 @@ function DeleteModal({ item, onClose, onConfirm, deleting }) {
    pero sin proyecto/género/talla, que son propios de la ropa de dotación.
 ═══════════════════════════════════════════════════════════════════════ */
 export default function InventarioCategoriaCrud({ categoria }) {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     // Sin `categoria` fija = "Inventario General": todo el inventario de todas las
     // categorías (incluidas las nuevas creadas en Parametros > Categoría del Producto,
     // salvo Dotación, que tiene su propio inventario aparte), con un filtro adicional
@@ -687,17 +690,17 @@ export default function InventarioCategoriaCrud({ categoria }) {
                     />
                 </div>
                 <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
-                    <button style={S.btnSecondary} onClick={handleExport} disabled={items.length === 0}>
+                    {puede.exportar && <button style={S.btnSecondary} onClick={handleExport} disabled={items.length === 0}>
                         Exportar Excel
-                    </button>
-                    {esGeneral && (
+                    </button>}
+                    {esGeneral && puede.importar && (
                         <button style={S.btnSecondary} onClick={() => setImportOpen(true)} disabled={tiposProducto.length === 0 || sedes.length === 0}>
                             Importar Excel
                         </button>
                     )}
-                    <button style={S.btnPrimary} onClick={() => setAddOpen(true)} disabled={tiposProducto.length === 0 || sedes.length === 0}>
+                    {puede.crear && <button style={S.btnPrimary} onClick={() => setAddOpen(true)} disabled={tiposProducto.length === 0 || sedes.length === 0}>
                         + Nuevo item
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -757,12 +760,12 @@ export default function InventarioCategoriaCrud({ categoria }) {
                                         </td>
                                         <td>
                                             <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                                                <button style={S.actionBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => setEditItem(item)}>
+                                                {puede.editar && <button style={S.actionBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => setEditItem(item)}>
                                                     <IconEdit size={14} />
-                                                </button>
-                                                <button style={S.actionBtn("#fce8e8", "#c0392b")} title="Eliminar" onClick={() => setDeleteItem(item)}>
+                                                </button>}
+                                                {puede.eliminar && <button style={S.actionBtn("#fce8e8", "#c0392b")} title="Eliminar" onClick={() => setDeleteItem(item)}>
                                                     <IconTrash size={14} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>

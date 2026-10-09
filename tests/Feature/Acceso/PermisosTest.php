@@ -80,8 +80,8 @@ class PermisosTest extends TestCase
     private function guardarMatriz(callable $cambio): void
     {
         $this->actuarComo('admin');
-        $filas = PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id'])
-            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id'));
+        $filas = PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id'])
+            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id', 'archivo_id'));
         $this->putJson('/api/permisos', ['denegados' => $cambio($filas)->values()->all()])->assertOk();
     }
 
@@ -154,6 +154,65 @@ class PermisosTest extends TestCase
         $this->guardarMatriz(fn ($f) => $this->sin($f, 'th', 'permisos'));
         $this->actuarComo('th');
         $this->getJson('/api/auditoria')->assertOk();
+    }
+
+    // ── Permisos por pestaña ──
+
+    public function test_sync_guarda_pestanas_y_la_sesion_las_recibe(): void
+    {
+        $this->guardarMatriz(fn ($f) => $f
+            ->push(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'seleccion', 'archivo_id' => 'base_ingreso'])
+            // Sin archivo_id (como lo mandaba la versión anterior): todo el submódulo.
+            ->push(['rol' => 'th', 'modulo_id' => 'sedes', 'submodulo_id' => '_modulo']));
+
+        $this->assertDatabaseHas('permisos_denegados', ['rol' => 'th', 'submodulo_id' => 'seleccion', 'archivo_id' => 'base_ingreso']);
+        $this->assertDatabaseHas('permisos_denegados', ['rol' => 'th', 'modulo_id' => 'sedes', 'archivo_id' => '']);
+
+        $this->actuarComo('th');
+        $denegados = collect($this->getJson('/api/user')->assertOk()->json('permisos_denegados'));
+        $this->assertTrue($denegados->contains(fn ($p) => $p['submodulo_id'] === 'seleccion' && $p['archivo_id'] === 'base_ingreso'));
+    }
+
+    public function test_quitar_una_pestana_cierra_solo_sus_datos(): void
+    {
+        $this->guardarMatriz(fn ($f) => $f
+            ->push(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'admin_contratos', 'archivo_id' => 'respuestas_formulario']));
+
+        $this->actuarComo('th');
+        $this->getJson('/api/respuestas-ingresos')->assertForbidden();
+        // Las demás pestañas de Administración de Contratos siguen abiertas.
+        $this->getJson('/api/contratos')->assertOk();
+        $this->getJson('/api/base-ingresos')->assertOk();
+        $this->getJson('/api/respuestas-ingresos/datos-contrato')->assertOk();
+        // Otro rol no se ve afectado.
+        $this->actuarComo('tic');
+        $this->getJson('/api/respuestas-ingresos')->assertOk();
+    }
+
+    public function test_una_api_compartida_sigue_abierta_mientras_alguna_pestana_que_la_usa_lo_este(): void
+    {
+        // Requisiciones la usan "Proceso de Selección" y "Candidatos".
+        $this->guardarMatriz(fn ($f) => $f
+            ->push(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'seleccion', 'archivo_id' => 'proceso_seleccion']));
+        $this->actuarComo('th');
+        $this->getJson('/api/requisiciones')->assertOk();
+
+        $this->guardarMatriz(fn ($f) => $f
+            ->push(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'seleccion', 'archivo_id' => 'candidatos']));
+        $this->actuarComo('th');
+        $this->getJson('/api/requisiciones')->assertForbidden();
+        // Candidatos también lo usa "Base de Ingreso", que sigue abierta.
+        $this->getJson('/api/candidatos')->assertOk();
+    }
+
+    public function test_negar_el_submodulo_niega_todas_sus_pestanas(): void
+    {
+        $th = $this->actuarComo('th');
+        PermisoDenegado::create(['rol' => 'th', 'modulo_id' => 'administrativo', 'submodulo_id' => 'seleccion']);
+
+        $this->assertFalse(PermisoDenegado::permite($th, 'administrativo', 'seleccion'));
+        $this->assertFalse(PermisoDenegado::permite($th, 'administrativo', 'seleccion', 'candidatos'));
+        $this->assertTrue(PermisoDenegado::permite($th, 'administrativo', 'admin_contratos', 'avales_contratacion'));
     }
 
     public function test_admin_siempre_tiene_acceso_aunque_la_matriz_niegue_todo(): void

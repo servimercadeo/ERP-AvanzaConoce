@@ -19,4 +19,14 @@ return [
      | del ERP). De ahí se toma la contraseña al dar de alta a un empleado que ya existe allá.
      */
     'avanzaconoce_users_table' => env('AVANZACONOCE_USERS_TABLE', 'users'),
+
+    /*
+     | Crear el usuario en AvanzaConoce al dar de alta a un empleado en el ERP (ver
+     | App\Services\AltaEnAvanzaConoce). Apagado por defecto: se enciende cuando
+     | AvanzaConoce ya tenga publicado POST /api/erp/empleados.
+     */
+    'crear_usuarios_en_avanza' => (bool) env('AVANZACONOCE_CREAR_USUARIOS', false),
+
+    /* Segundos máximos de espera a AvanzaConoce por cada alta (no debe frenar el ERP). */
+    'avanzaconoce_timeout' => (int) env('AVANZACONOCE_TIMEOUT', 10),
 ];

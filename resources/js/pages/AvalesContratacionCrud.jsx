@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { FilterDropdown } from "../components/SearchableSelect";
 import { IconEye, IconEdit, IconClose } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
@@ -66,6 +67,8 @@ const fmtDate = (val) => {
 };
 
 export default function AvalesContratacionCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -579,7 +582,7 @@ export default function AvalesContratacionCrud() {
                                                 >
                                                     <IconEye size={15} />
                                                 </button>
-                                                <button
+                                                {puede.editar && <button
                                                     style={S.actionBtn(
                                                         "#e8f8f5",
                                                         "var(--primary-dark)",
@@ -593,7 +596,7 @@ export default function AvalesContratacionCrud() {
                                                     }
                                                 >
                                                     <IconEdit size={15} />
-                                                </button>
+                                                </button>}
                                                 <button
                                                     style={{
                                                         ...S.actionBtn(
@@ -634,7 +637,7 @@ export default function AvalesContratacionCrud() {
                                                     )}
                                                 </button>
                                                 {/* Con contrato ya creado el aval no se puede anular */}
-                                                {!row.tiene_contrato && (
+                                                {!row.tiene_contrato && puede.editar && (
                                                 <button
                                                     style={{
                                                         ...S.actionBtn(

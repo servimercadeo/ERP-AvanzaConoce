@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconClose,
     IconEdit,
@@ -445,7 +446,7 @@ function CronogramaCard({ entry, onEdit, onToggle }) {
                     </span>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    {entry.activo && (
+                    {entry.activo && onEdit && (
                         <button
                             style={S.actionBtn}
                             onClick={() => onEdit(entry)}
@@ -454,7 +455,7 @@ function CronogramaCard({ entry, onEdit, onToggle }) {
                             <IconEdit size={14} />
                         </button>
                     )}
-                    <button
+                    {onToggle && <button
                         style={{
                             ...S.actionBtn,
                             color: entry.activo ? "#b45309" : "#0d6e5a",
@@ -469,7 +470,7 @@ function CronogramaCard({ entry, onEdit, onToggle }) {
                         ) : (
                             <IconCheckCircle size={14} />
                         )}
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -668,6 +669,8 @@ function CronogramaCard({ entry, onEdit, onToggle }) {
 const FILTROS = ["Todos", "Activo", "Inactivo"];
 
 export default function CronogramaDotacion() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [modalEntry, setModalEntry] = useState(null);
     const [toggleEntry, setToggleEntry] = useState(null);
@@ -859,12 +862,12 @@ export default function CronogramaDotacion() {
                         </button>
                     ))}
                 </div>
-                <button
+                {puede.crear && <button
                     style={S.btnPrimary}
                     onClick={() => setModalEntry(false)}
                 >
                     + Nuevo cronograma
-                </button>
+                </button>}
             </div>
 
             {/* Contenido */}
@@ -902,8 +905,8 @@ export default function CronogramaDotacion() {
                         <CronogramaCard
                             key={c.id}
                             entry={c}
-                            onEdit={() => setModalEntry(c)}
-                            onToggle={() => setToggleEntry(c)}
+                            onEdit={puede.editar ? () => setModalEntry(c) : null}
+                            onToggle={puede.editar ? () => setToggleEntry(c) : null}
                         />
                     ))}
                 </div>

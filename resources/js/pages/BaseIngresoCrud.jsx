@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useAcciones } from "../hooks/useAcciones";
 import { useDebounce } from '../hooks/useDebounce';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
@@ -187,6 +188,8 @@ const getEstadoColors = (estado) => {
 };
 
 export default function BaseIngresoCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
   const [data, setData]           = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [sedes, setSedes]         = useState([]);
@@ -435,7 +438,7 @@ export default function BaseIngresoCrud() {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={S.btnSecondary} onClick={handleSync}>Actualizar</button>
-          <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>
+          {puede.crear && <button style={S.btnPrimary} onClick={() => handleOpenModal('create')}>+ Nuevo ingreso</button>}
         </div>
       </div>
 
@@ -480,8 +483,8 @@ export default function BaseIngresoCrud() {
                       <div style={S.actions}>
                         <button style={S.actionBtn('#e8f0ff', '#1a4fa8')} title="Ver" onClick={() => handleOpenModal('view', row)}><IconEye size={15} /></button>
                         <button style={S.actionBtn('#fff4e0', '#b8720a')} title="Copiar teléfono" onClick={() => handleCopyTelefono(row.telefono)}><IconPhone size={15} /></button>
-                        <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}><IconEdit size={15} /></button>
-                        <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => handleDelete(row.id)}><IconTrash size={15} /></button>
+                        {puede.editar && <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => handleOpenModal('edit', row)}><IconEdit size={15} /></button>}
+                        {puede.eliminar && <button style={S.actionBtn('#fce8e8', '#a33')} title="Eliminar" onClick={() => handleDelete(row.id)}><IconTrash size={15} /></button>}
                       </div>
                     </td>
                   </tr>

@@ -2,10 +2,38 @@
 // cualquier submódulo (ej. "Empleados" dentro de "Administrativo").
 export const SUBMODULO_RAIZ = '_modulo';
 
-// Acceso por módulo/submódulo: lista de DENEGACIÓN administrada desde el módulo Permisos
-// (ver `user.permisos_denegados`, que llega con la sesión). Por defecto todo es visible;
-// una fila en `permisos_denegados` es la excepción que lo oculta para ese rol. "admin"
-// siempre tiene acceso total (nunca llega con nada denegado).
+// Pestañas (archivos) de un submódulo, o las propias del módulo si es SUBMODULO_RAIZ.
+export function archivosDe(mod, submoduleId) {
+  if (!mod) return [];
+  if (submoduleId === SUBMODULO_RAIZ) return mod.archivos ?? [];
+  return (mod.submods ?? []).find((s) => s.id === submoduleId)?.archivos ?? [];
+}
+
+// Acciones que el módulo Permisos puede negar dentro de una pestaña que el rol sí ve. Cada
+// pestaña declara en `acciones` cuáles tiene de verdad (y su página ya las respeta con
+// useAcciones); la matriz solo ofrece esas.
+export const ACCIONES = [
+  { id: 'crear', label: 'Crear' },
+  { id: 'editar', label: 'Editar' },
+  { id: 'eliminar', label: 'Eliminar' },
+  { id: 'importar', label: 'Importar' },
+  { id: 'exportar', label: 'Exportar' },
+];
+
+// Fila de `permisos_denegados` para ese submódulo: sin archivo_id es todo el submódulo;
+// con archivo_id, solo esa pestaña. Sin accion es "no la ve"; con accion, "no puede hacer eso".
+function denegado(user, moduleId, submoduleId, archivoId = '', accion = '') {
+  return (user.permisos_denegados ?? []).some(
+    (p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId
+      && (p.archivo_id ?? '') === archivoId && (p.accion ?? '') === accion,
+  );
+}
+
+// Acceso por módulo/submódulo/pestaña: lista de DENEGACIÓN administrada desde el módulo
+// Permisos (ver `user.permisos_denegados`, que llega con la sesión). Por defecto todo es
+// visible; una fila en `permisos_denegados` es la excepción que lo oculta para ese rol.
+// "admin" siempre tiene acceso total (nunca llega con nada denegado). Un submódulo con
+// todas sus pestañas denegadas también queda oculto.
 export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user) return false;
   if (user.rol === 'admin') return true;
@@ -15,8 +43,25 @@ export function canAccessSubmodule(user, moduleId, submoduleId) {
   if (!user.rol && (moduleId === 'administrativo' || moduleId === 'permisos')) {
     return false;
   }
-  const denegados = user.permisos_denegados ?? [];
-  return !denegados.some((p) => p.modulo_id === moduleId && p.submodulo_id === submoduleId);
+  if (denegado(user, moduleId, submoduleId)) return false;
+
+  const archivos = archivosDe(ERP_MODULES.find((m) => m.id === moduleId), submoduleId);
+  return archivos.length === 0 || archivos.some((a) => !denegado(user, moduleId, submoduleId, a.id));
+}
+
+// Una pestaña es visible si su submódulo lo es y no se le denegó a ella en particular.
+export function canAccessArchivo(user, moduleId, submoduleId, archivoId) {
+  if (!canAccessSubmodule(user, moduleId, submoduleId)) return false;
+  if (!user.rol || user.rol === 'admin') return true;
+  return !denegado(user, moduleId, submoduleId, archivoId);
+}
+
+// ¿Puede hacer `accion` (crear, editar, ...) en esa pestaña? Necesita verla y que la acción
+// no esté negada ni en la pestaña ni en todo el submódulo (igual que PermisoDenegado::permite).
+export function canDo(user, moduleId, submoduleId, archivoId, accion) {
+  if (!canAccessArchivo(user, moduleId, submoduleId, archivoId)) return false;
+  if (!user.rol || user.rol === 'admin') return true;
+  return !denegado(user, moduleId, submoduleId, '', accion) && !denegado(user, moduleId, submoduleId, archivoId, accion);
 }
 
 // Un módulo es visible si al menos uno de sus submódulos (o sus archivos propios, bajo
@@ -72,7 +117,7 @@ export const ERP_MODULES = [
       */
     ],
     archivos: [
-      { id: 'sedes_file',                      label: 'Sedes' },
+      { id: 'sedes_file',                      label: 'Sedes', acciones: ['crear', 'editar', 'eliminar'] },
       // { id: 'relacion',                         label: 'Relación Almacenista - Secretaria Sedes' },
       // { id: 'regionales',                       label: 'Regionales' },
       // { id: 'consultar_contratos',              label: 'Consultar Contratos' },
@@ -93,7 +138,7 @@ export const ERP_MODULES = [
         icon: 'usuarios',
         desc: 'Gestión completa de empleados',
         archivos: [
-          { id: 'empleados_file', label: 'Empleados' },
+          { id: 'empleados_file', label: 'Empleados', acciones: ['crear', 'editar', 'eliminar', 'importar', 'exportar'] },
         ]
       },
       {
@@ -102,9 +147,9 @@ export const ERP_MODULES = [
         icon: 'usuarios',
         desc: 'Proceso de selección de personal',
         archivos: [
-          { id: 'proceso_seleccion', label: 'Proceso de Selección' },
-          { id: 'candidatos', label: 'Candidatos' },
-          { id: 'base_ingreso', label: 'Base de Ingreso' }
+          { id: 'proceso_seleccion', label: 'Proceso de Selección', acciones: ['crear', 'editar'] },
+          { id: 'candidatos', label: 'Candidatos', acciones: ['editar'] },
+          { id: 'base_ingreso', label: 'Base de Ingreso', acciones: ['crear', 'editar', 'eliminar'] }
         ]
       },
       {
@@ -113,11 +158,11 @@ export const ERP_MODULES = [
         icon: 'admin_contratos',
         desc: 'Gestión de contratos',
         archivos: [
-          { id: 'avales_contratacion', label: 'Avales de Contratación' },
-          { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos' },
-          { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos' },
-          { id: 'Seguros_medicos', label: 'Seguimiento' },
-          { id: 'centros_costos_catalogo', label: 'Centros de Costos' },
+          { id: 'avales_contratacion', label: 'Avales de Contratación', acciones: ['editar'] },
+          { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos', acciones: ['eliminar'] },
+          { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos', acciones: ['crear', 'editar', 'importar', 'exportar'] },
+          { id: 'Seguros_medicos', label: 'Seguimiento', acciones: ['editar'] },
+          { id: 'centros_costos_catalogo', label: 'Centros de Costos', acciones: ['crear', 'editar', 'eliminar'] },
           // { id: 'auxilios_contratos', label: 'Auxilios Contratos' },
           // { id: 'empleadores', label: 'Empleadores' },
           // { id: 'consultar_vacaciones', label: 'Consultar Vacaciones por Tomar' },
@@ -237,11 +282,11 @@ export const ERP_MODULES = [
         icon: 'dotacion',
         desc: 'Control de dotación de uniformes por empleado: tallas, cantidades, actas y renovaciones',
         archivos: [
-          { id: 'productos_dotacion',   label: 'Inventario de dotación' },
-          { id: 'pedidos_dotacion',    label: 'Pedidos automáticos' },
-          { id: 'pedidos_globales',    label: 'Pedidos globales' },
+          { id: 'productos_dotacion',   label: 'Inventario de dotación', acciones: ['crear', 'editar', 'eliminar', 'importar', 'exportar'] },
+          { id: 'pedidos_dotacion',    label: 'Pedidos automáticos', acciones: ['crear', 'editar', 'eliminar', 'importar', 'exportar'] },
+          { id: 'pedidos_globales',    label: 'Pedidos globales', acciones: ['editar', 'eliminar', 'importar', 'exportar'] },
           { id: 'trazabilidad_pedidos', label: 'Trazabilidad' },
-          { id: 'cronograma',          label: 'Cronograma' },
+          { id: 'cronograma',          label: 'Cronograma', acciones: ['crear', 'editar'] },
         ]
       },
       {
@@ -250,7 +295,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Inventario de activos por sede',
         archivos: [
-          { id: 'inventario_activos', label: 'Inventario de Activos' },
+          { id: 'inventario_activos', label: 'Inventario de Activos', acciones: ['crear', 'editar', 'eliminar', 'exportar'] },
         ]
       },
       {
@@ -259,7 +304,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Inventario de materiales por sede',
         archivos: [
-          { id: 'inventario_materiales', label: 'Inventario de Materiales' },
+          { id: 'inventario_materiales', label: 'Inventario de Materiales', acciones: ['crear', 'editar', 'eliminar', 'exportar'] },
         ]
       },
       {
@@ -268,7 +313,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Inventario de equipos por sede',
         archivos: [
-          { id: 'inventario_equipos', label: 'Inventario de Equipos' },
+          { id: 'inventario_equipos', label: 'Inventario de Equipos', acciones: ['crear', 'editar', 'eliminar', 'exportar'] },
         ]
       },
       {
@@ -277,7 +322,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Inventario de elementos de protección personal por sede',
         archivos: [
-          { id: 'inventario_epp', label: 'Inventario de EPP' },
+          { id: 'inventario_epp', label: 'Inventario de EPP', acciones: ['crear', 'editar', 'eliminar', 'exportar'] },
         ]
       },
       {
@@ -286,7 +331,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Inventario de herramientas por sede',
         archivos: [
-          { id: 'inventario_herramientas', label: 'Inventario de Herramientas' },
+          { id: 'inventario_herramientas', label: 'Inventario de Herramientas', acciones: ['crear', 'editar', 'eliminar', 'exportar'] },
         ]
       },
       {
@@ -295,8 +340,8 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Todo el inventario de productos por sede, filtrable por sede y categoría',
         archivos: [
-          { id: 'inventario_general', label: 'Inventario General' },
-          { id: 'aprobacion_traslado_file', label: 'Aprobación de Traslado' },
+          { id: 'inventario_general', label: 'Inventario General', acciones: ['crear', 'editar', 'eliminar', 'importar', 'exportar'] },
+          { id: 'aprobacion_traslado_file', label: 'Aprobación de Traslado', acciones: ['editar'] },
         ]
       },
       {
@@ -305,7 +350,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Custodia de productos y equipos por empleado',
         archivos: [
-          { id: 'asignacion_inventario_file', label: 'Asignación de Inventario' },
+          { id: 'asignacion_inventario_file', label: 'Asignación de Inventario', acciones: ['crear', 'editar'] },
         ]
       },
       {
@@ -314,7 +359,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Elige un empleado y consulta qué tiene asignado actualmente',
         archivos: [
-          { id: 'inventario_empleado_file', label: 'Inventario de Empleado' },
+          { id: 'inventario_empleado_file', label: 'Inventario de Empleado', acciones: ['editar', 'exportar'] },
         ]
       },
       {
@@ -323,7 +368,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
         archivos: [
-          { id: 'work_orders_file', label: 'Work Orders' },
+          { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
         ]
       },
       /*
@@ -363,7 +408,7 @@ export const ERP_MODULES = [
         icon: 'pedidos',
         desc: 'Gestión de pedidos',
         archivos: [
-          { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos' }
+          { id: 'ver_crear_pedidos', label: 'Ver y Crear Pedidos', acciones: ['crear', 'editar', 'eliminar', 'exportar'] }
         ]
       },
       {
@@ -372,8 +417,8 @@ export const ERP_MODULES = [
         icon: 'compras',
         desc: 'Seguimiento de pedidos enviados a compras',
         archivos: [
-          { id: 'ver_compras', label: 'Compras' },
-          { id: 'ver_crear_orden_compra', label: 'Ver y Crear Orden de Compra' }
+          { id: 'ver_compras', label: 'Compras', acciones: ['editar'] },
+          { id: 'ver_crear_orden_compra', label: 'Ver y Crear Orden de Compra', acciones: ['crear', 'eliminar'] }
         ]
       },
       {
@@ -382,7 +427,7 @@ export const ERP_MODULES = [
         icon: 'pedidos',
         desc: 'Asignar quién gestiona cada pedido',
         archivos: [
-          { id: 'asignacion_pedidos_file', label: 'Asignación de Pedidos' }
+          { id: 'asignacion_pedidos_file', label: 'Asignación de Pedidos', acciones: ['editar'] }
         ]
       },
       /*
@@ -450,7 +495,7 @@ export const ERP_MODULES = [
         icon: 'empleadores_cat',
         desc: 'Catálogo de empleadores',
         archivos: [
-          { id: 'empleadores_file', label: 'Empleadores' },
+          { id: 'empleadores_file', label: 'Empleadores', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -459,7 +504,7 @@ export const ERP_MODULES = [
         icon: 'empresas_cat',
         desc: 'Catálogo de empresas',
         archivos: [
-          { id: 'empresas_file', label: 'Empresas' },
+          { id: 'empresas_file', label: 'Empresas', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -468,7 +513,7 @@ export const ERP_MODULES = [
         icon: 'regionales_cat',
         desc: 'Catálogo de regionales',
         archivos: [
-          { id: 'regionales_file', label: 'Regionales' },
+          { id: 'regionales_file', label: 'Regionales', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -477,7 +522,7 @@ export const ERP_MODULES = [
         icon: 'centros_costos_cat',
         desc: 'Catálogo de centros de costo',
         archivos: [
-          { id: 'centros_costos_file', label: 'Centros de Costos' },
+          { id: 'centros_costos_file', label: 'Centros de Costos', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -486,7 +531,7 @@ export const ERP_MODULES = [
         icon: 'proyectos_cat',
         desc: 'Catálogo de proyectos',
         archivos: [
-          { id: 'proyectos_file', label: 'Proyectos' },
+          { id: 'proyectos_file', label: 'Proyectos', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -495,7 +540,7 @@ export const ERP_MODULES = [
         icon: 'pedidos',
         desc: 'Catálogo de clases de pedido',
         archivos: [
-          { id: 'clases_pedido_file', label: 'Clases de Pedidos' },
+          { id: 'clases_pedido_file', label: 'Clases de Pedidos', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -504,7 +549,7 @@ export const ERP_MODULES = [
         icon: 'config',
         desc: 'Catálogo de conceptos de pedido',
         archivos: [
-          { id: 'conceptos_pedido_file', label: 'Conceptos de Pedidos' },
+          { id: 'conceptos_pedido_file', label: 'Conceptos de Pedidos', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -513,8 +558,8 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Catálogo de categorías de producto. Crear una nueva genera su propio módulo en Inventarios',
         archivos: [
-          { id: 'categoria_producto_file', label: 'Categoría del Producto' },
-          { id: 'tipo_producto_file', label: 'Tipo de Producto' },
+          { id: 'categoria_producto_file', label: 'Categoría del Producto', acciones: ['crear', 'editar', 'eliminar'] },
+          { id: 'tipo_producto_file', label: 'Tipo de Producto', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
       {
@@ -523,12 +568,12 @@ export const ERP_MODULES = [
         icon: 'empresas_cat',
         desc: 'Catálogo de proveedores',
         archivos: [
-          { id: 'proveedores_file', label: 'Proveedores' },
+          { id: 'proveedores_file', label: 'Proveedores', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       }
     ],
     archivos: [
-      { id: 'ver_y_crear_parametros', label: 'Ver y Crear Parametros' },
+      { id: 'ver_y_crear_parametros', label: 'Ver y Crear Parametros', acciones: ['crear', 'editar', 'eliminar'] },
     ]
   },
   {
@@ -544,7 +589,7 @@ export const ERP_MODULES = [
         icon: 'permisos',
         desc: 'Visibilidad de módulos y submódulos por rol',
         archivos: [
-          { id: 'permisos_file', label: 'Roles y Permisos' },
+          { id: 'permisos_file', label: 'Roles y Permisos', acciones: ['editar'] },
         ]
       },
       {
@@ -553,7 +598,7 @@ export const ERP_MODULES = [
         icon: 'permisos',
         desc: 'Rastro de quién creó, editó o eliminó qué en el sistema',
         archivos: [
-          { id: 'auditoria_file', label: 'Auditoría del Sistema' },
+          { id: 'auditoria_file', label: 'Auditoría del Sistema', acciones: ['exportar'] },
         ]
       }
     ],

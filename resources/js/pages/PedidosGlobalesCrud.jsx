@@ -9,6 +9,7 @@ import {
     IconClose,
 } from "../components/Icons";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 8;
@@ -1360,6 +1361,8 @@ function ImportPedidosGlobalesModal({
 }
 
 export default function PedidosGlobalesCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const [filtroEstado, setFiltroEstado] = useState("Todos");
@@ -1670,19 +1673,19 @@ export default function PedidosGlobalesCrud() {
                     <option value="Pedido confirmado">Pedido confirmado</option>
                     <option value="Completado">Completado</option>
                 </SelectBuscable>
-                <button
+                {puede.exportar && <button
                     style={S.btnSecondary}
                     onClick={handleExport}
                     disabled={filtered.length === 0}
                 >
                     Exportar Excel
-                </button>
-                <button
+                </button>}
+                {puede.importar && <button
                     style={S.btnSecondary}
                     onClick={() => setImportOpen(true)}
                 >
                     Importar Excel
-                </button>
+                </button>}
             </div>
 
             {selectedIds.size > 0 && (
@@ -1705,7 +1708,7 @@ export default function PedidosGlobalesCrud() {
                             Devolución usada
                         </option>
                     </SelectBuscable>
-                    <button
+                    {puede.editar && <button
                         style={{
                             ...S.btnPrimary,
                             opacity: bulkSaving ? 0.6 : 1,
@@ -1714,7 +1717,7 @@ export default function PedidosGlobalesCrud() {
                         disabled={bulkSaving}
                     >
                         {bulkSaving ? "Aplicando…" : "Aplicar"}
-                    </button>
+                    </button>}
                     <button
                         style={S.btnSecondary}
                         onClick={() => setSelectedIds(new Set())}
@@ -2081,7 +2084,7 @@ export default function PedidosGlobalesCrud() {
                                                             "center",
                                                     }}
                                                 >
-                                                    <button
+                                                    {puede.editar && <button
                                                         style={S.actionBtn}
                                                         title="Editar"
                                                         onClick={() =>
@@ -2089,8 +2092,8 @@ export default function PedidosGlobalesCrud() {
                                                         }
                                                     >
                                                         <IconEdit size={14} />
-                                                    </button>
-                                                    {!g.confirmado && (
+                                                    </button>}
+                                                    {!g.confirmado && puede.editar && (
                                                         <button
                                                             style={{
                                                                 ...S.actionBtn,
@@ -2117,7 +2120,7 @@ export default function PedidosGlobalesCrud() {
                                                             </svg>
                                                         </button>
                                                     )}
-                                                    {g.confirmado &&
+                                                    {g.confirmado && puede.editar &&
                                                         !g.entrega_confirmada && (
                                                             <button
                                                                 style={{
@@ -2188,7 +2191,7 @@ export default function PedidosGlobalesCrud() {
                                                             </svg>
                                                         </span>
                                                     )}
-                                                    <button
+                                                    {puede.eliminar && <button
                                                         style={{
                                                             ...S.actionBtn,
                                                             color: "#c0392b",
@@ -2199,7 +2202,7 @@ export default function PedidosGlobalesCrud() {
                                                         }
                                                     >
                                                         <IconTrash size={14} />
-                                                    </button>
+                                                    </button>}
                                                 </div>
                                             </td>
                                         </tr>

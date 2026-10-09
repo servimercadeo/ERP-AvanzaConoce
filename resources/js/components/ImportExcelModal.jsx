@@ -65,6 +65,9 @@ export default function ImportExcelModal({
                         { titulo: "Nombre", tipo: "texto", ancho: 32, valor: (d) => d.nombre },
                         { titulo: "Usuario (email)", tipo: "texto", ancho: 32, valor: (d) => d.credenciales.email },
                         { titulo: "Contraseña", tipo: "texto", ancho: 20, valor: (d) => d.credenciales.password },
+                        ...(conCredenciales.some((d) => d.credenciales.avanza)
+                            ? [{ titulo: "AvanzaConoce", tipo: "texto", ancho: 50, valor: (d) => d.credenciales.avanza?.mensaje ?? "" }]
+                            : []),
                     ],
                     filas: conCredenciales,
                 },
@@ -331,6 +334,18 @@ export default function ImportExcelModal({
                                     </p>
                                 </div>
                             )}
+                            {result.sin_celular?.length > 0 && (
+                                <div style={S.notFoundBox}>
+                                    <p style={S.notFoundTitle}>
+                                        Sin celular (no se dieron de alta ni se generaron
+                                        credenciales; el celular es obligatorio. Agrégalo en
+                                        el Excel o en Empleados):
+                                    </p>
+                                    <p style={S.notFoundText}>
+                                        {result.sin_celular.join(", ")}
+                                    </p>
+                                </div>
+                            )}
                             {result.sin_contrato?.length > 0 && (
                                 <div style={S.notFoundBox}>
                                     <p style={S.notFoundTitle}>
@@ -394,6 +409,11 @@ export default function ImportExcelModal({
                                                             {d.credenciales
                                                                 ? `${d.credenciales.email} / ${d.credenciales.password}`
                                                                 : "—"}
+                                                            {d.credenciales?.avanza && (
+                                                                <div style={{ fontSize: "0.75rem", color: ["ok", "existente"].includes(d.credenciales.avanza.estado) ? "var(--primary-dark)" : "#8a5a00" }}>
+                                                                    AvanzaConoce: {d.credenciales.avanza.mensaje}
+                                                                </div>
+                                                            )}
                                                         </td>
                                                     )}
                                                 </tr>

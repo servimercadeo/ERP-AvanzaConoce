@@ -38,6 +38,21 @@ class CredencialesAvanzaConoce
     /** Contraseña cifrada del usuario de AvanzaConoce con esa cédula, o null. */
     public static function passwordEnAvanza(?string $cedula): ?string
     {
+        $hash = self::columnaEnAvanza($cedula, 'password');
+
+        // Solo bcrypt, el formato que valida el ERP.
+        return is_string($hash) && str_starts_with($hash, '$2y$') ? $hash : null;
+    }
+
+    /** id del usuario de AvanzaConoce con esa cédula, o null. */
+    public static function idEnAvanza(?string $cedula): ?int
+    {
+        $id = self::columnaEnAvanza($cedula, 'id');
+        return is_numeric($id) ? (int) $id : null;
+    }
+
+    private static function columnaEnAvanza(?string $cedula, string $columna): mixed
+    {
         $cedula = trim((string) $cedula);
         if (!self::disponible() || !ctype_digit($cedula)) {
             return null;
@@ -46,14 +61,11 @@ class CredencialesAvanzaConoce
         try {
             // DB::raw: la tabla de AvanzaConoce no lleva el prefijo `erp_` del ERP.
             $tabla = str_replace('`', '', (string) config('sso.avanzaconoce_users_table', 'users'));
-            $hash = DB::table(DB::raw("`{$tabla}`"))->where('nit', $cedula)->value('password');
+            return DB::table(DB::raw("`{$tabla}`"))->where('nit', $cedula)->value($columna);
         } catch (\Throwable $e) {
-            Log::warning('No se pudo leer la contraseña de AvanzaConoce para la cédula ' . $cedula . ': ' . $e->getMessage());
+            Log::warning("No se pudo leer {$columna} de AvanzaConoce para la cédula {$cedula}: " . $e->getMessage());
             return null;
         }
-
-        // Solo bcrypt, el formato que valida el ERP.
-        return is_string($hash) && str_starts_with($hash, '$2y$') ? $hash : null;
     }
 
     /**

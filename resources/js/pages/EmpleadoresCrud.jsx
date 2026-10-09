@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { SearchableSelect } from "../components/SearchableSelect";
 import {
     IconSearch,
@@ -263,6 +264,7 @@ function ContactosModal({
     onChanged,
     regionesDisponibles,
 }) {
+    const puede = useAcciones();
     const [contactoModalOpen, setContactoModalOpen] = useState(false);
     const [editContacto, setEditContacto] = useState(null);
 
@@ -310,7 +312,7 @@ function ContactosModal({
                             marginBottom: 12,
                         }}
                     >
-                        <button
+                        {puede.editar && <button
                             className="btn-primary"
                             style={{
                                 display: "inline-flex",
@@ -325,7 +327,7 @@ function ContactosModal({
                             }}
                         >
                             <IconPlus size={13} /> Nuevo contacto
-                        </button>
+                        </button>}
                     </div>
 
                     {contactos.length === 0 ? (
@@ -355,7 +357,7 @@ function ContactosModal({
                                         <td>{c.regional?.nombre ?? "—"}</td>
                                         <td>
                                             <div style={S.actions}>
-                                                <button
+                                                {puede.editar && <button
                                                     style={S.actionBtn(
                                                         "var(--primary-light)",
                                                         "var(--primary-dark)",
@@ -369,8 +371,8 @@ function ContactosModal({
                                                     }}
                                                 >
                                                     <IconEdit size={14} />
-                                                </button>
-                                                <button
+                                                </button>}
+                                                {puede.editar && <button
                                                     style={S.actionBtn(
                                                         "#fce8e8",
                                                         "#a33",
@@ -381,7 +383,7 @@ function ContactosModal({
                                                     }
                                                 >
                                                     <IconTrash size={14} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>
@@ -410,6 +412,8 @@ function ContactosModal({
 
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function EmpleadoresCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 280);
@@ -520,9 +524,9 @@ export default function EmpleadoresCrud() {
                         }}
                     />
                 </div>
-                <button className="btn-primary" onClick={handleCreate}>
+                {puede.crear && <button className="btn-primary" onClick={handleCreate}>
                     + Nuevo Empleador
-                </button>
+                </button>}
             </div>
 
             <div style={S.tableWrap}>
@@ -594,7 +598,7 @@ export default function EmpleadoresCrud() {
                                     </td>
                                     <td>
                                         <div style={S.actions}>
-                                            <button
+                                            {puede.editar && <button
                                                 style={S.actionBtn(
                                                     "var(--primary-light)",
                                                     "var(--primary-dark)",
@@ -603,8 +607,8 @@ export default function EmpleadoresCrud() {
                                                 onClick={() => handleEdit(e)}
                                             >
                                                 <IconEdit size={14} />
-                                            </button>
-                                            <button
+                                            </button>}
+                                            {puede.eliminar && <button
                                                 style={S.actionBtn(
                                                     "#fce8e8",
                                                     "#a33",
@@ -613,7 +617,7 @@ export default function EmpleadoresCrud() {
                                                 onClick={() => handleDelete(e)}
                                             >
                                                 <IconTrash size={14} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -379,6 +380,8 @@ function VerModal({ item, onClose }) {
 
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function WorkOrdersCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
@@ -466,9 +469,9 @@ export default function WorkOrdersCrud() {
                     <option value="">Todos los proveedores</option>
                     {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
                 </SelectBuscable>
-                <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
+                {puede.importar && <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
                     <IconPlus size={14} /> Importar
-                </button>
+                </button>}
             </div>
 
             <div style={S.tableWrap}>
@@ -520,9 +523,9 @@ export default function WorkOrdersCrud() {
                                             <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver todos los datos" onClick={() => setVerTarget(w)}>
                                                 <IconEye size={14} />
                                             </button>
-                                            <button style={S.actionBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => setDeleteTarget(w)}>
+                                            {puede.eliminar && <button style={S.actionBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => setDeleteTarget(w)}>
                                                 <IconTrash size={14} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

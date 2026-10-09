@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconClose, IconEmptySearch, IconLoading, IconTrash } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -135,8 +136,12 @@ function VerOrdenModal({ orden, onClose, onImprimir, imprimiendo }) {
 }
 
 export default function OrdenCompraCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
-    const [vista, setVista] = useState("crear");
+    const [vistaElegida, setVista] = useState(null);
+    // Sin permiso de crear, solo queda el historial.
+    const vista = vistaElegida ?? (puede.crear ? "crear" : "historial");
     const [toast, setToast] = useState(null);
     const showToast = (msg, isError = false) => {
         setToast({ msg, isError });
@@ -296,7 +301,7 @@ export default function OrdenCompraCrud() {
             {toast && <div style={{ ...S.toast, ...(toast.isError ? S.toastError : {}) }}>{toast.msg}</div>}
 
             <div style={S.tabBar}>
-                {[{ id: "crear", label: "Crear Orden de Compra" }, { id: "historial", label: "Historial de Órdenes" }].map((t) => (
+                {[...(puede.crear ? [{ id: "crear", label: "Crear Orden de Compra" }] : []), { id: "historial", label: "Historial de Órdenes" }].map((t) => (
                     <button key={t.id} style={{ ...S.tab, ...(vista === t.id ? S.tabActive : {}) }} onClick={() => setVista(t.id)}>
                         {t.label}
                     </button>
@@ -514,7 +519,7 @@ export default function OrdenCompraCrud() {
                                                 >
                                                     {imprimiendoId === o.id ? "Abriendo…" : "🖨 Imprimir"}
                                                 </button>
-                                                <button style={{ ...S.btnSecondary, color: "#a33" }} onClick={() => handleEliminarOrden(o)}>Eliminar</button>
+                                                {puede.eliminar && <button style={{ ...S.btnSecondary, color: "#a33" }} onClick={() => handleEliminarOrden(o)}>Eliminar</button>}
                                             </div>
                                         </td>
                                     </tr>

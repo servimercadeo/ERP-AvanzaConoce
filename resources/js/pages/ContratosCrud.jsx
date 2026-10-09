@@ -9,6 +9,7 @@ import AvisoModal from "../components/AvisoModal";
 import BotonArchivo from "../components/BotonArchivo";
 import DocumentosEmpleadoPanel from "../components/DocumentosEmpleadoPanel";
 import { useAuth } from "../context/AuthContext";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch,
     IconEye,
@@ -2512,6 +2513,8 @@ export default function ContratosCrud() {
     // salario ni auxilio de transporte.
     const { user } = useAuth();
     const puedeVerInfoSensible = user?.rol === "th" || user?.rol === "admin";
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [contratos, setContratos] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -3044,7 +3047,7 @@ export default function ContratosCrud() {
                     </button>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
+                    {puede.exportar && <button
                         style={{
                             border: "1px solid var(--border)",
                             background: "var(--white)",
@@ -3060,8 +3063,8 @@ export default function ContratosCrud() {
                         title="Exporta los contratos que coinciden con la búsqueda y los filtros activos"
                     >
                         {exporting ? "Exportando…" : "Exportar Excel"}
-                    </button>
-                    <button
+                    </button>}
+                    {puede.importar && <button
                         style={{
                             border: "1px solid var(--border)",
                             background: "var(--white)",
@@ -3079,8 +3082,8 @@ export default function ContratosCrud() {
                         }}
                     >
                         Importar Excel
-                    </button>
-                    <button
+                    </button>}
+                    {puede.crear && <button
                         className="btn-primary"
                         onClick={() => {
                             setEditTarget(null);
@@ -3088,7 +3091,7 @@ export default function ContratosCrud() {
                         }}
                     >
                         + Nuevo contrato
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -3203,7 +3206,7 @@ export default function ContratosCrud() {
                                             >
                                                 <IconEye />
                                             </button>
-                                            <button
+                                            {puede.editar && <button
                                                 style={S.actionBtn(
                                                     "#e8f8f5",
                                                     "var(--primary-dark)",
@@ -3221,7 +3224,7 @@ export default function ContratosCrud() {
                                                 }}
                                             >
                                                 <IconEdit />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

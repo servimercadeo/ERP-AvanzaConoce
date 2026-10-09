@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAcciones } from "../hooks/useAcciones";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { useDebounce } from '../hooks/useDebounce';
@@ -455,6 +456,8 @@ const PROYECTO_COLORS = {
 };
 
 export default function ProductosDotacion() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const { user } = useAuth();
     // Por defecto se filtra por la sede del usuario logueado; si no tiene sede
@@ -749,12 +752,12 @@ export default function ProductosDotacion() {
                     </div>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-                    <button style={S.btnSecondary} onClick={handleExport} disabled={exporting || (pagina?.total ?? 0) === 0}>
+                    {puede.exportar && <button style={S.btnSecondary} onClick={handleExport} disabled={exporting || (pagina?.total ?? 0) === 0}>
                         {exporting ? 'Exportando…' : 'Exportar Excel'}
-                    </button>
-                    <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>Importar Excel</button>
-                    <button style={S.btnSecondary} onClick={() => setBulkOpen(true)}>Carga masiva</button>
-                    <button style={S.btnPrimary} onClick={() => setAddOpen(true)}>+ Nuevo item</button>
+                    </button>}
+                    {puede.importar && <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>Importar Excel</button>}
+                    {puede.importar && <button style={S.btnSecondary} onClick={() => setBulkOpen(true)}>Carga masiva</button>}
+                    {puede.crear && <button style={S.btnPrimary} onClick={() => setAddOpen(true)}>+ Nuevo item</button>}
                 </div>
             </div>
 
@@ -807,12 +810,12 @@ export default function ProductosDotacion() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                                                <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => setEditItem(item)}>
+                                                {puede.editar && <button style={S.actionBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => setEditItem(item)}>
                                                     <IconEdit size={14} />
-                                                </button>
-                                                <button style={S.actionBtn('#fce8e8', '#c0392b')} title="Eliminar" onClick={() => setDeleteItem(item)}>
+                                                </button>}
+                                                {puede.eliminar && <button style={S.actionBtn('#fce8e8', '#c0392b')} title="Eliminar" onClick={() => setDeleteItem(item)}>
                                                     <IconTrash size={14} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>

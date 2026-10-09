@@ -2,7 +2,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { canAccessModule, canAccessSubmodule } from '../data/erpModules';
+import { canAccessModule, canAccessSubmodule, canAccessArchivo } from '../data/erpModules';
+import { PestanaContext } from '../hooks/useAcciones';
 import { useErpModules } from '../hooks/useErpModules';
 import { MODULE_ICONS, IconFolder, IconUnderConstruction, IconLoading } from '../components/Icons';
 
@@ -395,22 +396,20 @@ export default function Submodule() {
   const mod = erpModules.find(m => m.id === moduleId);
   const sub = mod ? mod.submods.find(s => s.id === submoduleId) : null;
 
-  /* Pestaña activa: por defecto la primera */
-  const [tabActiva, setTabActiva] = useState(() => {
-    const archivos = sub?.archivos ?? [];
-    return archivos.some(archivo => archivo.id === archivoId)
-      ? archivoId
-      : archivos[0]?.id ?? null;
-  });
+  /* Solo las pestañas que la matriz de Permisos le deja ver a este rol */
+  const archivos = (sub?.archivos ?? []).filter(a => canAccessArchivo(user, moduleId, submoduleId, a.id));
 
+  /* Pestaña activa: la de la URL si se puede ver; si no, la primera visible */
+  const pestanaInicial = () => (archivos.some(archivo => archivo.id === archivoId)
+    ? archivoId
+    : archivos[0]?.id ?? null);
+  const [tabActiva, setTabActiva] = useState(pestanaInicial);
+
+  const idsVisibles = archivos.map(a => a.id).join('|');
   useEffect(() => {
-    const archivos = sub?.archivos ?? [];
-    const archivoValido = archivoId && archivos.some(archivo => archivo.id === archivoId)
-      ? archivoId
-      : archivos[0]?.id ?? null;
-
-    setTabActiva(archivoValido);
-  }, [archivoId, sub]);
+    setTabActiva(pestanaInicial());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archivoId, sub, idsVisibles]);
 
   if (!mod || !sub) {
     return (
@@ -426,7 +425,6 @@ export default function Submodule() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const archivos       = sub.archivos ?? [];
   const archivoActual  = archivos.find(a => a.id === tabActiva);
   const CrudComponent  = tabActiva ? resolveSubCrud(moduleId, submoduleId, tabActiva, sub) : null;
 
@@ -503,7 +501,9 @@ export default function Submodule() {
                 </p>
               </div>
               <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
-                <CrudComponent categoria={sub.categoriaDinamica} />
+                <PestanaContext.Provider value={{ moduleId: mod.id, submoduleId: sub.id, archivoId: tabActiva }}>
+                  <CrudComponent categoria={sub.categoriaDinamica} />
+                </PestanaContext.Provider>
               </Suspense>
             </>
           ) : (

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IconFile, MODULE_ICONS, IconFolder } from './Icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, NavLink } from 'react-router-dom';
-import { canAccessModule, canAccessSubmodule, SUBMODULO_RAIZ } from '../data/erpModules';
+import { canAccessModule, canAccessSubmodule, canAccessArchivo, SUBMODULO_RAIZ } from '../data/erpModules';
 import { useErpModules } from '../hooks/useErpModules';
 
 export default function Header() {
@@ -86,7 +86,7 @@ export default function Header() {
                       </Link>
                       {sub.archivos?.length > 0 && (
                         <div className="sub-dropdown">
-                          {sub.archivos.map(archivo => (
+                          {sub.archivos.filter(archivo => canAccessArchivo(user, mod.id, sub.id, archivo.id)).map(archivo => (
                             <Link key={archivo.id} to={`/module/${mod.id}/submodule/${sub.id}/file/${archivo.id}`} onClick={closeMobileMenu}>
                               <span className="sub-icon"><IconFile size={14} /></span>
                               <span>{archivo.label}</span>
@@ -97,7 +97,7 @@ export default function Header() {
                     </div>
                   ))
                 ) : (
-                  canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ) && mod.archivos?.map(archivo => (
+                  canAccessSubmodule(user, mod.id, SUBMODULO_RAIZ) && mod.archivos?.filter(archivo => canAccessArchivo(user, mod.id, SUBMODULO_RAIZ, archivo.id)).map(archivo => (
                     <Link key={archivo.id} to={`/module/${mod.id}`} onClick={closeMobileMenu}>
                       <span className="sub-icon"><IconFile size={14} /></span>
                       <span>{archivo.label}</span>
