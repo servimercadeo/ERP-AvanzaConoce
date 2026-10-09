@@ -26,7 +26,7 @@ function AprobarSerialesModal({ traslado, onClose, onConfirmar, procesando }) {
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
-                    <span style={{ fontWeight: 800, fontSize: "1rem" }}>Elegir seriales a trasladar</span>
+                    <span style={{ fontWeight: 800, fontSize: "1rem" }}>Elegir seriales  trasladar</span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
                 </div>
                 <div style={S.modalBody}>
