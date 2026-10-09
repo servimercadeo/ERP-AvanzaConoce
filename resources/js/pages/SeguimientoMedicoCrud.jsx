@@ -2,9 +2,12 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import AvisoModal from "../components/AvisoModal";
+import BotonArchivo from "../components/BotonArchivo";
+import DocumentosEmpleadoPanel from "../components/DocumentosEmpleadoPanel";
 import {
     IconSearch, IconEye, IconEdit, IconClose,
-    IconEmptySearch, IconLoading, IconTrash,
+    IconEmptySearch, IconLoading,
 } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -38,8 +41,6 @@ const DOCS_MEDICOS = [
 ];
 const DOCS_MED_INIT = () => Object.fromEntries(DOCS_MEDICOS.map(d => [d.id, { file: null, status: "idle", name: null, error: null }]));
 
-const RESPONSABLES_DOC = ["Julián", "Jhonatan", "Juan Carlos", "Beatriz"];
-const DOC_EMPLEADO_VACIO = { nombre_documento: "", nombre_seguimiento: "", fecha_seguimiento: "", responsable: "" };
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
@@ -78,7 +79,6 @@ function Field({ label, k, type = "text", opts, req, form, errors = {}, onChange
 
 /* ─── Modal de ver / editar ─────────────────────────────────────────── */
 function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyectoOpts, empleados, onSave }) {
-    const qc = useQueryClient();
     const [form, setForm]                         = useState({});
     const [eventos, setEventos]                   = useState([]);
     const [eventosCollapsed, setEventosCollapsed] = useState([]);
@@ -90,22 +90,13 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
     const [eventoDocIdx, setEventoDocIdx]         = useState(0);
+    const [docPendiente, setDocPendiente]         = useState(false);
+    const [avisoDocPendiente, setAvisoDocPendiente] = useState(false);
     const [extraNombre, setExtraNombre]           = useState("");
     const [extraArchivo, setExtraArchivo]         = useState(null);
     const [subiendoExtra, setSubiendoExtra]       = useState(false);
     const [extraError, setExtraError]             = useState("");
     const [extraInputKey, setExtraInputKey]       = useState(0);
-    const [docForm, setDocForm]                   = useState(DOC_EMPLEADO_VACIO);
-    const [docArchivo, setDocArchivo]             = useState(null);
-    const [guardandoDoc, setGuardandoDoc]         = useState(false);
-    const [editandoDocId, setEditandoDocId]       = useState(null);
-
-    const empleadoId = contrato?.empleado_id;
-    const { data: docsEmpleado = [], isLoading: cargandoDocs } = useQuery({
-        queryKey: ["documentos-empleado", empleadoId],
-        queryFn: () => api.get("/documentos-empleado", { params: { user_id: empleadoId } }).then(r => r.data),
-        enabled: open && !!empleadoId,
-    });
 
     const eventoIdx = Math.max(0, Math.min(eventoDocIdx, eventos.length - 1));
     const eventoSel = eventos[eventoIdx] ?? null;
@@ -136,14 +127,11 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
             setEvCierre(_evs.map(() => true));
             setSaving(false);
             setActive("empleado");
+            setDocPendiente(false);
             setDocsMed(DOCS_MED_INIT());
             setUploadingMed(false);
             setDocsSubidos({});
             setEventoDocIdx(0);
-            setDocForm(DOC_EMPLEADO_VACIO);
-            setDocArchivo(null);
-            setGuardandoDoc(false);
-            setEditandoDocId(null);
         }
     }, [open, contrato]);
 
@@ -267,6 +255,11 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
     };
 
     const handleSave = async () => {
+        if (docPendiente) {
+            setActive("doc_empleado");
+            setAvisoDocPendiente(true);
+            return;
+        }
         setSaving(true);
         try {
             await onSave(contrato.id, { ...form, eventos_medicos: eventos });
@@ -276,55 +269,6 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
         }
     };
 
-    const docFormValido = docForm.nombre_documento && docForm.nombre_seguimiento && docForm.fecha_seguimiento && docForm.responsable;
-
-    const handleAgregarDoc = async () => {
-        if (!docFormValido || guardandoDoc || !empleadoId) return;
-        setGuardandoDoc(true);
-        try {
-            const fd = new FormData();
-            fd.append("user_id", empleadoId);
-            Object.entries(docForm).forEach(([k, v]) => fd.append(k, v));
-            if (docArchivo) fd.append("archivo", docArchivo);
-            if (editandoDocId) {
-                fd.append("_method", "PUT");
-                await api.post(`/documentos-empleado/${editandoDocId}`, fd);
-            } else {
-                await api.post("/documentos-empleado", fd);
-            }
-            qc.invalidateQueries({ queryKey: ["documentos-empleado", empleadoId] });
-            setDocForm(DOC_EMPLEADO_VACIO);
-            setDocArchivo(null);
-            setEditandoDocId(null);
-        } finally {
-            setGuardandoDoc(false);
-        }
-    };
-
-    const handleEditarDoc = (d) => {
-        setDocForm({
-            nombre_documento:   d.nombre_documento,
-            nombre_seguimiento: d.nombre_seguimiento,
-            fecha_seguimiento:  d.fecha_seguimiento,
-            responsable:        d.responsable,
-        });
-        setDocArchivo(null);
-        setEditandoDocId(d.id);
-    };
-
-    const handleCancelarEdicionDoc = () => {
-        setDocForm(DOC_EMPLEADO_VACIO);
-        setDocArchivo(null);
-        setEditandoDocId(null);
-    };
-
-    const handleEliminarDoc = async (d) => {
-        if (!confirm(`¿Eliminar el documento "${d.nombre_documento}"?`)) return;
-        await api.delete(`/documentos-empleado/${d.id}`);
-        qc.invalidateQueries({ queryKey: ["documentos-empleado", empleadoId] });
-    };
-
-    const handleDescargarDoc = (d) => window.open(`/api/documentos-empleado/${d.id}/download`, "_blank");
 
     return (
         <div style={S.overlay}>
@@ -351,7 +295,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                         ["empleado",   "Información del Empleado"],
                         ["eventos",    `Eventos Médicos${eventos.length ? ` (${eventos.length})` : ""}`],
                         ["documentos", "Documentos Médicos"],
-                        ["doc_empleado", `Documentos del Empleado${docsEmpleado.length ? ` (${docsEmpleado.length})` : ""}`],
+                        ["doc_empleado", "Documentos del Empleado"],
                     ].map(([key, lbl]) => (
                         <button key={key} style={activeTab === key ? S.tabActive : S.tab} onClick={() => setActive(key)}>
                             {lbl}
@@ -667,7 +611,7 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                                                 </div>
                                                 <div style={S.formGroup}>
                                                     <label style={S.label}>Archivo</label>
-                                                    <input key={extraInputKey} type="file" onChange={e => setExtraArchivo(e.target.files[0] ?? null)} />
+                                                    <BotonArchivo key={extraInputKey} archivo={extraArchivo} onChange={setExtraArchivo} />
                                                 </div>
                                             </div>
                                             {extraError && <div style={{ ...S.err, marginTop: 8 }}>{extraError}</div>}
@@ -691,122 +635,17 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
                     )}
 
                     {/* ── Tab 4: Documentos del Empleado (otrosí, certificados, etc.) ── */}
-                    {activeTab === "doc_empleado" && (
-                        <div>
-                            <div style={S.sectionHeader}>DOCUMENTOS DEL EMPLEADO</div>
-
-                            {!readOnly && (
-                                <div style={{ marginTop: 14, padding: "14px 16px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                                    <div className="form-grid" style={S.grid3}>
-                                        <div style={S.formGroup}>
-                                            <label style={S.label}>Nombre del Documento</label>
-                                            <input
-                                                style={S.input}
-                                                value={docForm.nombre_documento}
-                                                onChange={e => setDocForm(f => ({ ...f, nombre_documento: e.target.value }))}
-                                                placeholder="Ej: Otrosí, Certificado…"
-                                            />
-                                        </div>
-                                        <div style={S.formGroup}>
-                                            <label style={S.label}>Nombre del Seguimiento</label>
-                                            <input
-                                                style={S.input}
-                                                value={docForm.nombre_seguimiento}
-                                                onChange={e => setDocForm(f => ({ ...f, nombre_seguimiento: e.target.value }))}
-                                                placeholder="Ej: Cambio de cargo, Acta de descargos…"
-                                            />
-                                        </div>
-                                        <div style={S.formGroup}>
-                                            <label style={S.label}>Fecha del Seguimiento</label>
-                                            <input
-                                                type="date"
-                                                style={S.input}
-                                                value={docForm.fecha_seguimiento}
-                                                onChange={e => setDocForm(f => ({ ...f, fecha_seguimiento: e.target.value }))}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="form-grid" style={{ ...S.grid2, marginTop: 12 }}>
-                                        <div style={S.formGroup}>
-                                            <label style={S.label}>Responsable</label>
-                                            <select
-                                                style={S.input}
-                                                value={docForm.responsable}
-                                                onChange={e => setDocForm(f => ({ ...f, responsable: e.target.value }))}
-                                            >
-                                                <option value="">Elige</option>
-                                                {RESPONSABLES_DOC.map(r => <option key={r} value={r}>{r}</option>)}
-                                            </select>
-                                        </div>
-                                        <div style={S.formGroup}>
-                                            <label style={S.label}>Archivo{editandoDocId ? " (opcional, remplaza el actual)" : ""}</label>
-                                            <input type="file" onChange={e => setDocArchivo(e.target.files[0] ?? null)} />
-                                        </div>
-                                    </div>
-                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-                                        {editandoDocId && (
-                                            <button className="btn-secondary" onClick={handleCancelarEdicionDoc}>
-                                                Cancelar edición
-                                            </button>
-                                        )}
-                                        <button
-                                            className="btn-primary"
-                                            disabled={guardandoDoc || !docFormValido}
-                                            onClick={handleAgregarDoc}
-                                            style={{ opacity: (guardandoDoc || !docFormValido) ? 0.6 : 1 }}
-                                        >
-                                            {guardandoDoc ? "Guardando…" : editandoDocId ? "Guardar cambios" : "+ Agregar documento"}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div style={{ marginTop: 16 }}>
-                                {cargandoDocs ? (
-                                    <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)" }}>
-                                        <IconLoading size={28} />
-                                    </div>
-                                ) : docsEmpleado.length === 0 ? (
-                                    <div style={{ padding: "30px 0", textAlign: "center", color: "var(--text-muted)", fontSize: "0.88rem" }}>
-                                        Sin documentos registrados.
-                                    </div>
-                                ) : (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                        {docsEmpleado.map(d => (
-                                            <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--border)", flexWrap: "wrap" }}>
-                                                <div style={{ flex: 1, minWidth: 180 }}>
-                                                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>{d.nombre_documento}</div>
-                                                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                                                        {d.nombre_seguimiento} · {d.fecha_seguimiento} · {d.responsable}
-                                                    </div>
-                                                </div>
-                                                {d.nombre_original && (
-                                                    <button
-                                                        onClick={() => handleDescargarDoc(d)}
-                                                        style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 700, cursor: "pointer", fontSize: "0.82rem" }}
-                                                    >
-                                                        ⬇ {d.nombre_original}
-                                                    </button>
-                                                )}
-                                                {!readOnly && (
-                                                    <div style={{ display: "flex", gap: 6 }}>
-                                                        <button title="Editar" onClick={() => handleEditarDoc(d)} style={{ background: "#e8f8f5", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "var(--primary-dark)" }}>
-                                                            <IconEdit />
-                                                        </button>
-                                                        <button title="Eliminar" onClick={() => handleEliminarDoc(d)} style={{ background: "#fce8e8", border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "#a33" }}>
-                                                            <IconTrash />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <div style={{ display: activeTab === "doc_empleado" ? "block" : "none" }}>
+                        <DocumentosEmpleadoPanel key={contrato.id} empleadoId={contrato.empleado_id} readOnly={readOnly} onPendienteChange={setDocPendiente} />
+                    </div>
                 </div>
 
+                <AvisoModal
+                    open={avisoDocPendiente}
+                    titulo="Documento sin agregar"
+                    mensaje='Tienes un documento del empleado a medio llenar. Pulsa "+ Agregar documento" para guardarlo, o "Limpiar" si no lo necesitas, y luego vuelve a Guardar.'
+                    onClose={() => setAvisoDocPendiente(false)}
+                />
                 {/* Pie del modal */}
                 <div style={S.modalFooter}>
                     {readOnly ? (
@@ -849,6 +688,16 @@ export default function SeguimientoMedicoCrud() {
         queryFn:  () => api.get("/contratos", { params: { estado: "Vigente" } }).then(r => r.data),
         staleTime: 30_000,
     });
+    const { data: docsEmpleadoTodos = [] } = useQuery({
+        queryKey: ["documentos-empleado", "todos"],
+        queryFn:  () => api.get("/documentos-empleado").then(r => r.data),
+        staleTime: 30_000,
+    });
+    // Solo se listan empleados con al menos un evento médico o un documento del empleado.
+    const conSeguimiento = useMemo(() => {
+        const conDocs = new Set(docsEmpleadoTodos.map(d => String(d.user_id)));
+        return contratos.filter(c => (c.eventos_medicos ?? []).length > 0 || conDocs.has(String(c.empleado_id)));
+    }, [contratos, docsEmpleadoTodos]);
     const { data: _qEmp } = useQuery({ queryKey: ["empleados"],           queryFn: () => api.get("/empleados").then(r => r.data) });
     const { data: _qCat } = useQuery({ queryKey: ["catalogos"],           queryFn: () => api.get("/catalogos").then(r => r.data) });
     const { data: _qSel } = useQuery({ queryKey: ["seleccion-catalogos"], queryFn: () => api.get("/seleccion/catalogos").then(r => r.data), staleTime: 10 * 60_000 });
@@ -861,8 +710,7 @@ export default function SeguimientoMedicoCrud() {
     /* ── Filtrado ── */
     const filtered = useMemo(() => {
         const q = norm(debSearch);
-        return contratos.filter(c => {
-            if ((c.eventos_medicos ?? []).length === 0) return false;
+        return conSeguimiento.filter(c => {
             if (!q) return true;
             return [
                 c.empleado?.cedula,
@@ -871,7 +719,7 @@ export default function SeguimientoMedicoCrud() {
                 c.cargo, c.lps_afiliado, c.arl, c.sede,
             ].some(v => norm(v ?? "").includes(q));
         });
-    }, [contratos, debSearch]);
+    }, [conSeguimiento, debSearch]);
 
     const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
     const paginated    = filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -880,11 +728,11 @@ export default function SeguimientoMedicoCrud() {
     const stats = useMemo(() => {
         const conEventos = contratos.filter(c => (c.eventos_medicos ?? []).length > 0);
         return {
-            total:      conEventos.length,
+            total:      conSeguimiento.length,
             conEventos: conEventos.length,
             conCierre:  conEventos.filter(c => (c.eventos_medicos ?? []).some(ev => ev.fecha_cierre)).length,
         };
-    }, [contratos]);
+    }, [contratos, conSeguimiento]);
 
     /* ── Guardar ── */
     const handleSave = async (id, payload) => {

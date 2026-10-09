@@ -5,6 +5,9 @@ import {
     SearchableSelect as FilterSelect,
 } from "../components/SearchableSelect";
 import api from "../api/axios";
+import AvisoModal from "../components/AvisoModal";
+import BotonArchivo from "../components/BotonArchivo";
+import DocumentosEmpleadoPanel from "../components/DocumentosEmpleadoPanel";
 import { useAuth } from "../context/AuthContext";
 import {
     IconSearch,
@@ -686,6 +689,13 @@ function Modal({
     const [uploadingMed, setUploadingMed]         = useState(false);
     const [docsSubidos, setDocsSubidos]           = useState({});
     const [eventoDocIdx, setEventoDocIdx]         = useState(0);
+    const [docPendiente, setDocPendiente]         = useState(false);
+    const [avisoDocPendiente, setAvisoDocPendiente] = useState(false);
+    const [extraNombre, setExtraNombre]           = useState("");
+    const [extraArchivo, setExtraArchivo]         = useState(null);
+    const [subiendoExtra, setSubiendoExtra]       = useState(false);
+    const [extraError, setExtraError]             = useState("");
+    const [extraInputKey, setExtraInputKey]       = useState(0);
     const isCreate = !initial?.id && !readOnly;
     const eventoIdx = Math.max(0, Math.min(eventoDocIdx, eventosMedicos.length - 1));
     const eventoSel = eventosMedicos[eventoIdx] ?? null;
@@ -749,6 +759,7 @@ function Modal({
             });
             setErrors({});
             setActive("principal");
+            setDocPendiente(false);
             setSaving(false);
             setFotoOverride(null);
             setFotoUploading(false);
@@ -778,6 +789,10 @@ function Modal({
         const _emp = empleados.find(e => String(e.id) === String(initial?.empleado_id));
         const ced = _emp?.cedula ?? initial?.documento ?? "";
         setDocsMed(DOCS_MED_INIT());
+        setExtraNombre("");
+        setExtraArchivo(null);
+        setExtraError("");
+        setExtraInputKey(k => k + 1);
         if (!ced || !eventoFecha) { setDocsSubidos({}); return; }
         api.get("/documentos-contratacion/docs-medicos", { params: { cedula: ced, evento: eventoFecha } })
             .then(r => setDocsSubidos(r.data ?? {}))
@@ -997,6 +1012,53 @@ function Modal({
         setUploadingMed(false);
     };
 
+    const docsExtra = docsSubidos.extras ?? [];
+
+    const recargarDocsSubidos = () =>
+        api.get("/documentos-contratacion/docs-medicos", { params: { cedula: cedulaMed, evento: eventoFecha } })
+            .then(r => setDocsSubidos(r.data ?? {}))
+            .catch(() => {});
+
+    const handleAgregarExtra = async () => {
+        if (!extraNombre.trim() || !extraArchivo || subiendoExtra || !cedulaMed || !eventoFecha) return;
+        setSubiendoExtra(true);
+        setExtraError("");
+        const tipo = `extra_${Date.now()}`;
+        try {
+            const fd = new FormData();
+            fd.append("documento", cedulaMed);
+            fd.append("tipo", tipo);
+            fd.append("nombre", extraNombre.trim());
+            fd.append("archivo", extraArchivo);
+            fd.append("evento", eventoFecha);
+            await api.post("/documentos-contratacion/upload", fd);
+            api.post("/documentos-contratacion/notificar-seguimiento-medico", {
+                documento:        cedulaMed,
+                nombres:          empForMed?.nombres   ?? "",
+                apellidos:        empForMed?.apellidos ?? "",
+                fechaSeguimiento: eventoFecha,
+                evento:           eventoFecha,
+                tipos:            [tipo],
+            }).catch(() => {});
+            setExtraNombre("");
+            setExtraArchivo(null);
+            setExtraInputKey(k => k + 1);
+            await recargarDocsSubidos();
+        } catch (err) {
+            setExtraError(err?.response?.data?.message ?? err.message);
+        } finally {
+            setSubiendoExtra(false);
+        }
+    };
+
+    const handleBorrarExtra = async (extra) => {
+        if (!confirm(`¿Eliminar el archivo "${extra.nombre}"?`)) return;
+        await api.delete("/documentos-contratacion/docs-medicos", {
+            data: { cedula: cedulaMed, tipo: extra.tipo, evento: eventoFecha },
+        });
+        await recargarDocsSubidos();
+    };
+
     const validate = () => {
         const e = {};
         if (!form.empleado_id && !form.documento) e.empleado_id = "Requerido";
@@ -1019,6 +1081,11 @@ function Modal({
     };
 
     const handleSave = async () => {
+        if (docPendiente) {
+            setActive("doc_empleado");
+            setAvisoDocPendiente(true);
+            return;
+        }
         const e = validate();
         if (Object.keys(e).length) {
             setErrors(e);
@@ -1264,6 +1331,7 @@ function Modal({
                             ["costos",            "Costos y Anexos"],
                             ["Seguimiento_medico","Seguimiento"],
                             ["doc_medicos",       "Documentos Médicos"],
+                            ["doc_empleado",      "Documentos del Empleado"],
                         ]
                     ).map(([key, lbl]) => (
                         <button
@@ -2224,6 +2292,17 @@ function Modal({
                                                 </div>
                                             );
                                         })}
+                                        {docsExtra.map(extra => (
+                                            <div key={extra.tipo} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#f0fdf4", borderRadius: "var(--radius-sm)", border: "1.5px solid #27ae60" }}>
+                                                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--text)", flex: 1 }}>{extra.nombre}</span>
+                                                <span style={{ color: "#27ae60", fontSize: "0.78rem" }}>✓ Subido el {extra.uploaded_at?.split(" ")[0] ?? ""}</span>
+                                                {!readOnly && (
+                                                    <button onClick={() => handleBorrarExtra(extra)} style={{ background: "#e74c3c", color: "#fff", border: "none", borderRadius: 4, padding: "5px 10px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>
+                                                        Borrar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                     {!readOnly && (
                                         <button
@@ -2234,10 +2313,42 @@ function Modal({
                                             {uploadingMed ? "Subiendo a SharePoint…" : "Subir a SharePoint"}
                                         </button>
                                     )}
+                                    {!readOnly && (
+                                        <div style={{ marginTop: 22, padding: "14px 16px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                                            <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--primary)", marginBottom: 10 }}>Agregar archivo</div>
+                                            <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14 }}>
+                                                <div style={S.formGroup}>
+                                                    <label style={S.label}>Nombre del archivo</label>
+                                                    <input style={S.input} value={extraNombre} onChange={e => setExtraNombre(e.target.value)} placeholder="Ej: Recomendaciones ARL" />
+                                                </div>
+                                                <div style={S.formGroup}>
+                                                    <label style={S.label}>Archivo</label>
+                                                    <BotonArchivo key={extraInputKey} archivo={extraArchivo} onChange={setExtraArchivo} />
+                                                </div>
+                                            </div>
+                                            {extraError && <div style={{ color: "#e74c3c", fontSize: "0.75rem", marginTop: 8 }}>{extraError}</div>}
+                                            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                                                <button
+                                                    className="btn-primary"
+                                                    onClick={handleAgregarExtra}
+                                                    disabled={subiendoExtra || !extraNombre.trim() || !extraArchivo}
+                                                    style={{ opacity: (subiendoExtra || !extraNombre.trim() || !extraArchivo) ? 0.6 : 1 }}
+                                                >
+                                                    {subiendoExtra ? "Subiendo…" : "+ Agregar archivo"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     </>
                                     )}
                                 </>
                             )}
+                        </div>
+                    )}
+
+                    {open && (
+                        <div style={{ display: activeTab === "doc_empleado" ? "block" : "none" }}>
+                            <DocumentosEmpleadoPanel key={initial?.id ?? "nuevo"} empleadoId={form.empleado_id} readOnly={readOnly} onPendienteChange={setDocPendiente} />
                         </div>
                     )}
 
@@ -2355,6 +2466,12 @@ function Modal({
                     )}
                 </div>
 
+                <AvisoModal
+                    open={avisoDocPendiente}
+                    titulo="Documento sin agregar"
+                    mensaje='Tienes un documento del empleado a medio llenar. Pulsa "+ Agregar documento" para guardarlo, o "Limpiar" si no lo necesitas, y luego vuelve a Guardar.'
+                    onClose={() => setAvisoDocPendiente(false)}
+                />
                 <div style={S.modalFooter}>
                     {readOnly ? (
                         <button style={S.btnSecondary} onClick={onClose}>
