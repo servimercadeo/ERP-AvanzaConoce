@@ -232,7 +232,7 @@ class User extends Authenticatable
         return array_merge($this->only('id', 'name', 'email', 'rol', 'sede_id'), [
             'permisos_denegados' => (!$this->rol || $this->rol === 'admin')
                 ? []
-                : PermisoDenegado::where('rol', $this->rol)->get(['modulo_id', 'submodulo_id', 'archivo_id'])->toArray(),
+                : PermisoDenegado::where('rol', $this->rol)->get(['modulo_id', 'submodulo_id', 'archivo_id', 'accion'])->toArray(),
         ]);
     }
 

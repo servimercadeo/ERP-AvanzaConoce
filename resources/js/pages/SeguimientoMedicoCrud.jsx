@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch, IconEye, IconEdit, IconClose,
     IconEmptySearch, IconLoading, IconTrash,
@@ -829,6 +830,8 @@ function SeguimientoModal({ open, onClose, contrato, readOnly, catalogs, proyect
 /*  CRUD PRINCIPAL                                                      */
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function SeguimientoMedicoCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
 
     const [search, setSearch]       = useState("");
@@ -989,7 +992,7 @@ export default function SeguimientoMedicoCrud() {
                                         <td>
                                             <div style={S.actions}>
                                                 <button style={S.actionBtn("#e8f0ff","#1a4fa8")} title="Ver"    onClick={() => setView(c)}><IconEye /></button>
-                                                <button style={S.actionBtn("#e8f8f5","var(--primary-dark)")} title="Editar" onClick={() => setEdit(c)}><IconEdit /></button>
+                                                {puede.editar && <button style={S.actionBtn("#e8f8f5","var(--primary-dark)")} title="Editar" onClick={() => setEdit(c)}><IconEdit /></button>}
                                             </div>
                                         </td>
                                     </tr>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconEye,
     IconEdit,
@@ -88,6 +89,8 @@ const MOCK_OPTS = {
 };
 
 export default function CandidatosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [candidates, setCandidates] = useState([]);
     const [requisitions, setRequisitions] = useState([]);
@@ -337,6 +340,7 @@ export default function CandidatosCrud() {
     };
 
     const toggleCandidateField = (candidateId, field) => {
+        if (!puede.editar) return;
         const candidate = candidates.find((x) => x.id === candidateId);
         if (!candidate) return;
         const currentVal = !!candidate[field];
@@ -971,13 +975,15 @@ export default function CandidatosCrud() {
                                     c.requisicion?.proyecto?.nombre || "",
                                 );
                                 const pruebasDisabled =
-                                    (!docsOk || (isTigo && !asmtOk)) &&
-                                    !c.pruebas;
+                                    !puede.editar ||
+                                    ((!docsOk || (isTigo && !asmtOk)) &&
+                                    !c.pruebas);
                                 const avalDisabled =
-                                    (!c.pruebas ||
+                                    !puede.editar ||
+                                    ((!c.pruebas ||
                                         !docsOk ||
                                         (isTigo && !entvOk)) &&
-                                    !c.aval;
+                                    !c.aval);
                                 const pruebasTip = !docsOk
                                     ? 'Sube "Hoja de vida" y "Pruebas psicotécnicas" primero'
                                     : isTigo && !asmtOk
@@ -1132,7 +1138,7 @@ export default function CandidatosCrud() {
                                         </td>
                                         <td style={{ padding: "12px 8px" }}>
                                             <div style={S.actions}>
-                                                {isTigo && (
+                                                {isTigo && puede.editar && (
                                                     <button
                                                         style={S.actionBtn(
                                                             "  #FFF8DA",
@@ -1150,7 +1156,7 @@ export default function CandidatosCrud() {
                                                         />
                                                     </button>
                                                 )}
-                                                <button
+                                                {puede.editar && <button
                                                     style={S.actionBtn(
                                                         "#e8f8f5",
                                                         "var(--primary-dark)",
@@ -1161,7 +1167,7 @@ export default function CandidatosCrud() {
                                                     }
                                                 >
                                                     <IconEdit size={15} />
-                                                </button>
+                                                </button>}
                                                 <button
                                                     style={S.actionBtn(
                                                         "#e8f0ff",

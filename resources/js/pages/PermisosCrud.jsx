@@ -3,10 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import { useErpModules } from "../hooks/useErpModules";
 import { MODULE_ICONS, IconFolder, IconLoading, IconChevronDown, IconChevronRight } from "../components/Icons";
-import { ROLES, clave, claveDeFila, construirCatalogo, firma, normalizar, pestanasDe } from "../utils/permisosMatriz.js";
+import { ROLES, clave, claveDeFila, construirCatalogo, destinosDeAccion, firma, normalizar, pestanasDe } from "../utils/permisosMatriz.js";
+import { ACCIONES } from "../data/erpModules";
+import { useAcciones } from "../hooks/useAcciones";
 
 export default function PermisosCrud() {
     const qc = useQueryClient();
+    const puede = useAcciones();
     const erpModules = useErpModules();
     const catalogo = useMemo(() => construirCatalogo(erpModules), [erpModules]);
     const [rolActivo, setRolActivo] = useState(ROLES[0].value);
@@ -20,7 +23,7 @@ export default function PermisosCrud() {
         setTimeout(() => setToast(null), 3000);
     };
 
-    const { data: filasDenegadas, isLoading } = useQuery({
+    const { data: filasDenegadas, isLoading, isError } = useQuery({
         queryKey: ["permisos"],
         queryFn: () => api.get("/permisos").then((r) => r.data),
     });
@@ -84,6 +87,43 @@ export default function PermisosCrud() {
         });
     };
 
+    const accionNegada = (moduloId, obj, archivoId, accion) =>
+        denegados.has(clave(rolActivo, moduloId, obj.id, archivoId, accion));
+
+    const toggleAccion = (moduloId, obj, archivoId, accion) => {
+        setDenegados((prev) => {
+            const next = new Set(prev);
+            const k = clave(rolActivo, moduloId, obj.id, archivoId, accion);
+            if (next.has(k)) next.delete(k);
+            else next.add(k);
+            return next;
+        });
+    };
+
+    // Chips de las acciones que declara la pestaña: marcado = permitido.
+    const chipsAcciones = (moduloId, obj, archivoId, acciones) => {
+        if (acciones.length === 0) return null;
+        return (
+            <div style={S.accionList}>
+                {ACCIONES.filter((a) => acciones.includes(a.id)).map((a) => {
+                    const permitida = !accionNegada(moduloId, obj, archivoId, a.id);
+                    return (
+                        <button
+                            key={a.id}
+                            type="button"
+                            style={{ ...S.accionChip, ...(permitida ? S.accionChipOn : {}) }}
+                            onClick={() => toggleAccion(moduloId, obj, archivoId, a.id)}
+                            aria-pressed={permitida}
+                            title={permitida ? `Puede ${a.label.toLowerCase()}` : `No puede ${a.label.toLowerCase()}`}
+                        >
+                            {a.label}
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const toggleModulo = (mod, marcarVisible) => {
         setDenegados((prev) => {
             const next = new Set(prev);
@@ -120,6 +160,14 @@ export default function PermisosCrud() {
         }
     };
 
+    if (isError) {
+        return (
+            <p style={{ padding: "40px 0", textAlign: "center", color: "#e74c3c" }}>
+                No se pudieron cargar los permisos. Recarga la página o avisa a sistemas.
+            </p>
+        );
+    }
+
     if (isLoading || !denegadosListos) {
         return (
             <div style={{ padding: "60px 0", textAlign: "center" }}>
@@ -131,12 +179,6 @@ export default function PermisosCrud() {
     return (
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
-
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 0, marginBottom: 20, maxWidth: 760 }}>
-                Elige un rol y marca qué módulos, submódulos y pestañas puede ver. Usa la flecha ▸ de un submódulo para
-                ver y marcar sus pestañas una por una. "Admin" no aparece aquí: siempre tiene acceso completo. Lo que no
-                marques queda oculto para ese rol en todo el sistema.
-            </p>
 
             {/* Tabs de rol */}
             <div style={S.tabBar}>
@@ -219,17 +261,29 @@ export default function PermisosCrud() {
                                                     <span style={S.countBadge}>{v}/{t}</span>
                                                 )}
                                             </div>
+                                            {pestanas.length === 0 && subTodos && (
+                                                <div style={{ marginLeft: 50 }}>
+                                                    {chipsAcciones(mod.id, obj, "", destinosDeAccion(obj)[0].acciones)}
+                                                </div>
+                                            )}
                                             {abierto && pestanas.length > 0 && (
                                                 <div style={S.pestanaList}>
                                                     {pestanas.map((a) => (
-                                                        <label key={a.id} style={S.pestanaRow}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={pestanaVisible(mod.id, obj, a.id)}
-                                                                onChange={() => togglePestana(mod.id, obj, a.id)}
-                                                            />
-                                                            <span>{a.label}</span>
-                                                        </label>
+                                                        <div key={a.id}>
+                                                            <label style={S.pestanaRow}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={pestanaVisible(mod.id, obj, a.id)}
+                                                                    onChange={() => togglePestana(mod.id, obj, a.id)}
+                                                                />
+                                                                <span>{a.label}</span>
+                                                            </label>
+                                                            {pestanaVisible(mod.id, obj, a.id) && (
+                                                                <div style={{ marginLeft: 24 }}>
+                                                                    {chipsAcciones(mod.id, obj, a.id, a.acciones ?? [])}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
@@ -246,7 +300,7 @@ export default function PermisosCrud() {
                 <span style={{ fontSize: "0.85rem", color: hayCambiosSinGuardar ? "#b7780c" : "var(--text-muted)", fontWeight: hayCambiosSinGuardar ? 700 : 400 }}>
                     {hayCambiosSinGuardar ? "Tienes cambios sin guardar." : "Sin cambios pendientes."}
                 </span>
-                <button style={S.btnPrimary} onClick={handleGuardar} disabled={guardando || !hayCambiosSinGuardar}>
+                <button style={S.btnPrimary} onClick={handleGuardar} disabled={!puede.editar || guardando || !hayCambiosSinGuardar}>
                     {guardando ? "Guardando…" : "Guardar cambios"}
                 </button>
             </div>
@@ -393,6 +447,30 @@ const S = {
         fontSize: "0.8rem",
         color: "var(--text-muted)",
         cursor: "pointer",
+    },
+    accionList: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 4,
+        marginTop: 4,
+    },
+    accionChip: {
+        padding: "2px 8px",
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontSize: "0.7rem",
+        fontWeight: 700,
+        fontFamily: "Nunito, sans-serif",
+        color: "var(--text-muted)",
+        textDecoration: "line-through",
+    },
+    accionChipOn: {
+        background: "var(--primary-light)",
+        borderColor: "var(--primary)",
+        color: "var(--primary-dark)",
+        textDecoration: "none",
     },
     footerBar: {
         position: "sticky",

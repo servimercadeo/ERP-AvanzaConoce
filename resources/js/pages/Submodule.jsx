@@ -3,6 +3,7 @@ import { useParams, Link, Navigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { canAccessModule, canAccessSubmodule, canAccessArchivo } from '../data/erpModules';
+import { PestanaContext } from '../hooks/useAcciones';
 import { useErpModules } from '../hooks/useErpModules';
 import { MODULE_ICONS, IconFolder, IconUnderConstruction, IconLoading } from '../components/Icons';
 
@@ -500,7 +501,9 @@ export default function Submodule() {
                 </p>
               </div>
               <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
-                <CrudComponent categoria={sub.categoriaDinamica} />
+                <PestanaContext.Provider value={{ moduleId: mod.id, submoduleId: sub.id, archivoId: tabActiva }}>
+                  <CrudComponent categoria={sub.categoriaDinamica} />
+                </PestanaContext.Provider>
               </Suspense>
             </>
           ) : (

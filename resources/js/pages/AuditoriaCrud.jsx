@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconEmptySearch, IconLoading } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -16,6 +17,8 @@ const ACCIONES = [
 ];
 
 export default function AuditoriaCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [userId, setUserId] = useState("");
     const [accion, setAccion] = useState("");
     const [proceso, setProceso] = useState("");
@@ -92,9 +95,9 @@ export default function AuditoriaCrud() {
     return (
         <div style={{ width: "100%" }}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-                <button className="btn-secondary" onClick={handleExport} disabled={exportando || total === 0}>
+                {puede.exportar && <button className="btn-secondary" onClick={handleExport} disabled={exportando || total === 0}>
                     {exportando ? "Exportando…" : "Exportar"}
-                </button>
+                </button>}
             </div>
 
             <div style={S.filtrosCard}>

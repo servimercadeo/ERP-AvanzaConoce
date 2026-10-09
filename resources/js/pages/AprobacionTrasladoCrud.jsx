@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose } from "../components/Icons";
 
 /**
@@ -65,6 +66,8 @@ function AprobarSerialesModal({ traslado, onClose, onConfirmar, procesando }) {
  * producto sin revisar de nuevo en Pedidos, para que ahí elijan otra salida.
  */
 export default function AprobacionTrasladoCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
@@ -251,20 +254,20 @@ export default function AprobacionTrasladoCrud() {
                                     <td>
                                         {t.estado === "Pendiente Aprobación" ? (
                                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                                <button
+                                                {puede.editar && <button
                                                     style={{ ...S.btn, background: "var(--primary)", color: "#fff" }}
                                                     disabled={procesandoId === t.id}
                                                     onClick={() => handleAprobar(t)}
                                                 >
                                                     Aprobar
-                                                </button>
-                                                <button
+                                                </button>}
+                                                {puede.editar && <button
                                                     style={{ ...S.btn, background: "#fde2e2", color: "#a33" }}
                                                     disabled={procesandoId === t.id}
                                                     onClick={() => handleRechazar(t)}
                                                 >
                                                     Rechazar
-                                                </button>
+                                                </button>}
                                             </div>
                                         ) : (
                                             <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>—</span>

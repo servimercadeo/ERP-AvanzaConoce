@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch,
     IconEmptySearch,
@@ -14,6 +15,8 @@ import SelectBuscable from "../components/SelectBuscable";
 const ESTADOS_COMPRA = ["Cotizando", "Pendiente Aprobación"];
 
 export default function ComprasCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
 
     // --- Pedidos de insumos de oficina (reales) ---
@@ -292,14 +295,14 @@ export default function ComprasCrud() {
                                             >
                                                 <IconEye size={14} />
                                             </button>
-                                            <button
+                                            {puede.editar && <button
                                                 style={{ ...S.actionIconBtn("#fce8e8", "#a33"), fontWeight: 800, fontSize: "0.9rem" }}
                                                 title="Regresar a Pedidos"
                                                 disabled={actualizandoId === p.id}
                                                 onClick={() => handleRegresarAPedidos(p)}
                                             >
                                                 ↩
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

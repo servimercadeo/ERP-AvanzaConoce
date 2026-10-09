@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ERP_MODULES, canAccessArchivo, canAccessModule, canAccessSubmodule } from "../data/erpModules.js";
+import { ERP_MODULES, canAccessArchivo, canAccessModule, canAccessSubmodule, canDo } from "../data/erpModules.js";
 import { claveDeFila, construirCatalogo, normalizar } from "./permisosMatriz.js";
 
 const catalogo = construirCatalogo(ERP_MODULES);
 const set = (...filas) => new Set(filas.map((f) => claveDeFila({ archivo_id: "", ...f })));
-const fila = (submodulo_id, archivo_id = "") => ({ rol: "th", modulo_id: "administrativo", submodulo_id, archivo_id });
+const fila = (submodulo_id, archivo_id = "", accion = "") => ({ rol: "th", modulo_id: "administrativo", submodulo_id, archivo_id, accion });
 const SELECCION = ["proceso_seleccion", "candidatos", "base_ingreso"];
 
 test("el catálogo trae las pestañas de cada submódulo", () => {
@@ -48,4 +48,31 @@ test("negar el submódulo niega sus pestañas; admin siempre ve todo", () => {
     assert.equal(canAccessArchivo(user, "administrativo", "seleccion", "candidatos"), false);
     const admin = { rol: "admin", permisos_denegados: [fila("seleccion", "candidatos")] };
     assert.equal(canAccessArchivo(admin, "administrativo", "seleccion", "candidatos"), true);
+});
+
+test("una acción negada se guarda en el submódulo si tiene una sola pestaña, o en la pestaña", () => {
+    const filas = normalizar(set(fila("empleados", "", "eliminar"), fila("admin_contratos", "ver_crear_contratos", "crear")), catalogo);
+    assert.deepEqual(filas.map(claveDeFila).sort(), [
+        claveDeFila(fila("empleados", "", "eliminar")),
+        claveDeFila(fila("admin_contratos", "ver_crear_contratos", "crear")),
+    ].sort());
+});
+
+test("ocultar la pestaña descarta sus acciones negadas", () => {
+    const filas = normalizar(set(fila("admin_contratos", "ver_crear_contratos"), fila("admin_contratos", "ver_crear_contratos", "crear")), catalogo);
+    assert.deepEqual(filas, [fila("admin_contratos", "ver_crear_contratos")]);
+});
+
+test("una acción negada no oculta la pestaña, solo esa acción", () => {
+    const user = { rol: "th", permisos_denegados: [fila("empleados", "", "eliminar")] };
+    assert.equal(canAccessArchivo(user, "administrativo", "empleados", "empleados_file"), true);
+    assert.equal(canDo(user, "administrativo", "empleados", "empleados_file", "eliminar"), false);
+    assert.equal(canDo(user, "administrativo", "empleados", "empleados_file", "editar"), true);
+    const admin = { rol: "admin", permisos_denegados: [fila("empleados", "", "eliminar")] };
+    assert.equal(canDo(admin, "administrativo", "empleados", "empleados_file", "eliminar"), true);
+});
+
+test("sin ver la pestaña tampoco puede hacer ninguna acción en ella", () => {
+    const user = { rol: "th", permisos_denegados: [fila("admin_contratos", "ver_crear_contratos")] };
+    assert.equal(canDo(user, "administrativo", "admin_contratos", "ver_crear_contratos", "exportar"), false);
 });

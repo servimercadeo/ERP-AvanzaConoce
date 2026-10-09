@@ -1,5 +1,5 @@
 // Lógica de la matriz del módulo Permisos (sin interfaz, para poder probarla aparte).
-import { SUBMODULO_RAIZ } from "../data/erpModules.js";
+import { ACCIONES, SUBMODULO_RAIZ } from "../data/erpModules.js";
 
 export const ROLES = [
     { value: "th", label: "Talento Humano" },
@@ -27,13 +27,23 @@ export function construirCatalogo(modulos) {
 }
 
 // "rol::modulo::submodulo::archivo" presente = denegado (oculto). Archivo vacío = todo el
-// submódulo, que es como se guarda cuando se le quitan todas las pestañas.
-export const clave = (rol, moduloId, submoduloId, archivoId = "") => `${rol}::${moduloId}::${submoduloId}::${archivoId}`;
-export const claveDeFila = (f) => clave(f.rol, f.modulo_id, f.submodulo_id, f.archivo_id ?? "");
+// submódulo, que es como se guarda cuando se le quitan todas las pestañas. Con
+// "::accion" al final, la pestaña se ve pero esa acción (crear, editar...) queda negada.
+export const clave = (rol, moduloId, submoduloId, archivoId = "", accion = "") =>
+    `${rol}::${moduloId}::${submoduloId}::${archivoId}` + (accion ? `::${accion}` : "");
+export const claveDeFila = (f) => clave(f.rol, f.modulo_id, f.submodulo_id, f.archivo_id ?? "", f.accion ?? "");
 
 // Pestañas que se controlan una por una: solo si el submódulo tiene más de una (con una
 // sola, el check del submódulo ya es el de su única pestaña).
 export const pestanasDe = (obj) => (obj.archivos.length > 1 ? obj.archivos : []);
+
+// Dónde se marcan las acciones de un submódulo: en cada pestaña si se controlan una por
+// una; si no, en el propio submódulo (archivoId "") con las acciones de su única pestaña.
+export function destinosDeAccion(obj) {
+    const pestanas = pestanasDe(obj);
+    if (pestanas.length > 0) return pestanas.map((a) => ({ archivoId: a.id, acciones: a.acciones ?? [] }));
+    return [{ archivoId: "", acciones: obj.archivos[0]?.acciones ?? [] }];
+}
 
 /**
  * Lo que se manda al servidor: si un submódulo quedó con todas sus pestañas ocultas se
@@ -42,8 +52,8 @@ export const pestanasDe = (obj) => (obj.archivos.length > 1 ? obj.archivos : [])
  */
 export function normalizar(denegados, catalogo) {
     const filas = new Map();
-    const agregar = (rol, modulo_id, submodulo_id, archivo_id = "") =>
-        filas.set(clave(rol, modulo_id, submodulo_id, archivo_id), { rol, modulo_id, submodulo_id, archivo_id });
+    const agregar = (rol, modulo_id, submodulo_id, archivo_id = "", accion = "") =>
+        filas.set(clave(rol, modulo_id, submodulo_id, archivo_id, accion), { rol, modulo_id, submodulo_id, archivo_id, accion });
 
     const conocidos = new Set();
     ROLES.forEach(({ value: rol }) => {
@@ -52,6 +62,18 @@ export function normalizar(denegados, catalogo) {
             const todo = denegados.has(clave(rol, mod.id, obj.id));
             conocidos.add(clave(rol, mod.id, obj.id));
             obj.archivos.forEach((a) => conocidos.add(clave(rol, mod.id, obj.id, a.id)));
+
+            // Acciones negadas: solo las que la pestaña declara y mientras siga visible (una
+            // pestaña oculta no necesita filas de acciones; una acción que la pestaña ya no
+            // declara tampoco, porque la matriz no deja desmarcarla).
+            destinosDeAccion(obj).forEach(({ archivoId, acciones }) => {
+                const oculto = todo || (archivoId !== "" && denegados.has(clave(rol, mod.id, obj.id, archivoId)));
+                ACCIONES.forEach(({ id: accion }) => {
+                    const k = clave(rol, mod.id, obj.id, archivoId, accion);
+                    conocidos.add(k);
+                    if (!oculto && acciones.includes(accion) && denegados.has(k)) agregar(rol, mod.id, obj.id, archivoId, accion);
+                });
+            });
 
             if (pestanas.length === 0) {
                 if (todo) agregar(rol, mod.id, obj.id);
@@ -65,8 +87,8 @@ export function normalizar(denegados, catalogo) {
 
     denegados.forEach((k) => {
         if (conocidos.has(k)) return;
-        const [rol, modulo_id, submodulo_id, archivo_id = ""] = k.split("::");
-        agregar(rol, modulo_id, submodulo_id, archivo_id);
+        const [rol, modulo_id, submodulo_id, archivo_id = "", accion = ""] = k.split("::");
+        agregar(rol, modulo_id, submodulo_id, archivo_id, accion);
     });
     return [...filas.values()];
 }

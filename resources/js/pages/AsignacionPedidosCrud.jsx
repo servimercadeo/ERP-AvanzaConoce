@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -13,6 +14,8 @@ import SelectBuscable from "../components/SelectBuscable";
  * trabajo por persona.
  */
 export default function AsignacionPedidosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
@@ -157,7 +160,7 @@ export default function AsignacionPedidosCrud() {
                                         <SelectBuscable
                                             style={S.selectInline}
                                             value={p.asignado_a_user_id ?? ""}
-                                            disabled={asignandoId === p.id || (!puedeAsignar(p) && !p.asignado_a_user_id)}
+                                            disabled={!puede.editar || asignandoId === p.id || (!puedeAsignar(p) && !p.asignado_a_user_id)}
                                             title={!puedeAsignar(p) && !p.asignado_a_user_id ? "Primero revisa el stock de este pedido: todavía no tiene productos listos para entregar." : undefined}
                                             onChange={(e) => handleAsignar(p, e.target.value ? Number(e.target.value) : null)}
                                         >

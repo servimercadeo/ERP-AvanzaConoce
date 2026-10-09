@@ -10,6 +10,7 @@ import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 import { ROLES_ERP } from "../utils/roles";
 import { useAuth } from "../context/AuthContext";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     COLUMNAS_IMPORTABLES,
     descargarPlantillaImportacion,
@@ -1501,6 +1502,8 @@ function getPaginasBotones(pagina, total) {
 
 /* ─── Componente principal ───────────────────────────────────────────── */
 export default function EmpleadosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [empleados, setEmpleados] = useState([]);
     // loading derived from React Query
     const [search, setSearch] = useState("");
@@ -1945,7 +1948,7 @@ export default function EmpleadosCrud() {
                     </button>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
+                    {puede.exportar && <button
                         style={{
                             ...S.filterBtn,
                             cursor:
@@ -1962,17 +1965,17 @@ export default function EmpleadosCrud() {
                         title="Exporta los empleados que coinciden con la búsqueda y los filtros activos"
                     >
                         {exporting ? "Exportando…" : "Exportar Excel"}
-                    </button>
-                    <button
+                    </button>}
+                    {puede.importar && <button
                         style={S.filterBtn}
                         onClick={() => setImportOpen(true)}
                         title="Importa datos personales desde Excel, buscando por cédula. Nunca sobrescribe datos existentes."
                     >
                         Importar Excel
-                    </button>
-                    <button className="btn-primary" onClick={openCreate}>
+                    </button>}
+                    {puede.crear && <button className="btn-primary" onClick={openCreate}>
                         + Nuevo empleado
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -2149,7 +2152,7 @@ export default function EmpleadosCrud() {
                                             >
                                                 <IconEye />
                                             </button>
-                                            <button
+                                            {puede.editar && <button
                                                 style={S.actionBtn(
                                                     "#e8f8f5",
                                                     "var(--primary-dark)",
@@ -2158,8 +2161,8 @@ export default function EmpleadosCrud() {
                                                 onClick={() => openEdit(emp)}
                                             >
                                                 <IconEdit />
-                                            </button>
-                                            <button
+                                            </button>}
+                                            {puede.eliminar && <button
                                                 style={{
                                                     ...S.actionBtn("#fee2e2", "#991b1b"),
                                                     opacity: eliminandoId === emp.id ? 0.5 : 1,
@@ -2169,7 +2172,7 @@ export default function EmpleadosCrud() {
                                                 onClick={() => handleDelete(emp)}
                                             >
                                                 <IconTrash />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

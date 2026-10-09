@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useAcciones } from "../hooks/useAcciones";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { SearchableSelect, FilterDropdown } from '../components/SearchableSelect';
@@ -51,6 +52,8 @@ const _pgb = { minWidth: 32, height: 32, padding: '0 8px', border: BD, borderRad
 
 /* ── Component ──────────────────────────────────────────────────────── */
 export default function SeleccionCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
   const qc = useQueryClient();
   const [data, setData] = useState([]);
   const [catalogs, setCatalogs] = useState({ cargos: [], proyectos: [], responsables: [], ciudades: [], empleadores: [] });
@@ -277,7 +280,7 @@ export default function SeleccionCrud() {
           />
         </div>
         <div style={S.row}>
-          <button style={S.btnPrimary} onClick={() => openModal('create')}>+ Nueva requisición</button>
+          {puede.crear && <button style={S.btnPrimary} onClick={() => openModal('create')}>+ Nueva requisición</button>}
         </div>
       </div>
 
@@ -312,7 +315,7 @@ export default function SeleccionCrud() {
                     <td style={S.td}>{row.ciudad?.nombre || '-'}</td>
                     <td style={{ ...S.td, textAlign: 'center' }}>
                       <div style={S.actions}>
-                        <button style={S.aBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => openModal('edit', row)}><IconEdit size={14}/></button>
+                        {puede.editar && <button style={S.aBtn('#e8f8f5', 'var(--primary-dark)')} title="Editar" onClick={() => openModal('edit', row)}><IconEdit size={14}/></button>}
                         <button style={S.aBtn('#e8f0ff', '#1a4fa8')} title="Ver" onClick={() => openModal('view', row)}><IconEye size={14}/></button>
                         {row.estado === 'En proceso' && (
                           <button

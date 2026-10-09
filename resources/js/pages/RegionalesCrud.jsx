@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch, IconEdit, IconTrash, IconClose,
     IconEmptySearch, IconLoading,
@@ -107,6 +108,8 @@ function FormModal({ open, onClose, onSave, editTarget }) {
 
 /* ═══════════════════════════════════════════════════════════════════ */
 export default function RegionalesCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 280);
@@ -205,9 +208,9 @@ export default function RegionalesCrud() {
                         }}
                     />
                 </div>
-                <button className="btn-primary" onClick={handleCreate}>
+                {puede.crear && <button className="btn-primary" onClick={handleCreate}>
                     + Nueva Regional
-                </button>
+                </button>}
             </div>
 
             <div style={S.tableWrap}>
@@ -237,7 +240,7 @@ export default function RegionalesCrud() {
                                     <td>{r.descripcion || "—"}</td>
                                     <td>
                                         <div style={S.actions}>
-                                            <button
+                                            {puede.editar && <button
                                                 style={S.actionBtn(
                                                     "var(--primary-light)",
                                                     "var(--primary-dark)",
@@ -246,14 +249,14 @@ export default function RegionalesCrud() {
                                                 onClick={() => handleEdit(r)}
                                             >
                                                 <IconEdit size={14} />
-                                            </button>
-                                            <button
+                                            </button>}
+                                            {puede.eliminar && <button
                                                 style={S.actionBtn("#fce8e8", "#a33")}
                                                 title="Eliminar"
                                                 onClick={() => handleDelete(r)}
                                             >
                                                 <IconTrash size={14} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>

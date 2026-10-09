@@ -51,7 +51,7 @@ export function useErpModules() {
                     icon: "productos",
                     desc: `Inventario de ${c.nombre.toLowerCase()} por sede`,
                     categoriaDinamica: c.nombre,
-                    archivos: [{ id: `${id}_file`, label: `Inventario de ${c.nombre}` }],
+                    archivos: [{ id: `${id}_file`, label: `Inventario de ${c.nombre}`, acciones: ["crear", "editar", "eliminar", "exportar"] }],
                 };
             });
 

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch,
     IconEye,
@@ -1826,6 +1827,8 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
 }
 
 export default function PedidosAutomaticosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const queryClient = useQueryClient();
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
@@ -2311,7 +2314,7 @@ export default function PedidosAutomaticosCrud() {
                     )}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                    <button
+                    {puede.crear && <button
                         style={{
                             padding: "9px 18px",
                             background:
@@ -2363,14 +2366,14 @@ export default function PedidosAutomaticosCrud() {
                                 {pedidosParaGlobal.length}
                             </span>
                         )}
-                    </button>
-                    <button style={S.btnSecondary} onClick={handleExport} disabled={filtered.length === 0}>
+                    </button>}
+                    {puede.exportar && <button style={S.btnSecondary} onClick={handleExport} disabled={filtered.length === 0}>
                         Exportar Excel
-                    </button>
-                    <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>
+                    </button>}
+                    {puede.importar && <button style={S.btnSecondary} onClick={() => setImportOpen(true)}>
                         Importar Excel
-                    </button>
-                    <button
+                    </button>}
+                    {puede.crear && <button
                         className="btn-primary"
                         onClick={() => {
                             setEditTarget(null);
@@ -2378,7 +2381,7 @@ export default function PedidosAutomaticosCrud() {
                         }}
                     >
                         + Nuevo pedido
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -2542,7 +2545,7 @@ export default function PedidosAutomaticosCrud() {
                                                 >
                                                     <IconEye />
                                                 </button>
-                                                <button
+                                                {puede.editar && <button
                                                     style={S.actionBtn(
                                                         "#e8f8f5",
                                                         "var(--primary-dark)",
@@ -2554,8 +2557,8 @@ export default function PedidosAutomaticosCrud() {
                                                     }}
                                                 >
                                                     <IconEdit />
-                                                </button>
-                                                <button
+                                                </button>}
+                                                {puede.eliminar && <button
                                                     style={S.actionBtn(
                                                         "#fce8e8",
                                                         "#a33",
@@ -2566,7 +2569,7 @@ export default function PedidosAutomaticosCrud() {
                                                     }
                                                 >
                                                     <IconTrash size={14} />
-                                                </button>
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch,
     IconEmptySearch,
@@ -20,6 +21,8 @@ const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras"
 const ALIADOS_MOCK = ["Aliado Norte S.A.S.", "Aliado Sur Limitada", "Distribuciones Avanza", "Punto de Venta Centro", "Aliado Alianza Oriente"];
 
 export default function PedidosCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const qc = useQueryClient();
 
     // --- Cargar datos dinámicos del backend si existen ---
@@ -751,18 +754,18 @@ export default function PedidosCrud() {
                         <IconFile size={15} style={{ marginRight: 6 }} />
                         Trazabilidad
                     </button>
-                    <button style={S.btnSecondary} onClick={handleExportar} disabled={exporting}>
+                    {puede.exportar && <button style={S.btnSecondary} onClick={handleExportar} disabled={exporting}>
                         {exporting ? <IconLoading size={15} /> : <IconFile size={15} style={{ marginRight: 6 }} />}
                         {exporting ? "Exportando..." : "Exportar Excel"}
-                    </button>
-                    <button style={S.btnDanger} onClick={handleEliminarPedidos}>
+                    </button>}
+                    {puede.eliminar && <button style={S.btnDanger} onClick={handleEliminarPedidos}>
                         <IconTrash size={15} style={{ marginRight: 6 }} />
                         Eliminar
-                    </button>
-                    <button className="btn-primary" onClick={handleAbrirNuevo}>
+                    </button>}
+                    {puede.crear && <button className="btn-primary" onClick={handleAbrirNuevo}>
                         <IconPlus size={15} />
                         Nuevo pedido
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -899,7 +902,7 @@ export default function PedidosCrud() {
                                                 >
                                                     <IconEye size={14} />
                                                 </button>
-                                                {(p.origen === "dotacion" || p.estado !== "Completado") && (
+                                                {puede.editar && (p.origen === "dotacion" || p.estado !== "Completado") && (
                                                     <button
                                                         style={{
                                                             ...S.actionIconBtn("#fef3c7", "#92400e"),
@@ -918,12 +921,12 @@ export default function PedidosCrud() {
                                                 )}
                                                 {p.origen !== "dotacion" && (
                                                     <>
-                                                        <button style={S.actionIconBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => handleAbrirEditar(p, "edit")}>
+                                                        {puede.editar && <button style={S.actionIconBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => handleAbrirEditar(p, "edit")}>
                                                             <IconEdit size={14} />
-                                                        </button>
-                                                        <button style={S.actionIconBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => handleEliminarUno(p)}>
+                                                        </button>}
+                                                        {puede.eliminar && <button style={S.actionIconBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => handleEliminarUno(p)}>
                                                             <IconTrash size={14} />
-                                                        </button>
+                                                        </button>}
                                                     </>
                                                 )}
                                             </div>

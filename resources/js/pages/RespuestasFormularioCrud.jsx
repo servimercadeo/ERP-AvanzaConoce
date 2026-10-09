@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconEye,
     IconTrash,
@@ -60,6 +61,8 @@ function getPaginasBotones(pagina, total) {
 }
 
 export default function RespuestasFormularioCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -441,7 +444,7 @@ export default function RespuestasFormularioCrud() {
                                                     <IconFolder size={15} />
                                                 </button>
                                             )}
-                                            <button
+                                            {puede.eliminar && <button
                                                 style={S.actionBtn(
                                                     "#fce8e8",
                                                     "#c0392b",
@@ -452,7 +455,7 @@ export default function RespuestasFormularioCrud() {
                                                 }
                                             >
                                                 <IconTrash size={15} />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>
@@ -722,7 +725,7 @@ export default function RespuestasFormularioCrud() {
                     }
                     onDownload={handleDownloadDoc}
                     onPreview={handlePreviewDoc}
-                    onDelete={handleDeleteDoc}
+                    onDelete={puede.eliminar ? handleDeleteDoc : null}
                     onRefresh={handleRefreshDocs}
                 />
             )}
@@ -1095,7 +1098,7 @@ function DocsModal({
                                                         />{" "}
                                                         Descargar
                                                     </button>
-                                                    <button
+                                                    {onDelete && <button
                                                         onClick={() =>
                                                             onDelete(
                                                                 row.documento,
@@ -1117,7 +1120,7 @@ function DocsModal({
                                                         }}
                                                     >
                                                         <IconTrash size={14} />
-                                                    </button>
+                                                    </button>}
                                                 </div>
                                             )}
                                         </div>

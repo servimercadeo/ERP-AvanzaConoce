@@ -4,6 +4,7 @@ import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
 import { canAccessModule, canAccessSubmodule, canAccessArchivo, SUBMODULO_RAIZ } from "../data/erpModules";
 import { useErpModules } from "../hooks/useErpModules";
+import { PestanaContext } from "../hooks/useAcciones";
 import {
     MODULE_ICONS,
     IconFolder,
@@ -322,7 +323,9 @@ export default function Module() {
                                             {archivoActual?.label?.toLowerCase()}
                                         </p>
                                     </div>
-                                    <CrudComponent />
+                                    <PestanaContext.Provider value={{ moduleId: mod.id, submoduleId: SUBMODULO_RAIZ, archivoId: tabVisible }}>
+                                        <CrudComponent />
+                                    </PestanaContext.Provider>
                                 </>
                             ) : (
                                 <div style={S.placeholder}>

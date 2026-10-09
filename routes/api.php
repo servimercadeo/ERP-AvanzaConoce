@@ -6,6 +6,7 @@ use App\Mail\AlertaIngresoMail;
 use App\Mail\CargaDocumentosMail;
 use App\Mail\DocumentosCompletadosMail;
 use App\Models\BaseIngreso;
+use App\Models\PermisoDenegado;
 use App\Models\RespuestaIngreso;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -252,27 +253,41 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo Administrativo: el acceso sale de la matriz del módulo Permisos (lo mismo que
     // ve cada rol en el menú). Contratos también lee empleados. Los contratos y empleados
     // (salarios, datos personales) no se abren a otros módulos aunque los consulten.
+    // Cada escritura pide además su acción (":crear", ":editar"...), que el módulo Permisos
+    // puede negarle a un rol que sí ve la pestaña.
     Route::middleware('permiso:administrativo.empleados')->group(function () {
         // Candidatos listos para convertirse en empleados (aval=true, sin usuario aún)
         Route::get('empleados/candidatos-listos', [EmpleadoController::class, 'candidatosListos']);
         // Importación masiva de datos personales desde Excel, por cédula (solo rellena
         // campos vacíos, nunca pisa un dato ya existente).
-        Route::post('empleados/importar-datos-personales', [EmpleadoController::class, 'importarDatosPersonales']);
-        Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia']);
-        Route::apiResource('empleados', EmpleadoController::class)->except(['index', 'show']);
+        Route::post('empleados/importar-datos-personales', [EmpleadoController::class, 'importarDatosPersonales'])
+            ->middleware('permiso:administrativo.empleados:importar');
+        Route::post('empleados', [EmpleadoController::class, 'store'])
+            ->middleware('permiso:administrativo.empleados:crear');
+        Route::match(['put', 'patch'], 'empleados/{empleado}', [EmpleadoController::class, 'update'])
+            ->middleware('permiso:administrativo.empleados:editar');
+        Route::delete('empleados/{empleado}', [EmpleadoController::class, 'destroy'])
+            ->middleware('permiso:administrativo.empleados:eliminar');
     });
+    Route::post('empleados/{empleado}/fotografia', [EmpleadoController::class, 'updateFotografia'])
+        ->middleware('permiso:administrativo.empleados:crear,administrativo.empleados:editar,administrativo.admin_contratos.ver_crear_contratos:crear,administrativo.admin_contratos.ver_crear_contratos:editar');
     Route::patch('empleados/{empleado}/tallas', [EmpleadoController::class, 'updateTallas'])
         ->middleware('permiso:administrativo.empleados');
     Route::apiResource('empleados', EmpleadoController::class)->only(['index', 'show'])
         ->middleware('permiso:administrativo.empleados,administrativo.admin_contratos');
 
-    Route::middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos')->group(function () {
-        // Rellenar datos faltantes de contratos desde Excel, por documento/cédula (solo
-        // rellena campos vacíos, nunca pisa un dato ya existente; nunca crea contratos). Lo usa
-        // "Importar Excel" de Contratos para las cédulas que ya tienen contrato.
-        Route::post('contratos/importar-datos-faltantes', [ContratoController::class, 'importarDatosFaltantes']);
-        Route::apiResource('contratos', ContratoController::class)->except(['index', 'show']);
-    });
+    // Escrituras de contratos, cada una con su acción de Ver y Crear Contratos. Seguimiento
+    // (Seguros_medicos) también edita el contrato (datos médicos) y no tiene acciones propias.
+    // "Importar Excel" crea los contratos nuevos uno por uno con POST /contratos: por eso
+    // crear acepta también a quien solo tiene importar.
+    Route::post('contratos/importar-datos-faltantes', [ContratoController::class, 'importarDatosFaltantes'])
+        ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:importar');
+    Route::post('contratos', [ContratoController::class, 'store'])
+        ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:crear,administrativo.admin_contratos.ver_crear_contratos:importar');
+    Route::match(['put', 'patch'], 'contratos/{contrato}', [ContratoController::class, 'update'])
+        ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:editar,administrativo.admin_contratos.Seguros_medicos');
+    Route::delete('contratos/{contrato}', [ContratoController::class, 'destroy'])
+        ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:eliminar');
     Route::apiResource('contratos', ContratoController::class)->only(['index', 'show'])
         ->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
 
@@ -315,7 +330,7 @@ Route::middleware('auth:sanctum')->group(function () {
         $centro = \App\Models\CentroCostoCatalogo::create($data);
 
         return response()->json($centro, 201);
-    });
+    })->middleware(PermisoDenegado::middleware('crear', 'administrativo.admin_contratos.centros_costos_catalogo', 'parametros.centros_costos.centros_costos_file'));
 
     // Edita un centro de costo del catálogo (Parametros > Centros de Costos)
     Route::put('centros-costo-catalogo/{centroCosto}', function (Request $request, \App\Models\CentroCostoCatalogo $centroCosto) {
@@ -341,64 +356,95 @@ Route::middleware('auth:sanctum')->group(function () {
         $centroCosto->update($data);
 
         return response()->json($centroCosto->fresh());
-    });
+    })->middleware(PermisoDenegado::middleware('editar', 'administrativo.admin_contratos.centros_costos_catalogo', 'parametros.centros_costos.centros_costos_file'));
 
     // Elimina un centro de costo del catálogo
     Route::delete('centros-costo-catalogo/{centroCosto}', function (\App\Models\CentroCostoCatalogo $centroCosto) {
         $centroCosto->delete();
         return response()->json(null, 204);
-    });
+    })->middleware(PermisoDenegado::middleware('eliminar', 'administrativo.admin_contratos.centros_costos_catalogo', 'parametros.centros_costos.centros_costos_file'));
 
     // Opciones y CRUD de sedes
     Route::get('sedes/options', [App\Http\Controllers\Api\SedeController::class, 'options']);
-    Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class);
+    Route::apiResource('sedes', App\Http\Controllers\Api\SedeController::class)
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'sedes._modulo.sedes_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'sedes._modulo.sedes_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'sedes._modulo.sedes_file'));
 
     // Catálogo de empleadores (Parametros > Empleadores)
     // "empleadores" -> "empleador" explícito: el inflector de Laravel no sabe español y por
     // defecto habría generado {empleadore}, que no coincide con el type-hint del controlador.
     Route::apiResource('empleadores', App\Http\Controllers\Api\EmpleadorController::class)
-        ->parameters(['empleadores' => 'empleador']);
+        ->parameters(['empleadores' => 'empleador'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.empleadores.empleadores_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.empleadores.empleadores_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.empleadores.empleadores_file'));
 
     // Contactos de un empleador (nombre, correo, regional que atiende)
-    Route::post('empleadores/{empleador}/contactos', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'store']);
-    Route::put('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'update']);
-    Route::delete('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'destroy']);
+    // Los contactos son parte de editar al empleador.
+    Route::post('empleadores/{empleador}/contactos', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'store'])
+        ->middleware(PermisoDenegado::middleware('editar', 'parametros.empleadores.empleadores_file'));
+    Route::put('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'update'])
+        ->middleware(PermisoDenegado::middleware('editar', 'parametros.empleadores.empleadores_file'));
+    Route::delete('empleadores/{empleador}/contactos/{contacto}', [App\Http\Controllers\Api\EmpleadorContactoController::class, 'destroy'])
+        ->middleware(PermisoDenegado::middleware('editar', 'parametros.empleadores.empleadores_file'));
 
     // Catálogo de empresas (Parametros > Empresas). El GET público de /empresas
     // (fuera de este grupo, línea ~125) sigue igual para los combos existentes.
-    Route::post('empresas', [EmpresaController::class, 'store']);
+    Route::post('empresas', [EmpresaController::class, 'store'])->middleware(PermisoDenegado::middleware('crear', 'parametros.empresas.empresas_file'));
     Route::get('empresas/{empresa}', [EmpresaController::class, 'show']);
-    Route::put('empresas/{empresa}', [EmpresaController::class, 'update']);
-    Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy']);
+    Route::put('empresas/{empresa}', [EmpresaController::class, 'update'])->middleware(PermisoDenegado::middleware('editar', 'parametros.empresas.empresas_file'));
+    Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy'])->middleware(PermisoDenegado::middleware('eliminar', 'parametros.empresas.empresas_file'));
 
     // Catálogo de regionales (Parametros > Regionales)
     Route::apiResource('regionales', App\Http\Controllers\Api\RegionalController::class)
-        ->parameters(['regionales' => 'regional']);
+        ->parameters(['regionales' => 'regional'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.regionales.regionales_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.regionales.regionales_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.regionales.regionales_file'));
 
     // Catálogo de proyectos (Parametros > Proyectos)
     Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
-        ->parameters(['proyectos' => 'proyecto']);
+        ->parameters(['proyectos' => 'proyecto'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.proyectos.proyectos_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.proyectos.proyectos_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.proyectos.proyectos_file'));
 
     // Catálogo de tipos de producto (Pedidos y Compras > Parametros > Tipo de Producto)
     Route::apiResource('tipos-producto', App\Http\Controllers\Api\TipoProductoController::class)
-        ->parameters(['tipos-producto' => 'tipoProducto']);
+        ->parameters(['tipos-producto' => 'tipoProducto'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.categoria_producto.tipo_producto_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.categoria_producto.tipo_producto_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.categoria_producto.tipo_producto_file'));
 
     // Catálogo de categorías de producto (Parametros > Categoría del Producto). Crear una
     // categoría nueva aquí genera automáticamente su propio submódulo en Inventarios.
     Route::apiResource('categorias-producto', App\Http\Controllers\Api\CategoriaProductoController::class)
-        ->parameters(['categorias-producto' => 'categoriaProducto']);
+        ->parameters(['categorias-producto' => 'categoriaProducto'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.categoria_producto.categoria_producto_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.categoria_producto.categoria_producto_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.categoria_producto.categoria_producto_file'));
 
     // Catálogo de clases de pedido (Pedidos y Compras > Parametros > Clases de Pedidos)
     Route::apiResource('clases-pedido', App\Http\Controllers\Api\ClasePedidoController::class)
-        ->parameters(['clases-pedido' => 'clasePedido']);
+        ->parameters(['clases-pedido' => 'clasePedido'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.clases_pedido.clases_pedido_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.clases_pedido.clases_pedido_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.clases_pedido.clases_pedido_file'));
 
     // Catálogo de conceptos de pedido (Pedidos y Compras > Parametros > Conceptos de Pedidos)
     Route::apiResource('conceptos-pedido', App\Http\Controllers\Api\ConceptoPedidoController::class)
-        ->parameters(['conceptos-pedido' => 'conceptoPedido']);
+        ->parameters(['conceptos-pedido' => 'conceptoPedido'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.conceptos_pedido.conceptos_pedido_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.conceptos_pedido.conceptos_pedido_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.conceptos_pedido.conceptos_pedido_file'));
 
     // Catálogo de proveedores (Parametros > Proveedores)
     Route::apiResource('proveedores', App\Http\Controllers\Api\ProveedorController::class)
-        ->parameters(['proveedores' => 'proveedor']);
+        ->parameters(['proveedores' => 'proveedor'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.proveedores.proveedores_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.proveedores.proveedores_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.proveedores.proveedores_file'));
 
     // Catálogo de formas de pago (Parametros > Formas de Pago)
     Route::apiResource('formas-pago', App\Http\Controllers\Api\FormaPagoController::class)
@@ -408,12 +454,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Parametros (igual que Categoría del Producto, pero sin generar submódulos aparte).
     Route::apiResource('tipos-parametro', App\Http\Controllers\Api\TipoParametroController::class)
         ->only(['index', 'store', 'update', 'destroy'])
-        ->parameters(['tipos-parametro' => 'tipoParametro']);
+        ->parameters(['tipos-parametro' => 'tipoParametro'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros._modulo.ver_y_crear_parametros'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
     // Valores dentro de cada Tipo de Parámetro genérico.
     Route::apiResource('valores-parametro', App\Http\Controllers\Api\ValorParametroController::class)
         ->only(['index', 'store', 'update', 'destroy'])
-        ->parameters(['valores-parametro' => 'valorParametro']);
+        ->parameters(['valores-parametro' => 'valorParametro'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros._modulo.ver_y_crear_parametros'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
@@ -421,12 +473,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('ordenes-compra/{ordenCompra}/pdf', [App\Http\Controllers\Api\OrdenCompraController::class, 'pdf']);
     Route::apiResource('ordenes-compra', App\Http\Controllers\Api\OrdenCompraController::class)
         ->parameters(['ordenes-compra' => 'ordenCompra'])
-        ->only(['index', 'show', 'store', 'destroy']);
+        ->only(['index', 'show', 'store', 'destroy'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'pedidos_compras.compras.ver_crear_orden_compra'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'pedidos_compras.compras.ver_crear_orden_compra'));
 
     // Inventario por sede de las categorías de producto (Inventarios > Activos/Materiales/Equipos/EPP/Herramientas)
     Route::get('inventario-productos/resumen', [App\Http\Controllers\Api\InventarioProductoController::class, 'resumen']);
     Route::get('inventario-productos/sedes', [App\Http\Controllers\Api\InventarioProductoController::class, 'sedesDisponibles']);
-    Route::post('inventario-productos/importar', [App\Http\Controllers\Api\InventarioProductoController::class, 'importar']);
+    Route::post('inventario-productos/importar', [App\Http\Controllers\Api\InventarioProductoController::class, 'importar'])
+        ->middleware(PermisoDenegado::middleware('importar', 'inventarios.inv_general.inventario_general'));
     Route::apiResource('inventario-productos', App\Http\Controllers\Api\InventarioProductoController::class)
         ->except(['show'])
         ->parameters(['inventario-productos' => 'inventarioProducto']);
@@ -434,23 +489,28 @@ Route::middleware('auth:sanctum')->group(function () {
     // Asignación de Inventario: custodia de una unidad/cantidad por un empleado.
     Route::apiResource('asignaciones-inventario', App\Http\Controllers\Api\AsignacionInventarioController::class)
         ->only(['index', 'store'])
-        ->parameters(['asignaciones-inventario' => 'asignacionInventario']);
-    Route::post('asignaciones-inventario/{asignacionInventario}/devolver', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'devolver']);
+        ->parameters(['asignaciones-inventario' => 'asignacionInventario'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'inventarios.asignacion_inventario.asignacion_inventario_file'));
+    Route::post('asignaciones-inventario/{asignacionInventario}/devolver', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'devolver'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.asignacion_inventario.asignacion_inventario_file', 'inventarios.inventario_empleado.inventario_empleado_file'));
     Route::post('asignaciones-inventario/{asignacionInventario}/acta-entrega', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'actaEntrega']);
 
     // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
-    Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar']);
+    Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
+        ->middleware(PermisoDenegado::middleware('importar', 'inventarios.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'destroy'])
-        ->parameters(['work-orders' => 'workOrder']);
+        ->parameters(['work-orders' => 'workOrder'])
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.work_orders.work_orders_file'));
 
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
     // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo
     // suyo, ya incluido en /user).
     Route::middleware('permiso:permisos.roles_permisos')->group(function () {
         Route::get('permisos', [App\Http\Controllers\Api\PermisoController::class, 'index']);
-        Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync']);
+        Route::put('permisos', [App\Http\Controllers\Api\PermisoController::class, 'sync'])
+            ->middleware(PermisoDenegado::middleware('editar', 'permisos.roles_permisos.permisos_file'));
     });
 
     // Auditoría del Sistema (Permisos > Auditoría).
@@ -461,18 +521,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)
     Route::apiResource('pedidos-compra', App\Http\Controllers\Api\PedidoCompraController::class)
-        ->parameters(['pedidos-compra' => 'pedidoCompra']);
+        ->parameters(['pedidos-compra' => 'pedidoCompra'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'pedidos_compras.pedidos.ver_crear_pedidos'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos', 'pedidos_compras.compras.ver_compras'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
 
     // Asignación de Pedidos: quién queda a cargo de gestionar cada pedido.
-    Route::patch('pedidos-compra/{pedidoCompra}/asignar', [App\Http\Controllers\Api\PedidoCompraController::class, 'asignar']);
+    Route::patch('pedidos-compra/{pedidoCompra}/asignar', [App\Http\Controllers\Api\PedidoCompraController::class, 'asignar'])
+        ->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.asignacion_pedidos.asignacion_pedidos_file'));
 
     // Revisión manual de stock/traslado para pedidos de oficina (mismo criterio que
     // Dotación, ahora contra inventario_productos)
     Route::get('pedidos-compra/{pedidoCompra}/stock-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'stockPorPedido']);
-    Route::post('pedido-compra-items/{pedidoCompraItem}/stock-local', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'marcarStockLocal']);
-    Route::post('pedido-compra-items/{pedidoCompraItem}/traslado', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'solicitarTraslado']);
-    Route::post('pedido-compra-items/{pedidoCompraItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'enviarACompras']);
-    Route::post('pedido-compra-items/{pedidoCompraItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'deshacerRevision']);
+    Route::post('pedido-compra-items/{pedidoCompraItem}/stock-local', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'marcarStockLocal'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-compra-items/{pedidoCompraItem}/traslado', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'solicitarTraslado'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-compra-items/{pedidoCompraItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'enviarACompras'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-compra-items/{pedidoCompraItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockPedidoCompraController::class, 'deshacerRevision'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
     // El Acta de Entrega ya no tiene endpoint propio: se dispara sola al asignar el
     // pedido a alguien en Asignación de Pedidos (ver PedidoCompraController::asignar()).
     // acta-traslado abajo es solo para REENVIAR el acta de un traslado ya aprobado.
@@ -482,18 +546,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // stock de arriba queda "Pendiente Aprobación" hasta que se apruebe o rechace aquí;
     // al aprobar recién se mueve el stock de verdad y se manda el Acta de Traslado.
     Route::get('traslados-producto', [App\Http\Controllers\Api\TrasladoProductoController::class, 'index']);
-    Route::post('traslados-producto/{trasladoProducto}/aprobar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'aprobar']);
-    Route::post('traslados-producto/{trasladoProducto}/rechazar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'rechazar']);
+    Route::post('traslados-producto/{trasladoProducto}/aprobar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'aprobar'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.inv_general.aprobacion_traslado_file'));
+    Route::post('traslados-producto/{trasladoProducto}/rechazar', [App\Http\Controllers\Api\TrasladoProductoController::class, 'rechazar'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.inv_general.aprobacion_traslado_file'));
 
     // Revisión manual de stock/traslado para pedidos de Dotación "Enviar a compras"
     // (Pedidos y Compras > Pedidos > Ver y Crear Pedidos, filas que vienen de Dotación)
-    Route::put('pedidos-automaticos/{pedidoAutomatico}/recibido-pedidos', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarRecibido']);
-    Route::put('pedidos-automaticos/{pedidoAutomatico}/estado-compra', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'actualizarEstadoCompra']);
+    Route::put('pedidos-automaticos/{pedidoAutomatico}/recibido-pedidos', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarRecibido'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos', 'pedidos_compras.compras.ver_compras'));
+    Route::put('pedidos-automaticos/{pedidoAutomatico}/estado-compra', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'actualizarEstadoCompra'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos', 'pedidos_compras.compras.ver_compras'));
     Route::get('pedidos-automaticos/{pedidoAutomatico}/stock-revision', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'stockPorPedido']);
-    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/stock-local', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarStockLocal']);
-    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/traslado', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'solicitarTraslado']);
-    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'enviarACompras']);
-    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'deshacerRevision']);
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/stock-local', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'marcarStockLocal'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/traslado', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'solicitarTraslado'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/enviar-compras', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'enviarACompras'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
+    Route::post('pedido-automatico-items/{pedidoAutomaticoItem}/deshacer-revision', [App\Http\Controllers\Api\RevisionStockDotacionController::class, 'deshacerRevision'])->middleware(PermisoDenegado::middleware('editar', 'pedidos_compras.pedidos.ver_crear_pedidos'));
 
     // Inventario de prendas de dotación
     Route::get('inventario-dotacion/proyectos', [InventarioDotacionController::class, 'proyectosDotacionUsuario']);
@@ -501,31 +567,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('inventario-dotacion/resumen', [InventarioDotacionController::class, 'resumen']);
     Route::get('inventario-dotacion/filtros', [InventarioDotacionController::class, 'filtros']);
     Route::get('inventario-dotacion', [InventarioDotacionController::class, 'index']);
-    Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk']);
-    Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import']);
-    Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store']);
-    Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update']);
-    Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy']);
+    Route::post('inventario-dotacion/bulk', [InventarioDotacionController::class, 'storeBulk'])->middleware(PermisoDenegado::middleware('importar', 'inventarios.dotacion.productos_dotacion'));
+    Route::post('inventario-dotacion/import', [InventarioDotacionController::class, 'import'])->middleware(PermisoDenegado::middleware('importar', 'inventarios.dotacion.productos_dotacion'));
+    Route::post('inventario-dotacion', [InventarioDotacionController::class, 'store'])->middleware(PermisoDenegado::middleware('crear', 'inventarios.dotacion.productos_dotacion'));
+    Route::put('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'update'])->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.productos_dotacion'));
+    Route::delete('inventario-dotacion/{inventarioDotacion}', [InventarioDotacionController::class, 'destroy'])->middleware(PermisoDenegado::middleware('eliminar', 'inventarios.dotacion.productos_dotacion'));
 
     // Pedidos automáticos de dotación
     Route::get('pedidos-automaticos/ultimo-empleado/{empleadoId}', [PedidoAutomaticoController::class, 'ultimoPorEmpleado']);
-    Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver']);
-    Route::put('pedidos-automaticos/bulk-estado', [PedidoAutomaticoController::class, 'bulkEstado']);
+    Route::post('pedidos-automaticos/{pedidoAutomatico}/devolver', [PedidoAutomaticoController::class, 'devolver'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.pedidos_globales'));
+    Route::put('pedidos-automaticos/bulk-estado', [PedidoAutomaticoController::class, 'bulkEstado'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.pedidos_globales'));
     Route::apiResource('pedidos-automaticos', PedidoAutomaticoController::class)
-        ->parameters(['pedidos-automaticos' => 'pedidoAutomatico']);
+        ->parameters(['pedidos-automaticos' => 'pedidoAutomatico'])
+        ->middlewareFor('store', 'permiso:inventarios.dotacion.pedidos_dotacion:crear,inventarios.dotacion.pedidos_dotacion:importar')
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'inventarios.dotacion.pedidos_dotacion'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.dotacion.pedidos_dotacion'));
 
     // Pedidos globales de dotación
     Route::get('pedidos-globales', [PedidoGlobalController::class, 'index']);
-    Route::post('pedidos-globales', [PedidoGlobalController::class, 'store']);
-    Route::post('pedidos-globales/import', [PedidoGlobalController::class, 'import']);
-    Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update']);
-    Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy']);
+    Route::post('pedidos-globales', [PedidoGlobalController::class, 'store'])->middleware(PermisoDenegado::middleware('crear', 'inventarios.dotacion.pedidos_dotacion'));
+    Route::post('pedidos-globales/import', [PedidoGlobalController::class, 'import'])->middleware(PermisoDenegado::middleware('importar', 'inventarios.dotacion.pedidos_globales'));
+    Route::put('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'update'])->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.pedidos_globales'));
+    Route::delete('pedidos-globales/{pedidoGlobal}', [PedidoGlobalController::class, 'destroy'])->middleware(PermisoDenegado::middleware('eliminar', 'inventarios.dotacion.pedidos_globales'));
 
     // Cronograma de entregas de dotación por proyecto
     Route::get('cronograma-dotacion', [CronogramaDotacionController::class, 'index']);
-    Route::post('cronograma-dotacion', [CronogramaDotacionController::class, 'store']);
-    Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update']);
-    Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle']);
+    Route::post('cronograma-dotacion', [CronogramaDotacionController::class, 'store'])->middleware(PermisoDenegado::middleware('crear', 'inventarios.dotacion.cronograma'));
+    Route::put('cronograma-dotacion/{cronogramaDotacion}', [CronogramaDotacionController::class, 'update'])->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.cronograma'));
+    Route::patch('cronograma-dotacion/{cronogramaDotacion}/toggle', [CronogramaDotacionController::class, 'toggle'])->middleware(PermisoDenegado::middleware('editar', 'inventarios.dotacion.cronograma'));
 
     // Selección, candidatos, base de ingresos y documentos de contratación: según la matriz
     // del módulo Permisos. El grupo pide Selección o Administración de Contratos (lo que
@@ -538,7 +609,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permiso:administrativo.seleccion.base_ingreso,administrativo.admin_contratos.avales_contratacion');
     // Anular aval: desmarca el aval del candidato y libera la vacante de la requisición
     Route::post('base-ingresos/{baseIngreso}/anular', [BaseIngresoController::class, 'anular'])
-        ->middleware('permiso:administrativo.admin_contratos.avales_contratacion');
+        ->middleware(PermisoDenegado::middleware('editar', 'administrativo.admin_contratos.avales_contratacion'));
     // Enviar alerta de ingreso al candidato por correo
     Route::post('base-ingresos/{baseIngreso}/alerta', function (BaseIngreso $baseIngreso) {
         if (!$baseIngreso->correo) {
@@ -566,14 +637,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // CRUD completo de base de ingresos
     Route::apiResource('base-ingresos', BaseIngresoController::class)
         ->parameters(['base-ingresos' => 'baseIngreso'])
-        ->middleware('permiso:administrativo.seleccion.base_ingreso,administrativo.admin_contratos.avales_contratacion');
+        ->middleware('permiso:administrativo.seleccion.base_ingreso,administrativo.admin_contratos.avales_contratacion')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'administrativo.seleccion.base_ingreso'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'administrativo.seleccion.base_ingreso', 'administrativo.admin_contratos.avales_contratacion'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'administrativo.seleccion.base_ingreso'));
 
     // Documentos del Empleado: otrosí, certificados, etc. ligados a un seguimiento de RH
     Route::get('documentos-empleado/{documentoEmpleado}/download', [App\Http\Controllers\Api\DocumentoEmpleadoController::class, 'download'])->middleware('permiso:administrativo.admin_contratos.Seguros_medicos');
     Route::apiResource('documentos-empleado', App\Http\Controllers\Api\DocumentoEmpleadoController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['documentos-empleado' => 'documentoEmpleado'])
-        ->middleware('permiso:administrativo.admin_contratos.Seguros_medicos');
+        ->middleware('permiso:administrativo.admin_contratos.Seguros_medicos')
+        ->middlewareFor('store', PermisoDenegado::middleware('editar', 'administrativo.admin_contratos.Seguros_medicos'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'administrativo.admin_contratos.Seguros_medicos'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('editar', 'administrativo.admin_contratos.Seguros_medicos'));
 
     // Devuelve nombre_completo y correo del ingreso más reciente para una cédula
     Route::get('documentos-contratacion/employee-info', function (Request $request) {
@@ -635,7 +712,7 @@ Route::middleware('auth:sanctum')->group(function () {
             file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:crear,administrativo.admin_contratos.ver_crear_contratos:editar,administrativo.admin_contratos.Seguros_medicos:editar');
 
     // Notifica al flujo de Power Automate con los documentos médicos recién subidos, incluyendo
     // el contenido en base64 (llamada server-to-server para evitar CORS)
@@ -689,23 +766,29 @@ Route::middleware('auth:sanctum')->group(function () {
         }
 
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos,administrativo.admin_contratos.Seguros_medicos');
+    })->middleware('permiso:administrativo.admin_contratos.ver_crear_contratos:crear,administrativo.admin_contratos.ver_crear_contratos:editar,administrativo.admin_contratos.Seguros_medicos:editar');
 
     // CRUD completo de requisiciones y candidatos
     Route::apiResource('requisiciones', RequisicionController::class)
         ->parameters(['requisiciones' => 'requisicion'])
-        ->middleware('permiso:administrativo.seleccion.proceso_seleccion,administrativo.seleccion.candidatos');
+        ->middleware('permiso:administrativo.seleccion.proceso_seleccion,administrativo.seleccion.candidatos')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'administrativo.seleccion.proceso_seleccion'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'administrativo.seleccion.proceso_seleccion'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'administrativo.seleccion.proceso_seleccion'));
     Route::get('candidatos/by-doc/{doc}', function ($doc) {
         $c = \App\Models\Candidato::where('identificacion', $doc)->first(['fecha_expedicion']);
         return response()->json($c ? ['fecha_expedicion' => $c->fecha_expedicion] : null);
     });
     Route::apiResource('candidatos', CandidatoController::class)
         ->parameters(['candidatos' => 'candidato'])
-        ->middleware('permiso:administrativo.seleccion.candidatos,administrativo.seleccion.base_ingreso');
+        ->middleware('permiso:administrativo.seleccion.candidatos,administrativo.seleccion.base_ingreso')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'administrativo.seleccion.candidatos'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'administrativo.seleccion.candidatos'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'administrativo.seleccion.candidatos'));
     Route::get('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'index'])->middleware('permiso:administrativo.seleccion.candidatos');
-    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store'])->middleware('permiso:administrativo.seleccion.candidatos');
+    Route::post('candidatos/{candidato}/documentos', [CandidatoDocumentoController::class, 'store'])->middleware(PermisoDenegado::middleware('editar', 'administrativo.seleccion.candidatos'));
     Route::get('candidatos/{candidato}/documentos/{documento}/download', [CandidatoDocumentoController::class, 'download'])->middleware('permiso:administrativo.seleccion.candidatos');
-    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy'])->middleware('permiso:administrativo.seleccion.candidatos');
+    Route::delete('candidatos/{candidato}/documentos/{documento}', [CandidatoDocumentoController::class, 'destroy'])->middleware(PermisoDenegado::middleware('editar', 'administrativo.seleccion.candidatos'));
 
     // Catálogos para el módulo de selección (cargos, proyectos, responsables, ciudades)
     Route::get('/seleccion/catalogos', function () {
@@ -885,7 +968,7 @@ Route::middleware('auth:sanctum')->group(function () {
         unset($meta[$documento]['archivos'][$tipo]);
         file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
+    })->middleware(PermisoDenegado::middleware('eliminar', 'administrativo.admin_contratos.respuestas_formulario'));
 
     Route::delete('/respuestas-ingresos/{id}', function ($id) {
         $respuesta = RespuestaIngreso::find($id);
@@ -894,7 +977,7 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $respuesta->delete();
         return response()->json(null, 204);
-    })->middleware('permiso:administrativo.admin_contratos.respuestas_formulario');
+    })->middleware(PermisoDenegado::middleware('eliminar', 'administrativo.admin_contratos.respuestas_formulario'));
 
     }); // fin Selección / Administración de Contratos
 });

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import { SearchableSelect } from "../components/SearchableSelect";
 import api from "../api/axios";
+import { useAcciones } from "../hooks/useAcciones";
 import {
     IconSearch,
     IconEye,
@@ -346,6 +347,8 @@ function getPaginasBotones(pagina, total) {
 }
 
 export default function SedesCrud() {
+    // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
+    const puede = useAcciones();
     const [sedes, setSedes] = useState([]);
     const [options, setOptions] = useState({
         users: [],
@@ -605,7 +608,7 @@ export default function SedesCrud() {
                         Filtros
                     </button>
                 </div>
-                <button
+                {puede.crear && <button
                     className="btn-primary"
                     onClick={() => {
                         setEditTarget(null);
@@ -613,7 +616,7 @@ export default function SedesCrud() {
                     }}
                 >
                     + Nueva sede
-                </button>
+                </button>}
             </div>
 
             <div style={S.tableWrap}>
@@ -709,7 +712,7 @@ export default function SedesCrud() {
                                             >
                                                 <IconEye />
                                             </button>
-                                            <button
+                                            {puede.editar && <button
                                                 style={S.actionBtn(
                                                     "#e8f8f5",
                                                     "var(--primary-dark)",
@@ -720,8 +723,8 @@ export default function SedesCrud() {
                                                 }}
                                             >
                                                 <IconEdit />
-                                            </button>
-                                            <button
+                                            </button>}
+                                            {puede.eliminar && <button
                                                 style={S.actionBtn(
                                                     "#fce8e8",
                                                     "#a33",
@@ -731,7 +734,7 @@ export default function SedesCrud() {
                                                 }
                                             >
                                                 <IconTrash />
-                                            </button>
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>
