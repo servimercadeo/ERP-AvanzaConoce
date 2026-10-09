@@ -1,1 +1,0 @@
-import{r as e}from"./vendor-query-qy_ppomC.js";import{u as r}from"./app-aF1SDJq4.js";import{A as a,D as n}from"./Layout-CyDmbozT.js";const u=e.createContext(null);function i(){const{user:s}=r(),t=e.useContext(u);return Object.fromEntries(a.map(({id:o})=>[o,!t||n(s,t.moduleId,t.submoduleId,t.archivoId,o)]))}export{u as P,i as u};

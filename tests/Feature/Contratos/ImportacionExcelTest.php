@@ -88,7 +88,7 @@ class ImportacionExcelTest extends TestCase
 
         // Después del alta en Empleados sí puede
         $this->actuarComo('th');
-        $r = $this->importarEmpleados([['cedula' => '5020', 'barrio' => 'CENTRO']])->assertOk()->assertJsonPath('dados_de_alta', 1);
+        $r = $this->importarEmpleados([['cedula' => '5020', 'barrio' => 'CENTRO', 'movil' => '3001110020']])->assertOk()->assertJsonPath('dados_de_alta', 1);
         $clave = $this->detalle($r, 'cedula', '5020')['credenciales']['password'];
         $this->app["auth"]->forgetGuards();
         $this->app["auth"]->shouldUse("web");
@@ -106,7 +106,7 @@ class ImportacionExcelTest extends TestCase
         $user->forceFill(['pendiente_alta' => true])->saveQuietly();
         $this->assertSame('general', $user->fresh()->rol);
 
-        $r = $this->importarEmpleados([['cedula' => '5001', 'barrio' => 'CENTRO']])->assertOk();
+        $r = $this->importarEmpleados([['cedula' => '5001', 'barrio' => 'CENTRO', 'movil' => '3001110001']])->assertOk();
 
         $r->assertJsonPath('dados_de_alta', 1)->assertJsonPath('actualizados', 1);
         $user = $user->fresh();

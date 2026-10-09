@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Contrato;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
+use App\Services\AltaEnAvanzaConoce;
 use App\Services\CredencialesAvanzaConoce;
 use App\Services\IdentidadUnica;
 use App\Services\ImportacionExcelValidador;
@@ -265,7 +266,6 @@ class EmpleadoController extends Controller
 
                 // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
                 $credenciales     = CredencialesAvanzaConoce::paraAlta($data['cedula'] ?? $empleado->cedula);
-                $plainPassword    = $credenciales['mostrar'];
                 $data['password'] = $credenciales['hash'];
 
                 $empleado->update($data);
@@ -273,12 +273,16 @@ class EmpleadoController extends Controller
 
                 app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
+                // Mismo usuario y contraseña en AvanzaConoce.
+                $credenciales = app(AltaEnAvanzaConoce::class)->sincronizar($empleado->fresh(), $credenciales);
+
                 return response()->json([
                     'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                     'credenciales' => [
                         'email'    => $empleado->email,
-                        'password' => $plainPassword,
+                        'password' => $credenciales['mostrar'],
                         'de_avanza' => $credenciales['de_avanza'],
+                        'avanza'   => $credenciales['avanza'],
                     ],
                 ], 201);
             }
@@ -299,19 +303,22 @@ class EmpleadoController extends Controller
 
         // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
         $credenciales     = CredencialesAvanzaConoce::paraAlta($data['cedula'] ?? null);
-        $plainPassword    = $credenciales['mostrar'];
         $data['password'] = $credenciales['hash'];
 
         $empleado = User::create($data);
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado);
 
+        // Mismo usuario y contraseña en AvanzaConoce.
+        $credenciales = app(AltaEnAvanzaConoce::class)->sincronizar($empleado->fresh(), $credenciales);
+
         return response()->json([
             'empleado'     => $empleado->load(['empresa', 'sedeCatalogo']),
             'credenciales' => [
                 'email'    => $empleado->email,
-                'password' => $plainPassword,
+                'password' => $credenciales['mostrar'],
                 'de_avanza' => $credenciales['de_avanza'],
+                'avanza'   => $credenciales['avanza'],
             ],
         ], 201);
     }
@@ -350,6 +357,12 @@ class EmpleadoController extends Controller
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
+
+        // AvanzaConoce lo había rechazado por un dato (p. ej. correo de otra persona): si se
+        // corrigió, vuelve a la cola de reintento (avanza:sincronizar-usuarios).
+        if ($empleado->avanza_sync_estado === AltaEnAvanzaConoce::CONFLICTO && $empleado->wasChanged(['email', 'cedula', 'movil', 'nombres', 'apellidos'])) {
+            $empleado->forceFill(['avanza_sync_estado' => AltaEnAvanzaConoce::PENDIENTE])->saveQuietly();
+        }
 
         // Igual que en index(): si no tiene foto propia se muestra la del formulario de
         // ingreso, para que el avatar no desaparezca de la lista tras editar.
@@ -475,10 +488,15 @@ class EmpleadoController extends Controller
             'sin_cambios'    => 0,
             'no_encontrados' => [],
             'sin_contrato'   => [],
+            'sin_celular'    => [],
             'detalle'        => [],
         ];
 
-        DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen) {
+        // Altas hechas por el import: se mandan a AvanzaConoce después de guardar (no se
+        // llama a otro sistema con la transacción abierta). [índice en detalle, usuario, credenciales]
+        $altas = [];
+
+        DB::transaction(function () use ($filas, $camposPermitidos, $camposFecha, $longitudesMaximas, &$resumen, &$altas) {
             foreach ($filas as $fila) {
                 if (!is_array($fila) || !is_scalar($fila['cedula'] ?? null)) continue;
                 $cedula = trim((string) $fila['cedula']);
@@ -533,7 +551,11 @@ class EmpleadoController extends Controller
                 // sentido rellenarle los datos y dejarlo igual de invisible.
                 $seDioDeAlta = false;
                 $credenciales = null;
-                if ($user->pendiente_alta) {
+                // El celular es obligatorio para dar de alta (también lo es en AvanzaConoce,
+                // donde se crea su usuario): sin él se guardan los datos pero sigue pendiente.
+                if ($user->pendiente_alta && trim((string) $user->movil) === '') {
+                    $resumen['sin_celular'][] = $cedula;
+                } elseif ($user->pendiente_alta) {
                     // Mismo rol por defecto que store(): 'consultor' ya no existe en el ENUM
                     // de `users.rol` y MySQL estricto tumbaría todo el lote.
                     $user->rol            = $user->rol ?: 'general';
@@ -543,6 +565,7 @@ class EmpleadoController extends Controller
                     $nuevas = CredencialesAvanzaConoce::paraAlta($user->cedula);
                     $user->password = $nuevas['hash'];
                     $credenciales = ['email' => $user->email, 'password' => $nuevas['mostrar'], 'de_avanza' => $nuevas['de_avanza']];
+                    $altas[] = [count($resumen['detalle']), $user, $nuevas];
                     $seDioDeAlta = true;
                 }
 
@@ -579,6 +602,17 @@ class EmpleadoController extends Controller
                 ];
             }
         });
+
+        $avanza = app(AltaEnAvanzaConoce::class);
+        foreach ($altas as [$i, $user, $nuevas]) {
+            $final = $avanza->sincronizar($user->fresh(), $nuevas);
+            $resumen['detalle'][$i]['credenciales'] = [
+                'email'     => $user->email,
+                'password'  => $final['mostrar'],
+                'de_avanza' => $final['de_avanza'],
+                'avanza'    => $final['avanza'],
+            ];
+        }
 
         return response()->json($resumen);
     }

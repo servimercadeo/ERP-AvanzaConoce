@@ -142,7 +142,8 @@ class User extends Authenticatable
         });
 
         // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
-        // (th/tic) a quien todavía no tiene rol asignado; nunca cambia ni quita uno elegido.
+        // (th/tic/supervisores) a quien todavía no tiene rol asignado; nunca cambia ni quita
+        // uno elegido. Los asesores comerciales se quedan en "general".
         static::saving(function (User $user) {
             $rolElegidoAhora = $user->exists && $user->isDirty('rol');
             if (!$user->isDirty('cargo') || $rolElegidoAhora || !in_array($user->rol, [null, 'general'], true)) {
@@ -155,6 +156,8 @@ class User extends Authenticatable
                 $user->rol = 'th';
             } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || str_contains($cargo, 'TIC'))) {
                 $user->rol = 'tic';
+            } elseif ($cargo !== '' && str_contains($cargo, 'SUPERVIS')) {
+                $user->rol = 'supervisores';
             }
         });
     }
@@ -167,6 +170,7 @@ class User extends Authenticatable
             'activo'               => 'boolean',
             'pendiente_alta'       => 'boolean',
             'ultimo_sso_at'        => 'datetime',
+            'avanza_sync_at'       => 'datetime',
             'fecha_nacimiento'     => 'date',
             'fecha_expedicion'     => 'date',
             'licencia_carro_vence' => 'date',

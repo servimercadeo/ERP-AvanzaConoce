@@ -1342,6 +1342,27 @@ function Modal({
     );
 }
 
+/* ─── Resultado de crear el usuario también en AvanzaConoce ───────────── */
+function AvisoAvanza({ avanza }) {
+    const bien = avanza.estado === "ok" || avanza.estado === "existente";
+    return (
+        <div
+            style={{
+                background: bien ? "#e8f8f5" : "#fff7e6",
+                color: bien ? "var(--primary-dark)" : "#8a5a00",
+                border: `1px solid ${bien ? "#bfe9e0" : "#f5d48a"}`,
+                borderRadius: "var(--radius-sm)",
+                padding: "10px 14px",
+                fontSize: "0.84rem",
+                marginBottom: 16,
+                lineHeight: 1.5,
+            }}
+        >
+            <strong>AvanzaConoce:</strong> {avanza.mensaje}
+        </div>
+    );
+}
+
 /* ─── Modal de credenciales iniciales ───────────────────────────────── */
 function CredencialesModal({ open, credenciales, onClose }) {
     const [copiado, setCopiado] = useState(false);
@@ -1389,6 +1410,7 @@ function CredencialesModal({ open, credenciales, onClose }) {
                             ? "El empleado ya tiene usuario en AvanzaConoce: entra al ERP con su correo y la misma contraseña que usa allá. Si la cambia o la resetea en AvanzaConoce, se actualiza también aquí."
                             : "Guarda estas credenciales y compártelas con el empleado. La contraseña no podrá recuperarse después de cerrar esta ventana."}
                     </p>
+                    {credenciales.avanza && <AvisoAvanza avanza={credenciales.avanza} />}
                     <div
                         style={{
                             background: "var(--bg)",
