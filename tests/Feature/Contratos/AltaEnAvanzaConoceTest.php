@@ -62,6 +62,7 @@ class AltaEnAvanzaConoceTest extends TestCase
                 && $req['email'] === $user->email
                 && $req['password_hash'] === $user->password
                 && $req['rol_avanza'] === 'admin'
+                && array_key_exists('ciudad', $req->data()) && array_key_exists('jefe_inmediato_correo', $req->data())
                 && !str_contains($req->body(), $clave);
         });
     }
@@ -90,6 +91,67 @@ class AltaEnAvanzaConoceTest extends TestCase
 
         $this->assertSame('supervisores', User::where('cedula', '6001')->value('rol'));
         $this->assertSame('general', User::where('cedula', '6002')->value('rol'));
+    }
+
+    public function test_si_ya_existia_en_avanza_queda_ok_y_enlazado(): void
+    {
+        Http::fake([self::URL => Http::response(['id' => 900, 'ya_existia' => true], 200)]);
+
+        $r = $this->postJson('/api/empleados', $this->payload())->assertCreated();
+
+        $r->assertJsonPath('credenciales.avanza.estado', 'ok');
+        $this->assertStringContainsString('Ya tenía usuario', $r->json('credenciales.avanza.mensaje'));
+        $user = User::where('cedula', '4001')->first();
+        $this->assertSame('ok', $user->avanza_sync_estado);
+        $this->assertSame(900, (int) $user->avanzaconoce_id);
+    }
+
+    public function test_un_422_de_avanza_es_conflicto_con_el_mensaje_de_sus_errores(): void
+    {
+        Http::fake([self::URL => Http::response([
+            'message' => 'The given data was invalid.',
+            'errors'  => ['movil' => ['El celular no debe tener más de 15 caracteres.']],
+        ], 422)]);
+
+        $r = $this->postJson('/api/empleados', $this->payload())->assertCreated();
+
+        $r->assertJsonPath('credenciales.avanza.estado', 'conflicto');
+        $this->assertStringContainsString('más de 15 caracteres', $r->json('credenciales.avanza.mensaje'));
+    }
+
+    public function test_401_y_500_de_avanza_quedan_como_error_para_reintentar(): void
+    {
+        Http::fake([self::URL => Http::sequence()
+            ->push(['message' => 'No autorizado'], 401)
+            ->push(['message' => 'No se pudo crear el usuario en AvanzaConoce. Se reintentará.'], 500)
+            ->push(['id' => 901, 'ya_existia' => false], 201)]);
+
+        $this->postJson('/api/empleados', $this->payload())->assertCreated()->assertJsonPath('credenciales.avanza.estado', 'error');
+        $this->artisan('avanza:sincronizar-usuarios')->assertSuccessful();
+        $this->assertSame('error', User::where('cedula', '4001')->value('avanza_sync_estado'));
+        $this->artisan('avanza:sincronizar-usuarios')->assertSuccessful();
+        $this->assertSame('ok', User::where('cedula', '4001')->value('avanza_sync_estado'));
+        Http::assertSentCount(3);
+    }
+
+    public function test_tic_por_cargo_solo_si_es_la_palabra_tic_no_logistica_ni_practicante(): void
+    {
+        config(['sso.crear_usuarios_en_avanza' => false]);
+        $esperado = [
+            '7001' => ['COORDINADOR DE TIC', 'tic'],
+            '7002' => ['TECNICO SISTEMAS', 'tic'],
+            '7003' => ['AUXILIAR DE LOGISTICA', 'general'],
+            '7004' => ['LIDER DE ANALITICA', 'general'],
+            '7005' => ['PRACTICANTE COMERCIAL', 'general'],
+            '7006' => ['ASISTENTE TALENTO HUMANO', 'th'],
+        ];
+        foreach ($esperado as $cedula => [$cargo, $rol]) {
+            $this->postJson('/api/contratos', [
+                'documento' => (string) $cedula, 'nombres' => 'ana', 'apellidos' => 'perez', 'cargo' => $cargo,
+                'tipo_contrato' => 'Indefinido', 'fecha_ingreso' => '2026-09-01', 'estado_contrato' => 'Activo',
+            ])->assertCreated();
+            $this->assertSame($rol, User::where('cedula', (string) $cedula)->value('rol'), $cargo);
+        }
     }
 
     public function test_apagado_no_llama_a_avanza_y_el_alta_sigue_igual(): void

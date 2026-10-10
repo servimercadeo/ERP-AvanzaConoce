@@ -154,7 +154,8 @@ class User extends Authenticatable
 
             if ($cargo !== '' && str_contains($cargo, 'TALENTO HUMANO')) {
                 $user->rol = 'th';
-            } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || str_contains($cargo, 'TIC'))) {
+            } elseif ($cargo !== '' && (str_contains($cargo, 'SISTEMAS') || preg_match('/\bTIC\b/u', $cargo))) {
+                // "TIC" como palabra: LOGÍSTICA, ANALÍTICA o PRACTICANTE también lo contienen y no son TIC.
                 $user->rol = 'tic';
             } elseif ($cargo !== '' && str_contains($cargo, 'SUPERVIS')) {
                 $user->rol = 'supervisores';

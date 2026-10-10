@@ -798,6 +798,9 @@ class EmpleadoController extends Controller
 
                     // ── Datos laborales (contrato > aval > requisición > user)
                     'cargo'            => $dato($contrato?->cargo, $ingreso?->cargo, $req?->cargo?->nombre, $user->cargo),
+                    // Rol que ya tiene en el ERP (el cargo lo sugiere al crear el contrato: th, tic,
+                    // supervisores...). Sin esto el formulario dejaba "general" y lo pisaba al guardar.
+                    'rol'              => $user->rol,
                     'sede'             => $dato($contrato?->sede, $ingreso?->lugar_trabajo, $candidato?->lugar_trabajo, $user->sede),
                     'tipo_vinculacion' => $dato($contrato?->tipo_vinculacion, $ingreso?->tipo_vinculacion, $candidato?->tipo_vinculacion, $user->tipo_vinculacion),
                     'tipo_funcionario' => $dato($user->tipo_funcionario),

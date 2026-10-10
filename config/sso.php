@@ -21,6 +21,12 @@ return [
     'avanzaconoce_users_table' => env('AVANZACONOCE_USERS_TABLE', 'users'),
 
     /*
+     | ¿El ERP comparte base con AvanzaConoce (y puede leer su tabla `users`)? null = solo en
+     | producción. true/false lo fuerza (p. ej. true para una prueba local con la base copiada).
+     */
+    'avanzaconoce_misma_bd' => env('AVANZACONOCE_MISMA_BD'),
+
+    /*
      | Crear el usuario en AvanzaConoce al dar de alta a un empleado en el ERP (ver
      | App\Services\AltaEnAvanzaConoce). Apagado por defecto: se enciende cuando
      | AvanzaConoce ya tenga publicado POST /api/erp/empleados.

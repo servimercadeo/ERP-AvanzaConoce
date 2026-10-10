@@ -24,6 +24,9 @@ class RolAvanzaConoceTest extends TestCase
             'Tigo otro cargo: sin regla'         => ['general', 'BACKOFFICE', 'TIGO EXPRESS', null],
             'Operaciones: pendiente'             => ['operaciones', 'ASESOR COMERCIAL', 'DIRECTV CO', null],
             'Admin del ERP: pendiente'           => ['admin', 'GERENTE', 'DIRECTV CO', null],
+            'Administrativo backoffice'          => ['general', 'BACKOFFICE', 'ADMINISTRATIVO', 'admin'],
+            'Administrativo supervisor'          => ['supervisores', 'SUPERVISOR DE CALIDAD', 'administrativo', 'admin'],
+            'Operaciones en administrativo: pendiente' => ['operaciones', 'ANALISTA', 'ADMINISTRATIVO', null],
             'Otro proyecto: sin regla'           => ['general', 'ASESOR COMERCIAL', 'HUGHES COL', null],
             'Sin contrato ni rol admin'          => ['general', 'ASESOR COMERCIAL', null, null],
         ];

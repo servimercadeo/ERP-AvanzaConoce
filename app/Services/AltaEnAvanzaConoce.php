@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Contrato;
+use App\Models\RespuestaIngreso;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -133,36 +136,94 @@ class AltaEnAvanzaConoce
     }
 
     /**
-     * Lo que recibe AvanzaConoce. La cédula es la llave; `email` es el usuario de ingreso
-     * (igual al del ERP, lo usa el SSO) y `email_contacto` el correo real para Bitrix y
-     * notificaciones (null si en el ERP solo hay el correo técnico {cédula}@avanzaconoce.com).
+     * Todo lo que el ERP sabe del empleado y que también pide el formulario de usuarios de
+     * AvanzaConoce (Users/Form.vue). Los catálogos van por NOMBRE (EPS, ARL, banco, RH,
+     * estado civil, cargo, sede, ciudad...): AvanzaConoce los traduce a sus ids y deja null
+     * lo que no reconozca. El supervisor va por correo (jefe inmediato del contrato).
      */
-    private function payload(User $user, ?\App\Models\Contrato $contrato, string $rol): array
+    private function payload(User $user, ?Contrato $contrato, string $rol): array
     {
-        $user->loadMissing('empresa');
+        $user->loadMissing(['empresa', 'sedeCatalogo.ciudad']);
+        $contrato?->loadMissing('centrosCostos');
+        $fecha = fn ($valor) => $valor ? Carbon::parse($valor)->toDateString() : null;
+        // El dato del contrato manda (es el vigente); si no hay, el del empleado.
+        $deContrato = fn (string $campo) => $contrato?->{$campo} ?: $user->{$campo};
 
         return [
-            'rol_avanza'       => $rol,
-            'rol_erp'          => $user->rol,
-            'proyecto'         => $contrato?->cliente_proyecto,
-            'erp_user_id'      => $user->id,
-            'cedula'           => trim((string) $user->cedula),
-            'nombres'          => $user->nombres,
-            'apellidos'        => $user->apellidos,
-            'name'             => $user->name,
-            'email'            => mb_strtolower(trim((string) $user->email)),
-            'email_contacto'   => $user->resolverEmailReal(),
-            'movil'            => trim((string) $user->movil),
-            'cargo'            => $user->cargo,
-            'sede'             => $user->sede,
-            'empresa'          => $user->empresa?->nombre,
-            'empleador'        => $contrato?->empleador ?? $user->empleador,
-            'regional'         => $contrato?->regional?->nombre,
-            'tipo_vinculacion' => $user->tipo_vinculacion,
-            'fecha_ingreso'    => $contrato?->fecha_ingreso?->toDateString(),
-            'genero'           => $user->genero,
-            'fecha_nacimiento' => $user->fecha_nacimiento ? \Illuminate\Support\Carbon::parse($user->fecha_nacimiento)->toDateString() : null,
-            'password_hash'    => $user->getAuthPassword(),
+            // Rol y llave
+            'rol_avanza'        => $rol,
+            'rol_erp'           => $user->rol,
+            'proyecto'          => $contrato?->cliente_proyecto,
+            'erp_user_id'       => $user->id,
+            'cedula'            => trim((string) $user->cedula),
+            'password_hash'     => $user->getAuthPassword(),
+
+            // Identidad y contacto
+            'nombres'           => $user->nombres,
+            'apellidos'         => $user->apellidos,
+            'name'              => $user->name,
+            'email'             => mb_strtolower(trim((string) $user->email)),
+            'email_contacto'    => $user->resolverEmailReal(),
+            'movil'             => trim((string) $user->movil),
+
+            // Datos personales
+            'fecha_nacimiento'  => $fecha($user->fecha_nacimiento),
+            'lugar_nacimiento'  => $user->lugar_nacimiento,
+            'genero'            => $user->genero,
+            'raza'              => $user->raza,
+            'estado_civil'      => $user->estado_civil,
+            'nivel_escolaridad' => $user->nivel_escolaridad,
+            'profesion'         => $user->profesion,
+            'numero_hijos'      => $user->numero_hijos,
+            'rh'                => $user->rh,
+            'direccion'         => $user->direccion_residencia,
+            'barrio'            => $user->barrio,
+            'estrato'           => $user->estrato,
+            // Ciudad de la sede donde trabaja; si no tiene sede, la del formulario de ingreso.
+            'ciudad'            => $user->sedeCatalogo?->ciudad?->nombre
+                ?: RespuestaIngreso::where('documento', $user->cedula)->latest()->value('ciudad'),
+            'observaciones_medicas' => $user->observaciones_medicas,
+            'alergias'          => $user->alergias,
+
+            // Contacto de emergencia
+            'contacto_emergencia_nombre'     => $user->contacto_emergencia_nombre,
+            'contacto_emergencia_telefono'   => $user->contacto_emergencia_telefono,
+            'contacto_emergencia_parentesco' => $user->contacto_emergencia_parentesco,
+
+            // Laboral (contrato vigente)
+            'cargo'             => $deContrato('cargo'),
+            'sede'              => $deContrato('sede'),
+            'regional'          => $contrato?->regional?->nombre,
+            'area_empresa'      => $contrato?->area_empresa,
+            'empresa'           => $contrato?->empresa ?: $user->empresa?->nombre,
+            'empleador'         => $deContrato('empleador'),
+            'tipo_vinculacion'  => $deContrato('tipo_vinculacion'),
+            'tipo_contrato'     => $contrato?->tipo_contrato,
+            'fecha_ingreso'     => $fecha($contrato?->fecha_ingreso),
+            'ingresos'          => $contrato?->salario ?? $user->ingresos,
+            'centro_costos'     => $contrato?->centrosCostos->first()?->codigo,
+            'jefe_inmediato_nombre' => $deContrato('jefe_inmediato_nombre') ?: $deContrato('jefe_inmediato'),
+            'jefe_inmediato_correo' => $deContrato('jefe_inmediato_correo'),
+            'codigo_directv'    => $user->codigo_directv,
+
+            // Seguridad social
+            'eps'               => $contrato?->lps_afiliado ?: $user->eps,
+            'arl'               => $deContrato('arl'),
+            'fondo_pensiones'   => $deContrato('fondo_pensiones'),
+            'caja_compensacion' => $deContrato('caja_compensacion'),
+
+            // Banco
+            'banco'             => $deContrato('banco'),
+            'tipo_cuenta'       => $deContrato('tipo_cuenta'),
+            'cuenta_bancaria'   => $deContrato('cuenta_bancaria'),
+
+            // Licencias y certificaciones
+            'licencia_carro'       => $user->licencia_carro,
+            'licencia_carro_vence' => $fecha($user->licencia_carro_vence),
+            'licencia_moto'        => $user->licencia_moto,
+            'licencia_moto_vence'  => $fecha($user->licencia_moto_vence),
+            'tiene_cert_alturas'   => (bool) $user->tiene_cert_alturas,
+            'cert_alturas_vence'   => $fecha($user->cert_alturas_vence),
         ];
     }
 

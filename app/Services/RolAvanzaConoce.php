@@ -17,6 +17,7 @@ use App\Models\User;
  *   DIRECTV  + cualquier otro cargo          -> empleado
  *   TIGO     + cargo ASESOR COMERCIAL...     -> asesor
  *   TIGO     + cargo de supervisor           -> supervisor
+ *   ADMINISTRATIVO (cualquier cargo)         -> admin   (en AvanzaConoce: portal "Solo Ausentismos")
  *   cualquier otro caso (rol operaciones o admin del ERP, otros proyectos o cargos) -> null:
  *   todavía no tiene regla y NO se crea en AvanzaConoce hasta definirla.
  *
@@ -38,6 +39,7 @@ class RolAvanzaConoce
     /** Proyectos del ERP (contratos.cliente_proyecto) de cada grupo de reglas. */
     public const PROYECTOS_DIRECTV = ['DIRECTV CO'];
     public const PROYECTOS_TIGO = ['TIGO EXPRESS', 'TIGO HOME'];
+    public const PROYECTOS_ADMINISTRATIVO = ['ADMINISTRATIVO'];
 
     public static function para(User $user, ?string $proyecto): ?string
     {
@@ -52,6 +54,10 @@ class RolAvanzaConoce
         $proyecto = mb_strtoupper(trim((string) $proyecto));
         $esAsesor = str_starts_with($cargo, 'ASESOR COMERCIAL');
         $esSupervisor = str_contains($cargo, 'SUPERVIS');
+
+        if (in_array($proyecto, self::PROYECTOS_ADMINISTRATIVO, true)) {
+            return self::ADMIN;
+        }
 
         if (in_array($proyecto, self::PROYECTOS_DIRECTV, true)) {
             return match (true) {
