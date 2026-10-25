@@ -116,7 +116,7 @@ function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
 
 /* ── CRUD genérico de los valores dentro de un Tipo de Parámetro creado por
    el usuario (solo nombre/descripción, igual de simple que ese tipo). ── */
-function ValoresParametroPanel({ tipo }) {
+export function ValoresParametroPanel({ tipo }) {
   const puede = useAcciones();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
@@ -285,7 +285,8 @@ export default function VerYCrearParametrosCrud() {
   const erpModules = useErpModules();
   const qc = useQueryClient();
   const mod = erpModules.find((m) => m.id === 'parametros');
-  const submods = (mod?.submods ?? []).filter((sub) => canAccessSubmodule(user, 'parametros', sub.id));
+  // Los tipos creados por el usuario se listan aparte (abajo), no como catálogo fijo.
+  const submods = (mod?.submods ?? []).filter((sub) => !sub.tipoParametro && canAccessSubmodule(user, 'parametros', sub.id));
 
   const [seleccionado, setSeleccionado] = useState(null);
   const [modalTipoOpen, setModalTipoOpen] = useState(false);

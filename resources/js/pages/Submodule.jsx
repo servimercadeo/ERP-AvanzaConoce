@@ -40,6 +40,7 @@ const InventarioEppCrud = lazy(() => import('./InventarioEppCrud'));
 const InventarioHerramientasCrud = lazy(() => import('./InventarioHerramientasCrud'));
 const InventarioGeneralCrud = lazy(() => import('./InventarioGeneralCrud'));
 const InventarioCategoriaCrud = lazy(() => import('./InventarioCategoriaCrud'));
+const ValoresParametroPanel = lazy(() => import('./VerYCrearParametrosCrud').then((m) => ({ default: m.ValoresParametroPanel })));
 const PermisosCrud = lazy(() => import('./PermisosCrud'));
 const AuditoriaCrud = lazy(() => import('./AuditoriaCrud'));
 const AsignacionPedidosCrud = lazy(() => import('./AsignacionPedidosCrud'));
@@ -355,7 +356,12 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'par_comerciales_tecnicos':
         case 'par_auxilio_movilidad':
           return null;
-        default: return null;
+        default:
+          // Tipo de parámetro creado por el usuario (ver useErpModules.js)
+          if (sub?.tipoParametro && archivoId === sub.archivos?.[0]?.id) {
+            return ValoresParametroPanel;
+          }
+          return null;
       }
 
     /* ── LIQUIDACIÓN COMISIONES ──────────────────────────── */
@@ -502,7 +508,7 @@ export default function Submodule() {
               </div>
               <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
                 <PestanaContext.Provider value={{ moduleId: mod.id, submoduleId: sub.id, archivoId: tabActiva }}>
-                  <CrudComponent categoria={sub.categoriaDinamica} />
+                  <CrudComponent categoria={sub.categoriaDinamica} tipo={sub.tipoParametro} />
                 </PestanaContext.Provider>
               </Suspense>
             </>

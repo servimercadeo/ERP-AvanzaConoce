@@ -129,7 +129,13 @@ export default function SeleccionCrud() {
   const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
   const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
-  const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
+  // Solo los cargos marcados para requisición; si la requisición ya tenía otro cargo, se conserva visible.
+  const cargosOpts       = (() => {
+    const lista = catalogs.cargos_requisicion || [];
+    const actual = (catalogs.cargos || []).find(c => String(c.id) === String(form?.cargo_id));
+    const conActual = actual && !lista.some(c => c.id === actual.id) ? [...lista, actual] : lista;
+    return conActual.map(c => ({ value: String(c.id), label: c.nombre }));
+  })();
   // Sedes de la ciudad de operación; si la ciudad no tiene sedes registradas, se muestran todas.
   const sedesCiudad      = (catalogs.sedes || []).filter(s => form.ciudad_id && String(s.id_ciudad) === String(form.ciudad_id));
   const sedesOpts        = (sedesCiudad.length ? sedesCiudad : (catalogs.sedes || []))

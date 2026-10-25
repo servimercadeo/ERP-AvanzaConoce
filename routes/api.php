@@ -794,6 +794,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/seleccion/catalogos', function () {
         return response()->json([
             'cargos'       => DB::table('cargos')->select('id', 'nombre')->orderBy('nombre')->get(),
+            // Subconjunto ofrecido en "Cargo requerido" de las requisiciones
+            'cargos_requisicion' => DB::table('cargos')->where('en_requisicion', true)->select('id', 'nombre')->orderBy('nombre')->get(),
             'proyectos'    => DB::table('proyectos')->where('activo', true)->orderBy('nombre')
                                ->get(['id', 'nombre'])
                                ->map(fn($p) => ['value' => $p->id, 'label' => $p->nombre])

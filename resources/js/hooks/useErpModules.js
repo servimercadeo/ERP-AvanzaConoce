@@ -35,13 +35,31 @@ export function useErpModules() {
         queryFn: () => api.get("/categorias-producto").then((r) => r.data),
         staleTime: 5 * 60 * 1000,
     });
+    // Tipos de parámetro creados en Parametros > Ver y Crear Parametros: cada uno aparece
+    // como submódulo propio en el menú de Parametros.
+    const { data: tiposParametro = [] } = useQuery({
+        queryKey: ["tipos-parametro"],
+        queryFn: () => api.get("/tipos-parametro").then((r) => r.data),
+        staleTime: 5 * 60 * 1000,
+    });
 
     return useMemo(() => {
         const nuevas = categorias.filter((c) => !CATEGORIAS_CON_MODULO_PROPIO.includes(c.nombre));
-        if (nuevas.length === 0) return ERP_MODULES;
+        if (nuevas.length === 0 && tiposParametro.length === 0) return ERP_MODULES;
 
         return ERP_MODULES.map((mod) => {
-            if (mod.id !== "inventarios") return mod;
+            if (mod.id === "parametros" && tiposParametro.length > 0) {
+                const submodsParametro = tiposParametro.map((t) => ({
+                    id: `param_${t.id}`,
+                    label: t.nombre,
+                    icon: "parametros",
+                    desc: `Valores de ${t.nombre}`,
+                    tipoParametro: t,
+                    archivos: [{ id: `param_${t.id}_file`, label: t.nombre, acciones: ["crear", "editar", "eliminar"] }],
+                }));
+                return { ...mod, submods: [...mod.submods, ...submodsParametro] };
+            }
+            if (mod.id !== "inventarios" || nuevas.length === 0) return mod;
 
             const submodsGenerados = nuevas.map((c) => {
                 const id = slugCategoria(c.nombre);
@@ -62,5 +80,5 @@ export function useErpModules() {
 
             return { ...mod, submods };
         });
-    }, [categorias]);
+    }, [categorias, tiposParametro]);
 }
