@@ -30,6 +30,10 @@
         <!-- DB_USERNAME/DB_PASSWORD se heredan del .env local (no se hardcodean aquí para
              no meter la contraseña real en un archivo versionado) -->
         <env name="DB_URL" value=""/>
+        <!-- Las pruebas nunca usan la base compartida con AvanzaConoce ni la llaman de verdad. -->
+        <env name="DB_PREFIX" value="" force="true"/>
+        <env name="AVANZACONOCE_MISMA_BD" value="" force="true"/>
+        <env name="AVANZACONOCE_CREAR_USUARIOS" value="false" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

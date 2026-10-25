@@ -790,6 +790,8 @@ function Modal({
             email: v(c.email, f.email),
             movil: v(c.movil, f.movil),
             fecha_expedicion: v(c.fecha_expedicion, f.fecha_expedicion),
+            // Rol que el ERP ya le asignó (p. ej. th por su cargo): no dejar "general" por defecto.
+            rol: v(c.rol, f.rol),
             // Datos personales
             genero: v(matchOpt(c.genero, GENEROS), f.genero),
             fecha_nacimiento: v(c.fecha_nacimiento, f.fecha_nacimiento),

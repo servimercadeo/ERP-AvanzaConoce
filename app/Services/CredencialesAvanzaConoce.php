@@ -69,11 +69,16 @@ class CredencialesAvanzaConoce
     }
 
     /**
-     * Solo en producción, donde las tablas del ERP llevan prefijo (`erp_users`) y `users` es
-     * la de AvanzaConoce. En local `users` es la propia tabla del ERP: no se consulta.
+     * Solo cuando el ERP comparte base con AvanzaConoce: sus tablas llevan prefijo
+     * (`erp_users`) y `users` es la de AvanzaConoce. Por defecto, solo en producción; en
+     * local se puede encender con AVANZACONOCE_MISMA_BD=true para probar con una copia de
+     * esa base. Sin prefijo, `users` sería la propia tabla del ERP: nunca se consulta.
      */
     private static function disponible(): bool
     {
-        return app()->environment('production') && DB::getTablePrefix() !== '';
+        $forzado = config('sso.avanzaconoce_misma_bd');
+        $mismaBd = ($forzado === null || $forzado === '') ? app()->environment('production') : (bool) $forzado;
+
+        return $mismaBd && DB::getTablePrefix() !== '';
     }
 }
