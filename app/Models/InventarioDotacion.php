@@ -20,7 +20,7 @@ class InventarioDotacion extends Model
         'SYM TIGO EXPRESS'   => 'TIGO EXPRESS',
         'SYM TIGO HOME'      => 'TIGO HOME',
         'SYM ADMINISTRATIVO' => 'ADMINISTRATIVO',
-        'DIRECTV'            => 'DIRECTV CO',
+        'DIRECTV'            => 'DIRECTV',
     ];
 
     protected $fillable = [

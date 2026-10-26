@@ -284,7 +284,7 @@ class ContratoController extends Controller
 
         // Proyecto de la requisición del candidato (sin N+1): solo de respaldo para los
         // contratos que no tienen proyecto. El del contrato manda: si se le cambió (ej. de
-        // DIRECTV CO a ADMINISTRATIVO), no puede volver a mostrarse el de la requisición.
+        // DIRECTV a ADMINISTRATIVO), no puede volver a mostrarse el de la requisición.
         $cedulas = $contratos->filter(fn ($c) => trim((string) $c->cliente_proyecto) === '')
             ->pluck('empleado.cedula')->filter()->unique()->values()->toArray();
         $proyectoPorCedula = [];

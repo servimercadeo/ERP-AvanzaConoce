@@ -233,7 +233,7 @@ class InventarioDotacionAccesoTest extends TestCase
     {
         $this->usuarioDeEmpresa(null);
         $sede = $this->sede();
-        $proyectoId = DB::table('proyectos')->where('nombre', 'DIRECTV CO')->value('id');
+        $proyectoId = DB::table('proyectos')->where('nombre', 'DIRECTV')->value('id');
         DB::table('proyecto_sede')->insert(['proyecto_id' => $proyectoId, 'sede_id' => $sede, 'created_at' => now(), 'updated_at' => now()]);
 
         $this->postJson('/api/inventario-dotacion', [

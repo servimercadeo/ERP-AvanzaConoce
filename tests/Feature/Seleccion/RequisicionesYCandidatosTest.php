@@ -99,7 +99,7 @@ class RequisicionesYCandidatosTest extends TestCase
         ] + $this->ubicacion())->assertStatus(422)->assertJsonValidationErrors('proyecto_id');
 
         $this->postJson('/api/requisiciones', [
-            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('DIRECTV CO'),
+            'fecha_solicitud' => '2026-09-01', 'requeridas' => 1, 'empresa_id' => $servimercadeo, 'proyecto_id' => $this->proyectoId('DIRECTV'),
         ] + $this->ubicacion())->assertCreated();
 
         // Servimercadeo también tiene personal administrativo.

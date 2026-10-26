@@ -70,7 +70,7 @@ test("Contratos: un solo Excel crea el contrato o completa el existente", async 
         lps_afiliado: "NUEVA EPS",
         fecha_vinculacion_caja: "2021-07-03T00:00:00.000000Z",
         fondo_cesantias: "PROTECCION",
-        cliente_proyecto: "DIRECTV CO",
+        cliente_proyecto: "DIRECTV",
         salario: "2000000.00",
     };
     // Mismo camino que ContratosCrud: archivo exportado → sheet_to_json → payloads
@@ -94,7 +94,7 @@ test("Contratos: un solo Excel crea el contrato o completa el existente", async 
     assert.equal(fila.arl, "SURA");
     assert.equal(fila.fecha_vinculacion_arl, "2021-07-02");
     assert.equal(fila.lps_afiliado, "NUEVA EPS");
-    assert.equal(fila.cliente_proyecto, "DIRECTV CO");
+    assert.equal(fila.cliente_proyecto, "DIRECTV");
     for (const campo of ["salario", "fecha_ingreso", "estado_contrato", "tipo_contrato", "centros_costos", "anexos", "nombres"]) {
         assert.ok(!(campo in fila), campo + " no debe completarse por carga masiva");
     }

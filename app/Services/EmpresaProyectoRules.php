@@ -15,17 +15,20 @@ class EmpresaProyectoRules
      *   'excepto' => cualquier proyecto menos los que empiezan por estos nombres.
      */
     private const REGLAS = [
-        'SERVIMERCADEO COL'        => ['solo'    => ['DIRECTV CO', 'ADMINISTRATIVO']],
+        'SERVIMERCADEO COL'        => ['solo'    => ['DIRECTV', 'ADMINISTRATIVO']],
         'SERVICIOS Y MERCADEO COL' => ['excepto' => ['DIRECTV']],
     ];
 
     /**
      * Nombres anteriores de un proyecto => nombre actual. "ADMINISTRACION" se renombró a
      * "ADMINISTRATIVO" (2026-09-24); contratos y requisiciones viejos pueden traer aún el
-     * nombre anterior y no deben quedar bloqueados al editarlos.
+     * nombre anterior y no deben quedar bloqueados al editarlos. DIRECTV se llamó "DIRECTV CO"
+     * (local) y "DIRECTV COL" (producción) hasta 2026-10-25: el país es un dato aparte.
      */
     private const ALIAS_PROYECTO = [
         'ADMINISTRACION' => 'ADMINISTRATIVO',
+        'DIRECTV CO'     => 'DIRECTV',
+        'DIRECTV COL'    => 'DIRECTV',
     ];
 
     /**
@@ -96,6 +99,14 @@ class EmpresaProyectoRules
      * true si la empresa puede usar el proyecto (también cuando falta alguno de los dos o la
      * empresa no está sujeta a la regla).
      */
+    /** Nombre actual del proyecto en mayúsculas ("DIRECTV COL" => "DIRECTV"), ver ALIAS_PROYECTO. */
+    public static function nombreActual(?string $proyecto): string
+    {
+        $proyecto = mb_strtoupper(trim((string) $proyecto), 'UTF-8');
+
+        return self::ALIAS_PROYECTO[$proyecto] ?? $proyecto;
+    }
+
     public static function permite(?string $empresa, ?string $proyecto): bool
     {
         if (!$empresa || !$proyecto) {
@@ -107,8 +118,7 @@ class EmpresaProyectoRules
             return true;
         }
 
-        $proyectoKey = mb_strtoupper(trim($proyecto), 'UTF-8');
-        $proyectoKey = self::ALIAS_PROYECTO[$proyectoKey] ?? $proyectoKey;
+        $proyectoKey = self::nombreActual($proyecto);
 
         if (isset($regla['solo'])) {
             return in_array($proyectoKey, $regla['solo'], true);

@@ -66,13 +66,9 @@ class AltaEnAvanzaConoce
 
         $resultado = $this->enviar($user);
 
-        if ($resultado['ya_existia']) {
-            // Se creó allá entre la consulta y el envío (o con otra cédula formateada): el
-            // ERP se queda con la contraseña de AvanzaConoce para que sigan siendo iguales.
-            if ($hash = CredencialesAvanzaConoce::passwordEnAvanza($user->cedula)) {
-                $user->forceFill(['password' => $hash])->saveQuietly();
-                $credenciales = ['hash' => $hash, 'mostrar' => CredencialesAvanzaConoce::MISMA_DE_AVANZA, 'de_avanza' => true];
-            }
+        // Se creó allá entre la consulta y el envío: enviar() ya adoptó su contraseña.
+        if ($resultado['ya_existia'] && $resultado['adopto_password']) {
+            $credenciales = ['hash' => $user->password, 'mostrar' => CredencialesAvanzaConoce::MISMA_DE_AVANZA, 'de_avanza' => true];
         }
 
         return $credenciales + ['avanza' => ['estado' => $resultado['estado'], 'mensaje' => $resultado['mensaje']]];
@@ -82,7 +78,7 @@ class AltaEnAvanzaConoce
      * Envía el usuario a AvanzaConoce y guarda el estado en el usuario del ERP. También lo
      * usa el comando de reintento.
      *
-     * @return array{estado: string, mensaje: string, ya_existia: bool}
+     * @return array{estado: string, mensaje: string, ya_existia: bool, adopto_password: bool}
      */
     public function enviar(User $user): array
     {
@@ -115,13 +111,21 @@ class AltaEnAvanzaConoce
 
         if ($respuesta->successful()) {
             $yaExistia = (bool) $respuesta->json('ya_existia', false);
+            // Ya existía allá (p. ej. lo crearon a mano mientras el alta estaba en reintento):
+            // el ERP se queda con la contraseña de AvanzaConoce para que sigan siendo iguales.
+            $adopto = false;
+            if ($yaExistia && ($hash = CredencialesAvanzaConoce::passwordEnAvanza($user->cedula))) {
+                $user->forceFill(['password' => $hash])->saveQuietly();
+                $adopto = true;
+            }
             $this->guardarEstado($user, self::OK, null, $respuesta->json('id'));
             return [
-                'estado'     => self::OK,
-                'mensaje'    => $yaExistia
+                'estado'          => self::OK,
+                'mensaje'         => $yaExistia
                     ? 'Ya tenía usuario en AvanzaConoce; se conserva su contraseña de allá.'
                     : 'Usuario creado también en AvanzaConoce con la misma contraseña.',
-                'ya_existia' => $yaExistia,
+                'ya_existia'      => $yaExistia,
+                'adopto_password' => $adopto,
             ];
         }
 
@@ -257,7 +261,7 @@ class AltaEnAvanzaConoce
     private function fallo(User $user, string $estado, string $mensaje): array
     {
         $this->guardarEstado($user, $estado, $mensaje);
-        return ['estado' => $estado, 'mensaje' => $mensaje, 'ya_existia' => false];
+        return ['estado' => $estado, 'mensaje' => $mensaje, 'ya_existia' => false, 'adopto_password' => false];
     }
 
     private function guardarEstado(User $user, string $estado, ?string $error, mixed $idAvanza = null): void

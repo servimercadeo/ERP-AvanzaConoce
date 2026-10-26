@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\CredencialesAvanzaConoce;
 use App\Services\SsoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,8 +30,16 @@ class SsoController extends Controller
             return redirect('/login?sso_error=token_invalido');
         }
 
+        // La persona se busca por cédula (la llave común): el correo del ERP puede ser otro,
+        // ej. el técnico "{cédula}@avanzaconoce.com". Sin cédula, por correo como antes.
+        $cedula = trim((string) ($payload->nit ?? '')) ?: CredencialesAvanzaConoce::cedulaPorIdEnAvanza($payload->sub ?? null);
+        $usuario = ($cedula ? User::where('cedula', $cedula)->first() : null)
+            ?? User::where('email', $payload->email ?? '')->first();
+
         // Pendiente de alta = creado desde Contratos, aún sin alta en Empleados: sin acceso.
-        $usuario = User::where('email', $payload->email)->where('activo', true)->where('pendiente_alta', false)->first();
+        if ($usuario && (!$usuario->activo || $usuario->pendiente_alta)) {
+            $usuario = null;
+        }
 
         if (!$usuario) {
             // El usuario existe en AvanzaConoce pero aún no fue creado (o está inactivo) en el ERP.

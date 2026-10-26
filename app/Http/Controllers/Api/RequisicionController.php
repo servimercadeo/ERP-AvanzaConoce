@@ -144,7 +144,7 @@ class RequisicionController extends Controller
         // Corregir el proyecto o la empresa de la requisición corrige también los contratos
         // que salieron de ella. Solo si el valor cambió de verdad (el formulario siempre los
         // envía) y solo en los contratos que aún tienen el valor anterior: un contrato al que
-        // se le cambió el proyecto a mano (ej. de DIRECTV CO a ADMINISTRATIVO) no se toca.
+        // se le cambió el proyecto a mano (ej. de DIRECTV a ADMINISTRATIVO) no se toca.
         $requisicion->load(['proyecto', 'empresa']);
         $cambios = array_filter([
             'cliente_proyecto' => [$proyectoAntes, $requisicion->proyecto?->nombre],

@@ -37,7 +37,7 @@ class RolAvanzaConoce
     private const ROLES_ERP_ADMIN = ['tic', 'th', 'financiera'];
 
     /** Proyectos del ERP (contratos.cliente_proyecto) de cada grupo de reglas. */
-    public const PROYECTOS_DIRECTV = ['DIRECTV CO'];
+    public const PROYECTOS_DIRECTV = ['DIRECTV'];
     public const PROYECTOS_TIGO = ['TIGO EXPRESS', 'TIGO HOME'];
     public const PROYECTOS_ADMINISTRATIVO = ['ADMINISTRATIVO'];
 
@@ -51,7 +51,8 @@ class RolAvanzaConoce
         }
 
         $cargo = mb_strtoupper(trim((string) $user->cargo));
-        $proyecto = mb_strtoupper(trim((string) $proyecto));
+        // Con su nombre actual: un contrato viejo puede traer "DIRECTV COL" o "ADMINISTRACION".
+        $proyecto = EmpresaProyectoRules::nombreActual($proyecto);
         $esAsesor = str_starts_with($cargo, 'ASESOR COMERCIAL');
         $esSupervisor = str_contains($cargo, 'SUPERVIS');
 
