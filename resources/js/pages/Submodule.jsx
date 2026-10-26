@@ -357,8 +357,9 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'par_auxilio_movilidad':
           return null;
         default:
-          // Tipo de parámetro creado por el usuario (ver useErpModules.js)
-          if (sub?.tipoParametro && archivoId === sub.archivos?.[0]?.id) {
+          // Tipo de parámetro creado por el usuario (ver useErpModules.js), suelto o
+          // agrupado con otros bajo el mismo submódulo (uno por pestaña).
+          if (sub?.esDinamico && sub.archivos?.some((a) => a.id === archivoId && a.tipoParametro)) {
             return ValoresParametroPanel;
           }
           return null;
@@ -508,7 +509,7 @@ export default function Submodule() {
               </div>
               <Suspense fallback={<div style={S.crudLoader}><IconLoading size={32} /></div>}>
                 <PestanaContext.Provider value={{ moduleId: mod.id, submoduleId: sub.id, archivoId: tabActiva }}>
-                  <CrudComponent categoria={sub.categoriaDinamica} tipo={sub.tipoParametro} />
+                  <CrudComponent categoria={sub.categoriaDinamica} tipo={archivoActual?.tipoParametro} />
                 </PestanaContext.Provider>
               </Suspense>
             </>

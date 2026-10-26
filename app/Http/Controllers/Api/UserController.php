@@ -25,7 +25,7 @@ class UserController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => ['required', Password::min(8)],
-            'rol'      => 'sometimes|in:admin,th,tic,operaciones,financiera,supervisores,general',
+            'rol'      => 'sometimes|in:admin,th,tic,operaciones,financiera,supervisores,general,tecnico',
         ]);
         if ($msg = \App\Services\IdentidadUnica::correoDeOtraPersona($data['email'], null)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['email' => $msg]);

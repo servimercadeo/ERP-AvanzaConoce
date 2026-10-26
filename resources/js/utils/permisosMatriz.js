@@ -8,6 +8,7 @@ export const ROLES = [
     { value: "financiera", label: "Financiera" },
     { value: "supervisores", label: "Supervisores" },
     { value: "general", label: "General" },
+    { value: "tecnico", label: "Técnico" },
 ];
 
 // Catálogo real de módulos, submódulos y pestañas (los mismos que arman el menú, incluidas

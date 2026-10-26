@@ -8,7 +8,7 @@ class TipoParametro extends Model
 {
     protected $table = 'tipos_parametro';
 
-    protected $fillable = ['nombre'];
+    protected $fillable = ['nombre', 'grupo'];
 
     public function valores()
     {
