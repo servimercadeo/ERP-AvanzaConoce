@@ -19,6 +19,7 @@ class TipoParametroController extends Controller
     {
         $data = $request->validate([
             'nombre' => 'required|string|max:100|unique:tipos_parametro,nombre',
+            'grupo'  => 'nullable|string|max:100',
         ]);
 
         $tipo = TipoParametro::create($data);
@@ -30,6 +31,7 @@ class TipoParametroController extends Controller
     {
         $data = $request->validate([
             'nombre' => 'required|string|max:100|unique:tipos_parametro,nombre,' . $tipoParametro->id,
+            'grupo'  => 'nullable|string|max:100',
         ]);
 
         $tipoParametro->update($data);

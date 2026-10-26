@@ -49,15 +49,37 @@ export function useErpModules() {
 
         return ERP_MODULES.map((mod) => {
             if (mod.id === "parametros" && tiposParametro.length > 0) {
-                const submodsParametro = tiposParametro.map((t) => ({
+                // Tipos con el mismo "grupo" (ej. "Work Orders") comparten un solo
+                // submódulo, uno por pestaña; sin grupo, cada tipo es su propio submódulo.
+                const porGrupo = new Map();
+                const sueltos = [];
+                tiposParametro.forEach((t) => {
+                    const grupo = (t.grupo || "").trim();
+                    if (!grupo) { sueltos.push(t); return; }
+                    if (!porGrupo.has(grupo)) porGrupo.set(grupo, []);
+                    porGrupo.get(grupo).push(t);
+                });
+
+                const archivoDe = (t) => ({ id: `param_${t.id}_file`, label: t.nombre, acciones: ["crear", "editar", "eliminar"], tipoParametro: t });
+
+                const submodsAgrupados = [...porGrupo.entries()].map(([grupo, tipos]) => ({
+                    id: `paramgrupo_${slugCategoria(grupo).replace(/^inv_/, "")}`,
+                    label: grupo,
+                    icon: "parametros",
+                    desc: `Catálogos de ${grupo}`,
+                    esDinamico: true,
+                    archivos: tipos.map(archivoDe),
+                }));
+                const submodsSueltos = sueltos.map((t) => ({
                     id: `param_${t.id}`,
                     label: t.nombre,
                     icon: "parametros",
                     desc: `Valores de ${t.nombre}`,
-                    tipoParametro: t,
-                    archivos: [{ id: `param_${t.id}_file`, label: t.nombre, acciones: ["crear", "editar", "eliminar"] }],
+                    esDinamico: true,
+                    archivos: [archivoDe(t)],
                 }));
-                return { ...mod, submods: [...mod.submods, ...submodsParametro] };
+
+                return { ...mod, submods: [...mod.submods, ...submodsAgrupados, ...submodsSueltos] };
             }
             if (mod.id !== "inventarios" || nuevas.length === 0) return mod;
 

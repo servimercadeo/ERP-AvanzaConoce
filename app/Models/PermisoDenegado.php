@@ -25,7 +25,7 @@ class PermisoDenegado extends Model
         return "{$this->rol} · {$this->modulo_id}/{$this->submodulo_id}{$archivo}{$accion}";
     }
 
-    public const ROLES_GESTIONABLES = ['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'];
+    public const ROLES_GESTIONABLES = ['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general', 'tecnico'];
 
     /** submodulo_id de los archivos que cuelgan directo del módulo (igual que el frontend). */
     public const SUBMODULO_RAIZ = '_modulo';

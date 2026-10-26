@@ -42,14 +42,16 @@ const COMPONENTES = {
 
 /* ── Modal simple para crear un Tipo de Parámetro nuevo (solo nombre), igual
    de sencillo que Categoría del Producto. ── */
-function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
+function NuevoTipoModal({ open, onClose, onSaved, editTarget, gruposExistentes }) {
   const [nombre, setNombre] = useState('');
+  const [grupo, setGrupo] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setNombre(editTarget?.nombre ?? '');
+      setGrupo(editTarget?.grupo ?? '');
       setError('');
     }
   }, [open, editTarget]);
@@ -64,10 +66,11 @@ function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
     setSaving(true);
     setError('');
     try {
+      const data = { nombre: nombre.trim(), grupo: grupo.trim() || null };
       if (editTarget) {
-        await api.put(`/tipos-parametro/${editTarget.id}`, { nombre: nombre.trim() });
+        await api.put(`/tipos-parametro/${editTarget.id}`, data);
       } else {
-        await api.post('/tipos-parametro', { nombre: nombre.trim() });
+        await api.post('/tipos-parametro', data);
       }
       onSaved();
       onClose();
@@ -101,6 +104,24 @@ function NuevoTipoModal({ open, onClose, onSaved, editTarget }) {
               placeholder="Ej. Turnos, Niveles de Riesgo…"
             />
             {error && <span style={S.err}>{error}</span>}
+          </div>
+          <div style={{ ...S.formGroup, marginTop: 14 }}>
+            <label style={S.label}>Grupo (opcional)</label>
+            <input
+              style={S.input}
+              list="grupos-tipo-parametro"
+              value={grupo}
+              onChange={(e) => setGrupo(e.target.value)}
+              placeholder="Ej. Work Orders…"
+            />
+            <datalist id="grupos-tipo-parametro">
+              {gruposExistentes.map((g) => <option key={g} value={g} />)}
+            </datalist>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+              Déjalo vacío para que aparezca solo en el menú. Usa el mismo nombre de grupo en
+              varios tipos (ej. "Work Orders") para agruparlos en un único submódulo, una
+              pestaña por tipo.
+            </span>
           </div>
         </div>
         <div style={S.modalFooter}>
@@ -286,7 +307,7 @@ export default function VerYCrearParametrosCrud() {
   const qc = useQueryClient();
   const mod = erpModules.find((m) => m.id === 'parametros');
   // Los tipos creados por el usuario se listan aparte (abajo), no como catálogo fijo.
-  const submods = (mod?.submods ?? []).filter((sub) => !sub.tipoParametro && canAccessSubmodule(user, 'parametros', sub.id));
+  const submods = (mod?.submods ?? []).filter((sub) => !sub.esDinamico && canAccessSubmodule(user, 'parametros', sub.id));
 
   const [seleccionado, setSeleccionado] = useState(null);
   const [modalTipoOpen, setModalTipoOpen] = useState(false);
@@ -430,6 +451,7 @@ export default function VerYCrearParametrosCrud() {
       <NuevoTipoModal
         open={modalTipoOpen}
         editTarget={editTipoTarget}
+        gruposExistentes={[...new Set(tiposParametro.map((t) => t.grupo).filter(Boolean))]}
         onClose={() => setModalTipoOpen(false)}
         onSaved={() => {
           qc.invalidateQueries({ queryKey: ['tipos-parametro'] });

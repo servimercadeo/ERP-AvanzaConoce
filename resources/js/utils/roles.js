@@ -7,6 +7,7 @@ export const ROLES_ERP = [
     { value: "financiera", label: "Financiera" },
     { value: "supervisores", label: "Supervisores" },
     { value: "general", label: "General" },
+    { value: "tecnico", label: "Técnico" },
 ];
 
 export const etiquetaRol = (rol) =>
