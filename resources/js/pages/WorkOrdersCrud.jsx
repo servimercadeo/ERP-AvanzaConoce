@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
@@ -63,6 +63,19 @@ const IMPORT_HEADER_MAP = {
     "descripcion de ibs": "descripcion",
     "aging": "aging",
     "region de servicio": "region_servicio",
+
+    // Encabezados del "Exporte Macaw" (hoja de Operaciones DTV): trae una fila por WO, sin
+    // N° de ítem, y la cédula del técnico que la atendió (con ella se asocia a su aliado).
+    "workorder": "numero_wo",
+    "cedula tecnico": "cedula_tecnico",
+    "tecnico atiende": "nombre_tecnico",
+    "tipo servicio": "servicio",
+    "nom tipo cliente": "tipo_orden",
+    "perimetro de la zona": "perimetro",
+    "ciudad": "municipio",
+    "fecha atencion": "fecha_estado",
+    "fecha creacion": "fecha_creacion",
+    "fecha finalizacion": "fecha_finalizacion",
 };
 
 const CAMPOS_PLANTILLA = [
@@ -123,7 +136,12 @@ function ImportModal({ onClose, onImported }) {
                 const llave = `${numeroWo}|${numeroItem}`;
                 if (filasPorLlave.has(llave)) combinadas++;
 
-                filasPorLlave.set(llave, { ...mapped, numero_wo: numeroWo, numero_item: numeroItem });
+                // Sin columna de ítem en el archivo no se manda numero_item: el backend
+                // actualiza entonces todas las filas de ese WO. Mandarlo vacío crearía una
+                // fila nueva con ítem "" en vez de actualizar las existentes.
+                const fila = { ...mapped, numero_wo: numeroWo };
+                if ("numero_item" in mapped) fila.numero_item = numeroItem;
+                filasPorLlave.set(llave, fila);
             });
 
             // Diagnóstico: se muestra SIEMPRE (no solo cuando casi nada coincide), porque ya
@@ -398,28 +416,36 @@ export default function WorkOrdersCrud() {
         setTimeout(() => setToast(null), 3500);
     };
 
-    const { data: workOrders = [], isLoading } = useQuery({
-        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro],
+    // Por páginas: con miles de WOs, traerlas todas pesaba megas y la tabla tardaba en
+    // pintarse. La búsqueda y los filtros se siguen aplicando sobre todas en el servidor.
+    const [pagina, setPagina] = useState(1);
+    const [porPagina, setPorPagina] = useState(50);
+    useEffect(() => setPagina(1), [debSearch, estadoFiltro, proveedorFiltro]);
+
+    const { data: resultado, isLoading } = useQuery({
+        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro, porPagina, pagina],
         queryFn: () =>
             api
-                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined } })
+                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, page: pagina, per_page: porPagina } })
                 .then((r) => r.data),
+        placeholderData: (prev) => prev,
     });
+    const workOrders = resultado?.data ?? [];
+    const totalFiltradas = resultado?.total ?? 0;
+    const ultimaPagina = resultado?.last_page ?? 1;
+    // Si se eliminó la última fila de la última página, volver a la anterior.
+    useEffect(() => {
+        if (pagina > ultimaPagina) setPagina(ultimaPagina);
+    }, [pagina, ultimaPagina]);
 
-    const { data: todasSinFiltro = [] } = useQuery({
-        queryKey: ["work-orders", "catalogos"],
-        queryFn: () => api.get("/work-orders").then((r) => r.data),
+    // Total y opciones de los filtros, sin descargar todas las WOs.
+    const { data: resumen } = useQuery({
+        queryKey: ["work-orders", "resumen"],
+        queryFn: () => api.get("/work-orders/resumen").then((r) => r.data),
         staleTime: 60 * 1000,
     });
-
-    const estados = useMemo(
-        () => [...new Set(todasSinFiltro.map((w) => w.estado).filter(Boolean))].sort(),
-        [todasSinFiltro],
-    );
-    const proveedores = useMemo(
-        () => [...new Set(todasSinFiltro.map((w) => w.proveedor).filter(Boolean))].sort(),
-        [todasSinFiltro],
-    );
+    const estados = resumen?.estados ?? [];
+    const proveedores = resumen?.proveedores ?? [];
 
     const invalidate = () => {
         qc.invalidateQueries({ queryKey: ["work-orders"] });
@@ -446,7 +472,7 @@ export default function WorkOrdersCrud() {
 
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{todasSinFiltro.length}</div>
+                    <div className="stat-num">{resumen?.total ?? 0}</div>
                     <div className="stat-label">Total Work Orders</div>
                 </div>
             </div>
@@ -535,6 +561,32 @@ export default function WorkOrdersCrud() {
                 )}
             </div>
 
+            {totalFiltradas > 0 && (
+                <div style={S.paginationBar}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <label style={S.label}>Ver #</label>
+                        <select
+                            style={{ ...S.input, width: 80 }}
+                            value={porPagina}
+                            onChange={(e) => {
+                                setPorPagina(Number(e.target.value));
+                                setPagina(1);
+                            }}
+                        >
+                            {[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>
+                            {(pagina - 1) * porPagina + 1}–{Math.min(pagina * porPagina, totalFiltradas)} de {totalFiltradas}
+                        </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button style={S.pageBtn(pagina === 1)} disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>‹</button>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>Página {pagina} de {ultimaPagina}</span>
+                        <button style={S.pageBtn(pagina === ultimaPagina)} disabled={pagina === ultimaPagina} onClick={() => setPagina((p) => p + 1)}>›</button>
+                    </div>
+                </div>
+            )}
+
             {importOpen && (
                 <ImportModal
                     onClose={() => setImportOpen(false)}
@@ -585,6 +637,12 @@ const S = {
     btnIcon: { display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-muted)", borderRadius: 6 },
     errorMsg: { background: "#fce8e8", color: "#c0392b", borderRadius: 6, padding: "8px 12px", fontSize: "0.84rem", fontWeight: 600, marginTop: 10 },
     toast: { position: "fixed", bottom: 28, right: 28, background: "var(--primary)", color: "#fff", borderRadius: "var(--radius-sm)", padding: "13px 22px", fontWeight: 700, fontSize: "0.92rem", zIndex: 99999, boxShadow: "0 8px 28px rgba(26,155,140,0.35)" },
+    paginationBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },
+    pageBtn: (disabled) => ({
+        minWidth: 32, height: 32, padding: "0 8px", border: "1.5px solid var(--border)", borderRadius: 6,
+        background: disabled ? "var(--bg)" : "var(--white)", color: disabled ? "var(--text-muted)" : "var(--text)",
+        fontWeight: 700, fontSize: "0.85rem", cursor: disabled ? "default" : "pointer",
+    }),
     fileDrop: {
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
         padding: "22px 16px", border: "1.5px dashed var(--primary)", borderRadius: "var(--radius-sm)",

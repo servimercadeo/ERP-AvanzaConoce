@@ -498,12 +498,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
+    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen']);
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
         ->middleware(PermisoDenegado::middleware('importar', 'inventarios.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'destroy'])
         ->parameters(['work-orders' => 'workOrder'])
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.work_orders.work_orders_file'));
+
+    // Aliados (Inventarios > Aliados): subagentes de Work Orders y sus técnicos indirectos.
+    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
+    Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
+        ->middleware(PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'));
+    Route::put('aliados/{aliado}/tecnicos/{tecnico}', [App\Http\Controllers\Api\AliadoController::class, 'actualizarTecnico'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'));
+    Route::apiResource('aliados', App\Http\Controllers\Api\AliadoController::class)
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.aliados.aliados_file'));
 
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
     // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo

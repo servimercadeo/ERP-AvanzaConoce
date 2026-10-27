@@ -45,6 +45,7 @@ class User extends Authenticatable
     protected $fillable = [
         // Acceso al sistema
         'name', 'email', 'password', 'avanzaconoce_id', 'rol', 'activo', 'pendiente_alta', 'ultimo_sso_at',
+        'aliado_id',
 
         // Información General
         'cedula', 'fecha_expedicion', 'apellidos', 'nombres', 'fotografia',
@@ -97,6 +98,12 @@ class User extends Authenticatable
     public function contratos(): HasMany
     {
         return $this->hasMany(Contrato::class, 'empleado_id');
+    }
+
+    /** Aliado del técnico indirecto (null para empleados y técnicos directos). */
+    public function aliado(): BelongsTo
+    {
+        return $this->belongsTo(Aliado::class);
     }
 
     public function preference(): HasOne

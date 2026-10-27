@@ -371,6 +371,15 @@ export const ERP_MODULES = [
           { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
         ]
       },
+      {
+        id: 'aliados',
+        label: 'Aliados',
+        icon: 'subagentes',
+        desc: 'Aliados (subagentes) de Work Orders y sus técnicos indirectos',
+        archivos: [
+          { id: 'aliados_file', label: 'Aliados', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
       /*
       {
         id: 'consultas',

@@ -67,11 +67,15 @@ return new class extends Migration
                 ]);
             }
 
-            $existentes = DB::table('valores_parametro')->where('tipo_parametro_id', $tipoId)
-                ->pluck('id', 'nombre');
-
             foreach ($valores as $nombreValor => $descripcion) {
-                if ($existentes->has($nombreValor)) {
+                // La comparación la hace MySQL (sin distinguir mayúsculas ni tildes, igual que
+                // el índice único tipo+nombre): si producción ya tiene "Urbano", no se inserta
+                // "URBANO", que fallaría como duplicado y trabaría `migrate`.
+                $existe = DB::table('valores_parametro')
+                    ->where('tipo_parametro_id', $tipoId)
+                    ->where('nombre', $nombreValor)
+                    ->exists();
+                if ($existe) {
                     continue;
                 }
                 DB::table('valores_parametro')->insert([
