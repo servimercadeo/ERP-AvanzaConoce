@@ -25,11 +25,11 @@ class OrdenCompraItem extends Model
 
     protected $casts = [
         'cantidad'        => 'integer',
-        'precio_unitario' => 'integer',
+        'precio_unitario' => \App\Casts\Monto::class,
         'iva_porcentaje'  => 'integer',
-        'subtotal'        => 'integer',
-        'iva_valor'       => 'integer',
-        'total'           => 'integer',
+        'subtotal'        => \App\Casts\Monto::class,
+        'iva_valor'       => \App\Casts\Monto::class,
+        'total'           => \App\Casts\Monto::class,
     ];
 
     public function ordenCompra()

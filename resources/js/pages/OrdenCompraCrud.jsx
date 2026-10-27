@@ -5,7 +5,11 @@ import { useAcciones } from "../hooks/useAcciones";
 import { IconClose, IconEmptySearch, IconLoading, IconTrash } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
-const money = (n) => `$ ${Number(n ?? 0).toLocaleString("es-CO")}`;
+// Pesos con centavos solo si los tiene: $ 1.500 / $ 1.500,5
+const money = (n) => `$ ${Number(n ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 2 })}`;
+// Igual que el servidor: subtotal al centavo, IVA al peso.
+const subtotalDe = (it) => Math.round((Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0) * 100) / 100;
+const ivaDe = (sub, it) => Math.round(sub * (Number(it.iva_porcentaje) || 0) / 100);
 
 /**
  * Picker de productos pendientes de una categoría ("Enviado a Compras" y todavía sin
@@ -196,13 +200,14 @@ export default function OrdenCompraCrud() {
     const totales = useMemo(() => {
         let subtotal = 0, ivaTotal = 0;
         items.forEach((it) => {
-            const sub = (Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0);
-            const iva = Math.round(sub * (Number(it.iva_porcentaje) || 0) / 100);
+            const sub = subtotalDe(it);
             subtotal += sub;
-            ivaTotal += iva;
+            ivaTotal += ivaDe(sub, it);
         });
-        const transporte = Number(valorTransporte) || 0;
-        return { subtotal, ivaTotal, transporte, total: subtotal + ivaTotal + transporte };
+        const redondear = (n) => Math.round(n * 100) / 100;
+        const transporte = redondear(Number(valorTransporte) || 0);
+        subtotal = redondear(subtotal);
+        return { subtotal, ivaTotal, transporte, total: redondear(subtotal + ivaTotal + transporte) };
     }, [items, valorTransporte]);
 
     const { data: ordenes = [], isLoading: loadingOrdenes } = useQuery({
@@ -356,7 +361,7 @@ export default function OrdenCompraCrud() {
                             </div>
                             <div style={S.formGroup}>
                                 <label style={S.label}>Valor Transporte</label>
-                                <input type="number" min={0} style={S.input} value={valorTransporte} onChange={(e) => setValorTransporte(e.target.value)} placeholder="$ 0" />
+                                <input type="number" min={0} step="0.01" style={S.input} value={valorTransporte} onChange={(e) => setValorTransporte(e.target.value)} placeholder="$ 0" />
                             </div>
                             <div style={{ ...S.formGroup, gridColumn: "span 1" }} />
 
@@ -420,8 +425,8 @@ export default function OrdenCompraCrud() {
                                 </thead>
                                 <tbody>
                                     {items.map((it) => {
-                                        const sub = (Number(it.cantidad) || 0) * (Number(it.precio_unitario) || 0);
-                                        const iva = Math.round(sub * (Number(it.iva_porcentaje) || 0) / 100);
+                                        const sub = subtotalDe(it);
+                                        const iva = ivaDe(sub, it);
                                         return (
                                             <tr key={it.id}>
                                                 <td style={{ fontWeight: 600 }}>{it.producto}</td>
@@ -430,7 +435,7 @@ export default function OrdenCompraCrud() {
                                                 <td>{it.cantidad}</td>
                                                 <td>
                                                     <input
-                                                        type="number" min={0} style={S.inputSmall}
+                                                        type="number" min={0} step="0.01" style={S.inputSmall}
                                                         value={it.precio_unitario}
                                                         onChange={(e) => actualizarItem(it.id, "precio_unitario", e.target.value)}
                                                     />

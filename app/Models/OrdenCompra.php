@@ -37,10 +37,10 @@ class OrdenCompra extends Model
     protected $casts = [
         'fecha_registro'   => 'datetime',
         'fecha_entrega'    => 'date',
-        'valor_transporte' => 'integer',
-        'subtotal'         => 'integer',
-        'iva_total'        => 'integer',
-        'valor_total'      => 'integer',
+        'valor_transporte' => \App\Casts\Monto::class,
+        'subtotal'         => \App\Casts\Monto::class,
+        'iva_total'        => \App\Casts\Monto::class,
+        'valor_total'      => \App\Casts\Monto::class,
     ];
 
     public static function generarCodigo(): string

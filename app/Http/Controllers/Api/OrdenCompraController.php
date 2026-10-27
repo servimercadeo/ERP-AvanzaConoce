@@ -162,10 +162,11 @@ class OrdenCompraController extends Controller
             'forma_pago_id'              => 'nullable|exists:formas_pago,id',
             'fecha_entrega'              => 'nullable|date',
             'observaciones'              => 'nullable|string|max:1000',
-            'valor_transporte'           => 'nullable|integer|min:0',
+            // Precios y transporte aceptan centavos (hasta 2 decimales, ej. 150.50).
+            'valor_transporte'           => 'nullable|numeric|min:0|decimal:0,2',
             'items'                      => 'required|array|min:1',
             'items.*.pedido_compra_item_id' => 'required|integer|exists:pedido_compra_items,id',
-            'items.*.precio_unitario'    => 'required|integer|min:0',
+            'items.*.precio_unitario'    => 'required|numeric|min:0|decimal:0,2',
             'items.*.iva_porcentaje'     => 'required|integer|min:0|max:100',
         ]);
 
@@ -194,7 +195,8 @@ class OrdenCompraController extends Controller
                     }
 
                     $cantidad = $pedidoItem->cantidad;
-                    $subtotal = $cantidad * $itemData['precio_unitario'];
+                    // Subtotal al centavo; el IVA se sigue redondeando al peso.
+                    $subtotal = round($cantidad * (float) $itemData['precio_unitario'], 2);
                     $ivaValor = (int) round($subtotal * $itemData['iva_porcentaje'] / 100);
 
                     $subtotalOrden += $subtotal;
@@ -211,11 +213,12 @@ class OrdenCompraController extends Controller
                         'iva_porcentaje'        => $itemData['iva_porcentaje'],
                         'subtotal'              => $subtotal,
                         'iva_valor'             => $ivaValor,
-                        'total'                 => $subtotal + $ivaValor,
+                        'total'                 => round($subtotal + $ivaValor, 2),
                     ];
                 }
 
-                $valorTransporte = $data['valor_transporte'] ?? 0;
+                $valorTransporte = round((float) ($data['valor_transporte'] ?? 0), 2);
+                $subtotalOrden = round($subtotalOrden, 2);
 
                 $orden = OrdenCompra::create([
                     'codigo'           => OrdenCompra::generarCodigo(),
@@ -230,7 +233,7 @@ class OrdenCompraController extends Controller
                     'valor_transporte' => $valorTransporte,
                     'subtotal'         => $subtotalOrden,
                     'iva_total'        => $ivaTotalOrden,
-                    'valor_total'      => $subtotalOrden + $ivaTotalOrden + $valorTransporte,
+                    'valor_total'      => round($subtotalOrden + $ivaTotalOrden + $valorTransporte, 2),
                     'estado'           => 'Creada',
                     'creado_por'       => $request->user()?->name ?? 'Sistema',
                 ]);

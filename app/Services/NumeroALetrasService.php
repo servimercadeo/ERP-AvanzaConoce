@@ -3,7 +3,7 @@
 namespace App\Services;
 
 /**
- * Convierte un valor entero de pesos colombianos a su escritura en letras
+ * Convierte un valor en pesos colombianos (con centavos, si los tiene) a su escritura en letras
  * (ej. 720426 -> "SETECIENTOS VEINTE MIL CUATROCIENTOS VEINTISEIS PESOS"), para el
  * campo "Valor total en letras" de la Orden de Compra impresa.
  */
@@ -14,12 +14,21 @@ class NumeroALetrasService
     private const DECENAS = [2 => 'VEINTE', 3 => 'TREINTA', 4 => 'CUARENTA', 5 => 'CINCUENTA', 6 => 'SESENTA', 7 => 'SETENTA', 8 => 'OCHENTA', 9 => 'NOVENTA'];
     private const CENTENAS = [1 => 'CIENTO', 2 => 'DOSCIENTOS', 3 => 'TRESCIENTOS', 4 => 'CUATROCIENTOS', 5 => 'QUINIENTOS', 6 => 'SEISCIENTOS', 7 => 'SETECIENTOS', 8 => 'OCHOCIENTOS', 9 => 'NOVECIENTOS'];
 
-    public static function pesos(int $valor): string
+    /** Con centavos: 1500.5 -> "MIL QUINIENTOS PESOS CON CINCUENTA CENTAVOS". */
+    public static function pesos(int|float $valor): string
     {
-        $valor = max(0, $valor);
-        $palabras = $valor === 0 ? 'CERO' : self::conUn(self::convertir($valor));
+        $totalCentavos = (int) round(max(0, $valor) * 100);
+        $enteros = intdiv($totalCentavos, 100);
+        $centavos = $totalCentavos % 100;
 
-        return "{$palabras} PESOS";
+        $palabras = $enteros === 0 ? 'CERO' : self::conUn(self::convertir($enteros));
+        $texto = "{$palabras} PESOS";
+
+        if ($centavos > 0) {
+            $texto .= ' CON ' . self::conUn(self::convertir($centavos)) . ($centavos === 1 ? ' CENTAVO' : ' CENTAVOS');
+        }
+
+        return $texto;
     }
 
     private static function convertir(int $n): string

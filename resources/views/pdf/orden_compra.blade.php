@@ -35,6 +35,10 @@
     </style>
 </head>
 <body>
+@php
+    // Pesos con centavos solo si los tiene: 1.500 / 1.500,50
+    $pesos = fn ($v) => number_format((float) $v, floor((float) $v) == (float) $v ? 0 : 2, ',', '.');
+@endphp
     <div class="header-empresa">SERVIMERCADEO</div>
     <div class="header-nit">NIT: 800.084.227-7 REGIMEN: COMUN</div>
     <div class="header-orden">ORDEN DE COMPRA No: {{ $ordenNumero }}</div>
@@ -93,8 +97,8 @@
                     <td class="unidad">UNIDADES</td>
                     <td class="talla">NA</td>
                     <td class="cant">{{ $it['cantidad'] }}</td>
-                    <td class="precio">${{ number_format($it['precio_unitario'], 0, ',', '.') }}</td>
-                    <td class="subtotal">${{ number_format($it['subtotal'], 0, ',', '.') }}</td>
+                    <td class="precio">${{ $pesos($it['precio_unitario']) }}</td>
+                    <td class="subtotal">${{ $pesos($it['subtotal']) }}</td>
                 </tr>
             @endforeach
         @endforeach
@@ -104,20 +108,20 @@
         <tr>
             <td class="encabezado" style="width:35%;">OBSERVACIONES DE ORDEN</td>
             <td class="encabezado" style="width:20%;">SUBTOTAL</td>
-            <td class="valor" style="width:20%;">${{ number_format($subtotal, 0, ',', '.') }}</td>
+            <td class="valor" style="width:20%;">${{ $pesos($subtotal) }}</td>
         </tr>
         <tr>
             <td rowspan="3" style="vertical-align: top;">OBSERVACIONES: {{ $observaciones ?: '—' }}</td>
             <td class="encabezado">IVA</td>
-            <td class="valor">${{ number_format($iva, 0, ',', '.') }}</td>
+            <td class="valor">${{ $pesos($iva) }}</td>
         </tr>
         <tr>
             <td class="encabezado">VALOR TRANSPORTE</td>
-            <td class="valor">${{ number_format($transporte, 0, ',', '.') }}</td>
+            <td class="valor">${{ $pesos($transporte) }}</td>
         </tr>
         <tr>
             <td class="encabezado" style="font-size: 11px;">TOTAL</td>
-            <td class="valor" style="font-size: 11px;">${{ number_format($total, 0, ',', '.') }}</td>
+            <td class="valor" style="font-size: 11px;">${{ $pesos($total) }}</td>
         </tr>
         <tr>
             <td class="letras" colspan="3">VALOR TOTAL EN LETRAS: {{ $totalEnLetras }}</td>

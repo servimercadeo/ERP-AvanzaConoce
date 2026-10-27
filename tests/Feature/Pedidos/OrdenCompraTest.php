@@ -108,6 +108,38 @@ class OrdenCompraTest extends TestCase
             ->assertCreated()->assertJsonPath('iva_total', 63)->assertJsonPath('valor_total', 396);
     }
 
+    public function test_el_precio_y_el_transporte_aceptan_centavos(): void
+    {
+        $item = $this->itemParaComprar(3);
+
+        // 3 x 150.50 = 451.50 ; IVA 19% = 85.785 -> 86 (al peso) ; + transporte 1000.25 = 1537.75
+        $r = $this->crearOrden(
+            [['pedido_compra_item_id' => $item, 'precio_unitario' => 150.5, 'iva_porcentaje' => 19]],
+            ['valor_transporte' => 1000.25]
+        )->assertCreated()
+            ->assertJsonPath('subtotal', 451.5)->assertJsonPath('iva_total', 86)
+            ->assertJsonPath('valor_transporte', 1000.25)->assertJsonPath('valor_total', 1537.75)
+            ->assertJsonPath('items.0.precio_unitario', 150.5);
+
+        $pdf = $this->get('/api/ordenes-compra/' . $r->json('id') . '/pdf')->assertOk();
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+    }
+
+    public function test_mas_de_dos_decimales_se_rechaza(): void
+    {
+        $item = $this->itemParaComprar();
+
+        $this->crearOrden([['pedido_compra_item_id' => $item, 'precio_unitario' => 150.555, 'iva_porcentaje' => 19]])
+            ->assertStatus(422)->assertJsonValidationErrors('items.0.precio_unitario');
+    }
+
+    public function test_el_valor_en_letras_incluye_los_centavos(): void
+    {
+        $this->assertSame('SETECIENTOS VEINTE MIL CUATROCIENTOS VEINTISEIS PESOS', \App\Services\NumeroALetrasService::pesos(720426));
+        $this->assertSame('MIL QUINIENTOS PESOS CON CINCUENTA CENTAVOS', \App\Services\NumeroALetrasService::pesos(1500.5));
+        $this->assertSame('CERO PESOS CON UN CENTAVO', \App\Services\NumeroALetrasService::pesos(0.01));
+    }
+
     public function test_una_orden_puede_consolidar_varios_productos(): void
     {
         $a = $this->itemParaComprar(2);
