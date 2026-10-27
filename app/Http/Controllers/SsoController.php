@@ -31,10 +31,13 @@ class SsoController extends Controller
         }
 
         // La persona se busca por cédula (la llave común): el correo del ERP puede ser otro,
-        // ej. el técnico "{cédula}@avanzaconoce.com". Sin cédula, por correo como antes.
+        // ej. el técnico "{cédula}@avanzaconoce.com". Solo sin cédula se busca por correo:
+        // cada quien cambia su correo en el perfil de AvanzaConoce, y con una cédula que no
+        // está en el ERP se podría entrar como el dueño de ese correo aquí.
         $cedula = trim((string) ($payload->nit ?? '')) ?: CredencialesAvanzaConoce::cedulaPorIdEnAvanza($payload->sub ?? null);
-        $usuario = ($cedula ? User::where('cedula', $cedula)->first() : null)
-            ?? User::where('email', $payload->email ?? '')->first();
+        $usuario = $cedula
+            ? User::where('cedula', $cedula)->first()
+            : User::where('email', $payload->email ?? '')->first();
 
         // Pendiente de alta = creado desde Contratos, aún sin alta en Empleados: sin acceso.
         if ($usuario && (!$usuario->activo || $usuario->pendiente_alta)) {

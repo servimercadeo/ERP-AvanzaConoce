@@ -60,6 +60,32 @@ class SsoTest extends TestCase
             ->assertOk()->assertJsonPath('id', $u->id);
     }
 
+    /**
+     * El correo lo puede cambiar cada usuario desde su perfil de AvanzaConoce: si el token trae
+     * una cédula que no está en el ERP, no se debe entrar como el dueño de ese correo en el ERP.
+     */
+    public function test_login_sso_con_cedula_que_no_esta_en_el_erp_no_entra_por_el_correo(): void
+    {
+        $this->usuario('admin', ['email' => 'admin@test.co', 'cedula' => '1111111']);
+        $token = JWT::encode([
+            'sub' => 77, 'email' => 'admin@test.co', 'nit' => '2222222', 'exp' => time() + 60,
+        ], self::SECRETO, 'HS256');
+
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/login?sso_error=sin_acceso');
+        $this->assertGuest();
+    }
+
+    public function test_login_sso_por_cedula_entra_aunque_el_correo_del_erp_sea_otro(): void
+    {
+        $u = $this->usuario('th', ['email' => '1111111@avanzaconoce.com', 'cedula' => '1111111']);
+        $token = JWT::encode([
+            'sub' => 78, 'email' => 'real@test.co', 'nit' => '1111111', 'exp' => time() + 60,
+        ], self::SECRETO, 'HS256');
+
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($u);
+    }
+
     public function test_login_sso_rechaza_token_ausente_invalido_o_de_usuario_inactivo(): void
     {
         $this->get('/sso/login')->assertRedirect('/login?sso_error=token_ausente');
