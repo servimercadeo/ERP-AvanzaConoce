@@ -461,8 +461,9 @@ export default function ProductosDotacion() {
     const qc = useQueryClient();
     const { user } = useAuth();
     // Por defecto se filtra por la sede del usuario logueado; si no tiene sede
-    // anidada, se parte mostrando la dotación de todas las sedes.
-    const sedeUsuario = user?.sede_id ?? 'Todas';
+    // anidada, se parte mostrando la dotación de todas las sedes. Admin y TH (que gestiona
+    // la dotación de todos) parten siempre de todas las sedes.
+    const sedeUsuario = ['admin', 'th'].includes(user?.rol) ? 'Todas' : (user?.sede_id ?? 'Todas');
     const [proyectoTab, setProyectoTab]   = useState('SYM TIGO EXPRESS');
     const [prendaFiltro, setPrendaFiltro] = useState('Todos');
     const [generoFiltro, setGeneroFiltro] = useState('Todos');

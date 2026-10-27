@@ -56,7 +56,9 @@ class InventarioDotacionController extends Controller
     {
         $todas = self::proyectosDotacion();
 
-        if ($user?->rol === 'admin') {
+        // Admin y TH (Talento Humano gestiona la dotación de todos) ven todos los proyectos y
+        // sus sedes, sin importar la empresa de su contrato.
+        if (in_array($user?->rol, ['admin', 'th'], true)) {
             return $todas;
         }
 

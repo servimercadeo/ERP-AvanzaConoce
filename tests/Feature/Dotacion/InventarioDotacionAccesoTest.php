@@ -96,10 +96,29 @@ class InventarioDotacionAccesoTest extends TestCase
         $empresaId = DB::table('empresas')->insertGetId([
             'nombre' => 'SERVIMERCADEO COL', 'pais' => 'Colombia', 'activo' => true, 'created_at' => now(), 'updated_at' => now(),
         ]);
-        foreach (['th', 'tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
+        foreach (['tic', 'operaciones', 'financiera', 'supervisores', 'general'] as $rol) {
             $this->actuarComo($rol, ['empresa_id' => $empresaId]);
             $this->assertEqualsCanonicalizing(['SYM ADMINISTRATIVO', 'DIRECTV'], $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->json());
         }
+    }
+
+    /** TH gestiona la dotación de todos: ve todos los proyectos y sus sedes aunque su empresa esté restringida. */
+    public function test_th_ve_y_gestiona_todos_los_proyectos_y_sedes_aunque_su_empresa_este_restringida(): void
+    {
+        $empresaId = DB::table('empresas')->insertGetId([
+            'nombre' => 'SERVICIOS Y MERCADEO COL', 'pais' => 'Colombia', 'activo' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $proyecto = DB::table('proyectos')->where('nombre', 'DIRECTV')->value('id')
+            ?? DB::table('proyectos')->insertGetId(['nombre' => 'DIRECTV', 'created_at' => now(), 'updated_at' => now()]);
+        $sede = DB::table('sedes')->insertGetId(['nombre' => 'SEDE DIRECTV', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('proyecto_sede')->insert(['proyecto_id' => $proyecto, 'sede_id' => $sede]);
+        $this->actuarComo('th', ['empresa_id' => $empresaId]);
+
+        $this->getJson('/api/inventario-dotacion/proyectos')->assertOk()->assertJsonCount(4);
+        $this->getJson('/api/inventario-dotacion/sedes?proyecto=DIRECTV')->assertOk()->assertJsonPath('0.nombre', 'SEDE DIRECTV');
+        $this->postJson('/api/inventario-dotacion', [
+            'proyecto' => 'DIRECTV', 'sede_id' => $sede, 'prenda' => 'GORRA', 'genero' => 'Masculino', 'talla' => 'M', 'precio' => 0, 'cantidad' => 3, 'stock_minimo' => 0,
+        ])->assertSuccessful();
     }
 
     public function test_usuario_sin_empresa_o_de_empresa_no_sujeta_a_la_regla_ve_todos(): void
