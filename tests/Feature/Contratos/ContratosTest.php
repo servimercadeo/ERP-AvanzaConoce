@@ -127,7 +127,7 @@ class ContratosTest extends TestCase
         $this->postJson('/api/contratos', $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'TIGO HOME']))
             ->assertStatus(422)->assertJsonValidationErrors('cliente_proyecto');
 
-        $id = $this->postJson('/api/contratos', $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO']))->assertCreated()->json('id');
+        $id = $this->postJson('/api/contratos', $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV']))->assertCreated()->json('id');
 
         $this->putJson("/api/contratos/$id", $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'TIGO EXPRESS']))
             ->assertStatus(422)->assertJsonValidationErrors('cliente_proyecto');
@@ -226,7 +226,7 @@ class ContratosTest extends TestCase
         [$polo, $pantalon, $carnet] = $this->prepararDotacionDirectv();
 
         $r = $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
         ]))->assertCreated();
 
         $r->assertJsonPath('pedido_automatico.estado', 'Activo');
@@ -242,7 +242,7 @@ class ContratosTest extends TestCase
         $pantalon->update(['cantidad' => 0]); // sin stock de pantalón
 
         $r = $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
         ]))->assertCreated();
 
         $pedido = PedidoAutomatico::where('contrato_id', $r->json('id'))->first();
@@ -262,7 +262,7 @@ class ContratosTest extends TestCase
         }
 
         $r = $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
         ]))->assertCreated()->assertJsonPath('pedido_automatico', null);
 
         $r->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no se pudo asignar ninguna prenda')
@@ -275,7 +275,7 @@ class ContratosTest extends TestCase
         $this->prepararDotacionDirectv();
 
         $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'CARGO SIN REGLA', 'sede' => 'SEDE DTV',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'CARGO SIN REGLA', 'sede' => 'SEDE DTV',
         ]))->assertCreated()->assertJsonPath('pedido_automatico', null)
             ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no tiene dotación definida'));
 
@@ -287,7 +287,7 @@ class ContratosTest extends TestCase
         $this->prepararDotacionDirectv();
 
         $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
             'estado_contrato' => 'No ingreso',
         ]))->assertCreated()->assertJsonPath('pedido_automatico', null);
 
@@ -297,7 +297,7 @@ class ContratosTest extends TestCase
     public function test_pasar_un_contrato_a_no_ingreso_elimina_el_pedido_y_restituye_el_inventario(): void
     {
         [$polo, $pantalon, $carnet] = $this->prepararDotacionDirectv();
-        $body = $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV']);
+        $body = $this->payload(['empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV']);
         $id = $this->postJson('/api/contratos', $body)->assertCreated()->json('id');
         $this->assertSame(8, $polo->fresh()->cantidad);
 
@@ -314,7 +314,7 @@ class ContratosTest extends TestCase
         // Sin la sede central administrativa el servicio no puede generar el pedido, pero el
         // contrato (lo importante) debe quedar guardado.
         $this->postJson('/api/contratos', $this->payload([
-            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV CO', 'cargo' => 'ASESOR COMERCIAL',
+            'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL',
         ]))->assertCreated()->assertJsonPath('pedido_automatico', null);
 
         $this->assertSame(1, Contrato::where('empleado_id', $this->empleado->id)->count());

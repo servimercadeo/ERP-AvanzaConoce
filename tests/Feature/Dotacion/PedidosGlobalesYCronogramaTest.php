@@ -74,7 +74,7 @@ class PedidosGlobalesYCronogramaTest extends TestCase
     {
         $a = $this->pedidoActivo('TIGO HOME');
         $b = $this->pedidoActivo('TIGO HOME');
-        $otroProyecto = $this->pedidoActivo('DIRECTV CO');
+        $otroProyecto = $this->pedidoActivo('DIRECTV');
         $otraRegional = $this->pedidoActivo('TIGO HOME', DB::table('regionales')->where('nombre', 'COSTA')->value('id'));
 
         $r = $this->postJson('/api/pedidos-globales', ['proyecto' => 'TIGO HOME', 'notas' => 'Lote 1'])
@@ -179,7 +179,7 @@ class PedidosGlobalesYCronogramaTest extends TestCase
 
     public function test_un_proyecto_solo_tiene_un_cronograma(): void
     {
-        $proyectoId = DB::table('proyectos')->where('nombre', 'DIRECTV CO')->value('id');
+        $proyectoId = DB::table('proyectos')->where('nombre', 'DIRECTV')->value('id');
 
         $this->postJson('/api/cronograma-dotacion', ['proyecto_id' => $proyectoId, 'fecha_entrega' => '2026-10-01', 'ciclo_meses' => 3])->assertCreated();
         $this->postJson('/api/cronograma-dotacion', ['proyecto_id' => $proyectoId, 'fecha_entrega' => '2027-01-01', 'ciclo_meses' => 6])->assertCreated();

@@ -54,13 +54,14 @@ class PedidoAutomatico extends Model
     public const PROYECTO_A_INVENTARIO = [
         'TIGO EXPRESS' => 'SYM TIGO EXPRESS',
         'TIGO HOME'    => 'SYM TIGO HOME',
-        'DIRECTV CO'   => 'DIRECTV',
+        'DIRECTV'      => 'DIRECTV',
         'DIRECTV ECU'  => 'DIRECTV',
     ];
 
     public static function proyectoInventarioDe(?string $proyectoContrato): ?string
     {
-        $proyectoContrato = trim((string) $proyectoContrato);
+        // Con su nombre actual: un contrato viejo puede traer "DIRECTV CO" o "DIRECTV COL".
+        $proyectoContrato = \App\Services\EmpresaProyectoRules::nombreActual($proyectoContrato);
 
         return $proyectoContrato === '' ? null : (self::PROYECTO_A_INVENTARIO[$proyectoContrato] ?? 'SYM ADMINISTRATIVO');
     }

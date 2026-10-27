@@ -23,10 +23,12 @@ class EmpresaProyectoRulesTest extends TestCase
             'SYM + FT&H'             => ['SERVICIOS Y MERCADEO COL', 'FT&H'],
             'SYM + S&M ASESORES'     => ['SERVICIOS Y MERCADEO COL', 'S&M ASESORES'],
             'SYM + proyecto nuevo'   => ['SERVICIOS Y MERCADEO COL', 'PROYECTO QUE SE CREE DESPUES'],
-            'Servimercadeo + DIRECTV' => ['SERVIMERCADEO COL', 'DIRECTV CO'],
+            'Servimercadeo + DIRECTV' => ['SERVIMERCADEO COL', 'DIRECTV'],
             'Servimercadeo + ADMINISTRATIVO' => ['SERVIMERCADEO COL', 'ADMINISTRATIVO'],
             'Servimercadeo + nombre anterior ADMINISTRACION' => ['SERVIMERCADEO COL', 'ADMINISTRACION'],
-            'ignora mayúsculas y espacios' => ['  servimercadeo col ', ' directv co '],
+            'Servimercadeo + nombre anterior DIRECTV CO'  => ['SERVIMERCADEO COL', 'DIRECTV CO'],
+            'Servimercadeo + nombre anterior DIRECTV COL' => ['SERVIMERCADEO COL', 'DIRECTV COL'],
+            'ignora mayúsculas y espacios' => ['  servimercadeo col ', ' directv '],
             'empresa no sujeta a la regla' => ['ALTYCOM', 'CUALQUIER PROYECTO'],
             'sin empresa'            => [null, 'TIGO HOME'],
             'sin proyecto'           => ['SERVIMERCADEO COL', null],
@@ -43,11 +45,11 @@ class EmpresaProyectoRulesTest extends TestCase
     public static function combinacionesInvalidas(): array
     {
         return [
-            'SYM + DIRECTV'          => ['SERVICIOS Y MERCADEO COL', 'DIRECTV CO', 'elige otro proyecto'],
+            'SYM + DIRECTV'          => ['SERVICIOS Y MERCADEO COL', 'DIRECTV', 'elige otro proyecto'],
             'SYM + otro DIRECTV'     => ['SERVICIOS Y MERCADEO COL', 'DIRECTV ECU', 'elige otro proyecto'],
-            'Servimercadeo + TIGO'   => ['SERVIMERCADEO COL', 'TIGO HOME', 'elige uno de estos proyectos: DIRECTV CO, ADMINISTRATIVO'],
-            'Servimercadeo + HUGHES' => ['SERVIMERCADEO COL', 'HUGHES COL', 'elige uno de estos proyectos: DIRECTV CO, ADMINISTRATIVO'],
-            'Servimercadeo + FT&H'   => ['SERVIMERCADEO COL', 'FT&H', 'elige uno de estos proyectos: DIRECTV CO, ADMINISTRATIVO'],
+            'Servimercadeo + TIGO'   => ['SERVIMERCADEO COL', 'TIGO HOME', 'elige uno de estos proyectos: DIRECTV, ADMINISTRATIVO'],
+            'Servimercadeo + HUGHES' => ['SERVIMERCADEO COL', 'HUGHES COL', 'elige uno de estos proyectos: DIRECTV, ADMINISTRATIVO'],
+            'Servimercadeo + FT&H'   => ['SERVIMERCADEO COL', 'FT&H', 'elige uno de estos proyectos: DIRECTV, ADMINISTRATIVO'],
         ];
     }
 

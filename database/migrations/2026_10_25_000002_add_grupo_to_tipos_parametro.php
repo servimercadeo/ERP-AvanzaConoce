@@ -14,6 +14,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasColumn('tipos_parametro', 'grupo')) {
+            return;
+        }
+
         Schema::table('tipos_parametro', function (Blueprint $table) {
             $table->string('grupo', 100)->nullable()->after('nombre');
         });

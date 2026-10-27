@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\CredencialesAvanzaConoce;
 use App\Services\SsoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,8 +30,19 @@ class SsoController extends Controller
             return redirect('/login?sso_error=token_invalido');
         }
 
+        // La persona se busca por cédula (la llave común): el correo del ERP puede ser otro,
+        // ej. el técnico "{cédula}@avanzaconoce.com". Solo sin cédula se busca por correo:
+        // cada quien cambia su correo en el perfil de AvanzaConoce, y con una cédula que no
+        // está en el ERP se podría entrar como el dueño de ese correo aquí.
+        $cedula = trim((string) ($payload->nit ?? '')) ?: CredencialesAvanzaConoce::cedulaPorIdEnAvanza($payload->sub ?? null);
+        $usuario = $cedula
+            ? User::where('cedula', $cedula)->first()
+            : User::where('email', $payload->email ?? '')->first();
+
         // Pendiente de alta = creado desde Contratos, aún sin alta en Empleados: sin acceso.
-        $usuario = User::where('email', $payload->email)->where('activo', true)->where('pendiente_alta', false)->first();
+        if ($usuario && (!$usuario->activo || $usuario->pendiente_alta)) {
+            $usuario = null;
+        }
 
         if (!$usuario) {
             // El usuario existe en AvanzaConoce pero aún no fue creado (o está inactivo) en el ERP.
@@ -39,6 +51,11 @@ class SsoController extends Controller
 
         // Registrar el momento del login SSO
         $usuario->update(['ultimo_sso_at' => now()]);
+
+        // Sesión nueva: la anterior del navegador (de otra persona, o de esta misma antes de
+        // cambiar su contraseña en AvanzaConoce) guarda la huella de otra contraseña, y Sanctum
+        // cerraría la sesión en la primera petición (/api/user → 401, de vuelta al login).
+        $request->session()->invalidate();
 
         Auth::login($usuario, remember: true);
 

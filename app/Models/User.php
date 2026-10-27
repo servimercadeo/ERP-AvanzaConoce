@@ -105,6 +105,24 @@ class User extends Authenticatable
     }
 
     /**
+     * Usuario que entra al ERP con ese correo: el suyo o, si ningún usuario del ERP lo tiene,
+     * el de la misma cédula que ese correo en AvanzaConoce (la contraseña es la misma en
+     * ambos). Así entra con el correo que conoce aunque aquí tenga otro, ej. el técnico.
+     */
+    public static function porCorreoDeAcceso(?string $email): ?self
+    {
+        $email = trim((string) $email);
+        if ($email === '') {
+            return null;
+        }
+
+        return static::where('email', $email)->first()
+            ?? (($cedula = \App\Services\CredencialesAvanzaConoce::cedulaPorEmailEnAvanza($email))
+                ? static::where('cedula', $cedula)->first()
+                : null);
+    }
+
+    /**
      * `email` suele quedar con el correo autogenerado "{cedula}@avanzaconoce.com" cuando
      * no se registró un correo real al crear el contrato (ver ContratoController::store).
      * En ese caso se busca el correo real en respuestas_ingresos / candidatos (igual que

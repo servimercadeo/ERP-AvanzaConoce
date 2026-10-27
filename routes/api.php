@@ -212,7 +212,8 @@ Route::get('/catalogos', function () {
 // Verifica si existe un usuario con el correo dado (para flujo de login en dos pasos)
 Route::post('/check-email', function (Request $request) {
     $request->validate(['email' => 'required|email']);
-    $user = \App\Models\User::where('email', $request->email)->first();
+    // También acepta el correo de AvanzaConoce (ver User::porCorreoDeAcceso)
+    $user = \App\Models\User::porCorreoDeAcceso($request->email);
     if (!$user) {
         return response()->json(['exists' => false], 200);
     }

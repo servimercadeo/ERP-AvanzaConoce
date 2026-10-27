@@ -51,19 +51,57 @@ class CredencialesAvanzaConoce
         return is_numeric($id) ? (int) $id : null;
     }
 
+    /**
+     * Cédula del usuario activo de AvanzaConoce con ese correo, o null. Sirve para entrar al
+     * ERP con el correo de AvanzaConoce cuando el del ERP es otro (ej. el técnico
+     * "{cédula}@avanzaconoce.com"): la persona es la misma, la llave es la cédula.
+     */
+    public static function cedulaPorEmailEnAvanza(?string $email): ?string
+    {
+        $email = mb_strtolower(trim((string) $email));
+        if ($email === '') {
+            return null;
+        }
+        $cedula = self::buscarEnAvanza(fn ($q) => $q->where('email', $email)->where('estado', 'Activo'), 'nit');
+        return self::cedulaValida($cedula);
+    }
+
+    /** Cédula del usuario de AvanzaConoce con ese id (el `sub` del token SSO), o null. */
+    public static function cedulaPorIdEnAvanza(mixed $id): ?string
+    {
+        if (!is_numeric($id)) {
+            return null;
+        }
+        return self::cedulaValida(self::buscarEnAvanza(fn ($q) => $q->where('id', (int) $id), 'nit'));
+    }
+
+    private static function cedulaValida(mixed $cedula): ?string
+    {
+        $cedula = trim((string) $cedula);
+        return ctype_digit($cedula) ? $cedula : null;
+    }
+
     private static function columnaEnAvanza(?string $cedula, string $columna): mixed
     {
         $cedula = trim((string) $cedula);
-        if (!self::disponible() || !ctype_digit($cedula)) {
+        if (!ctype_digit($cedula)) {
+            return null;
+        }
+        return self::buscarEnAvanza(fn ($q) => $q->where('nit', $cedula), $columna);
+    }
+
+    private static function buscarEnAvanza(\Closure $filtro, string $columna): mixed
+    {
+        if (!self::disponible()) {
             return null;
         }
 
         try {
             // DB::raw: la tabla de AvanzaConoce no lleva el prefijo `erp_` del ERP.
             $tabla = str_replace('`', '', (string) config('sso.avanzaconoce_users_table', 'users'));
-            return DB::table(DB::raw("`{$tabla}`"))->where('nit', $cedula)->value($columna);
+            return $filtro(DB::table(DB::raw("`{$tabla}`")))->value($columna);
         } catch (\Throwable $e) {
-            Log::warning("No se pudo leer {$columna} de AvanzaConoce para la cédula {$cedula}: " . $e->getMessage());
+            Log::warning("No se pudo leer {$columna} de AvanzaConoce: " . $e->getMessage());
             return null;
         }
     }

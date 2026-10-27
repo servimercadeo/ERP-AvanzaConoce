@@ -790,6 +790,18 @@ class EmpleadoController extends Controller
                     'talla_pantalon'       => $dato($user->talla_pantalon, $respuesta?->talla_pantalon),
                     'talla_zapatos'        => $dato($user->talla_zapatos, $respuesta?->talla_zapatos),
 
+                    // ── Lo que ya tenga su ficha (p. ej. cargado con Importar Excel antes del alta)
+                    'observaciones_medicas' => $dato($user->observaciones_medicas),
+                    'alergias'              => $dato($user->alergias),
+                    'licencia_carro'        => $dato($user->licencia_carro),
+                    'licencia_carro_vence'  => $toDate($user->licencia_carro_vence),
+                    'licencia_moto'         => $dato($user->licencia_moto),
+                    'licencia_moto_vence'   => $toDate($user->licencia_moto_vence),
+                    'tiene_cert_alturas'    => (bool) $user->tiene_cert_alturas,
+                    'cert_alturas_vence'    => $toDate($user->cert_alturas_vence),
+                    'codigo_directv'        => $dato($user->codigo_directv),
+                    'comentarios'           => $dato($user->comentarios),
+
                     // ── Seguridad social (contrato > formulario de ingreso > candidato > user)
                     'eps'              => $dato($contrato?->lps_afiliado, $respuesta?->eps, $user->eps),
                     'arl'              => $dato($contrato?->arl, $candidato?->arl, $user->arl),

@@ -53,10 +53,10 @@ class ImportarContratosActivosCommand extends Command
         'finalizado traslado' => 'Finalizado traslado',
     ];
 
-    // CSV trae "DIRECTV COL"; el resto de la app (EmpresaProyectoRules, DotacionAutoPedidoService)
-    // usa "DIRECTV CO" como nombre canónico del proyecto.
+    // CSV trae "DIRECTV COL"; el proyecto se llama solo "DIRECTV" (el país es un dato aparte).
     private const CLIENTE_PROYECTO_MAP = [
-        'DIRECTV COL' => 'DIRECTV CO',
+        'DIRECTV COL' => 'DIRECTV',
+        'DIRECTV CO'  => 'DIRECTV',
     ];
 
     private const EMPLEADOR_MAP = [

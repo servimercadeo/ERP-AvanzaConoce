@@ -285,7 +285,7 @@ class PedidosAutomaticosTest extends TestCase
     public function test_a_un_empleado_de_directv_solo_se_le_asigna_dotacion_de_directv(): void
     {
         $dtv = $this->usuario('general', ['cedula' => '1003']);
-        Contrato::create(['empleado_id' => $dtv->id, 'cargo' => 'ASESOR COMERCIAL', 'estado_contrato' => 'Activo', 'cliente_proyecto' => 'DIRECTV CO']);
+        Contrato::create(['empleado_id' => $dtv->id, 'cargo' => 'ASESOR COMERCIAL', 'estado_contrato' => 'Activo', 'cliente_proyecto' => 'DIRECTV']);
         $poloDtv = InventarioDotacion::create([
             'proyecto' => 'DIRECTV', 'prenda' => 'POLO', 'genero' => 'Masculino', 'talla' => 'M',
             'precio' => 1000, 'cantidad' => 5, 'stock_minimo' => 0,

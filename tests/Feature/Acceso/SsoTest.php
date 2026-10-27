@@ -42,6 +42,50 @@ class SsoTest extends TestCase
         $this->assertNotNull($u->fresh()->ultimo_sso_at);
     }
 
+    /**
+     * El navegador ya tenía una sesión del ERP (de otra persona, o de la misma antes de
+     * cambiar su contraseña en AvanzaConoce): Sanctum guarda en la sesión la huella de esa
+     * contraseña y, si no coincide con la del usuario que entra por SSO, cierra la sesión en
+     * la primera petición (/api/user → 401) y la app vuelve al login sin ningún mensaje.
+     */
+    public function test_login_sso_sobre_una_sesion_previa_queda_con_sesion_valida(): void
+    {
+        $u = $this->usuario('th', ['email' => 'sso@test.co']);
+        $token = app(SsoService::class)->generarToken('sso@test.co', 5);
+
+        $this->withSession(['password_hash_web' => 'huella-de-otra-contrasena'])
+            ->get('/sso/login?token=' . $token)->assertRedirect('/dashboard');
+
+        $this->getJson('/api/user', ['Referer' => config('app.url')])
+            ->assertOk()->assertJsonPath('id', $u->id);
+    }
+
+    /**
+     * El correo lo puede cambiar cada usuario desde su perfil de AvanzaConoce: si el token trae
+     * una cédula que no está en el ERP, no se debe entrar como el dueño de ese correo en el ERP.
+     */
+    public function test_login_sso_con_cedula_que_no_esta_en_el_erp_no_entra_por_el_correo(): void
+    {
+        $this->usuario('admin', ['email' => 'admin@test.co', 'cedula' => '1111111']);
+        $token = JWT::encode([
+            'sub' => 77, 'email' => 'admin@test.co', 'nit' => '2222222', 'exp' => time() + 60,
+        ], self::SECRETO, 'HS256');
+
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/login?sso_error=sin_acceso');
+        $this->assertGuest();
+    }
+
+    public function test_login_sso_por_cedula_entra_aunque_el_correo_del_erp_sea_otro(): void
+    {
+        $u = $this->usuario('th', ['email' => '1111111@avanzaconoce.com', 'cedula' => '1111111']);
+        $token = JWT::encode([
+            'sub' => 78, 'email' => 'real@test.co', 'nit' => '1111111', 'exp' => time() + 60,
+        ], self::SECRETO, 'HS256');
+
+        $this->get('/sso/login?token=' . $token)->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($u);
+    }
+
     public function test_login_sso_rechaza_token_ausente_invalido_o_de_usuario_inactivo(): void
     {
         $this->get('/sso/login')->assertRedirect('/login?sso_error=token_ausente');

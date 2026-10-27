@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,9 @@ class AuthController extends Controller
             'email'    => 'required|email',
             'password' => 'required|string',
         ]);
+
+        // Puede ser el correo de AvanzaConoce: se entra con el del usuario del ERP de su cédula.
+        $credentials['email'] = User::porCorreoDeAcceso($credentials['email'])?->email ?? $credentials['email'];
 
         // Un usuario pendiente de alta (creado desde Contratos) todavía no recibió
         // credenciales: no puede entrar hasta que Empleados complete su alta.
