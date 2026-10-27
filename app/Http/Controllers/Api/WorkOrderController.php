@@ -14,6 +14,13 @@ class WorkOrderController extends Controller
     {
         $query = WorkOrder::query();
 
+        // El rol "tecnico" solo ve las work orders asignadas a su propia cédula; el resto
+        // de roles con acceso al submódulo (operaciones, admin, etc.) las ve todas. Sin
+        // cédula registrada no ve ninguna (nunca todas por descarte de "IS NULL").
+        if ($request->user()?->rol === 'tecnico') {
+            $query->where('cedula_tecnico', $request->user()->cedula ?? '__sin_cedula__');
+        }
+
         if ($request->search) {
             $q = $request->search;
             $query->where(function ($w) use ($q) {
@@ -49,6 +56,15 @@ class WorkOrderController extends Controller
      * y se hace upsert por el PAR `numero_wo` + `numero_item` (un mismo WO trae varias filas
      * en el archivo, una por cada ítem/material) para poder reimportar el mismo archivo
      * actualizado sin duplicar filas.
+     *
+     * Actualización PARCIAL: una columna que no viene en la fila (no existe la llave en el
+     * array, no que venga vacía) no se toca si la WO ya existía — así un archivo que solo
+     * trae numero_wo + nombre_tecnico, por ejemplo, solo cambia ese dato y conserva el resto.
+     * Si la columna sí viene pero vacía, se interpreta como borrado explícito de ese campo.
+     *
+     * Si la fila tampoco trae numero_item (import parcial, sin desglose por ítem), el match
+     * para actualizar se hace solo por numero_wo, sobre TODAS las filas que ya existan con
+     * ese WO (y si no existe ninguna, se crea una con numero_item vacío).
      */
     public function importar(Request $request)
     {
@@ -73,38 +89,79 @@ class WorkOrderController extends Controller
 
         $filas = [];
         foreach ($items as $fila) {
+            $tieneItem = array_key_exists('numero_item', $fila);
+
             $valores = [
-                'numero_wo'   => trim($fila['numero_wo']),
+                'numero_wo' => trim($fila['numero_wo']),
+            ];
+            if ($tieneItem) {
                 // Vacío en vez de null: NULL no deduplica bien en el índice único de MySQL
                 // (cada NULL cuenta como distinto), y la mayoría de WOs solo traen una fila.
-                'numero_item' => trim((string) ($fila['numero_item'] ?? '')),
-                'numero_wo_ibs' => isset($fila['numero_wo_ibs']) && trim((string) $fila['numero_wo_ibs']) !== ''
-                    ? trim((string) $fila['numero_wo_ibs'])
-                    : null,
-            ];
+                $valores['numero_item'] = trim((string) $fila['numero_item']);
+            }
 
-            foreach ($camposTexto as $campo) {
-                $valores[$campo] = isset($fila[$campo]) && trim((string) $fila[$campo]) !== ''
-                    ? trim((string) $fila[$campo])
+            if (array_key_exists('numero_wo_ibs', $fila)) {
+                $valores['numero_wo_ibs'] = trim((string) $fila['numero_wo_ibs']) !== ''
+                    ? trim((string) $fila['numero_wo_ibs'])
                     : null;
             }
-            foreach ($camposFecha as $campo) {
-                $valores[$campo] = $this->parsearFecha($fila[$campo] ?? null);
-            }
-            $valores['aging'] = isset($fila['aging']) && is_numeric($fila['aging']) ? (int) $fila['aging'] : null;
 
-            $filas[$valores['numero_wo'] . '|' . $valores['numero_item']] = $valores;
+            foreach ($camposTexto as $campo) {
+                if (!array_key_exists($campo, $fila)) {
+                    continue;
+                }
+                $valores[$campo] = trim((string) $fila[$campo]) !== '' ? trim((string) $fila[$campo]) : null;
+            }
+            foreach ($camposFecha as $campo) {
+                if (!array_key_exists($campo, $fila)) {
+                    continue;
+                }
+                $valores[$campo] = $this->parsearFecha($fila[$campo]);
+            }
+            if (array_key_exists('aging', $fila)) {
+                $valores['aging'] = is_numeric($fila['aging']) ? (int) $fila['aging'] : null;
+            }
+
+            $llaveStr = $valores['numero_wo'] . '|' . ($tieneItem ? $valores['numero_item'] : '');
+            $filas[$llaveStr] = ['tiene_item' => $tieneItem, 'valores' => $valores];
         }
 
         $creadas = 0;
         $actualizadas = 0;
 
         DB::transaction(function () use ($filas, &$creadas, &$actualizadas) {
-            foreach ($filas as $valores) {
-                $llave = ['numero_wo' => $valores['numero_wo'], 'numero_item' => $valores['numero_item']];
-                $existia = WorkOrder::where($llave)->exists();
-                WorkOrder::updateOrCreate($llave, $valores);
-                $existia ? $actualizadas++ : $creadas++;
+            foreach ($filas as $entry) {
+                $valores = $entry['valores'];
+
+                if ($entry['tiene_item']) {
+                    $llave = ['numero_wo' => $valores['numero_wo'], 'numero_item' => $valores['numero_item']];
+                    $existente = WorkOrder::where($llave)->first();
+
+                    if ($existente) {
+                        // Solo se pisan los campos que vinieron en esta fila; lo que no se
+                        // mandó conserva el valor que ya tenía la WO.
+                        $existente->fill($valores);
+                        $existente->save();
+                        $actualizadas++;
+                    } else {
+                        WorkOrder::create($valores);
+                        $creadas++;
+                    }
+                    continue;
+                }
+
+                // Sin numero_item: se actualizan TODAS las filas que ya existan con ese WO.
+                $existentes = WorkOrder::where('numero_wo', $valores['numero_wo'])->get();
+                if ($existentes->isNotEmpty()) {
+                    foreach ($existentes as $existente) {
+                        $existente->fill($valores);
+                        $existente->save();
+                    }
+                    $actualizadas += $existentes->count();
+                } else {
+                    WorkOrder::create(array_merge($valores, ['numero_item' => '']));
+                    $creadas++;
+                }
             }
         });
 
