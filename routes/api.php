@@ -498,6 +498,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
+    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen']);
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
         ->middleware(PermisoDenegado::middleware('importar', 'inventarios.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)

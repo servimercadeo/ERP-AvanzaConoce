@@ -10,7 +10,40 @@ use Illuminate\Support\Facades\DB;
 
 class WorkOrderController extends Controller
 {
+    /**
+     * Con ?page= responde por páginas (?per_page=25|50|100, por defecto 50): con miles de
+     * WOs, traerlas todas pesaba megas y la tabla tardaba en pintarse. Sin ?page= devuelve
+     * la lista completa, como antes.
+     */
     public function index(Request $request)
+    {
+        $query = $this->filtrar($this->visibles($request), $request)
+            ->orderByDesc('fecha_estado')->orderByDesc('id');
+
+        if ($request->has('page')) {
+            $porPagina = (int) $request->per_page;
+            return response()->json($query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50));
+        }
+
+        return response()->json($query->get());
+    }
+
+    /** Total y opciones de los filtros (estados, proveedores) sin descargar las WOs. */
+    public function resumen(Request $request)
+    {
+        $distintos = fn (string $columna) => $this->visibles($request)
+            ->whereNotNull($columna)->where($columna, '!=', '')
+            ->distinct()->orderBy($columna)->pluck($columna);
+
+        return response()->json([
+            'total'       => $this->visibles($request)->count(),
+            'estados'     => $distintos('estado'),
+            'proveedores' => $distintos('proveedor'),
+        ]);
+    }
+
+    /** Las WOs que este usuario puede ver. */
+    private function visibles(Request $request)
     {
         $query = WorkOrder::query();
 
@@ -21,6 +54,11 @@ class WorkOrderController extends Controller
             $query->where('cedula_tecnico', $request->user()->cedula ?? '__sin_cedula__');
         }
 
+        return $query;
+    }
+
+    private function filtrar($query, Request $request)
+    {
         if ($request->search) {
             $q = $request->search;
             $query->where(function ($w) use ($q) {
@@ -39,7 +77,7 @@ class WorkOrderController extends Controller
             $query->where('proveedor', $request->proveedor);
         }
 
-        return response()->json($query->orderByDesc('fecha_estado')->orderByDesc('id')->get());
+        return $query;
     }
 
     public function destroy(WorkOrder $workOrder)

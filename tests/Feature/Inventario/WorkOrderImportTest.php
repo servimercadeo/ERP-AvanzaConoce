@@ -43,6 +43,45 @@ class WorkOrderImportTest extends TestCase
         $this->assertSame('Abierta', WorkOrder::where(['numero_wo' => 'WO1', 'numero_item' => '20'])->value('estado'));
     }
 
+    public function test_por_paginas_respeta_la_busqueda_y_sin_page_responde_la_lista_completa(): void
+    {
+        foreach (range(1, 30) as $i) {
+            WorkOrder::create(['numero_wo' => "WO{$i}", 'numero_item' => '', 'municipio' => $i <= 27 ? 'CALI' : 'PASTO']);
+        }
+        $this->actingAs($this->usuario('admin'));
+
+        $this->getJson('/api/work-orders?page=2&per_page=25&search=CALI')->assertOk()
+            ->assertJsonPath('total', 27)->assertJsonPath('last_page', 2)->assertJsonCount(2, 'data');
+
+        $this->assertCount(30, $this->getJson('/api/work-orders')->assertOk()->json());
+    }
+
+    public function test_el_resumen_trae_total_y_filtros_solo_de_lo_que_el_usuario_puede_ver(): void
+    {
+        WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Finalizado', 'proveedor' => 'P-CALI']);
+        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'cedula_tecnico' => '666', 'estado' => 'Atendido', 'proveedor' => 'P-PASTO']);
+
+        $this->actingAs($this->usuario('admin'));
+        $this->getJson('/api/work-orders/resumen')->assertOk()
+            ->assertJsonPath('total', 2)->assertJsonPath('estados', ['Atendido', 'Finalizado']);
+
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+        $this->getJson('/api/work-orders/resumen')->assertOk()
+            ->assertJsonPath('total', 1)->assertJsonPath('proveedores', ['P-CALI']);
+    }
+
+    public function test_el_tecnico_no_importa_ni_elimina_work_orders(): void
+    {
+        $ajena = WorkOrder::create(['numero_wo' => 'WO9', 'numero_item' => '', 'cedula_tecnico' => '666']);
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+
+        $this->deleteJson("/api/work-orders/{$ajena->id}")->assertForbidden();
+        $this->postJson('/api/work-orders/importar', ['items' => [['numero_wo' => 'X1']]])->assertForbidden();
+
+        $this->assertTrue(WorkOrder::whereKey($ajena->id)->exists());
+        $this->assertFalse(WorkOrder::where('numero_wo', 'X1')->exists());
+    }
+
     public function test_el_tecnico_solo_ve_las_work_orders_de_su_cedula(): void
     {
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555']);
