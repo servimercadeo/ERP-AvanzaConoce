@@ -63,6 +63,19 @@ const IMPORT_HEADER_MAP = {
     "descripcion de ibs": "descripcion",
     "aging": "aging",
     "region de servicio": "region_servicio",
+
+    // Encabezados del "Exporte Macaw" (hoja de Operaciones DTV): trae una fila por WO, sin
+    // N° de ítem, y la cédula del técnico que la atendió (con ella se asocia a su aliado).
+    "workorder": "numero_wo",
+    "cedula tecnico": "cedula_tecnico",
+    "tecnico atiende": "nombre_tecnico",
+    "tipo servicio": "servicio",
+    "nom tipo cliente": "tipo_orden",
+    "perimetro de la zona": "perimetro",
+    "ciudad": "municipio",
+    "fecha atencion": "fecha_estado",
+    "fecha creacion": "fecha_creacion",
+    "fecha finalizacion": "fecha_finalizacion",
 };
 
 const CAMPOS_PLANTILLA = [
@@ -123,7 +136,12 @@ function ImportModal({ onClose, onImported }) {
                 const llave = `${numeroWo}|${numeroItem}`;
                 if (filasPorLlave.has(llave)) combinadas++;
 
-                filasPorLlave.set(llave, { ...mapped, numero_wo: numeroWo, numero_item: numeroItem });
+                // Sin columna de ítem en el archivo no se manda numero_item: el backend
+                // actualiza entonces todas las filas de ese WO. Mandarlo vacío crearía una
+                // fila nueva con ítem "" en vez de actualizar las existentes.
+                const fila = { ...mapped, numero_wo: numeroWo };
+                if ("numero_item" in mapped) fila.numero_item = numeroItem;
+                filasPorLlave.set(llave, fila);
             });
 
             // Diagnóstico: se muestra SIEMPRE (no solo cuando casi nada coincide), porque ya

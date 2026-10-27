@@ -505,6 +505,17 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['work-orders' => 'workOrder'])
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.work_orders.work_orders_file'));
 
+    // Aliados (Inventarios > Aliados): subagentes de Work Orders y sus técnicos indirectos.
+    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
+    Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
+        ->middleware(PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'));
+    Route::put('aliados/{aliado}/tecnicos/{tecnico}', [App\Http\Controllers\Api\AliadoController::class, 'actualizarTecnico'])
+        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'));
+    Route::apiResource('aliados', App\Http\Controllers\Api\AliadoController::class)
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.aliados.aliados_file'));
+
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
     // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo
     // suyo, ya incluido en /user).

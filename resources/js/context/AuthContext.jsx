@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 
 const AuthContext = createContext(null);
@@ -6,6 +7,10 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    // Las consultas quedan en caché 5 min (app.jsx): al cambiar de usuario en la misma
+    // pestaña se vacía, o el siguiente vería los datos del anterior (ej. un técnico
+    // viendo todas las Work Orders que había cargado el admin).
+    const queryClient = useQueryClient();
 
     // Al cargar la app verificamos si ya hay sesión activa (ej: viene de SSO).
     // Primero obtenemos el CSRF cookie para que Sanctum reconozca la sesión.
@@ -52,6 +57,7 @@ export function AuthProvider({ children }) {
             { email, password },
             { baseURL: "/" },
         );
+        queryClient.clear();
         setUser(res.data.user);
         return res.data.user;
     };
@@ -62,6 +68,7 @@ export function AuthProvider({ children }) {
         } catch {
             // Si la sesión ya expiró en el servidor igualmente limpiamos el estado local
         } finally {
+            queryClient.clear();
             setUser(null);
         }
     };
