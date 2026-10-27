@@ -23,13 +23,24 @@ return new class extends Migration
 
         $now = now();
         $rows = [];
-        foreach (self::SUBMODULOS_ADMINISTRATIVO as $submodulo) {
-            $rows[] = ['rol' => 'tecnico', 'modulo_id' => 'administrativo', 'submodulo_id' => $submodulo, 'created_at' => $now, 'updated_at' => $now];
+        $denegar = [
+            'administrativo' => self::SUBMODULOS_ADMINISTRATIVO,
+            'permisos'       => self::SUBMODULOS_PERMISOS,
+        ];
+        foreach ($denegar as $modulo => $submodulos) {
+            foreach ($submodulos as $submodulo) {
+                $existe = DB::table('permisos_denegados')
+                    ->where(['rol' => 'tecnico', 'modulo_id' => $modulo, 'submodulo_id' => $submodulo])
+                    ->exists();
+                if (!$existe) {
+                    $rows[] = ['rol' => 'tecnico', 'modulo_id' => $modulo, 'submodulo_id' => $submodulo, 'created_at' => $now, 'updated_at' => $now];
+                }
+            }
         }
-        foreach (self::SUBMODULOS_PERMISOS as $submodulo) {
-            $rows[] = ['rol' => 'tecnico', 'modulo_id' => 'permisos', 'submodulo_id' => $submodulo, 'created_at' => $now, 'updated_at' => $now];
+
+        if ($rows) {
+            DB::table('permisos_denegados')->insert($rows);
         }
-        DB::table('permisos_denegados')->insert($rows);
     }
 
     public function down(): void

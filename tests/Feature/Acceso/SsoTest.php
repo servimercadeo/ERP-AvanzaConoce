@@ -42,6 +42,24 @@ class SsoTest extends TestCase
         $this->assertNotNull($u->fresh()->ultimo_sso_at);
     }
 
+    /**
+     * El navegador ya tenía una sesión del ERP (de otra persona, o de la misma antes de
+     * cambiar su contraseña en AvanzaConoce): Sanctum guarda en la sesión la huella de esa
+     * contraseña y, si no coincide con la del usuario que entra por SSO, cierra la sesión en
+     * la primera petición (/api/user → 401) y la app vuelve al login sin ningún mensaje.
+     */
+    public function test_login_sso_sobre_una_sesion_previa_queda_con_sesion_valida(): void
+    {
+        $u = $this->usuario('th', ['email' => 'sso@test.co']);
+        $token = app(SsoService::class)->generarToken('sso@test.co', 5);
+
+        $this->withSession(['password_hash_web' => 'huella-de-otra-contrasena'])
+            ->get('/sso/login?token=' . $token)->assertRedirect('/dashboard');
+
+        $this->getJson('/api/user', ['Referer' => config('app.url')])
+            ->assertOk()->assertJsonPath('id', $u->id);
+    }
+
     public function test_login_sso_rechaza_token_ausente_invalido_o_de_usuario_inactivo(): void
     {
         $this->get('/sso/login')->assertRedirect('/login?sso_error=token_ausente');

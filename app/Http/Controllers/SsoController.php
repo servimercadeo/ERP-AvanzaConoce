@@ -49,6 +49,11 @@ class SsoController extends Controller
         // Registrar el momento del login SSO
         $usuario->update(['ultimo_sso_at' => now()]);
 
+        // Sesión nueva: la anterior del navegador (de otra persona, o de esta misma antes de
+        // cambiar su contraseña en AvanzaConoce) guarda la huella de otra contraseña, y Sanctum
+        // cerraría la sesión en la primera petición (/api/user → 401, de vuelta al login).
+        $request->session()->invalidate();
+
         Auth::login($usuario, remember: true);
 
         return redirect('/dashboard');
