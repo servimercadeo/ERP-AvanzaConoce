@@ -468,6 +468,15 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
+    // Parametros > Operaciones > Asignación de Vehículo
+    Route::get('vehiculos/tecnicos', [App\Http\Controllers\Api\VehiculoController::class, 'tecnicos']);
+    Route::get('vehiculos/{vehiculo}/archivo/{cara}', [App\Http\Controllers\Api\VehiculoController::class, 'descargarArchivo']);
+    Route::apiResource('vehiculos', App\Http\Controllers\Api\VehiculoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'));
+
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);

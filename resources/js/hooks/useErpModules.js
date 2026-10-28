@@ -62,14 +62,23 @@ export function useErpModules() {
 
                 const archivoDe = (t) => ({ id: `param_${t.id}_file`, label: t.nombre, acciones: ["crear", "editar", "eliminar"], tipoParametro: t });
 
-                const submodsAgrupados = [...porGrupo.entries()].map(([grupo, tipos]) => ({
-                    id: `paramgrupo_${slugCategoria(grupo).replace(/^inv_/, "")}`,
-                    label: grupo,
-                    icon: "parametros",
-                    desc: `Catálogos de ${grupo}`,
-                    esDinamico: true,
-                    archivos: tipos.map(archivoDe),
-                }));
+                const submodsAgrupados = [...porGrupo.entries()].map(([grupo, tipos]) => {
+                    const id = `paramgrupo_${slugCategoria(grupo).replace(/^inv_/, "")}`;
+                    const archivos = tipos.map(archivoDe);
+                    // El grupo "Operaciones" trae además una pestaña fija (no un Tipo de
+                    // Parámetro más): Asignación de Vehículo, con su propio CRUD.
+                    if (id === "paramgrupo_operaciones") {
+                        archivos.push({ id: "asignacion_vehiculo_file", label: "Asignación de Vehículo", acciones: ["crear", "editar", "eliminar"] });
+                    }
+                    return {
+                        id,
+                        label: grupo,
+                        icon: "parametros",
+                        desc: `Catálogos de ${grupo}`,
+                        esDinamico: true,
+                        archivos,
+                    };
+                });
                 const submodsSueltos = sueltos.map((t) => ({
                     id: `param_${t.id}`,
                     label: t.nombre,

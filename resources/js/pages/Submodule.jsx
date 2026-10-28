@@ -51,6 +51,7 @@ const AliadosCrud = lazy(() => import('./AliadosCrud'));
 const AprobacionTrasladoCrud = lazy(() => import('./AprobacionTrasladoCrud'));
 const CategoriaProductoCrud = lazy(() => import('./CategoriaProductoCrud'));
 const ProveedoresCrud = lazy(() => import('./ProveedoresCrud'));
+const VehiculosCrud = lazy(() => import('./VehiculosCrud'));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -362,6 +363,9 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'par_comerciales_tecnicos':
         case 'par_auxilio_movilidad':
           return null;
+        case 'paramgrupo_operaciones':
+          if (archivoId === 'asignacion_vehiculo_file') return VehiculosCrud;
+        // eslint-disable-next-line no-fallthrough
         default:
           // Tipo de parámetro creado por el usuario (ver useErpModules.js), suelto o
           // agrupado con otros bajo el mismo submódulo (uno por pestaña).
