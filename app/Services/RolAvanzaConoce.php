@@ -12,6 +12,7 @@ use App\Models\User;
  * Directo", etc.). Reglas acordadas con Talento Humano:
  *
  *   rol ERP tic / th / financiera            -> admin   (cualquier proyecto)
+ *   rol ERP tecnico (técnico directo)        -> empleado (cualquier proyecto; portal "Solo Ausentismos")
  *   DIRECTV  + cargo ASESOR COMERCIAL...     -> asesor_directo
  *   DIRECTV  + cargo de supervisor           -> supervisor
  *   DIRECTV  + cualquier otro cargo          -> empleado
@@ -45,6 +46,12 @@ class RolAvanzaConoce
     {
         if (in_array($user->rol, self::ROLES_ERP_ADMIN, true)) {
             return self::ADMIN;
+        }
+        // Técnico directo, en cualquier proyecto (ADMINISTRATIVO o DIRECTV, de Servimercadeo).
+        // AvanzaConoce lo deja como sus técnicos: portal "Solo Ausentismos" con la opción
+        // "Empleado" de esa pantalla (ver config/erp.php portal_tecnicos / rol_tecnicos allá).
+        if ($user->rol === 'tecnico') {
+            return self::EMPLEADO;
         }
         if (in_array($user->rol, ['operaciones', 'admin'], true)) {
             return null; // pendiente de definir

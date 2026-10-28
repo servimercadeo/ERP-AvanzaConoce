@@ -93,6 +93,31 @@ class AltaEnAvanzaConoceTest extends TestCase
         $this->assertSame('general', User::where('cedula', '6002')->value('rol'));
     }
 
+    public function test_un_cargo_de_tecnico_queda_con_rol_tecnico_y_va_a_avanza_como_empleado(): void
+    {
+        Http::fake([self::URL => Http::response(['id' => 950], 201)]);
+        $esperado = [
+            '8001' => ['TÉCNICO DE INSTALACIONES', 'tecnico'],
+            '8002' => ['TECNICO SENIOR', 'tecnico'],
+            '8003' => ['TECNICO SISTEMAS', 'tic'],
+            '8004' => ['AUXILIAR DE CALIDAD Y SOPORTE TECNICO', 'general'],
+            '8005' => ['SUPERVISOR TECNICO', 'supervisores'],
+        ];
+        foreach ($esperado as $cedula => [$cargo, $rol]) {
+            $this->postJson('/api/contratos', [
+                'documento' => (string) $cedula, 'nombres' => 'ana', 'apellidos' => 'perez', 'cargo' => $cargo,
+                'cliente_proyecto' => 'TIGO HOME',
+                'tipo_contrato' => 'Indefinido', 'fecha_ingreso' => '2026-09-01', 'estado_contrato' => 'Activo',
+            ])->assertCreated();
+            $this->assertSame($rol, User::where('cedula', (string) $cedula)->value('rol'), $cargo);
+        }
+
+        // Alta del técnico: en AvanzaConoce va como "empleado" aunque su proyecto sea TIGO.
+        $this->postJson('/api/empleados', $this->payload(['cedula' => '8001', 'rol' => 'tecnico', 'email' => 'tecnico8001@test.co', 'movil' => '3118001000']))
+            ->assertCreated()->assertJsonPath('credenciales.avanza.estado', 'ok');
+        Http::assertSent(fn (Request $req) => $req['cedula'] === '8001' && $req['rol_avanza'] === 'empleado' && $req['rol_erp'] === 'tecnico');
+    }
+
     public function test_si_ya_existia_en_avanza_queda_ok_y_enlazado(): void
     {
         Http::fake([self::URL => Http::response(['id' => 900, 'ya_existia' => true], 200)]);

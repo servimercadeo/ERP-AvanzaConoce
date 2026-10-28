@@ -167,7 +167,7 @@ class User extends Authenticatable
         });
 
         // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
-        // (th/tic/supervisores) a quien todavía no tiene rol asignado; nunca cambia ni quita
+        // (th/tic/supervisores/tecnico) a quien todavía no tiene rol asignado; nunca cambia ni quita
         // uno elegido. Los asesores comerciales se quedan en "general".
         static::saving(function (User $user) {
             $rolElegidoAhora = $user->exists && $user->isDirty('rol');
@@ -184,6 +184,10 @@ class User extends Authenticatable
                 $user->rol = 'tic';
             } elseif ($cargo !== '' && str_contains($cargo, 'SUPERVIS')) {
                 $user->rol = 'supervisores';
+            } elseif (str_starts_with(\Illuminate\Support\Str::ascii($cargo), 'TECNICO')) {
+                // Técnico directo ("TÉCNICO DE INSTALACIONES", "TECNICO SENIOR"...). Los
+                // "AUXILIAR ... TECNICO" o "SOPORTE TECNICO" no: muchos son de oficina.
+                $user->rol = 'tecnico';
             }
         });
     }

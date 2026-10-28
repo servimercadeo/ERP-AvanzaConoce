@@ -31,6 +31,10 @@ class RolAvanzaConoceTest extends TestCase
             'Operaciones en administrativo: pendiente' => ['operaciones', 'ANALISTA', 'ADMINISTRATIVO', null],
             'Otro proyecto: sin regla'           => ['general', 'ASESOR COMERCIAL', 'HUGHES COL', null],
             'Sin contrato ni rol admin'          => ['general', 'ASESOR COMERCIAL', null, null],
+            'Técnico en DirecTV'                 => ['tecnico', 'TÉCNICO DE INSTALACIONES', 'DIRECTV', 'empleado'],
+            'Técnico en Tigo'                    => ['tecnico', 'TECNICO DE INSTALACIONES', 'TIGO HOME', 'empleado'],
+            'Técnico en Administrativo'          => ['tecnico', 'TECNICO', 'ADMINISTRATIVO', 'empleado'],
+            'Técnico sin contrato'               => ['tecnico', 'TECNICO', null, 'empleado'],
         ];
     }
 
