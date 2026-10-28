@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
@@ -6,7 +6,7 @@ import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 
 /*
- * Inventarios > Aliados: aliados (subagentes) de Work Orders y sus técnicos indirectos.
+ * Operaciones > Aliados: aliados (subagentes) de Work Orders y sus técnicos indirectos.
  *
  * - Aliado empresa (ej. Tecnotelevisión S.A.S): uno o más técnicos; solo se crea el aliado y
  *   sus técnicos se agregan después desde su ficha.
@@ -19,11 +19,23 @@ import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlu
 
 const TIPOS = {
     empresa: { label: "Empresa", nombre: "Aliado empresa", color: "#1a6fa8", bg: "#e6f1fa" },
-    tecnico: { label: "Indirecto", nombre: "Aliado indirecto", color: "#1a8a5a", bg: "#e6f6ee" },
+    tecnico: { label: "Indirecto", nombre: "Aliado / técnico indirecto", color: "#1a8a5a", bg: "#e6f6ee" },
 };
 
-const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", contacto_nombre: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
-const TECNICO_VACIO = { cedula: "", nombres: "", apellidos: "", movil: "", email: "", ciudad: "", direccion: "", observaciones: "" };
+const TIPOS_DOCUMENTO = { CC: "Cédula de ciudadanía", CE: "Cédula de extranjería", NIT: "NIT" };
+
+// Proyectos para los que trabaja el aliado (uno o varios): salen de Parámetros > Proyectos,
+// todos los activos menos ADMINISTRATIVO. Se guardan por id, así que un cambio de nombre
+// en Parámetros se ve aquí.
+const useProyectosAliado = () => useQuery({
+    queryKey: ["aliados-proyectos"],
+    queryFn: () => api.get("/aliados/proyectos").then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+}).data ?? [];
+const nombresProyectos = (aliado) => (aliado.proyectos ?? []).map((p) => p.nombre).join(", ");
+
+const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", proyectos: [], contacto_nombre: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
+const TECNICO_VACIO = { tipo_documento: "CC", cedula: "", nombres: "", apellidos: "", movil: "", email: "", proyectos: [], ciudad: "", direccion: "", observaciones: "" };
 
 const mensajeError = (err, fallback) => {
     const errores = err?.response?.data?.errors;
@@ -31,9 +43,11 @@ const mensajeError = (err, fallback) => {
     return err?.response?.data?.message ?? fallback;
 };
 
+// span: columnas que ocupa; "full" = toda la fila.
 function Campo({ label, children, span, ayuda }) {
+    const columna = span === "full" ? "1 / -1" : `span ${span}`;
     return (
-        <div style={{ ...S.formGroup, ...(span ? { gridColumn: `span ${span}` } : {}) }}>
+        <div style={{ ...S.formGroup, ...(span ? { gridColumn: columna } : {}) }}>
             <label style={S.label}>{label}</label>
             {children}
             {ayuda && <span style={S.ayuda}>{ayuda}</span>}
@@ -41,7 +55,8 @@ function Campo({ label, children, span, ayuda }) {
     );
 }
 
-function Modal({ titulo, onClose, maxWidth = 640, children, footer }) {
+// Ancho por defecto amplio: los formularios se acomodan en 3 columnas y se leen mejor.
+function Modal({ titulo, onClose, maxWidth = "min(980px, 94vw)", children, footer }) {
     return (
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth }} onClick={(e) => e.stopPropagation()}>
@@ -56,15 +71,41 @@ function Modal({ titulo, onClose, maxWidth = 640, children, footer }) {
     );
 }
 
+function SelectTipoDocumento({ value, onChange, disabled }) {
+    return (
+        <select style={S.input} value={value} onChange={onChange} disabled={disabled}>
+            {Object.entries(TIPOS_DOCUMENTO).map(([valor, nombre]) => <option key={valor} value={valor}>{nombre}</option>)}
+        </select>
+    );
+}
+
+/* ─── Proyectos para los que trabaja: se marcan uno o varios ──────────── */
+function CampoProyectos({ value, set }) {
+    const opciones = useProyectosAliado();
+    const marcados = value ?? [];
+    const alternar = (id) => set("proyectos")({
+        target: { value: marcados.includes(id) ? marcados.filter((x) => x !== id) : [...marcados, id] },
+    });
+    return (
+        <Campo label="Proyecto(s) para los que trabaja *" span="full" ayuda="Marca todos los que apliquen (ej. HUGHES y DIRECTV). Salen de Parámetros > Proyectos.">
+            <div style={S.checks}>
+                {opciones.map((p) => (
+                    <label key={p.id} style={S.check(marcados.includes(p.id))}>
+                        <input type="checkbox" checked={marcados.includes(p.id)} onChange={() => alternar(p.id)} />
+                        {p.nombre}
+                    </label>
+                ))}
+            </div>
+        </Campo>
+    );
+}
+
 /* ─── Campos del aliado (empresa) ─────────────────────────────────────── */
 function CamposAliado({ form, set, documentoBloqueado }) {
     return (
         <div style={S.grid2}>
             <Campo label="Tipo de documento *">
-                <select style={S.input} value={form.tipo_documento} onChange={set("tipo_documento")} disabled={documentoBloqueado}>
-                    <option value="NIT">NIT</option>
-                    <option value="CC">Cédula (persona natural)</option>
-                </select>
+                <SelectTipoDocumento value={form.tipo_documento} onChange={set("tipo_documento")} disabled={documentoBloqueado} />
             </Campo>
             <Campo label="Número de documento *" ayuda={form.tipo_documento === "NIT" ? "Con o sin dígito de verificación, ej. 900123456-7" : null}>
                 <input style={S.input} value={form.documento} onChange={set("documento")} disabled={documentoBloqueado} />
@@ -72,6 +113,7 @@ function CamposAliado({ form, set, documentoBloqueado }) {
             <Campo label="Razón social o nombre *" span={2}>
                 <input style={S.input} value={form.nombre} onChange={set("nombre")} placeholder="Ej. TECNOMARIN S.A.S" />
             </Campo>
+            <CampoProyectos value={form.proyectos} set={set} />
             <Campo label="Persona de contacto">
                 <input style={S.input} value={form.contacto_nombre ?? ""} onChange={set("contacto_nombre")} />
             </Campo>
@@ -87,7 +129,7 @@ function CamposAliado({ form, set, documentoBloqueado }) {
             <Campo label="Dirección" span={2}>
                 <input style={S.input} value={form.direccion ?? ""} onChange={set("direccion")} />
             </Campo>
-            <Campo label="Observaciones" span={2}>
+            <Campo label="Observaciones" span="full">
                 <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={form.observaciones ?? ""} onChange={set("observaciones")} />
             </Campo>
         </div>
@@ -95,11 +137,21 @@ function CamposAliado({ form, set, documentoBloqueado }) {
 }
 
 /* ─── Campos de la persona (técnico) ──────────────────────────────────── */
+// conUbicacion: es el formulario del aliado / técnico indirecto (tipo de documento,
+// proyectos, ciudad...); sin él, es solo un técnico más de un aliado empresa.
 function CamposTecnico({ form, set, conUbicacion, cedulaBloqueada }) {
+    const esNit = conUbicacion && form.tipo_documento === "NIT";
+    const cedulaPersona = String(form.cedula ?? "").split("-")[0];
     return (
         <div style={S.grid2}>
-            <Campo label="Cédula *">
-                <input style={S.input} value={form.cedula} onChange={set("cedula")} inputMode="numeric" disabled={cedulaBloqueada} />
+            {conUbicacion && (
+                <Campo label="Tipo de documento *">
+                    <SelectTipoDocumento value={form.tipo_documento} onChange={set("tipo_documento")} />
+                </Campo>
+            )}
+            <Campo label={conUbicacion ? "Número de documento *" : "Cédula *"}
+                ayuda={esNit ? "NIT de persona natural: su cédula con el dígito de verificación, ej. 1020304050-3. Su usuario técnico queda con la cédula." : null}>
+                <input style={S.input} value={form.cedula} onChange={set("cedula")} inputMode={esNit ? "text" : "numeric"} disabled={cedulaBloqueada} />
             </Campo>
             <Campo label="Celular *">
                 <input style={S.input} value={form.movil} onChange={set("movil")} inputMode="tel" />
@@ -111,18 +163,19 @@ function CamposTecnico({ form, set, conUbicacion, cedulaBloqueada }) {
                 <input style={S.input} value={form.apellidos} onChange={set("apellidos")} />
             </Campo>
             <Campo label={cedulaBloqueada ? "Correo (con el que entra al ERP) *" : "Correo (con el que entra al ERP)"} span={2}
-                ayuda={cedulaBloqueada ? null : `Si no tiene, se usa ${form.cedula || "{cédula}"}@avanzaconoce.com`}>
+                ayuda={cedulaBloqueada ? null : `Si no tiene, se usa ${cedulaPersona || "{cédula}"}@avanzaconoce.com`}>
                 <input style={S.input} type="email" value={form.email ?? ""} onChange={set("email")} />
             </Campo>
             {conUbicacion && (
                 <>
+                    <CampoProyectos value={form.proyectos} set={set} />
                     <Campo label="Ciudad">
                         <input style={S.input} value={form.ciudad} onChange={set("ciudad")} />
                     </Campo>
                     <Campo label="Dirección">
                         <input style={S.input} value={form.direccion} onChange={set("direccion")} />
                     </Campo>
-                    <Campo label="Observaciones" span={2}>
+                    <Campo label="Observaciones" span="full">
                         <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={form.observaciones} onChange={set("observaciones")} />
                     </Campo>
                 </>
@@ -161,7 +214,7 @@ function NuevoAliadoModal({ onClose, onCreado }) {
 
     if (!tipo) {
         return (
-            <Modal titulo="Nuevo aliado" onClose={onClose} maxWidth={680}>
+            <Modal titulo="Nuevo aliado" onClose={onClose} maxWidth="min(820px, 94vw)">
                 <p style={{ marginTop: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>¿Qué tipo de aliado vas a registrar?</p>
                 <div style={S.tarjetas}>
                     <button style={S.tarjeta} onClick={() => setTipo("empresa")}>
@@ -213,7 +266,7 @@ function NuevoAliadoModal({ onClose, onCreado }) {
 
 /* ─── Editar datos del aliado ─────────────────────────────────────────── */
 function EditarAliadoModal({ aliado, onClose, onGuardado }) {
-    const [form, set] = useFormulario({ ...ALIADO_VACIO, ...aliado });
+    const [form, set] = useFormulario({ ...ALIADO_VACIO, ...aliado, proyectos: (aliado.proyectos ?? []).map((p) => p.id) });
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -388,7 +441,7 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <span style={S.badge(TIPOS[aliado.tipo])}>{TIPOS[aliado.tipo].nombre}</span>
                         {!aliado.activo && <span style={S.badge({ color: "#a33", bg: "#fce8e8" })}>Inactivo</span>}
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{aliado.tipo_documento} {aliado.documento}</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>{TIPOS_DOCUMENTO[aliado.tipo_documento] ?? aliado.tipo_documento} {aliado.documento}</span>
                     </div>
                     {puede.editar && (
                         <button style={S.btnSecondary} onClick={() => setEditarOpen(true)}>
@@ -400,6 +453,7 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                 <p className="section-title" style={{ margin: "16px 0 10px" }}>Datos básicos</p>
                 <div style={S.datos}>
                     {[
+                        ["Proyecto(s)", nombresProyectos(aliado)],
                         ["Contacto", aliado.contacto_nombre], ["Teléfono", aliado.telefono], ["Correo", aliado.correo],
                         ["Ciudad", aliado.ciudad], ["Dirección", aliado.direccion], ["Observaciones", aliado.observaciones],
                     ].map(([label, valor]) => (
@@ -521,6 +575,8 @@ export default function AliadosCrud() {
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
     const [tipoFiltro, setTipoFiltro] = useState("");
+    const [proyectoFiltro, setProyectoFiltro] = useState("");
+    const proyectosOpciones = useProyectosAliado();
     const [nuevoOpen, setNuevoOpen] = useState(false);
     const [fichaId, setFichaId] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -533,10 +589,24 @@ export default function AliadosCrud() {
         setTimeout(() => setToast(null), 3500);
     };
 
-    const { data: aliados = [], isLoading } = useQuery({
-        queryKey: ["aliados", debSearch, tipoFiltro],
-        queryFn: () => api.get("/aliados", { params: { search: debSearch || undefined, tipo: tipoFiltro || undefined } }).then((r) => r.data),
+    // Por páginas de 10; los filtros y el resumen de arriba se calculan en el servidor sobre todos.
+    const [pagina, setPagina] = useState(1);
+    useEffect(() => setPagina(1), [debSearch, tipoFiltro, proyectoFiltro]);
+
+    const { data: resultado, isLoading } = useQuery({
+        queryKey: ["aliados", debSearch, tipoFiltro, proyectoFiltro, pagina],
+        queryFn: () => api.get("/aliados", { params: { search: debSearch || undefined, tipo: tipoFiltro || undefined, proyecto: proyectoFiltro || undefined, page: pagina } }).then((r) => r.data),
+        placeholderData: (prev) => prev,
     });
+    const aliados = resultado?.data ?? [];
+    const resumen = resultado?.resumen ?? { aliados: 0, empresa: 0, tecnico: 0, tecnicos: 0 };
+    const total = resultado?.total ?? 0;
+    const porPagina = resultado?.per_page ?? 10;
+    const ultimaPagina = resultado?.last_page ?? 1;
+    // Si se eliminó la última fila de la última página, volver a la anterior.
+    useEffect(() => {
+        if (pagina > ultimaPagina) setPagina(ultimaPagina);
+    }, [pagina, ultimaPagina]);
 
     const invalidate = () => qc.invalidateQueries({ queryKey: ["aliados"] });
 
@@ -555,17 +625,15 @@ export default function AliadosCrud() {
         }
     };
 
-    const totalTecnicos = aliados.reduce((n, a) => n + a.tecnicos_count, 0);
-
     return (
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
 
             <div className="stats-row">
-                <div className="stat-card"><div className="stat-num">{aliados.length}</div><div className="stat-label">Aliados</div></div>
-                <div className="stat-card"><div className="stat-num">{aliados.filter((a) => a.tipo === "empresa").length}</div><div className="stat-label">Aliados empresa</div></div>
-                <div className="stat-card"><div className="stat-num">{aliados.filter((a) => a.tipo === "tecnico").length}</div><div className="stat-label">Aliados indirectos</div></div>
-                <div className="stat-card"><div className="stat-num">{totalTecnicos}</div><div className="stat-label">Técnicos</div></div>
+                <div className="stat-card"><div className="stat-num">{resumen.aliados}</div><div className="stat-label">Aliados</div></div>
+                <div className="stat-card"><div className="stat-num">{resumen.empresa}</div><div className="stat-label">Aliados empresa</div></div>
+                <div className="stat-card"><div className="stat-num">{resumen.tecnico}</div><div className="stat-label">Aliados indirectos</div></div>
+                <div className="stat-card"><div className="stat-num">{resumen.tecnicos}</div><div className="stat-label">Técnicos</div></div>
             </div>
 
             <div style={S.toolbar}>
@@ -577,6 +645,10 @@ export default function AliadosCrud() {
                     <option value="">Todos los tipos</option>
                     <option value="empresa">Aliados empresa</option>
                     <option value="tecnico">Aliados indirectos</option>
+                </select>
+                <select style={S.filtroSelect} value={proyectoFiltro} onChange={(e) => setProyectoFiltro(e.target.value)}>
+                    <option value="">Todos los proyectos</option>
+                    {proyectosOpciones.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                 </select>
                 {puede.crear && (
                     <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setNuevoOpen(true)}>
@@ -594,7 +666,7 @@ export default function AliadosCrud() {
                     <table className="data-table" style={{ fontSize: "0.85rem" }}>
                         <thead>
                             <tr>
-                                <th>Aliado</th><th>Documento</th><th>Tipo</th><th>Ciudad</th><th style={{ textAlign: "center" }}>Técnicos</th>
+                                <th>Aliado</th><th>Documento</th><th>Tipo</th><th>Proyecto(s)</th><th>Ciudad</th><th style={{ textAlign: "center" }}>Técnicos</th>
                                 <th style={{ textAlign: "center" }}>Asignadas</th><th style={{ textAlign: "center" }}>Atendidas</th><th style={{ textAlign: "center" }}>Finalizadas</th>
                                 <th>Estado</th><th style={{ textAlign: "center" }}>Acciones</th>
                             </tr>
@@ -605,6 +677,7 @@ export default function AliadosCrud() {
                                     <td style={{ fontWeight: 700 }}>{a.nombre}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{a.tipo_documento} {a.documento}</td>
                                     <td><span style={S.badge(TIPOS[a.tipo])}>{TIPOS[a.tipo].label}</span></td>
+                                    <td>{nombresProyectos(a) || <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                                     <td>{a.ciudad || "—"}</td>
                                     <td style={{ textAlign: "center" }}>{a.tecnicos_count}</td>
                                     <td style={{ textAlign: "center" }}>{a.work_orders.asignadas}</td>
@@ -629,6 +702,19 @@ export default function AliadosCrud() {
                     </table>
                 )}
             </div>
+
+            {total > 0 && (
+                <div style={S.paginationBar}>
+                    <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>
+                        {(pagina - 1) * porPagina + 1}–{Math.min(pagina * porPagina, total)} de {total}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button style={S.pageBtn(pagina === 1)} disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>‹</button>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>Página {pagina} de {ultimaPagina}</span>
+                        <button style={S.pageBtn(pagina === ultimaPagina)} disabled={pagina === ultimaPagina} onClick={() => setPagina((p) => p + 1)}>›</button>
+                    </div>
+                </div>
+            )}
 
             {nuevoOpen && (
                 <NuevoAliadoModal
@@ -680,6 +766,12 @@ const S = {
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     ayuda: { fontSize: "0.74rem", color: "var(--text-muted)" },
+    paginationBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },
+    pageBtn: (disabled) => ({
+        minWidth: 32, height: 32, padding: "0 8px", border: "1.5px solid var(--border)", borderRadius: 6,
+        background: disabled ? "var(--bg)" : "var(--white)", color: disabled ? "var(--text-muted)" : "var(--text)",
+        fontWeight: 700, fontSize: "0.85rem", cursor: disabled ? "default" : "pointer",
+    }),
     input: { width: "100%", boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },
     btnPrimary: { padding: "9px 20px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", fontFamily: "Nunito,sans-serif" },
     btnSecondary: { padding: "9px 18px", background: "var(--white)", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", fontFamily: "Nunito,sans-serif" },
@@ -701,4 +793,10 @@ const S = {
     }),
     credenciales: { background: "var(--bg)", borderRadius: "var(--radius-sm)", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 },
     credValor: { fontFamily: "monospace", fontSize: "0.95rem", fontWeight: 700, marginTop: 4, wordBreak: "break-all" },
+    checks: { display: "flex", gap: 10, flexWrap: "wrap" },
+    check: (marcado) => ({
+        display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", cursor: "pointer", fontSize: "0.86rem", fontWeight: 700,
+        border: `1.5px solid ${marcado ? "var(--primary)" : "var(--border)"}`, borderRadius: "var(--radius-sm)",
+        background: marcado ? "var(--primary-light)" : "var(--white)", color: marcado ? "var(--primary-dark)" : "var(--text)",
+    }),
 };

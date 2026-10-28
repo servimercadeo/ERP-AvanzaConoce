@@ -88,6 +88,9 @@ const MOCK_OPTS = {
     ],
 };
 
+// Ciudad del candidato (la que se llena en su formulario); si no la tiene, la de su requisición.
+const ciudadCandidato = (c) => c.ciudad?.nombre || c.requisicion?.ciudad?.nombre || "";
+
 export default function CandidatosCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
@@ -819,6 +822,7 @@ export default function CandidatosCrud() {
                 c.identificacion.includes(term) ||
                 c.correo.toLowerCase().includes(term) ||
                 (c.celular || "").includes(term) ||
+                (ciudadCandidato(c) || "").toLowerCase().includes(term) ||
                 c.estado.toLowerCase().includes(term),
         );
     }, [candidates, debouncedSearch]);
@@ -943,6 +947,7 @@ export default function CandidatosCrud() {
                                     Correo electrónico
                                 </th>
                                 <th style={S.candTh("left")}>Celular</th>
+                                <th style={S.candTh("left")}>Ciudad</th>
                                 <th style={S.candTh("left")}>Proyecto</th>
                                 <th style={S.candTh("left")}>Requisición</th>
                                 <th style={S.candTh("left")}>Estado proceso</th>
@@ -1042,6 +1047,15 @@ export default function CandidatosCrud() {
                                             }}
                                         >
                                             {c.celular}
+                                        </td>
+                                        <td
+                                            style={{
+                                                padding: "12px 8px",
+                                                fontSize: "0.85rem",
+                                                color: "var(--text)",
+                                            }}
+                                        >
+                                            {ciudadCandidato(c) || "-"}
                                         </td>
                                         <td
                                             style={{
@@ -1187,7 +1201,7 @@ export default function CandidatosCrud() {
                             })}
                             {filteredCandDetail.length === 0 && (
                                 <tr>
-                                    <td colSpan="12" style={S.empty}>
+                                    <td colSpan="13" style={S.empty}>
                                         No se encontraron candidatos.
                                     </td>
                                 </tr>

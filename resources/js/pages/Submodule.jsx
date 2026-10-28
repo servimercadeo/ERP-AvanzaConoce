@@ -177,16 +177,6 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
             case 'inventario_empleado_file': return InventarioEmpleadoCrud;
             default: return null;
           }
-        case 'work_orders':
-          switch (archivoId) {
-            case 'work_orders_file': return WorkOrdersCrud;
-            default: return null;
-          }
-        case 'aliados':
-          switch (archivoId) {
-            case 'aliados_file': return AliadosCrud;
-            default: return null;
-          }
         case 'productos':
           switch (archivoId) {
             // case 'productos_file':         return ProductosCrud;
@@ -202,6 +192,22 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
             return InventarioCategoriaCrud;
           }
           return null;
+      }
+
+    /* ── OPERACIONES ────────────────────────────────────── */
+    case 'operaciones':
+      switch (submoduleId) {
+        case 'work_orders':
+          switch (archivoId) {
+            case 'work_orders_file': return WorkOrdersCrud;
+            default: return null;
+          }
+        case 'aliados':
+          switch (archivoId) {
+            case 'aliados_file': return AliadosCrud;
+            default: return null;
+          }
+        default: return null;
       }
 
     /* ── PEDIDOS Y COMPRAS ──────────────────────────────── */

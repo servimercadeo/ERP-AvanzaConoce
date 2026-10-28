@@ -7,7 +7,7 @@ import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlu
 import SelectBuscable from "../components/SelectBuscable";
 
 /**
- * Work Orders (Inventarios > Work Orders): visor de las órdenes de trabajo técnicas que
+ * Work Orders (Operaciones > Work Orders): visor de las órdenes de trabajo técnicas que
  * llegan por el Excel de origen del proveedor (50+ columnas en ese archivo). Solo se
  * guardan y muestran las columnas más útiles para seguimiento operativo — WO, estado,
  * técnico/cuadrilla, ubicación, fechas clave y aging — el resto de columnas del archivo

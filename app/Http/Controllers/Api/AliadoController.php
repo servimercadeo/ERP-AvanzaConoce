@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Inventarios > Aliados: aliados (subagentes) de Work Orders y sus técnicos indirectos.
+ * Operaciones > Aliados: aliados (subagentes) de Work Orders y sus técnicos indirectos.
  *
  * - Aliado empresa (tipo "empresa", ej. Tecnotelevisión S.A.S): uno o más técnicos; solo se
  *   crea el aliado y sus técnicos se agregan después.
@@ -31,22 +31,51 @@ class AliadoController extends Controller
     private const ESTADO_ATENDIDA = 'Atendido';
     private const ESTADO_FINALIZADA = 'Finalizado';
 
+    /** Proyectos de Parámetros que se le pueden asignar a un aliado (todos menos ADMINISTRATIVO). */
+    public function proyectos()
+    {
+        return response()->json(Aliado::proyectosDisponibles());
+    }
+
+    /**
+     * Con ?page= responde por páginas de 10, con el resumen (aliados por tipo y técnicos)
+     * de todos los que cumplen los filtros, no solo de la página. Sin ?page= devuelve la lista completa.
+     */
     public function index(Request $request)
     {
-        $aliados = Aliado::withCount('tecnicos')
+        $query = Aliado::query()
             ->when($request->tipo, fn ($q, $tipo) => $q->where('tipo', $tipo))
+            ->when($request->proyecto, fn ($q, $proyecto) => $q->whereHas('proyectos', fn ($p) => $p->where('proyectos.id', $proyecto)))
             ->when($request->search, function ($q, $s) {
                 $q->where(fn ($w) => $w->where('nombre', 'like', "%{$s}%")
                     ->orWhere('documento', 'like', "%{$s}%")
                     ->orWhereHas('tecnicos', fn ($t) => $t->where('name', 'like', "%{$s}%")->orWhere('cedula', 'like', "%{$s}%")));
-            })
-            ->orderBy('nombre')
-            ->get();
+            });
 
+        if (! $request->has('page')) {
+            $aliados = (clone $query)->withCount('tecnicos')->with('proyectos:id,nombre')->orderBy('nombre')->get();
+            $this->agregarConteos($aliados);
+
+            return response()->json($aliados);
+        }
+
+        $resumen = [
+            'aliados' => (clone $query)->count(),
+            'empresa' => (clone $query)->where('tipo', Aliado::EMPRESA)->count(),
+            'tecnico' => (clone $query)->where('tipo', Aliado::TECNICO)->count(),
+            'tecnicos' => User::whereIn('aliado_id', (clone $query)->select('id'))->count(),
+        ];
+
+        $pagina = (clone $query)->withCount('tecnicos')->with('proyectos:id,nombre')->orderBy('nombre')->orderBy('id')->paginate(10);
+        $this->agregarConteos($pagina->getCollection());
+
+        return response()->json($pagina->toArray() + ['resumen' => $resumen]);
+    }
+
+    private function agregarConteos($aliados): void
+    {
         $conteos = $this->conteosWorkOrders('users.aliado_id', $aliados->pluck('id')->all());
         $aliados->each(fn ($a) => $a->setAttribute('work_orders', $conteos[$a->id] ?? $this->conteoVacio()));
-
-        return response()->json($aliados);
     }
 
     public function show(Aliado $aliado)
@@ -60,6 +89,7 @@ class AliadoController extends Controller
         $tecnicos->each(fn ($t) => $t->setAttribute('work_orders', $conteos[$t->id] ?? $this->conteoVacio()));
 
         $aliado->setRelation('tecnicos', $tecnicos);
+        $aliado->load('proyectos:id,nombre');
         $aliado->setAttribute('work_orders', $this->conteosWorkOrders('users.aliado_id', [$aliado->id])[$aliado->id] ?? $this->conteoVacio());
 
         return response()->json($aliado);
@@ -84,26 +114,41 @@ class AliadoController extends Controller
 
         if ($tipo === Aliado::EMPRESA) {
             $data = $request->validate($this->reglasAliado());
-            $aliado = Aliado::create($data + ['tipo' => Aliado::EMPRESA]);
+            $aliado = DB::transaction(function () use ($data) {
+                $aliado = Aliado::create($data + ['tipo' => Aliado::EMPRESA]);
+                $aliado->proyectos()->sync($data['proyectos']);
+                return $aliado;
+            });
 
-            return response()->json(['aliado' => $aliado, 'credenciales' => null], 201);
+            return response()->json(['aliado' => $aliado->load('proyectos:id,nombre'), 'credenciales' => null], 201);
         }
 
         // Tipo técnico: los datos de la persona sirven para el aliado y para su usuario técnico.
-        $data = $request->validate($this->reglasTecnico() + [
-            'ciudad'        => 'nullable|string|max:100',
-            'direccion'     => 'nullable|string|max:255',
-            'observaciones' => 'nullable|string|max:2000',
+        // Su documento puede ser CC, CE o NIT; el NIT de una persona natural es su cédula más
+        // el dígito de verificación ("1234567-8"), así que su usuario queda con la cédula.
+        $data = $request->validate(array_merge($this->reglasTecnico(), [
+            'tipo_documento' => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
+            'cedula'         => ['required', 'regex:/^[0-9]{5,15}(-[0-9])?$/'],
+            'ciudad'         => 'nullable|string|max:100',
+            'direccion'      => 'nullable|string|max:255',
+            'observaciones'  => 'nullable|string|max:2000',
+        ], $this->reglasProyectos()), [
+            'cedula.regex' => 'El número de documento debe tener solo números (el NIT puede llevar el dígito de verificación, ej. 1234567-8).',
         ]);
+        if ($data['tipo_documento'] !== 'NIT' && str_contains($data['cedula'], '-')) {
+            throw ValidationException::withMessages(['cedula' => 'La cédula debe tener solo números.']);
+        }
         $request->validate(['cedula' => 'unique:aliados,documento'], [
             'cedula.unique' => 'Ya existe un aliado con ese documento.',
         ]);
+        $documento = $data['cedula'];
+        $data['cedula'] = explode('-', $documento)[0];
 
-        [$aliado, $credenciales] = DB::transaction(function () use ($data) {
+        [$aliado, $credenciales] = DB::transaction(function () use ($data, $documento) {
             $aliado = Aliado::create([
                 'tipo'           => Aliado::TECNICO,
-                'tipo_documento' => 'CC',
-                'documento'      => $data['cedula'],
+                'tipo_documento' => $data['tipo_documento'],
+                'documento'      => $documento,
                 'nombre'         => $this->nombreCompleto($data),
                 'telefono'       => $data['movil'],
                 'correo'         => $data['email'] ?? null,
@@ -111,11 +156,12 @@ class AliadoController extends Controller
                 'direccion'      => $data['direccion'] ?? null,
                 'observaciones'  => $data['observaciones'] ?? null,
             ]);
+            $aliado->proyectos()->sync($data['proyectos']);
 
             return [$aliado, $this->crearTecnico($aliado, $data)];
         });
 
-        return response()->json(['aliado' => $aliado, 'credenciales' => $credenciales], 201);
+        return response()->json(['aliado' => $aliado->load('proyectos:id,nombre'), 'credenciales' => $credenciales], 201);
     }
 
     public function update(Request $request, Aliado $aliado)
@@ -126,9 +172,13 @@ class AliadoController extends Controller
             unset($reglas['tipo_documento'], $reglas['documento']);
         }
 
-        $aliado->update($request->validate($reglas));
+        $data = $request->validate($reglas);
+        DB::transaction(function () use ($aliado, $data) {
+            $aliado->update($data);
+            $aliado->proyectos()->sync($data['proyectos']);
+        });
 
-        return response()->json($aliado->fresh());
+        return response()->json($aliado->fresh()->load('proyectos:id,nombre'));
     }
 
     public function destroy(Aliado $aliado)
@@ -240,7 +290,7 @@ class AliadoController extends Controller
     private function reglasAliado(?Aliado $aliado = null): array
     {
         return [
-            'tipo_documento'  => ['required', Rule::in(['NIT', 'CC'])],
+            'tipo_documento'  => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
             'documento'       => ['required', 'string', 'max:20', 'regex:/^[0-9][0-9\-]*$/', Rule::unique('aliados', 'documento')->ignore($aliado?->id)],
             'nombre'          => 'required|string|max:150',
             'contacto_nombre' => 'nullable|string|max:150',
@@ -249,6 +299,15 @@ class AliadoController extends Controller
             'ciudad'          => 'nullable|string|max:100',
             'direccion'       => 'nullable|string|max:255',
             'observaciones'   => 'nullable|string|max:2000',
+        ] + $this->reglasProyectos();
+    }
+
+    /** Proyectos (ids de Parámetros) para los que trabaja el aliado: al menos uno, puede ser varios. */
+    private function reglasProyectos(): array
+    {
+        return [
+            'proyectos'   => 'required|array|min:1',
+            'proyectos.*' => ['integer', 'distinct', Rule::in(Aliado::proyectosDisponibles()->pluck('id')->all())],
         ];
     }
 

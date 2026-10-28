@@ -362,24 +362,6 @@ export const ERP_MODULES = [
           { id: 'inventario_empleado_file', label: 'Inventario de Empleado', acciones: ['editar', 'exportar'] },
         ]
       },
-      {
-        id: 'work_orders',
-        label: 'Work Orders',
-        icon: 'productos',
-        desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
-        archivos: [
-          { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
-        ]
-      },
-      {
-        id: 'aliados',
-        label: 'Aliados',
-        icon: 'subagentes',
-        desc: 'Aliados (subagentes) de Work Orders y sus técnicos indirectos',
-        archivos: [
-          { id: 'aliados_file', label: 'Aliados', acciones: ['crear', 'editar', 'eliminar'] },
-        ]
-      },
       /*
       {
         id: 'consultas',
@@ -401,6 +383,34 @@ export const ERP_MODULES = [
         ]
       }
       */
+    ],
+    archivos: []
+  },
+  {
+    id: 'operaciones',
+    label: 'Operaciones',
+    icon: 'operaciones',
+    color: '#0e7490',
+    desc: 'Work Orders, aliados y técnicos.',
+    submods: [
+      {
+        id: 'work_orders',
+        label: 'Work Orders',
+        icon: 'work_orders',
+        desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
+        archivos: [
+          { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
+        ]
+      },
+      {
+        id: 'aliados',
+        label: 'Aliados',
+        icon: 'subagentes',
+        desc: 'Aliados (subagentes) de Work Orders y sus técnicos indirectos',
+        archivos: [
+          { id: 'aliados_file', label: 'Aliados', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
     ],
     archivos: []
   },

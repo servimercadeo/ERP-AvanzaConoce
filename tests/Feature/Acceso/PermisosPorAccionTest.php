@@ -87,7 +87,7 @@ class PermisosPorAccionTest extends TestCase
         '/api/pedidos-compra'              => ['crear', 'pedidos_compras.pedidos'],
         '/api/ordenes-compra'              => ['crear', 'pedidos_compras.compras'],
         '/api/asignaciones-inventario'     => ['crear', 'inventarios.asignacion_inventario'],
-        '/api/work-orders/importar'        => ['importar', 'inventarios.work_orders'],
+        '/api/work-orders/importar'        => ['importar', 'operaciones.work_orders'],
         '/api/inventario-productos/importar' => ['importar', 'inventarios.inv_general'],
         '/api/inventario-dotacion'         => ['crear', 'inventarios.dotacion'],
         '/api/inventario-dotacion/import'  => ['importar', 'inventarios.dotacion'],

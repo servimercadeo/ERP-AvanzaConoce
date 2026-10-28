@@ -505,26 +505,28 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware(PermisoDenegado::middleware('editar', 'inventarios.asignacion_inventario.asignacion_inventario_file', 'inventarios.inventario_empleado.inventario_empleado_file'));
     Route::post('asignaciones-inventario/{asignacionInventario}/acta-entrega', [App\Http\Controllers\Api\AsignacionInventarioController::class, 'actaEntrega']);
 
-    // Work Orders (Inventarios > Work Orders): visor de órdenes de trabajo técnicas,
+    // Work Orders (Operaciones > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
     Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen']);
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
-        ->middleware(PermisoDenegado::middleware('importar', 'inventarios.work_orders.work_orders_file'));
+        ->middleware(PermisoDenegado::middleware('importar', 'operaciones.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'destroy'])
         ->parameters(['work-orders' => 'workOrder'])
-        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.work_orders.work_orders_file'));
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.work_orders.work_orders_file'));
 
-    // Aliados (Inventarios > Aliados): subagentes de Work Orders y sus técnicos indirectos.
+    // Aliados (Operaciones > Aliados): subagentes de Work Orders y sus técnicos indirectos.
+    // Antes del apiResource: si no, "proyectos" se tomaría como el id de un aliado.
+    Route::get('aliados/proyectos', [App\Http\Controllers\Api\AliadoController::class, 'proyectos']);
     Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
     Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
-        ->middleware(PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'));
+        ->middleware(PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'));
     Route::put('aliados/{aliado}/tecnicos/{tecnico}', [App\Http\Controllers\Api\AliadoController::class, 'actualizarTecnico'])
-        ->middleware(PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'));
+        ->middleware(PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'));
     Route::apiResource('aliados', App\Http\Controllers\Api\AliadoController::class)
-        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'inventarios.aliados.aliados_file'))
-        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'inventarios.aliados.aliados_file'))
-        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.aliados.aliados_file'));
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.aliados.aliados_file'));
 
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
     // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo
