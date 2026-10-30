@@ -49,7 +49,7 @@ const useModalidadesAliado = () => useQuery({
     staleTime: 5 * 60 * 1000,
 }).data ?? [];
 
-const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", codigo_pdv: "", modalidad_id_bt: "", proyectos: [],jefe_inmediato_id: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
+const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", representante_legal_nombre: "", representante_legal_documento: "", codigo_pdv: "", modalidad_id_bt: "", proyectos: [],jefe_inmediato_id: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
 const TECNICO_VACIO = { tipo_documento: "CC", cedula: "", nombres: "", apellidos: "", movil: "", email: "", proyectos: [], jefe_inmediato_id: "", ciudad: "", direccion: "", observaciones: "" };
 
 const mensajeError = (err, fallback) => {
@@ -177,6 +177,12 @@ function CamposAliado({ form, set, errores = {}, esPersona }) {
             </Campo>
             {!esPersona && (
                 <>
+                    <Campo label="Nombre del representante legal *" span={2} error={errores.representante_legal_nombre}>
+                        <input style={S.input} value={form.representante_legal_nombre ?? ""} onChange={set("representante_legal_nombre")} placeholder="Ej. MARÍA PÉREZ GÓMEZ" />
+                    </Campo>
+                    <Campo label="Documento del representante legal *" error={errores.representante_legal_documento}>
+                        <input style={S.input} value={form.representante_legal_documento ?? ""} onChange={set("representante_legal_documento")} inputMode="numeric" placeholder="Cédula, solo números" />
+                    </Campo>
                     <Campo label="Código punto de venta (PDV) *" error={errores.codigo_pdv}>
                         <input style={S.input} value={form.codigo_pdv ?? ""} onChange={set("codigo_pdv")} inputMode="numeric" placeholder="Ej. 39582" />
                     </Campo>
@@ -341,7 +347,8 @@ function NuevoAliadoModal({ onClose, onCreado }) {
 
 /* ─── Editar datos del aliado ─────────────────────────────────────────── */
 function EditarAliadoModal({ aliado, onClose, onGuardado }) {
-    const [form, set, errores, setErrores] = useFormulario({ ...ALIADO_VACIO, ...aliado, proyectos: (aliado.proyectos ?? []).map((p) => p.id), jefe_inmediato_id: aliado.jefe_inmediato_id ?? "", codigo_pdv: aliado.codigo_pdv ?? "", modalidad_id_bt: aliado.modalidad_id_bt ?? "" });
+    const [form, set, errores, setErrores] = useFormulario({ ...ALIADO_VACIO, ...aliado, proyectos: (aliado.proyectos ?? []).map((p) => p.id), jefe_inmediato_id: aliado.jefe_inmediato_id ?? "", codigo_pdv: aliado.codigo_pdv ?? "", modalidad_id_bt: aliado.modalidad_id_bt ?? "",
+        representante_legal_nombre: aliado.representante_legal_nombre ?? "", representante_legal_documento: aliado.representante_legal_documento ?? "" });
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -541,6 +548,9 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                 <div style={S.datos}>
                     {[
                         ...(aliado.tipo === "empresa" ? [
+                            ["Representante legal", aliado.representante_legal_nombre
+                                ? `${aliado.representante_legal_nombre}${aliado.representante_legal_documento ? ` · CC ${aliado.representante_legal_documento}` : ""}`
+                                : null],
                             ["Código PDV", aliado.codigo_pdv],
                             ["Modalidad", modalidades.find((m) => m.id_bt === aliado.modalidad_id_bt)?.nombre],
                         ] : []),

@@ -24,7 +24,8 @@ class Aliado extends Model
     protected $table = 'aliados';
 
     protected $fillable = [
-        'tipo', 'tipo_documento', 'documento', 'nombre', 'codigo_pdv', 'modalidad_id_bt',
+        'tipo', 'tipo_documento', 'documento', 'nombre', 'representante_legal_nombre', 'representante_legal_documento',
+        'codigo_pdv', 'modalidad_id_bt',
         'telefono', 'correo', 'ciudad', 'direccion', 'observaciones', 'jefe_inmediato_id', 'activo',
     ];
 

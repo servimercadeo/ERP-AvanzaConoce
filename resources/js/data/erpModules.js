@@ -554,6 +554,15 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'cargos',
+        label: 'Cargos',
+        icon: 'administrativo',
+        desc: 'Catálogo de cargos de Contratos, Empleados y Selección',
+        archivos: [
+          { id: 'cargos_file', label: 'Cargos', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
+      {
         id: 'clases_pedido',
         label: 'Clases de Pedidos',
         icon: 'pedidos',

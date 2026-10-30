@@ -72,6 +72,8 @@ class AliadoController extends Controller
         'apellidos.regex'       => 'Los apellidos solo pueden tener letras y espacios.',
         'email.unique'          => 'Ese correo ya lo usa otro usuario del ERP.',
         'codigo_pdv.regex'      => 'El código punto de venta (PDV) debe tener solo números, ej. 39582.',
+        'representante_legal_nombre.regex'    => 'El nombre del representante legal solo puede tener letras y espacios.',
+        'representante_legal_documento.regex' => 'El documento del representante legal debe tener solo números, entre 5 y 15 dígitos (sin puntos ni espacios).',
         'modalidad_id_bt.required' => 'Selecciona la modalidad del aliado.',
         'modalidad_id_bt.integer'  => 'Selecciona la modalidad del aliado.',
         'modalidad_id_bt.in'       => 'La modalidad elegida no está en el catálogo de AvanzaConoce. Recarga la página y vuelve a elegirla.',
@@ -84,6 +86,8 @@ class AliadoController extends Controller
         'documento'         => 'Número de documento',
         'nombre'            => 'Razón social o nombre',
         'codigo_pdv'        => 'Código punto de venta (PDV)',
+        'representante_legal_nombre'    => 'Nombre del representante legal',
+        'representante_legal_documento' => 'Documento del representante legal',
         'modalidad_id_bt'   => 'Modalidad',
         'telefono'          => 'Teléfono',
         'correo'            => 'Correo',
@@ -259,7 +263,8 @@ class AliadoController extends Controller
         $reglas = $this->reglasAliado($aliado) + ['activo' => 'sometimes|boolean'];
         // El documento del aliado tipo técnico es la cédula de su usuario: no se cambia aquí.
         if ($aliado->tipo === Aliado::TECNICO) {
-            unset($reglas['tipo_documento'], $reglas['documento'], $reglas['codigo_pdv'], $reglas['modalidad_id_bt']);
+            unset($reglas['tipo_documento'], $reglas['documento'], $reglas['codigo_pdv'], $reglas['modalidad_id_bt'],
+                $reglas['representante_legal_nombre'], $reglas['representante_legal_documento']);
         }
 
         $data = $this->validar($request, $reglas);
@@ -402,6 +407,8 @@ class AliadoController extends Controller
             'tipo_documento'  => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
             'documento'       => ['required', 'string', 'max:20', 'regex:/^[0-9]{5,15}(-[0-9])?$/', Rule::unique('aliados', 'documento')->ignore($aliado?->id)],
             'nombre'          => 'required|string|max:150',
+            'representante_legal_nombre'    => ['required', 'string', 'max:150', 'regex:' . self::REGEX_NOMBRE],
+            'representante_legal_documento' => ['required', 'string', 'regex:/^[0-9]{5,15}$/'],
             'codigo_pdv'      => ['required', 'string', 'regex:/^[0-9]{1,20}$/'],
             'modalidad_id_bt' => ['required', 'integer', Rule::in(Aliado::modalidadesDisponibles()->pluck('id_bt')->all())],
             'telefono'        => ['required', 'string', 'max:20', 'regex:' . self::REGEX_TELEFONO],

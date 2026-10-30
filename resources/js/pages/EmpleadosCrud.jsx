@@ -119,22 +119,6 @@ const ESTADOS_EMP = [
     "Incapacitado",
     "Suspendido",
 ];
-const CARGOS = [
-    "COORDINADOR/A ADMINISTRATIVO/A",
-    "AUXILIAR DE ALMACÉN",
-    "CONTADOR/A",
-    "CONDUCTOR/A",
-    "ASISTENTE RRHH",
-    "TÉCNICO DE MANTENIMIENTO",
-    "GERENTE",
-    "SECRETARIO/A",
-    "ASESOR COMERCIAL",
-    "VENDEDOR/A",
-    "SUPERVISOR/A",
-    "AUXILIAR DE SISTEMAS",
-    "ANALISTA ADMINISTRATIVO",
-    "OTRO",
-];
 const TIPOS_VINC = [
     "Empleado directo",
     "Contratista",
@@ -1556,7 +1540,8 @@ export default function EmpleadosCrud() {
     const [filtroCiudad, setFiltroCiudad] = useState("Todas");
     const [catalogs, setCatalogs] = useState({
         sedes: SEDES,
-        cargos: CARGOS,
+        // Del catálogo (Parámetros > Cargos), al cargar /catalogos.
+        cargos: [],
         eps: EPS_LIST,
         arls: ARL_LIST,
         cajas: CAJAS,

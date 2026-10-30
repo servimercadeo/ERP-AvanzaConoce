@@ -44,6 +44,7 @@ class AliadosTest extends TestCase
             'nombre' => 'TECNOMARIN S.A.S', 'telefono' => '3001112233', 'ciudad' => 'MEDELLIN',
             'correo' => 'contacto@tecnomarin.co', 'direccion' => 'Calle 10 # 20-30',
             'codigo_pdv' => '39582', 'modalidad_id_bt' => 26359,
+            'representante_legal_nombre' => 'María Pérez Gómez', 'representante_legal_documento' => '43123456',
             'proyectos' => [$this->proyecto['DIRECTV'], $this->proyecto['HUGHES COL']],
             'jefe_inmediato_id' => $this->jefe,
         ], $extra);
@@ -480,6 +481,8 @@ class AliadosTest extends TestCase
             'tipo_documento'    => 'Completa el campo «Tipo de documento».',
             'documento'         => 'Completa el campo «Número de documento».',
             'nombre'            => 'Completa el campo «Razón social o nombre».',
+            'representante_legal_nombre'    => 'Completa el campo «Nombre del representante legal».',
+            'representante_legal_documento' => 'Completa el campo «Documento del representante legal».',
             'codigo_pdv'        => 'Completa el campo «Código punto de venta (PDV)».',
             'modalidad_id_bt'   => 'Selecciona la modalidad del aliado.',
             'telefono'          => 'Completa el campo «Teléfono».',
@@ -539,6 +542,10 @@ class AliadosTest extends TestCase
 
         $error = fn (array $extra, string $campo) => $this->postJson('/api/aliados', $this->empresa(['documento' => '800111222'] + $extra))->assertStatus(422)->json("errors.{$campo}.0");
         $this->assertSame('El código punto de venta (PDV) debe tener solo números, ej. 39582.', $error(['codigo_pdv' => 'PDV-12'], 'codigo_pdv'));
+        $this->assertSame('El nombre del representante legal solo puede tener letras y espacios.', $error(['representante_legal_nombre' => 'Ana 123'], 'representante_legal_nombre'));
+        $this->assertStringContainsString('solo números', $error(['representante_legal_documento' => '43.123.456'], 'representante_legal_documento'));
+        $this->postJson('/api/aliados', $this->empresa(['documento' => '800111223', 'representante_legal_nombre' => 'José Ñúñez']))->assertCreated()
+            ->assertJsonPath('aliado.representante_legal_nombre', 'José Ñúñez')->assertJsonPath('aliado.representante_legal_documento', '43123456');
         $this->assertStringContainsString('no está en el catálogo', $error(['modalidad_id_bt' => 99999], 'modalidad_id_bt'));
         $this->putJson("/api/aliados/{$id}", $this->empresa(['codigo_pdv' => '', 'modalidad_id_bt' => '']))
             ->assertJsonValidationErrors(['codigo_pdv', 'modalidad_id_bt']);

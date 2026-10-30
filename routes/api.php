@@ -404,6 +404,15 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.regionales.regionales_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.regionales.regionales_file'));
 
+    // Catálogo de cargos (Parametros > Cargos): los selects de Contratos, Empleados y Selección.
+    Route::apiResource('cargos', App\Http\Controllers\Api\CargoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['cargos' => 'cargo'])
+        ->middleware('permiso:parametros.cargos')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.cargos.cargos_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.cargos.cargos_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.cargos.cargos_file'));
+
     // Catálogo de proyectos (Parametros > Proyectos)
     Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
         ->parameters(['proyectos' => 'proyecto'])
