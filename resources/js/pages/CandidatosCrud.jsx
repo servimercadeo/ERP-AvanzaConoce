@@ -2144,7 +2144,7 @@ export default function CandidatosCrud() {
                                             >
                                                 EJERCICIO COMERCIAL APLICADO
                                             </label>
-                                            <input
+                                            <SelectBuscable
                                                 value={
                                                     procForm.assesment
                                                         ?.ejercicio_comercial ||
@@ -2161,36 +2161,24 @@ export default function CandidatosCrud() {
                                                     }))
                                                 }
                                                 style={S.formInput}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label
-                                                style={{
-                                                    display: "block",
-                                                    fontSize: "0.78rem",
-                                                    marginBottom: 6,
-                                                    fontWeight: 500,
-                                                }}
                                             >
-                                                NOMBRE DEL EJERCICIO
-                                            </label>
-                                            <input
-                                                value={
-                                                    procForm.assesment
-                                                        ?.nombre_ejercicio || ""
-                                                }
-                                                onChange={(e) =>
-                                                    setProcForm((p) => ({
-                                                        ...p,
-                                                        assesment: {
-                                                            ...p.assesment,
-                                                            nombre_ejercicio:
-                                                                e.target.value,
-                                                        },
-                                                    }))
-                                                }
-                                                style={S.formInput}
-                                            />
+                                                <option value="">--</option>
+                                                <option value="El Producto Mágico">
+                                                    El Producto Mágico
+                                                </option>
+                                                <option value="El Cliente Difícil">
+                                                    El Cliente Difícil
+                                                </option>
+                                                <option value="La Llamada en Frío">
+                                                    La Llamada en Frío
+                                                </option>
+                                                <option value="El Cierre Exprés">
+                                                    El Cierre Exprés
+                                                </option>
+                                                <option value="¿Y tú qué harías?">
+                                                    ¿Y tú qué harías?
+                                                </option>
+                                            </SelectBuscable>
                                         </div>
                                         <div>
                                             <label

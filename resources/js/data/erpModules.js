@@ -362,27 +362,6 @@ export const ERP_MODULES = [
           { id: 'inventario_empleado_file', label: 'Inventario de Empleado', acciones: ['editar', 'exportar'] },
         ]
       },
-<<<<<<< HEAD
-=======
-      {
-        id: 'work_orders',
-        label: 'Work Orders',
-        icon: 'productos',
-        desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
-        archivos: [
-          { id: 'work_orders_file', label: 'Work Orders', acciones: ['editar', 'eliminar', 'importar', 'exportar'] },
-        ]
-      },
-      {
-        id: 'aliados',
-        label: 'Aliados',
-        icon: 'subagentes',
-        desc: 'Aliados (subagentes) de Work Orders y sus técnicos indirectos',
-        archivos: [
-          { id: 'aliados_file', label: 'Aliados', acciones: ['crear', 'editar', 'eliminar'] },
-        ]
-      },
->>>>>>> f8f4a735827f922e4940a463639ec10ec1ec210a
       /*
       {
         id: 'consultas',
@@ -420,7 +399,7 @@ export const ERP_MODULES = [
         icon: 'work_orders',
         desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
         archivos: [
-          { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
+          { id: 'work_orders_file', label: 'Work Orders', acciones: ['editar', 'eliminar', 'importar', 'exportar'] },
         ]
       },
       {
