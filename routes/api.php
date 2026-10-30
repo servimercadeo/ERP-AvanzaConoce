@@ -513,12 +513,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'update', 'destroy'])
         ->parameters(['work-orders' => 'workOrder'])
-<<<<<<< HEAD
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.work_orders.work_orders_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.work_orders.work_orders_file'));
-=======
-        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'inventarios.work_orders.work_orders_file'))
-        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'inventarios.work_orders.work_orders_file'));
->>>>>>> f8f4a735827f922e4940a463639ec10ec1ec210a
 
     // Aliados (Operaciones > Aliados): subagentes de Work Orders y sus técnicos indirectos.
     // Antes del apiResource: si no, "proyectos" se tomaría como el id de un aliado.
