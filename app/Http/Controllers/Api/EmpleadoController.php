@@ -712,7 +712,7 @@ class EmpleadoController extends Controller
     public function candidatosListos(\Illuminate\Http\Request $request)
     {
         // Usuarios que tienen al menos un contrato vigente (completado = true)
-        $query = User::with(['empresa'])
+        $query = User::with(['empresa', 'sedeCatalogo'])
             ->whereHas('contratos', fn($q) => $q->where('completado', true));
 
         if ($request->search) {
@@ -734,8 +734,36 @@ class EmpleadoController extends Controller
             $query->orderByDesc($latestContrato)->limit(5);
         }
 
+        $users = $query->get();
+
+        // Todo lo de cada usuario se trae en bloque (unas pocas consultas en total, no 6 por
+        // usuario): mismo criterio de "el más reciente" que tenía cada consulta individual.
+        $clave = fn ($v) => mb_strtolower(trim((string) $v), 'UTF-8');
+        $cedulas = $users->pluck('cedula')->filter()->unique()->values();
+        $contratos = Contrato::with('sedeCatalogo')
+            ->whereIn('empleado_id', $users->pluck('id'))->where('completado', true)
+            ->orderByDesc('created_at')->orderByDesc('id')->get()
+            ->groupBy('empleado_id')->map->first();
+        $candidatos = $cedulas->isEmpty() ? collect() : \App\Models\Candidato::with(['empleador', 'requisicion.empresa', 'requisicion.empleador', 'requisicion.proyecto', 'requisicion.cargo'])
+            ->whereIn('identificacion', $cedulas)
+            ->orderByDesc('aval')->orderByDesc('created_at')->orderByDesc('id')->get()
+            ->groupBy(fn ($c) => $clave($c->identificacion))->map->first();
+        $ingresos = $candidatos->isEmpty() ? collect() : \App\Models\BaseIngreso::whereIn('candidato_id', $candidatos->pluck('id'))
+            ->orderByDesc('created_at')->orderByDesc('id')->get()
+            ->groupBy('candidato_id')->map->first();
+        $respuestas = $cedulas->isEmpty() ? collect() : \App\Models\RespuestaIngreso::whereIn('documento', $cedulas)
+            ->orderByDesc('created_at')->orderByDesc('id')->get()
+            ->groupBy(fn ($r) => $clave($r->documento))->map->first();
+        // Dueños de cada correo posible (para no proponer uno que ya use otro empleado).
+        $correosPosibles = $users->flatMap(function ($u) use ($candidatos, $ingresos, $respuestas, $clave) {
+            $cand = $u->cedula ? $candidatos->get($clave($u->cedula)) : null;
+            return [$u->email, $respuestas->get($clave($u->cedula))?->correo, $cand?->correo, $cand ? $ingresos->get($cand->id)?->correo : null];
+        })->filter()->map($clave)->unique()->values();
+        $duenosCorreo = $correosPosibles->isEmpty() ? collect() : User::whereIn('email', $correosPosibles)->get(['id', 'email'])
+            ->groupBy(fn ($u) => $clave($u->email))->map(fn ($g) => $g->pluck('id')->all());
+
         return response()->json(
-            $query->get()->map(function ($user) {
+            $users->map(function ($user) use ($contratos, $candidatos, $ingresos, $respuestas, $duenosCorreo, $clave) {
                 $toDate = fn($v) => $v ? \Carbon\Carbon::parse($v)->format('Y-m-d') : null;
                 // Primer valor real entre las fuentes, en orden de prioridad. Los rellenos con
                 // que se crea el usuario desde Contratos ("0000000000", "Sin asignar", el
@@ -743,29 +771,17 @@ class EmpleadoController extends Controller
                 $dato = fn (...$valores) => collect($valores)->first(fn ($v) => !self::esRelleno($v));
 
                 // 1. Último contrato vigente
-                $contrato = Contrato::where('empleado_id', $user->id)
-                    ->where('completado', true)
-                    ->latest()
-                    ->first();
+                $contrato = $contratos->get($user->id);
 
                 // 2. Candidato vinculado por cédula: si la cédula pasó por varias
                 //    requisiciones, el del aval vigente (el más reciente), no el más antiguo.
-                $candidato = $user->cedula
-                    ? \App\Models\Candidato::with(['empleador', 'requisicion.empresa', 'requisicion.empleador', 'requisicion.proyecto', 'requisicion.cargo'])
-                        ->where('identificacion', $user->cedula)
-                        ->orderByDesc('aval')->latest()->orderByDesc('id')
-                        ->first()
-                    : null;
+                $candidato = $user->cedula ? $candidatos->get($clave($user->cedula)) : null;
 
                 // 3. Base de ingresos del candidato
-                $ingreso = $candidato
-                    ? \App\Models\BaseIngreso::where('candidato_id', $candidato->id)->latest()->first()
-                    : null;
+                $ingreso = $candidato ? $ingresos->get($candidato->id) : null;
 
                 // 4. Respuesta de ingreso (formulario personal del empleado)
-                $respuesta = $user->cedula
-                    ? \App\Models\RespuestaIngreso::where('documento', $user->cedula)->latest()->first()
-                    : null;
+                $respuesta = $user->cedula ? $respuestas->get($clave($user->cedula)) : null;
 
                 $req = $candidato?->requisicion;
 
@@ -785,7 +801,7 @@ class EmpleadoController extends Controller
                     // para escribir el real al dar el alta.
                     'email'            => collect([$user->email, $respuesta?->correo, $candidato?->correo, $ingreso?->correo])
                         ->first(fn ($c) => !self::esRelleno($c)
-                            && !User::where('email', $c)->where('id', '!=', $user->id)->exists()),
+                            && collect($duenosCorreo->get($clave($c), []))->doesntContain(fn ($id) => $id !== $user->id)),
                     'movil'            => $dato($user->movil, $respuesta?->celular, $candidato?->celular, $ingreso?->telefono),
                     'genero'           => $dato($user->genero, $candidato?->genero),
                     'fecha_expedicion' => $toDate($dato($user->fecha_expedicion, $candidato?->fecha_expedicion)),

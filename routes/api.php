@@ -52,14 +52,24 @@ Route::get('/registro/catalogos', function (Request $request) {
         }
     }
 
+    // Listas de nombres en una sola consulta (ver ListasDeNombres): es el formulario público.
+    $nombres = \App\Support\ListasDeNombres::traer([
+        'proyectos'        => ['tabla' => 'proyectos', 'filtro' => fn ($q) => $q->where('activo', true)],
+        'eps'              => ['tabla' => 'eps'],
+        'fondos_pensiones' => ['tabla' => 'fondos_pensiones'],
+        'fondos_cesantias' => ['tabla' => 'fondos_cesantias'],
+        'estados_civil'    => ['tabla' => 'estados_civil'],
+        'tipos_rh'         => ['tabla' => 'tipos_rh'],
+    ]);
+
     return response()->json([
         'ciudades'        => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
-        'proyectos'       => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
-        'eps'             => DB::table('eps')->orderBy('nombre')->pluck('nombre'),
-        'fondos_pensiones'=> DB::table('fondos_pensiones')->orderBy('nombre')->pluck('nombre'),
-        'fondos_cesantias'=> DB::table('fondos_cesantias')->orderBy('nombre')->pluck('nombre'),
-        'estados_civil'   => DB::table('estados_civil')->orderBy('nombre')->pluck('nombre'),
-        'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
+        'proyectos'       => $nombres['proyectos'],
+        'eps'             => $nombres['eps'],
+        'fondos_pensiones'=> $nombres['fondos_pensiones'],
+        'fondos_cesantias'=> $nombres['fondos_cesantias'],
+        'estados_civil'   => $nombres['estados_civil'],
+        'tipos_rh'        => $nombres['tipos_rh'],
         'negocio'         => $negocio,
         'estado'          => $estado,
         // Empresa de la requisición: la que se muestra en el formulario (S&M o Servimercadeo).
@@ -181,31 +191,42 @@ Route::get('/catalogos', function () {
 
     $merge = fn($base, $extra) => $base->merge($extra)->filter(fn($v) => $v && $v !== '')->unique()->sort()->values();
 
+    // Las listas de nombres en una sola consulta (ver ListasDeNombres). area_empresa no
+    // lleva DISTINCT, como antes.
+    $hayAreas = \Illuminate\Support\Facades\Schema::hasTable('area_empresa');
+    $listas = collect(['cargos' => 'cargos', 'eps' => 'eps', 'arls' => 'arls', 'cajas' => 'cajas_compensacion',
+        'pensiones' => 'fondos_pensiones', 'cesantias' => 'fondos_cesantias', 'bancos' => 'bancos',
+        'tipos_rh' => 'tipos_rh', 'sedes' => 'sedes'])->map(fn ($tabla) => ['tabla' => $tabla, 'distinct' => true])->all();
+    if ($hayAreas) {
+        $listas['areas_empresa'] = ['tabla' => 'area_empresa'];
+    }
+    $nombres = \App\Support\ListasDeNombres::traer($listas);
+    // Tipos de funcionario/vinculación: distintos exactos (como el unique() de PHP) en una
+    // sola consulta; el filtro y el orden finales siguen en PHP ($merge), como antes.
+    $tipos = DB::table('users')->selectRaw("? as k, CONVERT(tipo_funcionario USING utf8mb4) COLLATE utf8mb4_bin as v", ['tipos_funcionario'])
+        ->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->distinct()
+        ->unionAll(DB::table('base_ingresos')->selectRaw("? as k, CONVERT(tipo_vinculacion USING utf8mb4) COLLATE utf8mb4_bin as v", ['tipos_vinculacion'])
+            ->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->distinct())
+        ->get()->groupBy('k')->map(fn ($g) => $g->pluck('v'));
+    $lista = fn (string $clave) => $nombres->get($clave, collect());
+
     return response()->json([
-        'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'pensiones'         => DB::table('fondos_pensiones')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'cesantias'         => DB::table('fondos_cesantias')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'areas_empresa'     => \Illuminate\Support\Facades\Schema::hasTable('area_empresa')
-                                    ? DB::table('area_empresa')->orderBy('nombre')->pluck('nombre')
-                                    : [],
+        'cargos'            => $lista('cargos'),
+        'eps'               => $lista('eps'),
+        'arls'              => $lista('arls'),
+        'cajas'             => $lista('cajas'),
+        'pensiones'         => $lista('pensiones'),
+        'cesantias'         => $lista('cesantias'),
+        'bancos'            => $lista('bancos'),
+        'tipos_rh'          => $lista('tipos_rh'),
+        'sedes'             => $lista('sedes'),
+        'areas_empresa'     => $hayAreas ? $lista('areas_empresa') : [],
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
-        'tipos_funcionario' => $merge(
-                                    DB::table('users')->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->pluck('tipo_funcionario'),
-                                    collect([])
-                               ),
-        'tipos_vinculacion' => $merge(
-                                    DB::table('base_ingresos')->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->pluck('tipo_vinculacion'),
-                                    collect([])
-                               ),
+        'tipos_funcionario' => $merge($tipos->get('tipos_funcionario', collect()), collect([])),
+        'tipos_vinculacion' => $merge($tipos->get('tipos_vinculacion', collect()), collect([])),
     ]);
 });
 

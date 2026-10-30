@@ -254,8 +254,10 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
             (item) => normalizeComparable(String(item.codigo)) === normalizeComparable(String(centroCostoCodigo)),
         );
         if (match) {
+            // Con "% CC" (exporte: una fila por centro) se toma ese porcentaje; sin él, 100%.
+            const porcentaje = leerPorcentaje(resolveValue(row, ["% cc", "porcentaje cc", "porcentaje centro de costos"]));
             payload.centros_costos = [
-                { centro_costo_catalogo_id: match.id, porcentaje: 100 },
+                { centro_costo_catalogo_id: match.id, porcentaje: porcentaje ?? 100 },
             ];
         } else {
             // Varios códigos ("CC01, CC02": no se sabe el porcentaje de cada uno) o un código
@@ -265,6 +267,15 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
     }
 
     return payload;
+}
+
+/** "25", 25, "25%", "25,5" o 0.25 (celda con formato % de Excel) => 25 / 25.5. */
+function leerPorcentaje(valor) {
+    if (valor === null || valor === undefined || String(valor).trim() === "") return null;
+    const texto = String(valor).trim();
+    const numero = Number(texto.replace("%", "").replace(",", ".").trim());
+    if (!Number.isFinite(numero) || numero <= 0) return null;
+    return !texto.includes("%") && numero < 1 ? Math.round(numero * 10000) / 100 : numero;
 }
 
 function buildAnexoFromExcelRow(row) {
@@ -361,6 +372,11 @@ export function buildContratoPayloadFromExcelRows(rows, catalogs = {}) {
                 if (!isFilled(group.payload[field]) && isFilled(payload[field])) {
                     group.payload[field] = payload[field];
                 }
+            });
+            // Exporte con una fila por centro de costo: se juntan en el mismo contrato.
+            (payload.centros_costos ?? []).forEach((cc) => {
+                const lista = (group.payload.centros_costos ??= []);
+                if (!lista.some((x) => x.centro_costo_catalogo_id === cc.centro_costo_catalogo_id)) lista.push(cc);
             });
         }
 

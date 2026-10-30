@@ -7,7 +7,7 @@ import { crearDescargaPlantilla } from "./excelImport.js";
  * Los encabezados de la hoja "Contratos" coinciden con los alias que reconoce el
  * importador (utils/contratosImport.js), así el mismo archivo se puede volver a cargar
  * con "Importar Excel" (que solo lee la primera hoja). El detalle que no cabe en una
- * fila por contrato (centros de costo, anexos y eventos médicos) va en hojas aparte,
+ * fila por contrato (anexos y eventos médicos) va en hojas aparte,
  * con la cédula y el nombre del empleado para cruzarlo.
  *
  * Salario, seguridad social, costos/anexos y datos médicos son sensibles (en pantalla
@@ -64,15 +64,10 @@ export const COLUMNAS_CONTRATOS = [
     { titulo: "Empleador", tipo: "texto", ancho: 26, valor: (c) => c.empleador },
     { titulo: "Cliente Proyecto", tipo: "texto", ancho: 22, valor: (c) => c.cliente_proyecto },
     { titulo: "Estado Contrato", tipo: "texto", ancho: 15, valor: (c) => c.estado_contrato },
-    // Solo el código: con un único centro el importador lo vuelve a asignar al 100%.
-    // El detalle con nombres y porcentajes está en la hoja "Centros de Costos" (solo TH/admin);
-    // el código va también en el exporte recortado (lo pidió TIC).
-    {
-        titulo: "Centro de Costos",
-        tipo: "texto",
-        ancho: 16,
-        valor: (c) => (c.centros_costos ?? []).map((cc) => cc.codigo).filter(Boolean).join(", "),
-    },
+    // Una fila por centro de costo (ver filasPorCentroCosto): el código y su porcentaje,
+    // también en el exporte recortado (lo pidió TIC). Al importar se vuelven a juntar.
+    { titulo: "Centro de Costos", tipo: "texto", ancho: 16, valor: (c) => c._centroCosto?.codigo },
+    { titulo: "% CC", tipo: "porcentaje", ancho: 8, valor: (c) => c._centroCosto?.porcentaje },
     { titulo: "Correo", tipo: "texto", ancho: 30, valor: (c) => c.empleado?.email },
     { titulo: "Correo del Jefe", tipo: "texto", ancho: 30, valor: (c) => c.jefe_inmediato_correo },
     { titulo: "ARL", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.arl },
@@ -96,32 +91,32 @@ const COLUMNAS_EMPLEADO = [
     { titulo: "Estado Contrato", tipo: "texto", ancho: 15, valor: (r) => r.contrato.estado_contrato },
 ];
 
-/** Aplana un detalle (centros de costo, anexos, eventos) a una fila por elemento. */
+/** Aplana un detalle (anexos, eventos médicos) a una fila por elemento. */
 const detalle = (contratos, campo) =>
     contratos.flatMap((contrato) => (contrato[campo] ?? []).map((item) => ({ contrato, item })));
+
+/**
+ * Un contrato con varios centros de costo sale en una fila por centro (los demás datos se
+ * repiten), cada una con su código y su "% CC"; sin centros, una sola fila.
+ */
+const filasPorCentroCosto = (contratos) =>
+    contratos.flatMap((c) => {
+        const centros = (c.centros_costos ?? []).filter((cc) => cc.codigo);
+        return centros.length ? centros.map((cc) => ({ ...c, _centroCosto: cc })) : [c];
+    });
 
 export function construirHojasContratos(contratos, { incluirSensible = false } = {}) {
     const hojas = [
         {
             nombre: "Contratos",
             columnas: COLUMNAS_CONTRATOS.filter((col) => incluirSensible || !col.sensible),
-            filas: contratos,
+            filas: filasPorCentroCosto(contratos),
         },
     ];
 
     if (!incluirSensible) return hojas;
 
     hojas.push(
-        {
-            nombre: "Centros de Costos",
-            columnas: [
-                ...COLUMNAS_EMPLEADO,
-                { titulo: "Código", tipo: "texto", ancho: 12, valor: (r) => r.item.codigo },
-                { titulo: "Centro de Costos", tipo: "texto", ancho: 32, valor: (r) => r.item.centro_costos },
-                { titulo: "Porcentaje (%)", tipo: "porcentaje", ancho: 14, valor: (r) => r.item.porcentaje },
-            ],
-            filas: detalle(contratos, "centros_costos"),
-        },
         {
             nombre: "Anexos",
             columnas: [

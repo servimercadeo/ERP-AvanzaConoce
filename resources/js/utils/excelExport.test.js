@@ -74,14 +74,43 @@ test("sin permiso sensible no exporta salario, seguridad social ni hojas de deta
     // El código de centro de costos sí va en la versión recortada.
     assert.ok(titulos.includes("Centro de Costos"));
     assert.equal(filasPlanas(hojas[0])[0]["Centro de Costos"], "CC01");
+    assert.equal(filasPlanas(hojas[0])[0]["% CC"], 100);
+});
+
+test("varios centros de costo: una fila por centro con su %, y al importar vuelven al mismo contrato", () => {
+    const tres = {
+        ...contrato,
+        centros_costos: [
+            { codigo: "220600", porcentaje: "25.00" },
+            { codigo: "220613", porcentaje: "70.00" },
+            { codigo: "220101", porcentaje: "5.00" },
+        ],
+    };
+    for (const incluirSensible of [true, false]) {
+        const filas = filasPlanas(construirHojasContratos([tres, { ...contrato, centros_costos: [] }], { incluirSensible })[0]);
+        assert.deepEqual(filas.map((f) => [f["Centro de Costos"], f["% CC"]]), [["220600", 25], ["220613", 70], ["220101", 5], [null, null]]);
+        assert.ok(filas.slice(0, 3).every((f) => f.Documento === "0012345678" && f.Cargo === filas[0].Cargo));
+    }
+    const cat = { centrosCostoCatalogo: [{ id: 1, codigo: "220600" }, { id: 2, codigo: "220613" }, { id: 3, codigo: "220101" }] };
+    const filas = filasPlanas(construirHojasContratos([tres], { incluirSensible: true })[0]);
+    const payloads = buildContratoPayloadFromExcelRows(filas, cat);
+    assert.equal(payloads.length, 1);
+    assert.deepEqual(payloads[0].centros_costos, [
+        { centro_costo_catalogo_id: 1, porcentaje: 25 },
+        { centro_costo_catalogo_id: 2, porcentaje: 70 },
+        { centro_costo_catalogo_id: 3, porcentaje: 5 },
+    ]);
+    // "% CC" escrito a mano: "25%", "25,5" o 0.25 (formato % de Excel).
+    const base = { Documento: "9", Nombres: "A", Apellidos: "B", "Centro de Costos": "220600" };
+    for (const [valor, esperado] of [["25%", 25], ["25,5", 25.5], [0.25, 25], ["", 100]]) {
+        assert.equal(buildContratoPayloadFromExcelRows([{ ...base, "% CC": valor }], cat)[0].centros_costos[0].porcentaje, esperado, String(valor));
+    }
 });
 
 test("con permiso sensible exporta todas las hojas con sus filas", () => {
     const hojas = construirHojasContratos([contrato], { incluirSensible: true });
-    assert.deepEqual(hojas.map((h) => h.nombre), ["Contratos", "Centros de Costos", "Anexos", "Seguimiento Médico"]);
-    const [cc] = filasPlanas(hojas[1]);
-    assert.equal(cc["Porcentaje (%)"], 100);
-    const [anexo] = filasPlanas(hojas[2]);
+    assert.deepEqual(hojas.map((h) => h.nombre), ["Contratos", "Anexos", "Seguimiento Médico"]);
+    const [anexo] = filasPlanas(hojas[1]);
     assert.equal(anexo.Valor, 150000);
     assert.equal(anexo["Fecha Entrega / Firma"], "2019-01-05");
     assert.equal(anexo.Documento, "0012345678");
@@ -160,7 +189,7 @@ test("el Excel de contratos se puede volver a importar con los mismos datos", ()
 const CONTRATOS_SOLICITADO = [
     "Sede", "Documento", "Nombres", "Apellidos", "Cargo", "Regional", "Tipo de Contrato", "Tipo de Vinculación",
     "Área Empresa", "Jefe Inmediato", "Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios",
-    "Fecha de Ingreso", "Fecha de Retiro", "Empresa", "Empleador", "Cliente Proyecto", "Estado Contrato", "Centro de Costos",
+    "Fecha de Ingreso", "Fecha de Retiro", "Empresa", "Empleador", "Cliente Proyecto", "Estado Contrato", "Centro de Costos", "% CC",
     "Correo", "Correo del Jefe", "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación",
     "Fecha Vinculación Caja", "Fondo de Pensiones", "Fondo de Cesantías", "Fecha Cierre Seguimiento", "ID Macaw", "Fecha de Registro",
 ];
@@ -178,10 +207,10 @@ const SENSIBLES_CONTRATO = ["Salario", "Auxilio Transporte Legal", "Anexos y Aux
     "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación", "Fecha Vinculación Caja",
     "Fondo de Pensiones", "Fondo de Cesantías", "Fecha Cierre Seguimiento"];
 
-test("contratos: las 34 columnas en el orden solicitado", () => {
+test("contratos: las 35 columnas en el orden solicitado", () => {
     const titulos = construirHojasContratos([contrato], { incluirSensible: true })[0].columnas.map((c) => c.titulo);
     assert.deepEqual(titulos, CONTRATOS_SOLICITADO);
-    assert.equal(titulos.length, 34);
+    assert.equal(titulos.length, 35);
     const [fila] = filasPlanas(construirHojasContratos([{ ...contrato, id_macaw: "M-77", seguimiento_fecha_cierre: "2026-02-01" }], { incluirSensible: true })[0]);
     assert.equal(fila["ID Macaw"], "M-77");
     assert.equal(fila["Fecha Cierre Seguimiento"], "2026-02-01");
@@ -247,7 +276,7 @@ test("el .xlsx generado tiene tipos reales y se re-importa como lo hace la panta
     const wb = construirLibro(XLSX, construirHojasContratos([contrato], { incluirSensible: true }));
     const leido = XLSX.read(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }), { type: "buffer" });
 
-    assert.deepEqual(leido.SheetNames, ["Contratos", "Centros de Costos", "Anexos", "Seguimiento Médico"]);
+    assert.deepEqual(leido.SheetNames, ["Contratos", "Anexos", "Seguimiento Médico"]);
     const ws = leido.Sheets.Contratos;
     const celdaDe = (titulo) => {
         const c = construirHojasContratos([contrato], { incluirSensible: true })[0].columnas.findIndex((col) => col.titulo === titulo);

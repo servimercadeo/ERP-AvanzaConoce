@@ -12,7 +12,9 @@ class PedidoAutomaticoController extends Controller
 {
     public function index(Request $request)
     {
-        $query = PedidoAutomatico::with(['empleado', 'contrato', 'items.inventario'])
+        // sedeCatalogo: el nombre de la sede de empleado y contrato sale del catálogo
+        // (HasSedeCatalogo); precargado, no es una consulta por pedido.
+        $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario'])
             ->whereNotNull('codigo');
 
         if ($request->search) {

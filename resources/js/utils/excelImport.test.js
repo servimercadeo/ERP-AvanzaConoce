@@ -50,8 +50,8 @@ test("Empleados: exportar y volver a importar conserva tipos y valores", async (
     assert.equal(f.tiene_cert_alturas, false, "un 'No' se conserva como false, no se descarta");
     assert.equal(f.cuenta_bancaria, "000123456789");
     assert.equal(f.sede, "SYM PEREIRA");
-    // Columnas que se exportan pero que este import no escribe a propósito
-    assert.ok(columnasNoReconocidas.includes("Ingresos"));
+    // "Ingresos" ya no se exporta (archivo de TH) y todas las columnas exportadas se reconocen.
+    assert.deepEqual(columnasNoReconocidas, []);
     assert.ok(!("ingresos" in f));
 });
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class PermisoDenegado extends Model
 {
@@ -73,7 +74,11 @@ class PermisoDenegado extends Model
         return false;
     }
 
-    public static function permite(?User $user, string $modulo, string $submodulo, ?string $archivo = null, string $accion = self::VER): bool
+    /**
+     * `$reglas`: las de su rol ya cargadas (reglasDe) para no consultar la BD en cada
+     * destino; el middleware las carga una vez por petición. Sin ellas, consulta.
+     */
+    public static function permite(?User $user, string $modulo, string $submodulo, ?string $archivo = null, string $accion = self::VER, ?Collection $reglas = null): bool
     {
         if (!$user) {
             return false;
@@ -85,11 +90,32 @@ class PermisoDenegado extends Model
             return !in_array($modulo, self::SIN_ROL_DENEGADOS, true);
         }
 
+        $archivos = array_unique([self::TODO_EL_SUBMODULO, $archivo ?? self::TODO_EL_SUBMODULO]);
+        $acciones = array_unique([self::VER, $accion]);
+
+        if ($reglas !== null) {
+            // Igual que la consulta: la BD compara sin mayúsculas ni espacios finales.
+            $n = fn ($v) => mb_strtolower(rtrim((string) $v), 'UTF-8');
+            $archivos = array_map($n, $archivos);
+            $acciones = array_map($n, $acciones);
+
+            return !$reglas->contains(fn ($r) => $n($r->modulo_id) === $n($modulo)
+                && $n($r->submodulo_id) === $n($submodulo)
+                && in_array($n($r->archivo_id), $archivos, true)
+                && in_array($n($r->accion), $acciones, true));
+        }
+
         return !static::where('rol', $user->rol)
             ->where('modulo_id', $modulo)
             ->where('submodulo_id', $submodulo)
-            ->whereIn('archivo_id', array_unique([self::TODO_EL_SUBMODULO, $archivo ?? self::TODO_EL_SUBMODULO]))
-            ->whereIn('accion', array_unique([self::VER, $accion]))
+            ->whereIn('archivo_id', $archivos)
+            ->whereIn('accion', $acciones)
             ->exists();
+    }
+
+    /** Todas las reglas (excepciones) de un rol, en una consulta. */
+    public static function reglasDe(string $rol): Collection
+    {
+        return static::where('rol', $rol)->get(['modulo_id', 'submodulo_id', 'archivo_id', 'accion']);
     }
 }

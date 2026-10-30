@@ -20,11 +20,23 @@ class EnsureUserHasPermission
      */
     public function handle(Request $request, Closure $next, string ...$destinos): Response
     {
+        $user = $request->user();
+        // Las reglas del rol, una sola consulta por petición aunque la ruta pruebe varios
+        // destinos o lleve varios middleware `permiso` (cada consulta cuesta en producción).
+        $reglas = null;
+        if ($user?->rol && $user->rol !== 'admin') {
+            $reglas = $request->attributes->get('permisos_del_rol');
+            if ($reglas === null) {
+                $reglas = PermisoDenegado::reglasDe($user->rol);
+                $request->attributes->set('permisos_del_rol', $reglas);
+            }
+        }
+
         $accion = PermisoDenegado::VER;
         foreach ($destinos as $destino) {
             [$ruta, $accion] = array_pad(explode(':', $destino, 2), 2, PermisoDenegado::VER);
             [$modulo, $submodulo, $archivo] = array_pad(explode('.', $ruta, 3), 3, null);
-            if (PermisoDenegado::permite($request->user(), $modulo, $submodulo ?? PermisoDenegado::SUBMODULO_RAIZ, $archivo, $accion)) {
+            if (PermisoDenegado::permite($user, $modulo, $submodulo ?? PermisoDenegado::SUBMODULO_RAIZ, $archivo, $accion, $reglas)) {
                 return $next($request);
             }
         }
