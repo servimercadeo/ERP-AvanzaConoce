@@ -113,7 +113,7 @@ class WorkOrderEstadoTest extends TestCase
         $aliado = Aliado::create(['tipo' => 'empresa', 'tipo_documento' => 'NIT', 'documento' => '900333444-1', 'nombre' => 'ALIADO SAS']);
         $this->usuario('tecnico', ['cedula' => '777', 'aliado_id' => $aliado->id]);
         WorkOrder::create([
-            'numero_wo' => 'WO6', 'numero_item' => '', 'cedula_tecnico_agendado' => '777', 'tecnico_agendado' => 'Pedro Pérez',
+            'numero_wo' => 'WO6', 'numero_item' => '', 'cedula_tecnico' => '777', 'cedula_tecnico_agendado' => '777', 'tecnico_agendado' => 'Pedro Pérez',
             // No debería pasar en la práctica (un indirecto no puede cerrar su WO), pero si
             // quedó un cierre viejo igual debe primar el agendado, no el cierre.
             'nombre_tecnico_cierre' => 'Otro Técnico', 'cedula_tecnico_cierre' => '999',

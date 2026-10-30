@@ -498,6 +498,9 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
     const modalidades = useModalidadesAliado();
     const [filtroEstado, setFiltroEstado] = useState("");
     const [filtroTecnico, setFiltroTecnico] = useState("");
+    const [buscarWo, setBuscarWo] = useState("");
+    const debBuscarWo = useDebounce(buscarWo, 300);
+    const [paginaWo, setPaginaWo] = useState(1);
     const [tecnicoModal, setTecnicoModal] = useState(null); // null | "nuevo" | técnico
     const [editarOpen, setEditarOpen] = useState(false);
     const [credenciales, setCredenciales] = useState(null);
@@ -507,12 +510,18 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
         queryFn: () => api.get(`/aliados/${aliadoId}`).then((r) => r.data),
     });
 
-    const { data: workOrders = [], isLoading: cargandoWo } = useQuery({
-        queryKey: ["aliado-work-orders", aliadoId, filtroEstado, filtroTecnico],
+    // De 25 en 25: un aliado puede tener miles de WO. Cambiar un filtro vuelve a la página 1.
+    useEffect(() => setPaginaWo(1), [filtroEstado, filtroTecnico, debBuscarWo]);
+    const { data: paginaWoData, isLoading: cargandoWo } = useQuery({
+        queryKey: ["aliado-work-orders", aliadoId, filtroEstado, filtroTecnico, debBuscarWo, paginaWo],
         queryFn: () => api.get(`/aliados/${aliadoId}/work-orders`, {
-            params: { estado: filtroEstado || undefined, cedula_tecnico: filtroTecnico || undefined },
+            params: { estado: filtroEstado || undefined, cedula_tecnico: filtroTecnico || undefined, search: debBuscarWo || undefined, page: paginaWo },
         }).then((r) => r.data),
+        placeholderData: (prev) => prev,
     });
+    const workOrders = paginaWoData?.data ?? [];
+    const totalWo = paginaWoData?.total ?? 0;
+    const ultimaPaginaWo = paginaWoData?.last_page ?? 1;
 
     const refrescar = () => {
         qc.invalidateQueries({ queryKey: ["aliado", aliadoId] });
@@ -619,6 +628,10 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                         </button>
                     ))}
                 </div>
+                <div style={{ ...S.searchWrap, marginBottom: 12, maxWidth: 360 }}>
+                    <span style={S.searchIcon}><IconSearch size={15} /></span>
+                    <input style={S.searchInput} placeholder="Buscar por N° de WO…" value={buscarWo} onChange={(e) => setBuscarWo(e.target.value)} />
+                </div>
                 {tecnicoFiltrado && (
                     <div style={{ ...S.info, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>Mostrando solo las de <strong>{tecnicoFiltrado.name}</strong></span>
@@ -651,6 +664,18 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                         </table>
                     )}
                 </div>
+                {totalWo > 0 && (
+                    <div style={S.paginationBar}>
+                        <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>
+                            {((paginaWo - 1) * 25 + 1).toLocaleString("es-CO")}–{Math.min(paginaWo * 25, totalWo).toLocaleString("es-CO")} de {totalWo.toLocaleString("es-CO")}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <button style={S.pageBtn(paginaWo === 1)} disabled={paginaWo === 1} onClick={() => setPaginaWo((p) => p - 1)}>‹</button>
+                            <span style={{ fontSize: "0.84rem", color: "var(--text-muted)" }}>Página {paginaWo} de {ultimaPaginaWo}</span>
+                            <button style={S.pageBtn(paginaWo === ultimaPaginaWo)} disabled={paginaWo === ultimaPaginaWo} onClick={() => setPaginaWo((p) => p + 1)}>›</button>
+                        </div>
+                    </div>
+                )}
             </Modal>
 
             {editarOpen && (

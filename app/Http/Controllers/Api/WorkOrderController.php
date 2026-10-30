@@ -34,14 +34,14 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Agrega a cada WO los datos del técnico asignado (por `cedula_tecnico_agendado`, o
-     * `cedula_tecnico` si no trae agendado — mismo formato que `users.cedula`): no viven en
+     * Agrega a cada WO los datos de su técnico, por `cedula_tecnico` (la misma cédula con la
+     * que el técnico ve sus WO y se cuentan en su aliado; mismo formato que `users.cedula`): no viven en
      * `work_orders` pero si el técnico ya es empleado del ERP, ahí están. Una sola consulta
      * por lote, no una por fila.
      */
     private function conDatosDelTecnico($workOrders)
     {
-        $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+        $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico;
 
         $cedulas = $workOrders->map($cedulaAsignado)->filter()->unique()->values();
         if ($cedulas->isEmpty()) {
@@ -259,6 +259,12 @@ class WorkOrderController extends Controller
                     continue;
                 }
                 $valores[$campo] = trim((string) $fila[$campo]) !== '' ? trim((string) $fila[$campo]) : null;
+            }
+            // La cédula enlaza la WO con su técnico (y su aliado): igual que users.cedula.
+            foreach (['cedula_tecnico', 'cedula_tecnico_agendado'] as $campo) {
+                if (array_key_exists($campo, $valores)) {
+                    $valores[$campo] = WorkOrder::normalizarCedula($valores[$campo]);
+                }
             }
             foreach ($camposFecha as $campo) {
                 if (!array_key_exists($campo, $fila)) {

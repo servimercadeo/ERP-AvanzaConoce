@@ -7,6 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class WorkOrder extends Model
 {
+    /**
+     * Cédula como la guarda `users.cedula`: sin espacios, puntos ni comas, y sin el ".0" que
+     * agrega Excel a un número ("1.085.293.826", "108529382 6", "1085293826.0" =>
+     * "1085293826"). Así la WO enlaza con su técnico aunque el archivo la traiga con formato.
+     */
+    public static function normalizarCedula($valor): ?string
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $texto = trim((string) $valor);
+        $texto = preg_replace('/^(\d+)[.,]0+$/', '$1', $texto);
+        $texto = preg_replace('/[\s.,]+/u', '', $texto);
+
+        return $texto === '' ? null : $texto;
+    }
+
     use RegistraAuditoria;
 
     protected $table = 'work_orders';

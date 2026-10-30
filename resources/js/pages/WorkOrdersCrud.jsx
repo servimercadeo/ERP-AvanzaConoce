@@ -272,11 +272,14 @@ const CAMPOS_PLANTILLA = [
 ];
 
 /* ─── Modal importar desde Excel ─────────────────────────────────────── */
+const LOTE_IMPORTACION = 1000;
+
 function ImportModal({ onClose, onImported }) {
     const [fileName, setFileName] = useState("");
     const [filas, setFilas] = useState([]);
     const [errores, setErrores] = useState([]);
     const [importing, setImporting] = useState(false);
+    const [progreso, setProgreso] = useState(null);
     const [error, setError] = useState("");
     const [duplicadasInfo, setDuplicadasInfo] = useState(0);
     const [diagnostico, setDiagnostico] = useState(null);
@@ -365,20 +368,34 @@ function ImportModal({ onClose, onImported }) {
         }
     };
 
+    // Por lotes: un archivo grande en una sola petición puede pasar el límite de tamaño o de
+    // tiempo del servidor. Cada lote se guarda aparte; si uno falla, se avisa cuántas
+    // quedaron cargadas (reimportar el mismo archivo no duplica: actualiza por WO + ítem).
     const handleImport = async () => {
         if (filas.length === 0) return;
         setImporting(true);
         setError("");
+        const total = { creadas: 0, actualizadas: 0 };
+        let enviadas = 0;
         try {
-            const { data } = await api.post("/work-orders/importar", { items: filas });
-            onImported(data);
+            for (let i = 0; i < filas.length; i += LOTE_IMPORTACION) {
+                const lote = filas.slice(i, i + LOTE_IMPORTACION);
+                setProgreso({ hechas: i, total: filas.length });
+                const { data } = await api.post("/work-orders/importar", { items: lote });
+                total.creadas += data.creadas ?? 0;
+                total.actualizadas += data.actualizadas ?? 0;
+                enviadas += lote.length;
+            }
+            onImported(total);
         } catch (err) {
             const listaErrores = err?.response?.data?.errores;
-            setError(
-                Array.isArray(listaErrores) ? listaErrores.join(" · ") : (err?.response?.data?.message ?? "No se pudo importar.")
-            );
+            const motivo = Array.isArray(listaErrores) ? listaErrores.join(" · ") : (err?.response?.data?.message ?? "No se pudo importar.");
+            setError(enviadas > 0
+                ? `Se cargaron ${enviadas} de ${filas.length} filas (${total.creadas} creadas, ${total.actualizadas} actualizadas) y luego falló: ${motivo} Puedes volver a importar el mismo archivo: no duplica.`
+                : motivo);
         } finally {
             setImporting(false);
+            setProgreso(null);
         }
     };
 
@@ -460,7 +477,7 @@ function ImportModal({ onClose, onImported }) {
                 <div style={S.modalFooter}>
                     <button style={S.btnSecondary} onClick={onClose} disabled={importing}>Cancelar</button>
                     <button style={S.btnPrimary} onClick={handleImport} disabled={importing || filas.length === 0}>
-                        {importing ? "Importando…" : `Importar ${filas.length} fila${filas.length !== 1 ? "s" : ""}`}
+                        {importing ? (progreso && progreso.total > LOTE_IMPORTACION ? `Importando ${progreso.hechas.toLocaleString("es-CO")} de ${progreso.total.toLocaleString("es-CO")}…` : "Importando…") : `Importar ${filas.length} fila${filas.length !== 1 ? "s" : ""}`}
                     </button>
                 </div>
             </div>

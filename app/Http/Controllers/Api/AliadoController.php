@@ -180,7 +180,11 @@ class AliadoController extends Controller
         return response()->json($aliado);
     }
 
-    /** Work Orders de los técnicos del aliado; ?estado=atendidas|finalizadas filtra. */
+    /**
+     * Work Orders de los técnicos del aliado (por Cédula Técnico), de 25 en 25 con ?page=.
+     * Filtros: ?estado=atendidas|finalizadas, ?cedula_tecnico= y ?search= (N° de WO o ítem).
+     * Sin ?page= devuelve las 500 más recientes (compatibilidad).
+     */
     public function workOrders(Request $request, Aliado $aliado)
     {
         $cedulas = $aliado->tecnicos()->whereNotNull('cedula')->pluck('cedula');
@@ -188,9 +192,19 @@ class AliadoController extends Controller
         $query = WorkOrder::whereIn('cedula_tecnico', $cedulas)
             ->when($request->estado === 'atendidas', fn ($q) => $q->where('estado', self::ESTADO_ATENDIDA))
             ->when($request->estado === 'finalizadas', fn ($q) => $q->where('estado', self::ESTADO_FINALIZADA))
-            ->when($request->cedula_tecnico, fn ($q, $c) => $q->where('cedula_tecnico', $c));
+            ->when($request->cedula_tecnico, fn ($q, $c) => $q->where('cedula_tecnico', $c))
+            ->when(trim((string) $request->search), fn ($q, $s) => $q->where(fn ($w) => $w
+                ->where('numero_wo', 'like', "%{$s}%")->orWhere('numero_wo_ibs', 'like', "%{$s}%")))
+            ->orderByDesc('fecha_finalizacion')->orderByDesc('id');
 
-        return response()->json($query->orderByDesc('fecha_finalizacion')->orderByDesc('id')->limit(500)->get());
+        if ($request->has('page')) {
+            return response()->json($query->paginate(25, [
+                'id', 'numero_wo', 'numero_item', 'estado', 'nombre_tecnico', 'cedula_tecnico', 'servicio', 'municipio',
+                'fecha_estado', 'fecha_finalizacion',
+            ]));
+        }
+
+        return response()->json($query->limit(500)->get());
     }
 
     public function store(Request $request)
