@@ -152,15 +152,16 @@ export default function ImportExcelModal({
                                     exactamente así en la primera fila):
                                 </p>
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                    {columnas.map((c) => (
+                                    {columnas.filter((c) => !c.soloExporte).map((c) => (
                                         <span
                                             key={c.campo}
+                                            title={c.informativa ? `Informativa: ${c.informativa}` : undefined}
                                             style={{
                                                 background: c.requerido
                                                     ? "var(--primary)"
-                                                    : "var(--white)",
-                                                color: c.requerido ? "#fff" : "var(--text)",
-                                                border: "1px solid var(--border)",
+                                                    : c.informativa ? "var(--bg)" : "var(--white)",
+                                                color: c.requerido ? "#fff" : c.informativa ? "var(--text-muted)" : "var(--text)",
+                                                border: c.informativa ? "1px dashed var(--border)" : "1px solid var(--border)",
                                                 borderRadius: 20,
                                                 padding: "3px 10px",
                                                 fontSize: "0.76rem",
@@ -177,6 +178,10 @@ export default function ImportExcelModal({
                                     usa para encontrar el registro). Las demás
                                     son opcionales — deja en blanco lo que no
                                     tengas, no hace falta llenar todas.
+                                    {columnas.some((c) => c.informativa && !c.soloExporte) && (
+                                        <> Las de borde punteado son informativas: se reconocen pero
+                                        no se cargan desde aquí (pasa el cursor para ver por qué).</>
+                                    )}
                                 </p>
                             </div>
                             <button style={S.btnSecondary} onClick={descargarPlantilla}>
@@ -211,6 +216,21 @@ export default function ImportExcelModal({
                                     <p style={S.miniTitle}>Columnas reconocidas:</p>
                                     <p style={S.miniText}>
                                         {parsed.columnasReconocidas.join(", ")}
+                                    </p>
+                                </div>
+                            )}
+                            {parsed.columnasInformativas?.length > 0 && (
+                                <div>
+                                    <p style={S.miniTitle}>Columnas informativas (no se cargan desde aquí):</p>
+                                    <p style={S.miniText}>
+                                        {Object.entries(
+                                            parsed.columnasInformativas.reduce((acc, c) => {
+                                                (acc[c.motivo] = acc[c.motivo] || []).push(c.titulo);
+                                                return acc;
+                                            }, {}),
+                                        )
+                                            .map(([motivo, titulos]) => `${titulos.join(", ")}: ${motivo}`)
+                                            .join(" · ")}
                                     </p>
                                 </div>
                             )}

@@ -1,4 +1,5 @@
-import { descargarExcel, fechaArchivo, nombreCompleto, aFecha, aFechaLocal } from "./excelExport.js";
+import { descargarExcel, fechaArchivo, nombreCompleto, aFecha } from "./excelExport.js";
+import { crearDescargaPlantilla } from "./excelImport.js";
 
 /*
  * Exportación de Contratos a Excel.
@@ -36,57 +37,52 @@ const resumenAnexos = (c) => {
 const totalAnexos = (c) =>
     (c.anexos ?? []).length ? (c.anexos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0) : null;
 
-const COLUMNAS_BASE = [
+// Orden acordado con Talento Humano (archivo "COLUMNAS IMPORTE-EXPORTE CONTRATOS Y
+// EMPLEADOS"): es el mismo del importador y de su plantilla. Fecha Cierre Seguimiento,
+// ID Macaw y Fecha de Registro ya no van. `sensible`: solo con permiso de ver salario,
+// seguridad social y costos (Talento Humano y admin).
+export const COLUMNAS_CONTRATOS = [
+    { titulo: "Sede", tipo: "texto", ancho: 30, valor: (c) => c.sede },
     { titulo: "Documento", tipo: "texto", ancho: 14, valor: doc },
     { titulo: "Nombres", tipo: "texto", ancho: 22, valor: (c) => c.empleado?.nombres },
     { titulo: "Apellidos", tipo: "texto", ancho: 22, valor: (c) => c.empleado?.apellidos },
-    { titulo: "Correo", tipo: "texto", ancho: 30, valor: (c) => c.empleado?.email },
     { titulo: "Cargo", tipo: "texto", ancho: 30, valor: (c) => c.cargo },
-    { titulo: "Sede", tipo: "texto", ancho: 30, valor: (c) => c.sede },
     { titulo: "Regional", tipo: "texto", ancho: 16, valor: (c) => c.regional?.nombre },
-    { titulo: "Área Empresa", tipo: "texto", ancho: 20, valor: (c) => c.area_empresa },
-    { titulo: "Jefe Inmediato", tipo: "texto", ancho: 28, valor: (c) => c.jefe_inmediato || c.jefe_inmediato_nombre },
-    { titulo: "Correo del Jefe", tipo: "texto", ancho: 30, valor: (c) => c.jefe_inmediato_correo },
     { titulo: "Tipo de Contrato", tipo: "texto", ancho: 22, valor: (c) => c.tipo_contrato },
     { titulo: "Tipo de Vinculación", tipo: "texto", ancho: 20, valor: (c) => c.tipo_vinculacion },
-    { titulo: "Estado Contrato", tipo: "texto", ancho: 15, valor: (c) => c.estado_contrato },
+    { titulo: "Área Empresa", tipo: "texto", ancho: 20, valor: (c) => c.area_empresa },
+    { titulo: "Jefe Inmediato", tipo: "texto", ancho: 28, valor: (c) => c.jefe_inmediato || c.jefe_inmediato_nombre },
+    { titulo: "Salario", tipo: "moneda", ancho: 14, sensible: true, valor: (c) => c.salario },
+    { titulo: "Auxilio Transporte Legal", tipo: "moneda", ancho: 14, sensible: true, valor: (c) => c.auxilio_transporte_legal },
+    // Resumen; el detalle fila por fila va en la hoja "Anexos". Al importar, el resumen se
+    // vuelve a leer como anexos del contrato nuevo (contratosImport.js).
+    { titulo: "Anexos y Auxilios", tipo: "texto", ancho: 45, sensible: true, valor: resumenAnexos },
+    { titulo: "Total Anexos y Auxilios", tipo: "moneda", ancho: 16, sensible: true, valor: totalAnexos },
     { titulo: "Fecha de Ingreso", tipo: "fecha", ancho: 14, valor: (c) => c.fecha_ingreso },
     { titulo: "Fecha de Retiro", tipo: "fecha", ancho: 14, valor: (c) => c.fecha_retiro },
     { titulo: "Empresa", tipo: "texto", ancho: 26, valor: (c) => c.empresa },
     { titulo: "Empleador", tipo: "texto", ancho: 26, valor: (c) => c.empleador },
     { titulo: "Cliente Proyecto", tipo: "texto", ancho: 22, valor: (c) => c.cliente_proyecto },
-];
-
-const COLUMNAS_SENSIBLES = [
-    { titulo: "Salario", tipo: "moneda", ancho: 14, valor: (c) => c.salario },
-    { titulo: "Auxilio Transporte Legal", tipo: "moneda", ancho: 14, valor: (c) => c.auxilio_transporte_legal },
-    { titulo: "ARL", tipo: "texto", ancho: 22, valor: (c) => c.arl },
-    { titulo: "Fecha Vinculación ARL", tipo: "fecha", ancho: 14, valor: (c) => c.fecha_vinculacion_arl },
-    { titulo: "EPS", tipo: "texto", ancho: 22, valor: (c) => c.lps_afiliado },
-    { titulo: "Fecha Vinculación EPS", tipo: "fecha", ancho: 14, valor: (c) => c.fecha_vinculacion_lps },
-    { titulo: "Caja de Compensación", tipo: "texto", ancho: 22, valor: (c) => c.caja_compensacion },
-    { titulo: "Fecha Vinculación Caja", tipo: "fecha", ancho: 14, valor: (c) => c.fecha_vinculacion_caja },
-    { titulo: "Fondo de Pensiones", tipo: "texto", ancho: 22, valor: (c) => c.fondo_pensiones },
-    { titulo: "Fondo de Cesantías", tipo: "texto", ancho: 22, valor: (c) => c.fondo_cesantias },
+    { titulo: "Estado Contrato", tipo: "texto", ancho: 15, valor: (c) => c.estado_contrato },
     // Solo el código: con un único centro el importador lo vuelve a asignar al 100%.
     // El detalle con nombres y porcentajes está en la hoja "Centros de Costos".
     {
         titulo: "Centro de Costos",
         tipo: "texto",
         ancho: 16,
+        sensible: true,
         valor: (c) => (c.centros_costos ?? []).map((cc) => cc.codigo).filter(Boolean).join(", "),
     },
-    { titulo: "Fecha Cierre Seguimiento", tipo: "fecha", ancho: 14, valor: (c) => c.seguimiento_fecha_cierre },
-    // Resumen en la hoja principal; el detalle fila por fila sigue en la hoja "Anexos".
-    // El importador ignora estas dos columnas (contratosImport.js): contienen "auxilio" y
-    // si no, al reimportar se tomarían como tipo de auxilio.
-    { titulo: "Anexos y Auxilios", tipo: "texto", ancho: 45, valor: resumenAnexos },
-    { titulo: "Total Anexos y Auxilios", tipo: "moneda", ancho: 16, valor: totalAnexos },
-];
-
-const COLUMNAS_FINALES = [
-    { titulo: "ID Macaw", tipo: "texto", ancho: 12, valor: (c) => c.id_macaw },
-    { titulo: "Fecha de Registro", tipo: "fecha", ancho: 14, valor: (c) => aFechaLocal(c.created_at) },
+    { titulo: "Correo", tipo: "texto", ancho: 30, valor: (c) => c.empleado?.email },
+    { titulo: "Correo del Jefe", tipo: "texto", ancho: 30, valor: (c) => c.jefe_inmediato_correo },
+    { titulo: "ARL", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.arl },
+    { titulo: "Fecha Vinculación ARL", tipo: "fecha", ancho: 14, sensible: true, valor: (c) => c.fecha_vinculacion_arl },
+    { titulo: "EPS", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.lps_afiliado },
+    { titulo: "Fecha Vinculación EPS", tipo: "fecha", ancho: 14, sensible: true, valor: (c) => c.fecha_vinculacion_lps },
+    { titulo: "Caja de Compensación", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.caja_compensacion },
+    { titulo: "Fecha Vinculación Caja", tipo: "fecha", ancho: 14, sensible: true, valor: (c) => c.fecha_vinculacion_caja },
+    { titulo: "Fondo de Pensiones", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.fondo_pensiones },
+    { titulo: "Fondo de Cesantías", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.fondo_cesantias },
 ];
 
 const COLUMNAS_EMPLEADO = [
@@ -104,7 +100,7 @@ export function construirHojasContratos(contratos, { incluirSensible = false } =
     const hojas = [
         {
             nombre: "Contratos",
-            columnas: [...COLUMNAS_BASE, ...(incluirSensible ? COLUMNAS_SENSIBLES : []), ...COLUMNAS_FINALES],
+            columnas: COLUMNAS_CONTRATOS.filter((col) => incluirSensible || !col.sensible),
             filas: contratos,
         },
     ];
@@ -152,6 +148,12 @@ export function construirHojasContratos(contratos, { incluirSensible = false } =
 
     return hojas;
 }
+
+/** Plantilla vacía para "Importar Excel" de Contratos: las columnas del exporte, en su orden. */
+export const descargarPlantillaContratos = crearDescargaPlantilla(
+    COLUMNAS_CONTRATOS.map((c, i) => ({ titulo: c.titulo, campo: c.titulo, requerido: i === 0 })),
+    "Plantilla_Importar_Contratos",
+);
 
 export function exportarContratosExcel(contratos, opciones) {
     return descargarExcel(construirHojasContratos(contratos, opciones), `Contratos_${fechaArchivo()}.xlsx`);

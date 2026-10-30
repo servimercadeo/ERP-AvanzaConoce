@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { aFecha, aNumero, aBooleano, limpiarTexto, serialExcel, valorCelda, filasPlanas, construirLibro } from "./excelExport.js";
 import { construirHojasContratos } from "./contratosExport.js";
 import { construirHojasEmpleados } from "./empleadosExport.js";
-import { buildContratoPayloadFromExcelRows } from "./contratosImport.js";
+import { buildContratoPayloadFromExcelRows, parsearResumenAnexos } from "./contratosImport.js";
+import { COLUMNAS_IMPORTABLES } from "./empleadosImport.js";
+import { crearParser } from "./excelImport.js";
 
 test("valida fechas sin correrlas de día por la zona horaria", () => {
     assert.equal(aFecha("2019-01-01T00:00:00.000000Z"), "2019-01-01");
@@ -146,8 +148,91 @@ test("el Excel de contratos se puede volver a importar con los mismos datos", ()
     assert.equal(payload.fondo_pensiones, "PORVENIR");
     assert.equal(payload.fondo_cesantias, "PROTECCION");
     assert.deepEqual(payload.centros_costos, [{ centro_costo_catalogo_id: 9, porcentaje: 100 }]);
-    // El auxilio de transporte no debe confundirse con un anexo
-    assert.equal(payload.anexos, undefined);
+    // Los anexos vuelven desde la columna resumen "Anexos y Auxilios" (el auxilio de
+    // transporte no se confunde con un anexo).
+    assert.deepEqual(payload.anexos, [{ anexo_auxilio: "Rodamiento", valor: 150000, fecha_entrega_firma: "2019-01-05" }]);
+});
+
+// Orden exacto del archivo "COLUMNAS IMPORTE-EXPORTE CONTRATOS Y EMPLEADOS".
+const CONTRATOS_SOLICITADO = [
+    "Sede", "Documento", "Nombres", "Apellidos", "Cargo", "Regional", "Tipo de Contrato", "Tipo de Vinculación",
+    "Área Empresa", "Jefe Inmediato", "Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios",
+    "Fecha de Ingreso", "Fecha de Retiro", "Empresa", "Empleador", "Cliente Proyecto", "Estado Contrato", "Centro de Costos",
+    "Correo", "Correo del Jefe", "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación",
+    "Fecha Vinculación Caja", "Fondo de Pensiones", "Fondo de Cesantías",
+];
+const EMPLEADOS_SOLICITADO = [
+    "Sede", "Cédula", "Fecha Expedición Documento", "Nombres", "Apellidos", "Cargo", "Fecha de Ingreso", "Fecha de Retiro",
+    "Empresa", "Empleador", "Cliente Proyecto", "Estado Contrato", "Género", "Fecha Nacimiento", "Lugar Nacimiento", "Raza",
+    "Estado Civil", "Nivel Escolaridad", "Profesión", "Número de Hijos", "RH", "Email", "Móvil", "Ciudad",
+    "Dirección Residencia", "Barrio", "Estrato", "Estado Empleado", "Tipo de funcionario (rol)", "Tipo Vinculación",
+    "Jefe Inmediato", "Correo del Jefe", "Cantidad de Contratos", "Banco", "Tipo de Cuenta", "No. de Cuenta Bancaria",
+    "Talla Camisa", "Talla Pantalón", "Talla Zapatos", "No. Licencia Carro", "Vence Licencia Carro", "No. Licencia Moto",
+    "Vence Licencia Moto", "Tiene Cert. Alturas", "Vence Cert. Alturas", "Contacto Emergencia", "Teléfono Emergencia",
+    "Parentesco Emergencia", "Fecha de Registro",
+];
+const SENSIBLES_CONTRATO = ["Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios", "Centro de Costos",
+    "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación", "Fecha Vinculación Caja",
+    "Fondo de Pensiones", "Fondo de Cesantías"];
+
+test("contratos: columnas en el orden solicitado, sin las que están en rojo", () => {
+    const titulos = construirHojasContratos([contrato], { incluirSensible: true })[0].columnas.map((c) => c.titulo);
+    assert.deepEqual(titulos, CONTRATOS_SOLICITADO);
+    for (const t of ["Fecha Cierre Seguimiento", "ID Macaw", "Fecha de Registro"]) assert.ok(!titulos.includes(t), t);
+    // Sin permiso sensible: el mismo orden, sin las columnas sensibles.
+    const sinPermiso = construirHojasContratos([contrato], { incluirSensible: false })[0].columnas.map((c) => c.titulo);
+    assert.deepEqual(sinPermiso, CONTRATOS_SOLICITADO.filter((t) => !SENSIBLES_CONTRATO.includes(t)));
+});
+
+test("empleados: columnas en el orden solicitado, sin las que están en rojo", () => {
+    const titulos = construirHojasEmpleados([])[0].columnas.map((c) => c.titulo);
+    assert.deepEqual(titulos, EMPLEADOS_SOLICITADO);
+    for (const t of ["Ingresos", "Código Directv", "Tipo de Contrato", "EPS", "ARL", "Fondo de Pensiones", "Caja de Compensación",
+        "Observaciones Médicas", "Alergias", "Comentarios"]) assert.ok(!titulos.includes(t), t);
+    // La plantilla de importación: mismo orden, sin Fecha de Registro (solo del exporte).
+    const plantilla = COLUMNAS_IMPORTABLES.filter((c) => !c.soloExporte).map((c) => c.titulo);
+    assert.deepEqual(plantilla, EMPLEADOS_SOLICITADO.filter((t) => t !== "Fecha de Registro"));
+});
+
+test("empleados: el Excel exportado se reimporta sin columnas desconocidas y solo carga las editables", async () => {
+    const XLSX = await import("xlsx");
+    const empleado = {
+        cedula: "1007845261", sede: "SYM PEREIRA", nombres: "CAMILA", apellidos: "RÍOS", cargo: "ASESOR", genero: "Femenino",
+        email: "camila@example.com", estado_empleado: "Activo", rol: "general", barrio: "CENTRO", empresa: { nombre: "Servimercadeo COL" },
+        created_at: "2026-05-06T15:00:00.000000Z", contratos: [{ estado_contrato: "Vigente", fecha_ingreso: "2024-03-01" }],
+    };
+    const wb = construirLibro(XLSX, construirHojasEmpleados([empleado]));
+    const buffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const { filas, columnasNoReconocidas, columnasInformativas } = await crearParser(COLUMNAS_IMPORTABLES)({ arrayBuffer: async () => buffer });
+
+    assert.deepEqual(columnasNoReconocidas, []);
+    const informativas = columnasInformativas.map((c) => c.titulo);
+    for (const t of ["Cargo", "Empresa", "Email", "Estado Empleado", "Tipo de funcionario (rol)", "Fecha de Registro"]) assert.ok(informativas.includes(t), t);
+    const [fila] = filas;
+    assert.equal(fila.cedula, "1007845261");
+    assert.equal(fila.sede, "SYM PEREIRA");
+    assert.equal(fila.genero, "Femenino");
+    assert.equal(fila.barrio, "CENTRO");
+    for (const campo of ["cargo", "email", "estado_empleado", "rol", "empresa", "estado_contrato"]) assert.ok(!(campo in fila), campo);
+});
+
+test("anexos: el resumen del exporte vuelve a anexos (con y sin fecha)", () => {
+    assert.deepEqual(parsearResumenAnexos("Rodamiento ($\u00a0150.000 · 05/01/2019); AUXILIO DE COMUNICACION ($ 15.000)"), [
+        { anexo_auxilio: "Rodamiento", valor: 150000, fecha_entrega_firma: "2019-01-05" },
+        { anexo_auxilio: "AUXILIO DE COMUNICACION", valor: 15000, fecha_entrega_firma: "" },
+    ]);
+    assert.deepEqual(parsearResumenAnexos(""), []);
+    assert.deepEqual(parsearResumenAnexos("texto sin formato"), []);
+});
+
+test("contratos: un centro de costos que no se puede asignar se reporta", () => {
+    const base = { Documento: "1", Nombres: "A", Apellidos: "B" };
+    const cat = { centrosCostoCatalogo: [{ id: 9, codigo: "CC01" }] };
+    const [varios] = buildContratoPayloadFromExcelRows([{ ...base, "Centro de Costos": "CC01, CC02" }], cat);
+    assert.equal(varios.centro_costo_no_asignado, "CC01, CC02");
+    assert.equal(varios.centros_costos, undefined);
+    const [uno] = buildContratoPayloadFromExcelRows([{ ...base, "Centro de Costos": "CC01" }], cat);
+    assert.deepEqual(uno.centros_costos, [{ centro_costo_catalogo_id: 9, porcentaje: 100 }]);
 });
 
 test("el .xlsx generado tiene tipos reales y se re-importa como lo hace la pantalla", async () => {
@@ -182,7 +267,6 @@ test("empleados: limpia el móvil de relleno y resume el contrato más reciente"
             cedula: "1007845261",
             nombres: "CAMILA ANDREA",
             movil: "0000000000",
-            ingresos: "1423500.00",
             tiene_cert_alturas: false,
             numero_hijos: 2,
             empresa: { nombre: "Servicios y Mercadeo COL" },
@@ -195,10 +279,10 @@ test("empleados: limpia el móvil de relleno y resume el contrato más reciente"
     const [fila] = filasPlanas(hoja);
     assert.equal(fila["Cédula"], "1007845261");
     assert.equal(fila["Móvil"], null);
-    assert.equal(fila.Ingresos, 1423500);
+    assert.equal(fila.Ingresos, undefined);
     assert.equal(fila["Tiene Cert. Alturas"], "No");
     assert.equal(fila.Empresa, "Servicios y Mercadeo COL");
-    assert.equal(fila["Tipo de Contrato"], "Término Fijo");
+    assert.equal(fila["Estado Contrato"], "Activo");
     assert.equal(fila["Fecha de Ingreso"], "2024-03-01");
     assert.equal(fila["Cantidad de Contratos"], 2);
     const titulos = hoja.columnas.map((c) => c.titulo);

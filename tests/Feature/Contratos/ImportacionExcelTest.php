@@ -112,7 +112,7 @@ class ImportacionExcelTest extends TestCase
         $user = $user->fresh();
         $this->assertSame('general', $user->rol);
         $this->assertFalse((bool) $user->pendiente_alta);
-        $this->assertSame('CENTRO', $user->barrio);
+        $this->assertEqualsIgnoringCase('centro', $user->barrio);
         $this->assertTrue(Hash::check($this->detalle($r, 'cedula', '5001')['credenciales']['password'], $user->password));
     }
 
@@ -150,14 +150,34 @@ class ImportacionExcelTest extends TestCase
     {
         $this->empleadoConContrato(['cedula' => '5005', 'movil' => '0000000000', 'eps' => 'Sin asignar', 'arl' => 'SIN ASIGNAR']);
 
-        $r = $this->importarEmpleados([['cedula' => '5005', 'movil' => '3001234567', 'eps' => 'nueva eps', 'arl' => 'sura']])->assertOk();
+        $r = $this->importarEmpleados([['cedula' => '5005', 'movil' => '3001234567', 'barrio' => 'centro', 'eps' => 'nueva eps', 'arl' => 'sura']])->assertOk();
 
-        $this->assertEqualsCanonicalizing(['movil', 'eps', 'arl'], $this->detalle($r, 'cedula', '5005')['campos_actualizados']);
+        $this->assertEqualsCanonicalizing(['movil', 'barrio'], $this->detalle($r, 'cedula', '5005')['campos_actualizados']);
         $user = User::where('cedula', '5005')->first();
         $this->assertSame('3001234567', $user->movil);
-        // Mismo formato que el formulario (EmpleadoController::normalizarNombres)
-        $this->assertSame('NUEVA EPS', $user->eps);
-        $this->assertSame('SURA', $user->arl);
+        $this->assertEqualsIgnoringCase('centro', $user->barrio);
+        // EPS y ARL ya no se importan desde Empleados (son del contrato): se ignoran.
+        $this->assertSame('Sin asignar', $user->eps);
+        $this->assertSame('SIN ASIGNAR', $user->arl);
+    }
+
+    public function test_ya_no_importa_las_columnas_que_salieron_del_formato(): void
+    {
+        $this->empleadoConContrato(['cedula' => '5010', 'codigo_directv' => null, 'eps' => null, 'arl' => null, 'fondo_pensiones' => null,
+            'caja_compensacion' => null, 'observaciones_medicas' => null, 'alergias' => null, 'comentarios' => null]);
+
+        $r = $this->importarEmpleados([['cedula' => '5010', 'codigo_directv' => '123', 'eps' => 'SURA', 'arl' => 'SURA', 'fondo_pensiones' => 'PORVENIR',
+            'caja_compensacion' => 'COMFAMILIAR', 'observaciones_medicas' => 'x', 'alergias' => 'x', 'comentarios' => 'x', 'cargo' => 'GERENTE',
+            'estado_empleado' => 'Inactivo', 'email' => 'otro@x.co']])->assertOk();
+
+        $this->assertSame([], $this->detalle($r, 'cedula', '5010')['campos_actualizados']);
+        $user = User::where('cedula', '5010')->first();
+        foreach (['codigo_directv', 'eps', 'arl', 'fondo_pensiones', 'caja_compensacion', 'observaciones_medicas', 'alergias', 'comentarios'] as $campo) {
+            $this->assertNull($user->{$campo}, $campo);
+        }
+        $this->assertNotSame('GERENTE', $user->cargo);
+        $this->assertSame('Activo', $user->estado_empleado);
+        $this->assertTrue((bool) $user->activo);
     }
 
     public function test_valida_sede_genero_y_correo_del_jefe(): void

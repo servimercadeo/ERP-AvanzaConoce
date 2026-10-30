@@ -257,6 +257,10 @@ export function buildContratoPayloadFromExcelRow(row, catalogs = {}) {
             payload.centros_costos = [
                 { centro_costo_catalogo_id: match.id, porcentaje: 100 },
             ];
+        } else {
+            // Varios códigos ("CC01, CC02": no se sabe el porcentaje de cada uno) o un código
+            // que no está en el catálogo: no se asigna y se avisa, en vez de perderlo en silencio.
+            payload.centro_costo_no_asignado = String(centroCostoCodigo).trim();
         }
     }
 
@@ -286,6 +290,24 @@ function buildAnexoFromExcelRow(row) {
         valor: valor || 0,
         fecha_entrega_firma: fecha,
     };
+}
+
+/**
+ * La columna "Anexos y Auxilios" del exporte de Contratos, de vuelta a anexos:
+ * "Rodamiento ($ 150.000 · 05/01/2019); AUXILIO DE COMUNICACION ($ 15.000)".
+ */
+export function parsearResumenAnexos(texto) {
+    if (!texto || typeof texto !== "string") return [];
+    return texto
+        .split(";")
+        .map((parte) => parte.trim())
+        .map((parte) => parte.match(/^(.*?)\s*\(\s*\$\s*([\d.,]+)(?:\s*·\s*(\d{1,2})\/(\d{1,2})\/(\d{4}))?\s*\)$/))
+        .filter(Boolean)
+        .map(([, nombre, valor, d, m, y]) => ({
+            anexo_auxilio: nombre === "Sin nombre" ? "" : nombre.trim(),
+            valor: parseNumeric(valor) || 0,
+            fecha_entrega_firma: y ? `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` : "",
+        }));
 }
 
 function isFilled(value) {
@@ -344,6 +366,14 @@ export function buildContratoPayloadFromExcelRows(rows, catalogs = {}) {
 
         if (anexo) {
             groups.get(key).anexos.push(anexo);
+        } else {
+            // Archivo de "Exportar Excel": los anexos vienen resumidos en una sola columna.
+            const resumen = resolveValue(row, ["anexos y auxilios"]);
+            const grupo = groups.get(key);
+            parsearResumenAnexos(typeof resumen === "string" ? resumen : "").forEach((a) => {
+                const clave = JSON.stringify(a);
+                if (!grupo.anexos.some((x) => JSON.stringify(x) === clave)) grupo.anexos.push(a);
+            });
         }
     });
 

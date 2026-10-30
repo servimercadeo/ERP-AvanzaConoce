@@ -1,34 +1,39 @@
 import { crearDescargaPlantilla, crearParser } from "./excelImport.js";
 
 /*
- * Importación de datos de empleados desde Excel, por cédula.
+ * Importación de datos de empleados desde Excel, por cédula: solo rellena los campos que
+ * el empleado tiene vacíos (EmpleadoController@importarDatosPersonales).
  *
- * Los títulos de columna coinciden EXACTAMENTE con los de "Exportar Excel"
- * (empleadosExport.js): exportar, llenar las celdas vacías y volver a importar el mismo
- * archivo debe funcionar sin ajustes ni avisos de "columna no reconocida".
+ * Columnas y orden: los del archivo "COLUMNAS IMPORTE-EXPORTE CONTRATOS Y EMPLEADOS",
+ * iguales al exporte (empleadosExport.js) menos Fecha de Registro, que es solo del
+ * exporte. Así un Excel exportado se vuelve a importar sin avisos.
  *
- * Quedan fuera a propósito (y por eso el archivo de producción reimportado en local
- * siempre los marcará como "no reconocidos", es intencional, no un bug):
- *   - Cargo: tiene un efecto secundario oculto en el backend (User::booted() deriva
- *     `rol` del cargo al guardarlo) — demasiado riesgoso para una carga masiva sin
- *     supervisión caso por caso.
- *   - Estado Empleado, Email, Ingresos, Empresa: estado operativo / credenciales /
- *     dinero / una relación que requeriría resolver el nombre a un id — cada uno con
- *     su propio flujo dedicado, no un campo de ficha suelto.
- *   - Tipo de Contrato, Estado Contrato, Fecha de Ingreso, Fecha de Retiro, Cliente
- *     Proyecto: viven en Contrato, no en el empleado — eso lo cubre "Importar Excel"
- *     del módulo Contratos (contratosImport.js).
- *   - Cantidad de Contratos, Fecha de Registro: columnas calculadas, no hay nada que
- *     escribir.
- *   - Ciudad: la exporta EmpleadoController@index como repliegue para mostrarla
- *     (respuestas_ingresos / candidatos / base_ingresos), no es una columna real de
- *     `users`.
+ * Columnas informativas (van en la plantilla y se reconocen, pero no se cargan aquí):
+ *   - Cargo, Empresa y los datos del contrato (fechas, proyecto, estado): son del contrato
+ *     y se copian solos al empleado desde Contratos (EmpleadoSyncService).
+ *   - Email: es el usuario de acceso; Estado Empleado (controla el acceso) y el rol: se
+ *     cambian en el formulario del empleado, nunca en lote.
+ *   - Ciudad y Cantidad de Contratos: se calculan.
+ * Ya no van: Ingresos, Código Directv, Tipo de Contrato, EPS, ARL, Fondo de Pensiones, Caja
+ * de Compensación, Observaciones Médicas, Alergias y Comentarios.
  */
+const DE_CONTRATOS = "se cargan en Contratos y se copian solos al empleado";
+const DEL_FORMULARIO = "se cambian en el formulario del empleado";
+const CALCULADA = "se calcula sola";
+
 export const COLUMNAS_IMPORTABLES = [
+    { titulo: "Sede", campo: "sede" },
     { titulo: "Cédula", campo: "cedula", requerido: true },
     { titulo: "Fecha Expedición Documento", campo: "fecha_expedicion", tipo: "fecha" },
     { titulo: "Nombres", campo: "nombres" },
     { titulo: "Apellidos", campo: "apellidos" },
+    { titulo: "Cargo", campo: "cargo", informativa: DE_CONTRATOS },
+    { titulo: "Fecha de Ingreso", campo: "fecha_ingreso", informativa: DE_CONTRATOS },
+    { titulo: "Fecha de Retiro", campo: "fecha_retiro", informativa: DE_CONTRATOS },
+    { titulo: "Empresa", campo: "empresa", informativa: DE_CONTRATOS },
+    { titulo: "Empleador", campo: "empleador" },
+    { titulo: "Cliente Proyecto", campo: "cliente_proyecto", informativa: DE_CONTRATOS },
+    { titulo: "Estado Contrato", campo: "estado_contrato", informativa: DE_CONTRATOS },
     { titulo: "Género", campo: "genero" },
     { titulo: "Fecha Nacimiento", campo: "fecha_nacimiento", tipo: "fecha" },
     { titulo: "Lugar Nacimiento", campo: "lugar_nacimiento" },
@@ -38,20 +43,18 @@ export const COLUMNAS_IMPORTABLES = [
     { titulo: "Profesión", campo: "profesion" },
     { titulo: "Número de Hijos", campo: "numero_hijos", tipo: "entero" },
     { titulo: "RH", campo: "rh" },
+    { titulo: "Email", campo: "email", informativa: DEL_FORMULARIO },
     { titulo: "Móvil", campo: "movil" },
+    { titulo: "Ciudad", campo: "ciudad", informativa: CALCULADA },
     { titulo: "Dirección Residencia", campo: "direccion_residencia" },
     { titulo: "Barrio", campo: "barrio" },
     { titulo: "Estrato", campo: "estrato" },
+    { titulo: "Estado Empleado", campo: "estado_empleado", informativa: DEL_FORMULARIO },
+    { titulo: "Tipo de funcionario (rol)", campo: "rol", informativa: DEL_FORMULARIO },
     { titulo: "Tipo Vinculación", campo: "tipo_vinculacion" },
-    { titulo: "Sede", campo: "sede" },
-    { titulo: "Empleador", campo: "empleador" },
     { titulo: "Jefe Inmediato", campo: "jefe_inmediato" },
     { titulo: "Correo del Jefe", campo: "jefe_inmediato_correo" },
-    { titulo: "Código Directv", campo: "codigo_directv" },
-    { titulo: "EPS", campo: "eps" },
-    { titulo: "ARL", campo: "arl" },
-    { titulo: "Fondo de Pensiones", campo: "fondo_pensiones" },
-    { titulo: "Caja de Compensación", campo: "caja_compensacion" },
+    { titulo: "Cantidad de Contratos", campo: "cantidad_contratos", informativa: CALCULADA },
     { titulo: "Banco", campo: "banco" },
     { titulo: "Tipo de Cuenta", campo: "tipo_cuenta" },
     { titulo: "No. de Cuenta Bancaria", campo: "cuenta_bancaria" },
@@ -67,13 +70,13 @@ export const COLUMNAS_IMPORTABLES = [
     { titulo: "Contacto Emergencia", campo: "contacto_emergencia_nombre" },
     { titulo: "Teléfono Emergencia", campo: "contacto_emergencia_telefono" },
     { titulo: "Parentesco Emergencia", campo: "contacto_emergencia_parentesco" },
-    { titulo: "Observaciones Médicas", campo: "observaciones_medicas" },
-    { titulo: "Alergias", campo: "alergias" },
-    { titulo: "Comentarios", campo: "comentarios" },
+    // Solo del exporte: se reconoce para que un Excel exportado se reimporte sin avisos,
+    // pero no va en la plantilla.
+    { titulo: "Fecha de Registro", campo: "created_at", informativa: "es solo del exporte", soloExporte: true },
 ];
 
 export const descargarPlantillaImportacion = crearDescargaPlantilla(
-    COLUMNAS_IMPORTABLES,
+    COLUMNAS_IMPORTABLES.filter((c) => !c.soloExporte),
     "Plantilla_Importar_Empleados",
 );
 

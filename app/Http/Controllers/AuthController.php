@@ -27,6 +27,14 @@ class AuthController extends Controller
             ]);
         }
 
+        // Estado Empleado Inactivo/Retirado (o contrato finalizado): sin acceso.
+        if (!Auth::user()->activo) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'Tu usuario está inactivo. Si crees que es un error, comunícate con Talento Humano.',
+            ]);
+        }
+
         $request->session()->regenerate();
 
         return response()->json([

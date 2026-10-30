@@ -227,7 +227,7 @@ Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanz
 Route::post('/sso/token', [SsoController::class, 'generarToken']);
 
 // ── Protegido (Sanctum) ───────────────────────────────────────────────────────
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     // Actualizar configuración global (tema de color)
     Route::post('/settings', [AppSettingController::class, 'update']);
 

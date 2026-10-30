@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             // Acceso según la matriz del módulo Permisos (módulo.submódulo).
             'permiso' => \App\Http\Middleware\EnsureUserHasPermission::class,
+            // Cierra la sesión de quien quedó inactivo mientras estaba conectado.
+            'activo' => \App\Http\Middleware\EnsureUsuarioActivo::class,
         ]);
         // El contenedor solo es alcanzable a través de Traefik (nunca directo desde
         // internet), así que confiar en cualquier origen es seguro aquí: sin esto, Laravel

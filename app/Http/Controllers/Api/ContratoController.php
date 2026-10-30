@@ -485,6 +485,8 @@ class ContratoController extends Controller
 
         // Sync campos del contrato al empleado
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($contrato);
+        // Contrato finalizado sin otro vigente: la persona queda Inactiva (ERP y AvanzaConoce).
+        app(\App\Services\AccesoEmpleado::class)->alGuardarContrato($contrato);
 
         $pedidoAutomatico = null;
         $motivoSinPedido = null;
@@ -617,6 +619,8 @@ class ContratoController extends Controller
 
         // Sync campos del contrato al empleado
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($result);
+        // Contrato finalizado sin otro vigente: la persona queda Inactiva (ERP y AvanzaConoce).
+        app(\App\Services\AccesoEmpleado::class)->alGuardarContrato($result);
 
         return response()->json($result);
     }

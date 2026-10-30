@@ -6,7 +6,9 @@ import { descargarExcel, fechaArchivo } from "./excelExport.js";
  * de campo del backend) y usa `crearParser`/`crearDescargaPlantilla` para obtener las
  * funciones concretas — ver empleadosImport.js.
  *
- * El contrato de cada columna es: { titulo, campo, requerido?, tipo? }.
+ * El contrato de cada columna es: { titulo, campo, requerido?, tipo?, informativa? }.
+ * `informativa: "motivo"`: la columna va en la plantilla y se reconoce al importar (no sale
+ * como "no reconocida"), pero no se carga; la vista previa muestra el motivo.
  * `tipo: "fecha"` activa la decodificación segura de fechas de Excel (ver más abajo).
  * Debe existir exactamente una columna con `requerido: true`: es la clave con la que el
  * backend busca el registro a actualizar (cédula, documento, etc.).
@@ -129,9 +131,11 @@ export function crearParser(columnas) {
 
         const columnasReconocidas = new Set();
         const columnasNoReconocidas = new Set();
+        const columnasInformativas = new Map();
         encabezados.forEach((h) => {
             const def = mapaNormalizado.get(normalizarTitulo(h));
-            if (def) columnasReconocidas.add(def.titulo);
+            if (def?.informativa) columnasInformativas.set(def.titulo, def.informativa);
+            else if (def) columnasReconocidas.add(def.titulo);
             else columnasNoReconocidas.add(h);
         });
 
@@ -143,7 +147,7 @@ export function crearParser(columnas) {
             const fila = { [columnaClave.campo]: clave };
             encabezados.forEach((h) => {
                 const def = mapaNormalizado.get(normalizarTitulo(h));
-                if (!def || def.campo === columnaClave.campo) return;
+                if (!def || def.informativa || def.campo === columnaClave.campo) return;
                 let valorCrudo = filaCruda[h];
                 if (valorCrudo === null || valorCrudo === undefined || valorCrudo === "") return;
 
@@ -171,6 +175,7 @@ export function crearParser(columnas) {
             filas,
             columnasReconocidas: Array.from(columnasReconocidas),
             columnasNoReconocidas: Array.from(columnasNoReconocidas),
+            columnasInformativas: Array.from(columnasInformativas, ([titulo, motivo]) => ({ titulo, motivo })),
             totalFilasLeidas: filasCrudas.length,
         };
     };

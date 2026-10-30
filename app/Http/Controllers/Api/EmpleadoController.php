@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Contrato;
 use App\Models\RespuestaIngreso;
 use App\Models\User;
+use App\Services\AccesoEmpleado;
 use App\Services\AltaEnAvanzaConoce;
 use App\Services\CredencialesAvanzaConoce;
 use App\Services\IdentidadUnica;
@@ -277,6 +278,8 @@ class EmpleadoController extends Controller
 
                 // Mismo usuario y contraseña en AvanzaConoce.
                 $credenciales = app(AltaEnAvanzaConoce::class)->sincronizar($empleado->fresh(), $credenciales);
+                // Si se dio de alta con un estado sin acceso (Inactivo/Retirado), queda bloqueado.
+                app(AccesoEmpleado::class)->alCambiarEstadoEmpleado($empleado->fresh(), AccesoEmpleado::ACTIVO);
 
                 return response()->json([
                     'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
@@ -289,8 +292,10 @@ class EmpleadoController extends Controller
                 ], 201);
             }
 
+            $estadoAnterior = $empleado->estado_empleado;
             $empleado->update($data);
             app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
+            app(AccesoEmpleado::class)->alCambiarEstadoEmpleado($empleado->fresh(), $estadoAnterior);
             return response()->json([
                 'empleado'     => $empleado->fresh()->load(['empresa', 'sedeCatalogo']),
                 'credenciales' => [
@@ -355,10 +360,15 @@ class EmpleadoController extends Controller
             unset($data['fotografia']);
         }
 
+        $estadoAnterior = $empleado->estado_empleado;
         $empleado->update($data);
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeUltimoContrato($empleado);
 
         app(\App\Services\EmpleadoSyncService::class)->syncFromUser($empleado->fresh());
+
+        // Estado Empleado Inactivo/Retirado quita el acceso al ERP y a AvanzaConoce; volver a
+        // un estado activo lo devuelve.
+        app(AccesoEmpleado::class)->alCambiarEstadoEmpleado($empleado->fresh(), $estadoAnterior);
 
         // AvanzaConoce lo había rechazado por un dato (p. ej. correo de otra persona): si se
         // corrigió, vuelve a la cola de reintento (avanza:sincronizar-usuarios).
@@ -453,15 +463,15 @@ class EmpleadoController extends Controller
             'estado_civil', 'nivel_escolaridad', 'profesion', 'numero_hijos', 'rh', 'movil',
             'direccion_residencia', 'barrio', 'estrato',
             'tipo_vinculacion', 'sede', 'empleador',
-            'jefe_inmediato', 'jefe_inmediato_correo', 'codigo_directv',
-            'eps', 'arl', 'fondo_pensiones', 'caja_compensacion',
+            'jefe_inmediato', 'jefe_inmediato_correo',
             'banco', 'tipo_cuenta', 'cuenta_bancaria',
             'talla_camisa', 'talla_pantalon', 'talla_zapatos',
             'licencia_carro', 'licencia_carro_vence', 'licencia_moto', 'licencia_moto_vence',
             'tiene_cert_alturas', 'cert_alturas_vence',
             'contacto_emergencia_nombre', 'contacto_emergencia_telefono', 'contacto_emergencia_parentesco',
-            'observaciones_medicas', 'alergias', 'comentarios',
         ];
+        // Ya no se importan (archivo "COLUMNAS IMPORTE-EXPORTE"): código Directv, EPS, ARL,
+        // fondo de pensiones, caja, observaciones médicas, alergias y comentarios.
         $camposFecha = [
             'fecha_expedicion', 'fecha_nacimiento',
             'licencia_carro_vence', 'licencia_moto_vence', 'cert_alturas_vence',
@@ -561,7 +571,8 @@ class EmpleadoController extends Controller
                     // Mismo rol por defecto que store(): 'consultor' ya no existe en el ENUM
                     // de `users.rol` y MySQL estricto tumbaría todo el lote.
                     $user->rol            = $user->rol ?: 'general';
-                    $user->activo         = true;
+                    // Sin acceso si ya quedó Inactivo (p. ej. su contrato se cargó finalizado).
+                    $user->activo         = AccesoEmpleado::tieneAcceso($user->estado_empleado);
                     $user->pendiente_alta = false;
                     // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
                     $nuevas = CredencialesAvanzaConoce::paraAlta($user->cedula);
@@ -608,6 +619,9 @@ class EmpleadoController extends Controller
         $avanza = app(AltaEnAvanzaConoce::class);
         foreach ($altas as [$i, $user, $nuevas]) {
             $final = $avanza->sincronizar($user->fresh(), $nuevas);
+            if (!$user->activo) {
+                app(AccesoEmpleado::class)->inactivar($user->fresh(), $user->estado_empleado);
+            }
             $resumen['detalle'][$i]['credenciales'] = [
                 'email'     => $user->email,
                 'password'  => $final['mostrar'],

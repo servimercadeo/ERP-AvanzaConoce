@@ -20,7 +20,7 @@ import {
     IconLoading,
 } from "../components/Icons";
 import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "../utils/contratosImport";
-import { exportarContratosExcel } from "../utils/contratosExport";
+import { exportarContratosExcel, descargarPlantillaContratos } from "../utils/contratosExport";
 import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 import SelectBuscable from "../components/SelectBuscable";
@@ -2919,10 +2919,13 @@ export default function ContratosCrud() {
             // de su contrato vigente (nunca se sobrescribe un dato existente).
             const paraCompletar = [];
             for (const [index, rawPayload] of payloads.entries()) {
-                const { correo_jefe_invalido: correoJefeInvalido, ...payload } = rawPayload;
+                const { correo_jefe_invalido: correoJefeInvalido, centro_costo_no_asignado: ccNoAsignado, ...payload } = rawPayload;
                 const documento = payload.documento ? String(payload.documento).trim() : "";
                 if (correoJefeInvalido) {
                     errors.push(`Cédula ${documento}: el correo del jefe "${correoJefeInvalido}" no es válido y no se cargó (el resto del contrato sí).`);
+                }
+                if (ccNoAsignado) {
+                    errors.push(`Cédula ${documento}: el centro de costos "${ccNoAsignado}" no se asignó (${ccNoAsignado.includes(",") ? "trae varios códigos: asígnalos con su porcentaje en el contrato" : "el código no existe en el catálogo"}).`);
                 }
                 if (documento && cedulasExistentes.has(documento)) {
                     paraCompletar.push(filaParaCompletarContrato(payload));
@@ -3325,11 +3328,15 @@ export default function ContratosCrud() {
                         </div>
                         <div style={{ padding: 24 }}>
                             <p style={{ margin: "0 0 12px", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                                Sube un archivo con las columnas de contrato (el mismo formato de «Exportar Excel»: Documento, Cargo, Sede, Tipo de Contrato, Fecha de Ingreso, Salario, EPS, ARL, Centro de Costos, etc.). Este es el primer paso: después se completan los empleados en Empleados &gt; Importar Excel, que es donde reciben sus credenciales.
+                                Sube un archivo con las columnas de contrato (el mismo formato de «Exportar Excel», o la plantilla de abajo: Sede, Documento, Nombres, Apellidos, Cargo, Regional, Tipo de Contrato…). Este es el primer paso: después se completan los empleados en Empleados &gt; Importar Excel, que es donde reciben sus credenciales.
                             </p>
+                            <button style={{ ...S.btnSecondary, marginBottom: 14 }} onClick={() => descargarPlantillaContratos()}>
+                                Descargar plantilla Excel
+                            </button>
                             <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text-muted)", lineHeight: 1.6, fontSize: "0.88rem" }}>
                                 <li>
-                                    <strong>Sin contrato:</strong> se crea el contrato completo, con sus anexos (una fila por auxilio).
+                                    <strong>Sin contrato:</strong> se crea el contrato completo, con sus anexos (la columna «Anexos y Auxilios» del exporte, o una fila por auxilio).
+                                    Si queda Finalizado (o Finalizado traslado) y no tiene otro contrato vigente, la persona queda Inactiva en el ERP y en AvanzaConoce.
                                     Si la persona aún no es empleado, queda creada como <em>pendiente de alta</em> (sin acceso al sistema); para eso el archivo debe traer Nombres y Apellidos.
                                 </li>
                                 <li>
