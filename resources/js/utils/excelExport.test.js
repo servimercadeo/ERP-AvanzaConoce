@@ -159,7 +159,7 @@ const CONTRATOS_SOLICITADO = [
     "Área Empresa", "Jefe Inmediato", "Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios",
     "Fecha de Ingreso", "Fecha de Retiro", "Empresa", "Empleador", "Cliente Proyecto", "Estado Contrato", "Centro de Costos",
     "Correo", "Correo del Jefe", "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación",
-    "Fecha Vinculación Caja", "Fondo de Pensiones", "Fondo de Cesantías",
+    "Fecha Vinculación Caja", "Fondo de Pensiones", "Fondo de Cesantías", "Fecha Cierre Seguimiento", "ID Macaw", "Fecha de Registro",
 ];
 const EMPLEADOS_SOLICITADO = [
     "Sede", "Cédula", "Fecha Expedición Documento", "Nombres", "Apellidos", "Cargo", "Fecha de Ingreso", "Fecha de Retiro",
@@ -173,12 +173,16 @@ const EMPLEADOS_SOLICITADO = [
 ];
 const SENSIBLES_CONTRATO = ["Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios", "Centro de Costos",
     "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación", "Fecha Vinculación Caja",
-    "Fondo de Pensiones", "Fondo de Cesantías"];
+    "Fondo de Pensiones", "Fondo de Cesantías", "Fecha Cierre Seguimiento"];
 
-test("contratos: columnas en el orden solicitado, sin las que están en rojo", () => {
+test("contratos: las 34 columnas en el orden solicitado", () => {
     const titulos = construirHojasContratos([contrato], { incluirSensible: true })[0].columnas.map((c) => c.titulo);
     assert.deepEqual(titulos, CONTRATOS_SOLICITADO);
-    for (const t of ["Fecha Cierre Seguimiento", "ID Macaw", "Fecha de Registro"]) assert.ok(!titulos.includes(t), t);
+    assert.equal(titulos.length, 34);
+    const [fila] = filasPlanas(construirHojasContratos([{ ...contrato, id_macaw: "M-77", seguimiento_fecha_cierre: "2026-02-01" }], { incluirSensible: true })[0]);
+    assert.equal(fila["ID Macaw"], "M-77");
+    assert.equal(fila["Fecha Cierre Seguimiento"], "2026-02-01");
+    assert.equal(fila["Fecha de Registro"], "2026-05-06");
     // Sin permiso sensible: el mismo orden, sin las columnas sensibles.
     const sinPermiso = construirHojasContratos([contrato], { incluirSensible: false })[0].columnas.map((c) => c.titulo);
     assert.deepEqual(sinPermiso, CONTRATOS_SOLICITADO.filter((t) => !SENSIBLES_CONTRATO.includes(t)));

@@ -1,4 +1,4 @@
-import { descargarExcel, fechaArchivo, nombreCompleto, aFecha } from "./excelExport.js";
+import { descargarExcel, fechaArchivo, nombreCompleto, aFecha, aFechaLocal } from "./excelExport.js";
 import { crearDescargaPlantilla } from "./excelImport.js";
 
 /*
@@ -38,9 +38,9 @@ const totalAnexos = (c) =>
     (c.anexos ?? []).length ? (c.anexos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0) : null;
 
 // Orden acordado con Talento Humano (archivo "COLUMNAS IMPORTE-EXPORTE CONTRATOS Y
-// EMPLEADOS"): es el mismo del importador y de su plantilla. Fecha Cierre Seguimiento,
-// ID Macaw y Fecha de Registro ya no van. `sensible`: solo con permiso de ver salario,
-// seguridad social y costos (Talento Humano y admin).
+// EMPLEADOS", versión con Fecha Cierre Seguimiento, ID Macaw y Fecha de Registro al final):
+// es el mismo de la plantilla de importación, que no lleva Fecha de Registro (solo exporte).
+// `sensible`: solo con permiso de ver salario, seguridad social y costos (TH y admin).
 export const COLUMNAS_CONTRATOS = [
     { titulo: "Sede", tipo: "texto", ancho: 30, valor: (c) => c.sede },
     { titulo: "Documento", tipo: "texto", ancho: 14, valor: doc },
@@ -83,6 +83,10 @@ export const COLUMNAS_CONTRATOS = [
     { titulo: "Fecha Vinculación Caja", tipo: "fecha", ancho: 14, sensible: true, valor: (c) => c.fecha_vinculacion_caja },
     { titulo: "Fondo de Pensiones", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.fondo_pensiones },
     { titulo: "Fondo de Cesantías", tipo: "texto", ancho: 22, sensible: true, valor: (c) => c.fondo_cesantias },
+    { titulo: "Fecha Cierre Seguimiento", tipo: "fecha", ancho: 14, sensible: true, valor: (c) => c.seguimiento_fecha_cierre },
+    { titulo: "ID Macaw", tipo: "texto", ancho: 12, valor: (c) => c.id_macaw },
+    // Solo del exporte: no va en la plantilla de importación.
+    { titulo: "Fecha de Registro", tipo: "fecha", ancho: 14, soloExporte: true, valor: (c) => aFechaLocal(c.created_at) },
 ];
 
 const COLUMNAS_EMPLEADO = [
@@ -151,7 +155,7 @@ export function construirHojasContratos(contratos, { incluirSensible = false } =
 
 /** Plantilla vacía para "Importar Excel" de Contratos: las columnas del exporte, en su orden. */
 export const descargarPlantillaContratos = crearDescargaPlantilla(
-    COLUMNAS_CONTRATOS.map((c, i) => ({ titulo: c.titulo, campo: c.titulo, requerido: i === 0 })),
+    COLUMNAS_CONTRATOS.filter((c) => !c.soloExporte).map((c, i) => ({ titulo: c.titulo, campo: c.titulo, requerido: i === 0 })),
     "Plantilla_Importar_Contratos",
 );
 

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
-import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye } from "../components/Icons";
+import { useAuth } from "../context/AuthContext";
+import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
 /**
@@ -61,6 +62,46 @@ const IMPORT_HEADER_MAP = {
     "inicio agendado": "inicio_agendado",
     "fin agendado": "fin_agendado",
     "descripcion de ibs": "descripcion",
+    "apellidos cliente": "apellido_cliente", // alias en plural del mismo campo que "apellido cliente" (Macaw)
+    // En el archivo real del usuario esas columnas vienen con el encabezado a secas, sin
+    // la palabra "cliente": "Nombre" (columna V) y "Apellido(s)" (columna S) — este último
+    // en plural ("Apellidos") igual que el otro alias de arriba, por eso van los dos.
+    "apellido": "apellido_cliente",
+    "apellidos": "apellido_cliente",
+    "nombre": "nombre_cliente",
+
+    // Resto de columnas del "Excel de origen del proveedor" (confirmadas por el usuario
+    // pegando la fila 1 de su archivo real): antes se descartaban al importar.
+    "dias de atraso": "dias_atraso",
+    "dias de atraso sp": "dias_atraso_sp",
+    "estado de la descarga": "estado_descarga",
+    "georreferencia": "georreferencia",
+    "nombre cuadrilla tecnico": "nombre_cuadrilla_tecnico",
+    "apellido cuadrilla tecnico": "apellido_cuadrilla_tecnico",
+    "cambio de domicilio entre calles": "cambio_domicilio_entre_calles",
+    "pais": "pais",
+    "puntos de referencia": "puntos_referencia",
+    "codigo postal": "codigo_postal",
+    "agrupacion": "agrupacion",
+    "estado de orden de trabajo": "estado_orden_trabajo",
+    "n de telefono principal": "telefono_principal",
+    "recursos": "recursos",
+    "fecha ultima de reasignacion": "fecha_ultima_reasignacion",
+    "reiteracion de servicio": "reiteracion_servicio",
+    "estado de la visita": "estado_visita",
+    "numero de visita": "numero_visita",
+    "x": "coordenada_x",
+    "y": "coordenada_y",
+    "razones": "razones",
+    // "Número de orden de trabajo" NO es numero_wo (ver nota arriba): es su propio campo.
+    "numero de orden de trabajo": "numero_orden_trabajo",
+    "codigo de sl": "codigo_sl",
+    "clase de cliente": "clase_cliente",
+    "agendamiento externo": "agendamiento_externo",
+    "estado en fecha": "estado_en_fecha",
+    "descarga materiales obligatoria": "descarga_materiales_obligatoria",
+    "descarga materiales confirmada": "descarga_materiales_confirmada",
+    "id del encabezado del pedido": "id_encabezado_pedido",
     "aging": "aging",
     "region de servicio": "region_servicio",
 
@@ -76,7 +117,151 @@ const IMPORT_HEADER_MAP = {
     "fecha atencion": "fecha_estado",
     "fecha creacion": "fecha_creacion",
     "fecha finalizacion": "fecha_finalizacion",
+
+    // Resto de columnas del Exporte Macaw (confirmadas por el usuario pegando la fila 1 de
+    // su Excel real): antes se descartaban todas al importar, ahora cada una tiene su propia
+    // columna en `work_orders` y sale con dato real en el Exportar Excel. "ibs" SÍ es
+    // numero_wo_ibs (mismo campo que "N° de WO de IBS" arriba, solo que acá el proveedor lo
+    // llama distinto); "tipo vinculacion" es el mismo campo que "modalidad" arriba (mismo
+    // dato, dos nombres según el formato del archivo). "subproducto" en minúscula también
+    // normaliza a la clave "subproducto" (ver más abajo el comentario sobre "gana la
+    // primera columna"): la fila trae ADEMÁS otra "subproducto" en minúscula con un código
+    // numérico sin relación, que queda ignorada a propósito.
+    "subproducto": "subproducto",
+    "tipo producto": "tipo_producto",
+    "se paga": "se_paga",
+    "consignada": "consignada",
+    "pago": "pago",
+    "tecnico agendado": "tecnico_agendado",
+    "cedula tecnico agendado": "cedula_tecnico_agendado",
+    "tipo vinculacion": "modalidad",
+    "ibs": "numero_wo_ibs",
+    "categoria": "categoria",
+    "problema": "problema",
+    "nombre cliente": "nombre_cliente",
+    "apellido cliente": "apellido_cliente",
+    "no documento": "no_documento_cliente",
+    "tel casa": "tel_casa",
+    "perimetro de la venta": "perimetro_venta",
+    "jornada": "jornada",
+    "fecha programacion": "fecha_programacion",
+    "fecha publicacion": "fecha_publicacion",
+    "tecnologia": "tecnologia",
+    "fecha cancelacion": "fecha_cancelacion",
+    "razon cancelacion": "razon_cancelacion",
+    "observaciones cancelacion": "observaciones_cancelacion",
+    "estado comercial": "estado_comercial",
+    "tipo": "tipo_wo",
+    "tecnico atendio": "tecnico_atendio_flag",
+    "wo aterior": "wo_anterior",
+    "wo fisica ok": "wo_fisica_ok",
+    "motivo": "motivo",
+    "consumio material": "consumio_material",
+    "paga por directv": "paga_por_directv",
+    "comision pagada": "comision_pagada",
+    "valor comision": "valor_comision",
+    "fecha pago": "fecha_pago",
+    "prueba de calidad": "prueba_calidad",
+    "numero de ticket de aprobacion": "numero_ticket_aprobacion",
+    "razon de prueba de calidad fallida": "razon_prueba_calidad_fallida",
+    "contrato enviado": "contrato_enviado",
+    "registrado por": "registrado_por",
+    "fecha registro material": "fecha_registro_material",
+    "fecha registro sin material": "fecha_registro_sin_material",
+    "modo atencion": "modo_atencion",
+    "auxiliar": "auxiliar",
+    "torre": "torre",
+    "conductor": "conductor",
+    "tipo auxilio": "tipo_auxilio",
+    "auxilio": "auxilio",
+    "aplica auxilio": "aplica_auxilio",
 };
+
+/**
+ * Columnas del "Exporte Macaw" que el usuario pidió replicar en el botón Exportar, en el
+ * mismo orden y con el mismo nombre exacto que trae ese archivo (confirmado por el usuario
+ * pegando la fila 1 de su Excel). El segundo valor es el campo del que sale el dato real
+ * cuando ya lo consumimos: la mayoría vienen de `work_orders` (mismo mapeo que
+ * IMPORT_HEADER_MAP arriba), y los que terminan en "_tecnico" los agrega el backend desde
+ * la ficha del técnico (ver WorkOrderController::conDatosDelTecnico) cuando esa WO trae
+ * cédula y el técnico ya es empleado del ERP. Un arreglo de campos es una cadena de
+ * respaldo (el primero que tenga dato gana); `null` es la única columna que de verdad no se
+ * guarda en ningún lado ("subproducto" en minúscula, el código numérico duplicado — ver
+ * nota en IMPORT_HEADER_MAP), así que esa sale "N/D" siempre.
+ */
+const COLUMNAS_EXPORTE_MACAW = [
+    ["Sede", "sede_tecnico"],
+    ["Subproducto", "subproducto"],
+    ["Tipo Servicio", "servicio"],
+    ["Tipo Producto", "tipo_producto"],
+    ["Se Paga", "se_paga"],
+    ["Consignada", "consignada"],
+    ["Pago", "pago"],
+    ["Técnico Agendado", ["tecnico_agendado", "nombre_tecnico"]],
+    ["Cédula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
+    ["Técnico Atiende", "nombre_tecnico_atiende"],
+    ["Cédula Técnico", "cedula_tecnico_atiende"],
+    ["Tipo Vinculación", ["modalidad", "tipo_vinculacion_tecnico"]],
+    ["Subagente/Aliado", "subagente_aliado_tecnico"],
+    ["workorder", "numero_wo"],
+    ["IBS", "numero_wo_ibs"],
+    ["Categoría", "categoria"],
+    ["Problema", "problema"],
+    ["Nombre Cliente", "nombre_cliente"],
+    ["Apellido Cliente", "apellido_cliente"],
+    ["No Documento", "no_documento_cliente"],
+    ["Dirección", "direccion"],
+    ["Barrio", "barrio"],
+    ["Ciudad", "municipio"],
+    ["Departamento", "departamento"],
+    ["Tel. Casa", "tel_casa"],
+    ["Perímetro de la Zona", "perimetro"],
+    ["Perímetro de la Venta", "perimetro_venta"],
+    ["Nom Tipo Cliente", "tipo_orden"],
+    ["Jornada", "jornada"],
+    ["Fecha Programación", "fecha_programacion"],
+    ["Fecha Atención", "fecha_estado"],
+    ["Fecha Finalización", "fecha_finalizacion"],
+    ["Fecha Publicación", "fecha_publicacion"],
+    ["Fecha Creación", "fecha_creacion"],
+    ["Proveedor", "proveedor"],
+    ["Tecnología", "tecnologia"],
+    ["Estado", "estado"],
+    ["Fecha Cancelación", "fecha_cancelacion"],
+    ["Razón Cancelación", "razon_cancelacion"],
+    ["Observaciones Cancelación", "observaciones_cancelacion"],
+    ["Estado Comercial", "estado_comercial"],
+    ["tipo", "tipo_wo"],
+    ["Tecnico atendio", "tecnico_atendio_flag"],
+    ["WO Aterior", "wo_anterior"],
+    ["WO Fisica OK", "wo_fisica_ok"],
+    ["Motivo", "motivo"],
+    // La columna "subproducto" en minúscula del archivo real: un código numérico sin
+    // relación con "Subproducto" (texto), que ya ocupó ese dato arriba — ver la nota en
+    // IMPORT_HEADER_MAP. No se guarda nada de esta, así que siempre sale "N/D".
+    ["subproducto", null],
+    ["Consumio Material", "consumio_material"],
+    ["Paga por Directv", "paga_por_directv"],
+    ["Comision pagada", "comision_pagada"],
+    ["Valor comision", "valor_comision"],
+    ["Fecha Pago", "fecha_pago"],
+    ["Prueba de Calidad", "prueba_calidad"],
+    ["Numero de ticket de aprobación", "numero_ticket_aprobacion"],
+    ["Razón de Prueba de Calidad Fallida", "razon_prueba_calidad_fallida"],
+    ["Contrato enviado", "contrato_enviado"],
+    ["Registrado por", "registrado_por"],
+    ["Fecha registro material", "fecha_registro_material"],
+    ["Fecha Registro sin material", "fecha_registro_sin_material"],
+    ["Modo Atención", "modo_atencion"],
+    ["Auxiliar", "auxiliar"],
+    ["Supervisor", "supervisor_tecnico"],
+    ["Torre", "torre"],
+    ["Placa vehiculo", "placa_vehiculo_tecnico"],
+    ["Conductor", "conductor"],
+    ["Tipo Auxilio", "tipo_auxilio"],
+    ["Auxilio", "auxilio"],
+    ["Aplica Auxilio", "aplica_auxilio"],
+];
 
 const CAMPOS_PLANTILLA = [
     "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
@@ -127,7 +312,12 @@ function ImportModal({ onClose, onImported }) {
                 const mapped = {};
                 Object.entries(row).forEach(([k, v]) => {
                     const key = IMPORT_HEADER_MAP[normalizeHeader(k)];
-                    if (key) { mapped[key] = typeof v === "string" ? v.trim() : v; clavesEncontradas.add(key); }
+                    // Gana la PRIMERA columna que matchee esa clave, no la última: el Exporte
+                    // Macaw trae "Subproducto" (texto) y, mucho más adelante, otra columna
+                    // "subproducto" en minúscula (un código numérico sin relación) que
+                    // normaliza al mismo nombre — sin esto, la segunda pisaba silenciosamente
+                    // el texto bueno con el número.
+                    if (key && !(key in mapped)) { mapped[key] = typeof v === "string" ? v.trim() : v; clavesEncontradas.add(key); }
                 });
 
                 const numeroWo = String(mapped.numero_wo ?? "").trim();
@@ -301,14 +491,48 @@ function DeleteModal({ item, onClose, onConfirm, deleting }) {
     );
 }
 
+/* ─── Modal para cambiar el estado de una Work Order ───────────────────── */
+function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
+    const [estado, setEstado] = useState(item.estado || "");
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+                <div style={S.modalHeader}>
+                    <span style={{ fontWeight: 800 }}>Cambiar estado — {item.numero_wo}</span>
+                    <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
+                </div>
+                <div style={S.modalBody}>
+                    <div style={S.formGroup}>
+                        <label style={S.label}>Estado</label>
+                        <SelectBuscable style={S.input} value={estado} onChange={(e) => setEstado(e.target.value)}>
+                            <option value="">Seleccione…</option>
+                            {estados.map((e) => <option key={e} value={e}>{e}</option>)}
+                        </SelectBuscable>
+                    </div>
+                    {error && <p style={S.errorMsg}>{error}</p>}
+                </div>
+                <div style={S.modalFooter}>
+                    <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
+                    <button style={S.btnPrimary} onClick={() => onConfirm(estado)} disabled={saving || !estado}>
+                        {saving ? "Guardando…" : "Guardar"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ─── Modal ver todos los campos guardados de una Work Order ──────────── */
 const SECCIONES_DETALLE = [
     {
         titulo: "Identificación",
         campos: [
             ["numero_wo", "N° de orden de trabajo"],
+            ["numero_orden_trabajo", "Número de orden de trabajo (otro campo)"],
+            ["id_encabezado_pedido", "ID del encabezado del pedido"],
             ["numero_item", "N° de ítem"],
             ["numero_wo_ibs", "N° de WO de IBS"],
+            ["codigo_sl", "Código de SL"],
             ["estado", "Estado"],
             ["fecha_estado", "Fecha de estado"],
         ],
@@ -317,18 +541,41 @@ const SECCIONES_DETALLE = [
         titulo: "Servicio",
         campos: [
             ["servicio", "Servicio"],
+            ["subproducto", "Subproducto"],
+            ["tipo_producto", "Tipo Producto"],
             ["tipo_orden", "Tipo de cliente"],
+            ["clase_cliente", "Clase de cliente"],
+            ["recursos", "Recursos"],
+            ["tecnologia", "Tecnología"],
             ["prioridad", "Prioridad"],
             ["proveedor", "Proveedor"],
         ],
     },
     {
+        titulo: "Cliente",
+        campos: [
+            ["nombre_cliente", "Nombre cliente"],
+            ["apellido_cliente", "Apellido(s) cliente"],
+            ["no_documento_cliente", "No. Documento"],
+            ["telefono_principal", "Teléfono principal"],
+            ["tel_casa", "Tel. Casa"],
+        ],
+    },
+    {
         titulo: "Técnico",
         campos: [
-            ["nombre_tecnico", "Nombre técnico"],
-            ["cedula_tecnico", "Cédula técnico"],
-            ["modalidad", "Modalidad"],
+            ["nombre_tecnico", "Nombre técnico (importado)"],
+            ["cedula_tecnico", "Cédula técnico (importado, define qué ve el técnico)"],
+            ["tecnico_agendado", "Técnico agendado"],
+            ["cedula_tecnico_agendado", "Cédula técnico agendado"],
+            ["nombre_tecnico_cierre", "Quién cerró la WO en el ERP"],
+            ["cedula_tecnico_cierre", "Cédula de quién la cerró"],
+            ["modalidad", "Modalidad / Tipo Vinculación"],
             ["cuadrilla_tecnico", "Cuadrilla/Técnico (login)"],
+            ["nombre_cuadrilla_tecnico", "Nombre cuadrilla/técnico"],
+            ["apellido_cuadrilla_tecnico", "Apellido cuadrilla/técnico"],
+            ["tecnico_atendio_flag", "Técnico atendió"],
+            ["modo_atencion", "Modo de atención"],
         ],
     },
     {
@@ -338,8 +585,38 @@ const SECCIONES_DETALLE = [
             ["municipio", "Municipio"],
             ["barrio", "Barrio"],
             ["direccion", "Dirección"],
-            ["perimetro", "Perímetro"],
+            ["cambio_domicilio_entre_calles", "Cambio de domicilio (entre calles)"],
+            ["puntos_referencia", "Puntos de referencia"],
+            ["perimetro", "Perímetro de la zona"],
+            ["perimetro_venta", "Perímetro de la venta"],
+            ["pais", "País"],
+            ["codigo_postal", "Código Postal"],
             ["region_servicio", "Región de servicio"],
+            ["georreferencia", "Georreferencia"],
+            ["coordenada_x", "Coordenada X"],
+            ["coordenada_y", "Coordenada Y"],
+        ],
+    },
+    {
+        titulo: "Estado y visita",
+        campos: [
+            ["estado_orden_trabajo", "Estado de orden de trabajo"],
+            ["estado_descarga", "Estado de la descarga"],
+            ["estado_visita", "Estado de la visita"],
+            ["numero_visita", "Número de visita"],
+            ["estado_en_fecha", "Estado en fecha"],
+            ["estado_comercial", "Estado Comercial"],
+            ["categoria", "Categoría"],
+            ["tipo_wo", "Tipo"],
+            ["jornada", "Jornada"],
+            ["agendamiento_externo", "Agendamiento externo"],
+            ["dias_atraso", "Días de atraso"],
+            ["dias_atraso_sp", "Días de atraso SP"],
+            ["reiteracion_servicio", "Reiteración de servicio"],
+            ["wo_anterior", "WO Anterior"],
+            ["wo_fisica_ok", "WO Física OK"],
+            ["motivo", "Motivo"],
+            ["razones", "Razones"],
         ],
     },
     {
@@ -348,9 +625,53 @@ const SECCIONES_DETALLE = [
             ["fecha_creacion", "Fecha de creación"],
             ["fecha_vencimiento", "Fecha de vencimiento"],
             ["fecha_finalizacion", "Fecha de finalización"],
+            ["fecha_programacion", "Fecha Programación"],
+            ["fecha_publicacion", "Fecha Publicación"],
+            ["fecha_ultima_reasignacion", "Fecha última de reasignación"],
             ["inicio_agendado", "Inicio agendado"],
             ["fin_agendado", "Fin agendado"],
             ["aging", "Aging"],
+        ],
+    },
+    {
+        titulo: "Cancelación",
+        campos: [
+            ["fecha_cancelacion", "Fecha Cancelación"],
+            ["razon_cancelacion", "Razón Cancelación"],
+            ["observaciones_cancelacion", "Observaciones Cancelación"],
+        ],
+    },
+    {
+        titulo: "Materiales y pago",
+        campos: [
+            ["descarga_materiales_obligatoria", "Descarga Materiales Obligatoria"],
+            ["descarga_materiales_confirmada", "Descarga Materiales Confirmada"],
+            ["consumio_material", "Consumió Material"],
+            ["se_paga", "Se Paga"],
+            ["consignada", "Consignada"],
+            ["pago", "Pago"],
+            ["paga_por_directv", "Paga por Directv"],
+            ["comision_pagada", "Comisión pagada"],
+            ["valor_comision", "Valor comisión"],
+            ["fecha_pago", "Fecha Pago"],
+            ["prueba_calidad", "Prueba de Calidad"],
+            ["numero_ticket_aprobacion", "Número de ticket de aprobación"],
+            ["razon_prueba_calidad_fallida", "Razón de Prueba de Calidad Fallida"],
+            ["contrato_enviado", "Contrato enviado"],
+            ["registrado_por", "Registrado por"],
+            ["fecha_registro_material", "Fecha registro material"],
+            ["fecha_registro_sin_material", "Fecha Registro sin material"],
+        ],
+    },
+    {
+        titulo: "Auxilio de transporte",
+        campos: [
+            ["auxiliar", "Auxiliar"],
+            ["torre", "Torre"],
+            ["conductor", "Conductor"],
+            ["tipo_auxilio", "Tipo Auxilio"],
+            ["auxilio", "Auxilio"],
+            ["aplica_auxilio", "Aplica Auxilio"],
         ],
     },
 ];
@@ -400,6 +721,10 @@ function VerModal({ item, onClose }) {
 export default function WorkOrdersCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
+    const { user } = useAuth();
+    // Un técnico indirecto (aliado, tiene aliado_id) no puede cambiar el estado de su propia
+    // WO — solo verla; el servidor vuelve a validar esto en WorkOrderController::update().
+    const esTecnicoIndirecto = user?.rol === "tecnico" && !!user?.aliado_id;
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
@@ -407,8 +732,12 @@ export default function WorkOrdersCrud() {
     const [proveedorFiltro, setProveedorFiltro] = useState("");
     const [importOpen, setImportOpen] = useState(false);
     const [verTarget, setVerTarget] = useState(null);
+    const [estadoTarget, setEstadoTarget] = useState(null);
+    const [guardandoEstado, setGuardandoEstado] = useState(false);
+    const [errorEstado, setErrorEstado] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const [exportando, setExportando] = useState(false);
     const [toast, setToast] = useState(null);
 
     const showToast = (msg) => {
@@ -449,6 +778,59 @@ export default function WorkOrdersCrud() {
 
     const invalidate = () => {
         qc.invalidateQueries({ queryKey: ["work-orders"] });
+    };
+
+    /**
+     * Exporta TODAS las WOs que cumplen los filtros actuales (no solo la página visible),
+     * con las columnas del "Exporte Macaw" tal como las pidió el usuario: dato real donde ya
+     * lo guardamos, "N/D" donde esa columna no existe en nuestro sistema.
+     */
+    const handleExportar = async () => {
+        setExportando(true);
+        try {
+            const { data: todas } = await api.get("/work-orders", {
+                params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined },
+            });
+            const XLSX = await import("xlsx");
+            const rows = todas.map((w) => Object.fromEntries(
+                COLUMNAS_EXPORTE_MACAW.map(([label, campo]) => {
+                    if (!campo) return [label, "N/D"];
+                    // Cadena de respaldo: el primer campo de la lista que tenga dato gana
+                    // (ej. "Tipo Vinculación" sale de la WO si la trajo importada, si no de
+                    // la ficha del técnico).
+                    const candidatos = Array.isArray(campo) ? campo : [campo];
+                    const valor = candidatos.map((c) => w[c]).find((v) => v !== null && v !== undefined && v !== "");
+                    return [label, valor ?? ""];
+                }),
+            ));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws["!cols"] = COLUMNAS_EXPORTE_MACAW.map(() => ({ wch: 22 }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Work Orders");
+            const fecha = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, `Work_Orders_${fecha}.xlsx`);
+            showToast(`Excel exportado (${rows.length} fila${rows.length !== 1 ? "s" : ""}).`);
+        } catch {
+            showToast("No se pudo exportar.");
+        } finally {
+            setExportando(false);
+        }
+    };
+
+    const handleCambiarEstado = async (estado) => {
+        if (!estadoTarget) return;
+        setGuardandoEstado(true);
+        setErrorEstado(null);
+        try {
+            await api.put(`/work-orders/${estadoTarget.id}`, { estado });
+            invalidate();
+            setEstadoTarget(null);
+            showToast("Estado actualizado.");
+        } catch (err) {
+            setErrorEstado(err?.response?.data?.message ?? "No se pudo cambiar el estado.");
+        } finally {
+            setGuardandoEstado(false);
+        }
     };
 
     const handleDelete = async () => {
@@ -495,6 +877,9 @@ export default function WorkOrdersCrud() {
                     <option value="">Todos los proveedores</option>
                     {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
                 </SelectBuscable>
+                {puede.exportar && <button className="btn-secondary" onClick={handleExportar} disabled={exportando}>
+                    {exportando ? "Exportando…" : "Exportar Excel"}
+                </button>}
                 {puede.importar && <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
                     <IconPlus size={14} /> Importar
                 </button>}
@@ -549,6 +934,11 @@ export default function WorkOrdersCrud() {
                                             <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver todos los datos" onClick={() => setVerTarget(w)}>
                                                 <IconEye size={14} />
                                             </button>
+                                            {puede.editar && !esTecnicoIndirecto && (
+                                                <button style={S.actionBtn("#eaf3ff", "#2566af")} title="Cambiar estado" onClick={() => setEstadoTarget(w)}>
+                                                    <IconEdit size={14} />
+                                                </button>
+                                            )}
                                             {puede.eliminar && <button style={S.actionBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => setDeleteTarget(w)}>
                                                 <IconTrash size={14} />
                                             </button>}
@@ -600,6 +990,17 @@ export default function WorkOrdersCrud() {
 
             {verTarget && (
                 <VerModal item={verTarget} onClose={() => setVerTarget(null)} />
+            )}
+
+            {estadoTarget && (
+                <EstadoModal
+                    item={estadoTarget}
+                    estados={estados}
+                    onClose={() => { setEstadoTarget(null); setErrorEstado(null); }}
+                    onConfirm={handleCambiarEstado}
+                    saving={guardandoEstado}
+                    error={errorEstado}
+                />
             )}
 
             {deleteTarget && (
