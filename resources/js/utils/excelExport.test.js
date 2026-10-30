@@ -70,7 +70,10 @@ test("sin permiso sensible no exporta salario, seguridad social ni hojas de deta
     const hojas = construirHojasContratos([contrato], { incluirSensible: false });
     assert.equal(hojas.length, 1);
     const titulos = hojas[0].columnas.map((c) => c.titulo);
-    for (const t of ["Salario", "EPS", "ARL", "Centro de Costos"]) assert.ok(!titulos.includes(t), t);
+    for (const t of ["Salario", "EPS", "ARL"]) assert.ok(!titulos.includes(t), t);
+    // El código de centro de costos sí va en la versión recortada.
+    assert.ok(titulos.includes("Centro de Costos"));
+    assert.equal(filasPlanas(hojas[0])[0]["Centro de Costos"], "CC01");
 });
 
 test("con permiso sensible exporta todas las hojas con sus filas", () => {
@@ -171,7 +174,7 @@ const EMPLEADOS_SOLICITADO = [
     "Vence Licencia Moto", "Tiene Cert. Alturas", "Vence Cert. Alturas", "Contacto Emergencia", "Teléfono Emergencia",
     "Parentesco Emergencia", "Fecha de Registro",
 ];
-const SENSIBLES_CONTRATO = ["Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios", "Centro de Costos",
+const SENSIBLES_CONTRATO = ["Salario", "Auxilio Transporte Legal", "Anexos y Auxilios", "Total Anexos y Auxilios",
     "ARL", "Fecha Vinculación ARL", "EPS", "Fecha Vinculación EPS", "Caja de Compensación", "Fecha Vinculación Caja",
     "Fondo de Pensiones", "Fondo de Cesantías", "Fecha Cierre Seguimiento"];
 

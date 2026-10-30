@@ -65,12 +65,12 @@ export const COLUMNAS_CONTRATOS = [
     { titulo: "Cliente Proyecto", tipo: "texto", ancho: 22, valor: (c) => c.cliente_proyecto },
     { titulo: "Estado Contrato", tipo: "texto", ancho: 15, valor: (c) => c.estado_contrato },
     // Solo el código: con un único centro el importador lo vuelve a asignar al 100%.
-    // El detalle con nombres y porcentajes está en la hoja "Centros de Costos".
+    // El detalle con nombres y porcentajes está en la hoja "Centros de Costos" (solo TH/admin);
+    // el código va también en el exporte recortado (lo pidió TIC).
     {
         titulo: "Centro de Costos",
         tipo: "texto",
         ancho: 16,
-        sensible: true,
         valor: (c) => (c.centros_costos ?? []).map((cc) => cc.codigo).filter(Boolean).join(", "),
     },
     { titulo: "Correo", tipo: "texto", ancho: 30, valor: (c) => c.empleado?.email },
