@@ -144,7 +144,7 @@ function FormModal({ open, onClose, onSave, editTarget, tecnicos }) {
                     </div>
 
                     <div style={S.formGroup}>
-                        <label style={S.label}>CC Propietario</label>
+                        <label style={S.label}>CC Propietario (en la tarjeta de propiedad)</label>
                         <input style={S.input} value={ccPropietario} onChange={(e) => setCcPropietario(e.target.value)} placeholder="Número de cédula" />
                     </div>
 

@@ -368,7 +368,7 @@ export const ERP_MODULES = [
         icon: 'productos',
         desc: 'Órdenes de trabajo técnicas importadas del archivo del proveedor',
         archivos: [
-          { id: 'work_orders_file', label: 'Work Orders', acciones: ['eliminar', 'importar'] },
+          { id: 'work_orders_file', label: 'Work Orders', acciones: ['editar', 'eliminar', 'importar', 'exportar'] },
         ]
       },
       {

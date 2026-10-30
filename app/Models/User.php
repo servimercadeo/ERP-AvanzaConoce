@@ -259,7 +259,7 @@ class User extends Authenticatable
      */
     public function datosDeSesion(): array
     {
-        return array_merge($this->only('id', 'name', 'email', 'rol', 'sede_id'), [
+        return array_merge($this->only('id', 'name', 'email', 'rol', 'sede_id', 'cedula', 'aliado_id'), [
             'permisos_denegados' => (!$this->rol || $this->rol === 'admin')
                 ? []
                 : PermisoDenegado::where('rol', $this->rol)->get(['modulo_id', 'submodulo_id', 'archivo_id', 'accion'])->toArray(),

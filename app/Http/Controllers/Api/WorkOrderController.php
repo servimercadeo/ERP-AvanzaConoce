@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Models\Vehiculo;
 use App\Models\WorkOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,7 +27,61 @@ class WorkOrderController extends Controller
             return response()->json($query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50));
         }
 
-        return response()->json($query->get());
+        // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con datos del
+        // técnico que la WO no trae (sede, vinculación, supervisor, aliado, vehículo
+        // asignado) en vez de dejarlos como "N/D" pudiéndolos sacar de su ficha.
+        return response()->json($this->conDatosDelTecnico($query->get()));
+    }
+
+    /**
+     * Agrega a cada WO los datos del técnico asignado (por `cedula_tecnico_agendado`, o
+     * `cedula_tecnico` si no trae agendado — mismo formato que `users.cedula`): no viven en
+     * `work_orders` pero si el técnico ya es empleado del ERP, ahí están. Una sola consulta
+     * por lote, no una por fila.
+     */
+    private function conDatosDelTecnico($workOrders)
+    {
+        $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+
+        $cedulas = $workOrders->map($cedulaAsignado)->filter()->unique()->values();
+        if ($cedulas->isEmpty()) {
+            return $workOrders;
+        }
+
+        $tecnicos = User::whereIn('cedula', $cedulas)
+            ->with('aliado:id,nombre')
+            ->get(['id', 'cedula', 'sede', 'tipo_vinculacion', 'jefe_inmediato', 'aliado_id'])
+            ->keyBy('cedula');
+
+        $vehiculosPorTecnico = Vehiculo::whereIn('tecnico_asignado_id', $tecnicos->pluck('id')->filter())
+            ->get(['placa', 'tecnico_asignado_id'])
+            ->keyBy('tecnico_asignado_id');
+
+        return $workOrders->map(function (WorkOrder $wo) use ($tecnicos, $vehiculosPorTecnico, $cedulaAsignado) {
+            $tecnico = $tecnicos->get($cedulaAsignado($wo));
+            $wo->sede_tecnico = $tecnico?->sede;
+            $wo->tipo_vinculacion_tecnico = $tecnico?->tipo_vinculacion;
+            $wo->supervisor_tecnico = $tecnico?->jefe_inmediato;
+            // "NA" (no "N/D"): si el técnico existe, SÍ sabemos si tiene aliado o no; "N/D"
+            // es solo para lo que el sistema no puede saber en absoluto.
+            $wo->subagente_aliado_tecnico = $tecnico ? ($tecnico->aliado?->nombre ?? 'NA') : null;
+            $wo->placa_vehiculo_tecnico = $tecnico ? $vehiculosPorTecnico->get($tecnico->id)?->placa : null;
+
+            // "Técnico Atiende" del exporte: un técnico indirecto (aliado) no puede cerrar su
+            // propia WO (ver update()), así que ahí se deja el mismo técnico agendado. Si es
+            // directo (o no está registrado en el ERP), manda quien la haya cerrado de verdad
+            // desde el sistema; si todavía nadie la cerró ahí (la mayoría: llegan ya cerradas
+            // en el archivo del proveedor), se usa el "Técnico Atiende" que trajo el import.
+            if ($tecnico && $tecnico->aliado_id) {
+                $wo->nombre_tecnico_atiende = $wo->tecnico_agendado ?: $wo->nombre_tecnico;
+                $wo->cedula_tecnico_atiende = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+            } else {
+                $wo->nombre_tecnico_atiende = $wo->nombre_tecnico_cierre ?: $wo->nombre_tecnico;
+                $wo->cedula_tecnico_atiende = $wo->cedula_tecnico_cierre ?: $wo->cedula_tecnico;
+            }
+
+            return $wo;
+        });
     }
 
     /** Total y opciones de los filtros (estados, proveedores) sin descargar las WOs. */
@@ -88,6 +144,39 @@ class WorkOrderController extends Controller
     }
 
     /**
+     * Cambia el estado de una WO. El rol "tecnico" solo puede tocar las que ya puede ver
+     * (las de su propia cédula, ver visibles()) y únicamente si es directo: un indirecto
+     * (aliado — tiene `aliado_id`) no puede cambiar el estado de su Work Order, solo verla.
+     * Cuando la cierra un técnico (directo) queda registrado en `*_cierre` para el exporte
+     * (ver conDatosDelTecnico, columna "Técnico Atiende"); si la cambia otro rol admin/
+     * operaciones no se toca, porque ese cambio no es un técnico cerrando su WO. Si el nuevo
+     * estado es "Finalizado" también se pone `fecha_finalizacion` (antes solo quedaba la de
+     * las WO que ya llegaban finalizadas por el import).
+     */
+    public function update(Request $request, WorkOrder $workOrder)
+    {
+        $data = $request->validate(['estado' => 'required|string|max:60']);
+        $user = $request->user();
+
+        if ($user->rol === 'tecnico') {
+            abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
+            abort_if($user->aliado_id, 403, 'Los técnicos aliados (indirectos) no pueden cambiar el estado de la Work Order.');
+
+            $workOrder->nombre_tecnico_cierre = $user->name;
+            $workOrder->cedula_tecnico_cierre = $user->cedula;
+        }
+
+        $workOrder->estado = $data['estado'];
+        $workOrder->fecha_estado = now();
+        if ($data['estado'] === 'Finalizado') {
+            $workOrder->fecha_finalizacion = now();
+        }
+        $workOrder->save();
+
+        return response()->json($workOrder);
+    }
+
+    /**
      * Importa/actualiza en bloque desde el Excel de origen: el frontend ya convirtió el
      * archivo a filas planas por nombre de columna, aquí solo se resuelven fechas
      * (tolerante: una fecha ilegible no bota la fila entera, solo esa columna queda null)
@@ -117,12 +206,33 @@ class WorkOrderController extends Controller
         // como una importación "exitosa" terminaba guardando todo vacío menos el WO.
         $items = $request->input('items');
 
-        $camposFecha = ['fecha_estado', 'fecha_creacion', 'fecha_vencimiento', 'fecha_finalizacion'];
+        $camposFecha = [
+            'fecha_estado', 'fecha_creacion', 'fecha_vencimiento', 'fecha_finalizacion',
+            'fecha_programacion', 'fecha_publicacion', 'fecha_cancelacion', 'fecha_pago',
+            'fecha_registro_material', 'fecha_registro_sin_material',
+            'estado_en_fecha', 'fecha_ultima_reasignacion',
+        ];
+        $camposEnteros = ['aging', 'dias_atraso', 'dias_atraso_sp', 'reiteracion_servicio'];
         $camposTexto = [
-            'estado', 'servicio', 'tipo_orden', 'prioridad', 'proveedor', 'cuadrilla_tecnico',
-            'nombre_tecnico', 'cedula_tecnico', 'modalidad', 'perimetro',
-            'departamento', 'municipio', 'barrio', 'direccion', 'inicio_agendado', 'fin_agendado',
-            'descripcion', 'region_servicio',
+            'estado', 'servicio', 'subproducto', 'tipo_orden', 'tipo_producto', 'se_paga', 'consignada',
+            'pago', 'prioridad', 'proveedor', 'cuadrilla_tecnico',
+            'nombre_tecnico', 'tecnico_agendado', 'cedula_tecnico_agendado', 'cedula_tecnico',
+            'modalidad', 'perimetro', 'perimetro_venta',
+            'departamento', 'municipio', 'barrio', 'direccion', 'tel_casa', 'no_documento_cliente',
+            'jornada', 'tecnologia', 'inicio_agendado', 'fin_agendado',
+            'descripcion', 'region_servicio', 'categoria', 'problema', 'nombre_cliente', 'apellido_cliente',
+            'estado_comercial', 'tipo_wo', 'tecnico_atendio_flag', 'wo_anterior', 'wo_fisica_ok', 'motivo',
+            'consumio_material', 'paga_por_directv', 'comision_pagada', 'valor_comision', 'prueba_calidad',
+            'numero_ticket_aprobacion', 'razon_prueba_calidad_fallida', 'contrato_enviado', 'registrado_por',
+            'modo_atencion', 'auxiliar', 'torre', 'conductor', 'tipo_auxilio', 'auxilio', 'aplica_auxilio',
+            'razon_cancelacion', 'observaciones_cancelacion',
+            // Del "Excel de origen del proveedor" (segundo formato de import):
+            'estado_descarga', 'estado_orden_trabajo', 'estado_visita', 'georreferencia',
+            'nombre_cuadrilla_tecnico', 'apellido_cuadrilla_tecnico', 'cambio_domicilio_entre_calles',
+            'pais', 'puntos_referencia', 'codigo_postal', 'agrupacion', 'telefono_principal', 'recursos',
+            'numero_visita', 'coordenada_x', 'coordenada_y', 'razones', 'numero_orden_trabajo', 'codigo_sl',
+            'clase_cliente', 'agendamiento_externo', 'descarga_materiales_obligatoria',
+            'descarga_materiales_confirmada', 'id_encabezado_pedido',
         ];
 
         $filas = [];
@@ -156,8 +266,11 @@ class WorkOrderController extends Controller
                 }
                 $valores[$campo] = $this->parsearFecha($fila[$campo]);
             }
-            if (array_key_exists('aging', $fila)) {
-                $valores['aging'] = is_numeric($fila['aging']) ? (int) $fila['aging'] : null;
+            foreach ($camposEnteros as $campo) {
+                if (!array_key_exists($campo, $fila)) {
+                    continue;
+                }
+                $valores[$campo] = is_numeric($fila[$campo]) ? (int) $fila[$campo] : null;
             }
 
             $llaveStr = $valores['numero_wo'] . '|' . ($tieneItem ? $valores['numero_item'] : '');
