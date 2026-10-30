@@ -18,6 +18,12 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Un archivo del build que ya no existe (pestaña abierta con la versión anterior) da 404,
+    # no la página de la app: así el navegador lo reporta como fallo de carga y recarga.
+    RewriteCond %{REQUEST_URI} ^/build/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
