@@ -224,7 +224,7 @@ class PedidosAutomaticosTest extends TestCase
         $pendiente = $this->crear(['estado' => 'Pendiente'])->assertCreated()->json('id');
         $this->assertSame(8, $this->camisa->fresh()->cantidad);
 
-        $this->actuarComo('th');
+        $this->actuarComo('admin'); // por defecto solo el admin elimina contratos
         $contrato = Contrato::where('empleado_id', $this->empleado->id)->firstOrFail();
         $this->deleteJson("/api/contratos/{$contrato->id}")->assertNoContent();
 

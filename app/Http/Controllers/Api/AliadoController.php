@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Aliado;
 use App\Models\User;
 use App\Models\WorkOrder;
+use App\Services\AltaAliadoEnAvanzaConoce;
+use App\Services\AltaEnAvanzaConoce;
 use App\Services\CredencialesAvanzaConoce;
 use App\Services\IdentidadUnica;
 use Illuminate\Http\Request;
@@ -31,10 +33,89 @@ class AliadoController extends Controller
     private const ESTADO_ATENDIDA = 'Atendido';
     private const ESTADO_FINALIZADA = 'Finalizado';
 
+    /** Teléfono / celular: números, con + inicial, espacios o guiones opcionales. */
+    private const REGEX_TELEFONO = '/^\+?[0-9][0-9 \-]{6,19}$/';
+    /** Nombres y apellidos: letras (con tildes y ñ), espacios, punto, guion y apóstrofo. */
+    private const REGEX_NOMBRE = "/^[\pL\s.'\-]+$/u";
+
+    /** Mensajes de validación en español (la app corre con locale "en" y sin traducciones). */
+    private const MENSAJES = [
+        'required'       => 'Completa el campo «:attribute».',
+        'string'         => 'El campo «:attribute» no es válido.',
+        'max'            => 'El campo «:attribute» admite máximo :max caracteres.',
+        'email'          => 'El correo «:input» no es válido. Escríbelo completo, ej. nombre@empresa.com.',
+        'in'             => 'Elige una opción válida en «:attribute».',
+        'integer'        => 'Elige una opción válida en «:attribute».',
+        'boolean'        => 'Elige una opción válida en «:attribute».',
+        'digits_between' => 'El campo «:attribute» debe tener solo números, entre :min y :max dígitos.',
+        'regex'          => 'El campo «:attribute» tiene un formato no válido.',
+        'unique'         => 'Ya existe un registro con ese «:attribute».',
+
+        'proyectos.required'   => 'Selecciona al menos un proyecto para el que trabaja el aliado (ej. DIRECTV o HUGHES COL).',
+        'proyectos.array'      => 'Selecciona al menos un proyecto para el que trabaja el aliado (ej. DIRECTV o HUGHES COL).',
+        'proyectos.min'        => 'Selecciona al menos un proyecto para el que trabaja el aliado (ej. DIRECTV o HUGHES COL).',
+        'proyectos.*.in'       => 'Uno de los proyectos marcados ya no está disponible en Parámetros > Proyectos. Recarga la página y vuelve a marcarlos.',
+        'proyectos.*.integer'  => 'Uno de los proyectos marcados no es válido. Recarga la página y vuelve a marcarlos.',
+        'proyectos.*.distinct' => 'Hay un proyecto marcado dos veces.',
+
+        'jefe_inmediato_id.required' => 'Selecciona el jefe inmediato del aliado.',
+        'jefe_inmediato_id.integer'  => 'Selecciona el jefe inmediato del aliado.',
+        'jefe_inmediato_id.in'       => 'El jefe inmediato debe ser un usuario activo del ERP que no sea técnico ni de rol general.',
+
+        'tipo_documento.in'     => 'El tipo de documento debe ser Cédula de ciudadanía, Cédula de extranjería o NIT.',
+        'documento.regex'       => 'El número de documento debe tener solo números, entre 5 y 15 dígitos (el NIT puede llevar el dígito de verificación, ej. 900123456-7).',
+        'documento.unique'      => 'Ya existe un aliado con ese número de documento.',
+        'cedula.digits_between' => 'La cédula debe tener solo números, entre 5 y 15 dígitos (sin puntos ni espacios).',
+        'telefono.regex'        => 'El teléfono debe tener solo números, ej. 3001234567 o 6041234567.',
+        'movil.regex'           => 'El celular debe tener solo números, ej. 3001234567.',
+        'nombres.regex'         => 'Los nombres solo pueden tener letras y espacios.',
+        'apellidos.regex'       => 'Los apellidos solo pueden tener letras y espacios.',
+        'email.unique'          => 'Ese correo ya lo usa otro usuario del ERP.',
+        'codigo_pdv.regex'      => 'El código punto de venta (PDV) debe tener solo números, ej. 39582.',
+        'modalidad_id_bt.required' => 'Selecciona la modalidad del aliado.',
+        'modalidad_id_bt.integer'  => 'Selecciona la modalidad del aliado.',
+        'modalidad_id_bt.in'       => 'La modalidad elegida no está en el catálogo de AvanzaConoce. Recarga la página y vuelve a elegirla.',
+    ];
+
+    /** Nombres de los campos como se ven en el formulario. */
+    private const ATRIBUTOS = [
+        'tipo'              => 'Tipo de aliado',
+        'tipo_documento'    => 'Tipo de documento',
+        'documento'         => 'Número de documento',
+        'nombre'            => 'Razón social o nombre',
+        'codigo_pdv'        => 'Código punto de venta (PDV)',
+        'modalidad_id_bt'   => 'Modalidad',
+        'telefono'          => 'Teléfono',
+        'correo'            => 'Correo',
+        'ciudad'            => 'Ciudad',
+        'direccion'         => 'Dirección',
+        'observaciones'     => 'Observaciones',
+        'proyectos'         => 'Proyecto(s)',
+        'jefe_inmediato_id' => 'Jefe inmediato',
+        'cedula'            => 'Cédula',
+        'nombres'           => 'Nombres',
+        'apellidos'         => 'Apellidos',
+        'movil'             => 'Celular',
+        'email'             => 'Correo',
+        'activo'            => 'Estado',
+    ];
+
     /** Proyectos de Parámetros que se le pueden asignar a un aliado (todos menos ADMINISTRATIVO). */
     public function proyectos()
     {
         return response()->json(Aliado::proyectosDisponibles());
+    }
+
+    /** Modalidades del aliado empresa (catálogo modalidades_bt de AvanzaConoce). */
+    public function modalidades()
+    {
+        return response()->json(Aliado::modalidadesDisponibles()->values());
+    }
+
+    /** Usuarios que se pueden elegir como jefe inmediato (todos menos técnicos y rol general). */
+    public function jefes()
+    {
+        return response()->json(Aliado::jefesDisponibles());
     }
 
     /**
@@ -53,7 +134,7 @@ class AliadoController extends Controller
             });
 
         if (! $request->has('page')) {
-            $aliados = (clone $query)->withCount('tecnicos')->with('proyectos:id,nombre')->orderBy('nombre')->get();
+            $aliados = (clone $query)->withCount('tecnicos')->with(['proyectos:id,nombre', 'jefeInmediato:id,name'])->orderBy('nombre')->get();
             $this->agregarConteos($aliados);
 
             return response()->json($aliados);
@@ -66,7 +147,7 @@ class AliadoController extends Controller
             'tecnicos' => User::whereIn('aliado_id', (clone $query)->select('id'))->count(),
         ];
 
-        $pagina = (clone $query)->withCount('tecnicos')->with('proyectos:id,nombre')->orderBy('nombre')->orderBy('id')->paginate(10);
+        $pagina = (clone $query)->withCount('tecnicos')->with(['proyectos:id,nombre', 'jefeInmediato:id,name'])->orderBy('nombre')->orderBy('id')->paginate(10);
         $this->agregarConteos($pagina->getCollection());
 
         return response()->json($pagina->toArray() + ['resumen' => $resumen]);
@@ -89,7 +170,7 @@ class AliadoController extends Controller
         $tecnicos->each(fn ($t) => $t->setAttribute('work_orders', $conteos[$t->id] ?? $this->conteoVacio()));
 
         $aliado->setRelation('tecnicos', $tecnicos);
-        $aliado->load('proyectos:id,nombre');
+        $aliado->load(['proyectos:id,nombre', 'jefeInmediato:id,name']);
         $aliado->setAttribute('work_orders', $this->conteosWorkOrders('users.aliado_id', [$aliado->id])[$aliado->id] ?? $this->conteoVacio());
 
         return response()->json($aliado);
@@ -110,58 +191,67 @@ class AliadoController extends Controller
 
     public function store(Request $request)
     {
-        $tipo = $request->validate(['tipo' => ['required', Rule::in([Aliado::EMPRESA, Aliado::TECNICO])]])['tipo'];
+        $tipo = $this->validar($request, ['tipo' => ['required', Rule::in([Aliado::EMPRESA, Aliado::TECNICO])]])['tipo'];
 
         if ($tipo === Aliado::EMPRESA) {
-            $data = $request->validate($this->reglasAliado());
+            $data = $this->validar($request, $this->reglasAliado());
             $aliado = DB::transaction(function () use ($data) {
                 $aliado = Aliado::create($data + ['tipo' => Aliado::EMPRESA]);
                 $aliado->proyectos()->sync($data['proyectos']);
                 return $aliado;
             });
 
-            return response()->json(['aliado' => $aliado->load('proyectos:id,nombre'), 'credenciales' => null], 201);
+            // Ya guardado en el ERP: su usuario en AvanzaConoce (rol Aliado, con PDV, modalidad
+            // y su líder como supervisor). Si allá falla, el aliado queda creado igual.
+            $credenciales = app(AltaAliadoEnAvanzaConoce::class)->sincronizar($aliado);
+
+            return response()->json(['aliado' => $aliado->fresh()->load(['proyectos:id,nombre', 'jefeInmediato:id,name']), 'credenciales' => $credenciales], 201);
         }
 
         // Tipo técnico: los datos de la persona sirven para el aliado y para su usuario técnico.
         // Su documento puede ser CC, CE o NIT; el NIT de una persona natural es su cédula más
         // el dígito de verificación ("1234567-8"), así que su usuario queda con la cédula.
-        $data = $request->validate(array_merge($this->reglasTecnico(), [
+        $data = $this->validar($request, array_merge($this->reglasTecnico(), [
             'tipo_documento' => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
-            'cedula'         => ['required', 'regex:/^[0-9]{5,15}(-[0-9])?$/'],
-            'ciudad'         => 'nullable|string|max:100',
-            'direccion'      => 'nullable|string|max:255',
+            'cedula'         => ['required', 'regex:/^[0-9]{5,15}(-[0-9])?$/', 'unique:aliados,documento'],
+            'ciudad'         => 'required|string|max:100',
+            'direccion'      => 'required|string|max:255',
             'observaciones'  => 'nullable|string|max:2000',
-        ], $this->reglasProyectos()), [
-            'cedula.regex' => 'El número de documento debe tener solo números (el NIT puede llevar el dígito de verificación, ej. 1234567-8).',
+        ], $this->reglasProyectos(), $this->reglasJefe()), ['cedula' => 'Número de documento'], [
+            'cedula.regex'  => 'El número de documento debe tener solo números, entre 5 y 15 dígitos (el NIT puede llevar el dígito de verificación, ej. 1234567-8).',
+            'cedula.unique' => 'Ya existe un aliado con ese número de documento.',
         ]);
         if ($data['tipo_documento'] !== 'NIT' && str_contains($data['cedula'], '-')) {
-            throw ValidationException::withMessages(['cedula' => 'La cédula debe tener solo números.']);
+            throw ValidationException::withMessages(['cedula' => 'La cédula debe tener solo números: el guion con dígito de verificación solo aplica al NIT.']);
         }
-        $request->validate(['cedula' => 'unique:aliados,documento'], [
-            'cedula.unique' => 'Ya existe un aliado con ese documento.',
-        ]);
         $documento = $data['cedula'];
         $data['cedula'] = explode('-', $documento)[0];
 
-        [$aliado, $credenciales] = DB::transaction(function () use ($data, $documento) {
+        [$aliado, $tecnico, $credenciales] = DB::transaction(function () use ($data, $documento) {
             $aliado = Aliado::create([
                 'tipo'           => Aliado::TECNICO,
                 'tipo_documento' => $data['tipo_documento'],
                 'documento'      => $documento,
                 'nombre'         => $this->nombreCompleto($data),
                 'telefono'       => $data['movil'],
-                'correo'         => $data['email'] ?? null,
-                'ciudad'         => $data['ciudad'] ?? null,
-                'direccion'      => $data['direccion'] ?? null,
+                'correo'         => $data['email'],
+                'ciudad'         => $data['ciudad'],
+                'direccion'      => $data['direccion'],
                 'observaciones'  => $data['observaciones'] ?? null,
+                'jefe_inmediato_id' => $data['jefe_inmediato_id'],
             ]);
             $aliado->proyectos()->sync($data['proyectos']);
 
-            return [$aliado, $this->crearTecnico($aliado, $data)];
+            return [$aliado, ...$this->crearTecnico($aliado, $data)];
         });
 
-        return response()->json(['aliado' => $aliado->load('proyectos:id,nombre'), 'credenciales' => $credenciales], 201);
+        // Ya guardado en el ERP: también se crea su usuario en AvanzaConoce, con la misma
+        // contraseña y el mismo rol del técnico directo. Si AvanzaConoce falla, el aliado
+        // queda creado igual y el alta allá se reintenta sola (avanza:sincronizar-usuarios).
+        $credenciales = app(AltaEnAvanzaConoce::class)->sincronizar($tecnico->fresh(), $credenciales);
+        $credenciales = $this->credencialesParaMostrar($tecnico, $credenciales) + ['avanza' => $credenciales['avanza']];
+
+        return response()->json(['aliado' => $aliado->load(['proyectos:id,nombre', 'jefeInmediato:id,name']), 'credenciales' => $credenciales], 201);
     }
 
     public function update(Request $request, Aliado $aliado)
@@ -169,16 +259,22 @@ class AliadoController extends Controller
         $reglas = $this->reglasAliado($aliado) + ['activo' => 'sometimes|boolean'];
         // El documento del aliado tipo técnico es la cédula de su usuario: no se cambia aquí.
         if ($aliado->tipo === Aliado::TECNICO) {
-            unset($reglas['tipo_documento'], $reglas['documento']);
+            unset($reglas['tipo_documento'], $reglas['documento'], $reglas['codigo_pdv'], $reglas['modalidad_id_bt']);
         }
 
-        $data = $request->validate($reglas);
+        $data = $this->validar($request, $reglas);
         DB::transaction(function () use ($aliado, $data) {
             $aliado->update($data);
             $aliado->proyectos()->sync($data['proyectos']);
         });
 
-        return response()->json($aliado->fresh()->load('proyectos:id,nombre'));
+        // AvanzaConoce rechazó un dato (correo o teléfono de otra persona...): al corregirlo
+        // aquí vuelve a quedar pendiente y el reintento lo crea.
+        if ($aliado->avanza_sync_estado === AltaEnAvanzaConoce::CONFLICTO && $aliado->wasChanged(['correo', 'telefono', 'documento', 'nombre'])) {
+            $aliado->forceFill(['avanza_sync_estado' => AltaEnAvanzaConoce::PENDIENTE])->saveQuietly();
+        }
+
+        return response()->json($aliado->fresh()->load(['proyectos:id,nombre', 'jefeInmediato:id,name']));
     }
 
     public function destroy(Aliado $aliado)
@@ -201,8 +297,9 @@ class AliadoController extends Controller
             return response()->json(['message' => 'Solo a un aliado empresa se le agregan técnicos: el aliado indirecto es una sola persona.'], 422);
         }
 
-        $data = $request->validate($this->reglasTecnico());
-        $credenciales = DB::transaction(fn () => $this->crearTecnico($aliado, $data));
+        $data = $this->validar($request, $this->reglasTecnico());
+        [$tecnico, $credenciales] = DB::transaction(fn () => $this->crearTecnico($aliado, $data));
+        $credenciales = $this->credencialesParaMostrar($tecnico, $credenciales);
 
         return response()->json(['credenciales' => $credenciales], 201);
     }
@@ -211,10 +308,10 @@ class AliadoController extends Controller
     {
         abort_unless($tecnico->aliado_id === $aliado->id, 404);
 
-        $data = $request->validate([
-            'nombres'   => 'required|string|max:100',
-            'apellidos' => 'required|string|max:100',
-            'movil'     => 'required|string|max:20',
+        $data = $this->validar($request, [
+            'nombres'   => ['required', 'string', 'max:100', 'regex:' . self::REGEX_NOMBRE],
+            'apellidos' => ['required', 'string', 'max:100', 'regex:' . self::REGEX_NOMBRE],
+            'movil'     => ['required', 'string', 'max:20', 'regex:' . self::REGEX_TELEFONO],
             'email'     => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($tecnico->id)],
             'activo'    => 'sometimes|boolean',
         ]);
@@ -232,6 +329,7 @@ class AliadoController extends Controller
         return response()->json($tecnico->fresh());
     }
 
+    /** @return array{0: User, 1: array} el técnico y sus credenciales (CredencialesAvanzaConoce::paraAlta). */
     private function crearTecnico(Aliado $aliado, array $data): array
     {
         $cedula = trim($data['cedula']);
@@ -244,8 +342,7 @@ class AliadoController extends Controller
                 : "La cédula {$cedula} ya existe en el ERP (empleado o usuario). Los técnicos directos se gestionan en Empleados."]);
         }
 
-        // Sin correo se usa el técnico "{cédula}@avanzaconoce.com", como en Contratos.
-        $email = IdentidadUnica::normalizarCorreo($data['email'] ?? '') ?: "{$cedula}@avanzaconoce.com";
+        $email = IdentidadUnica::normalizarCorreo($data['email']);
         if (User::where('email', $email)->exists()) {
             throw ValidationException::withMessages(['email' => "El correo {$email} ya está registrado en el ERP."]);
         }
@@ -269,6 +366,11 @@ class AliadoController extends Controller
         ]);
         $tecnico->forceFill(['rol' => 'tecnico', 'aliado_id' => $aliado->id])->save();
 
+        return [$tecnico, $credenciales];
+    }
+
+    private function credencialesParaMostrar(User $tecnico, array $credenciales): array
+    {
         return [
             'nombre'    => $tecnico->name,
             'email'     => $tecnico->email,
@@ -287,19 +389,35 @@ class AliadoController extends Controller
         }
     }
 
+    /** Valida con los mensajes y nombres de campo en español. */
+    private function validar(Request $request, array $reglas, array $atributos = [], array $mensajes = []): array
+    {
+        return $request->validate($reglas, $mensajes + self::MENSAJES, $atributos + self::ATRIBUTOS);
+    }
+
+    /** Todos obligatorios menos Observaciones. */
     private function reglasAliado(?Aliado $aliado = null): array
     {
         return [
             'tipo_documento'  => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
-            'documento'       => ['required', 'string', 'max:20', 'regex:/^[0-9][0-9\-]*$/', Rule::unique('aliados', 'documento')->ignore($aliado?->id)],
+            'documento'       => ['required', 'string', 'max:20', 'regex:/^[0-9]{5,15}(-[0-9])?$/', Rule::unique('aliados', 'documento')->ignore($aliado?->id)],
             'nombre'          => 'required|string|max:150',
-            'contacto_nombre' => 'nullable|string|max:150',
-            'telefono'        => 'nullable|string|max:20',
-            'correo'          => 'nullable|email|max:150',
-            'ciudad'          => 'nullable|string|max:100',
-            'direccion'       => 'nullable|string|max:255',
+            'codigo_pdv'      => ['required', 'string', 'regex:/^[0-9]{1,20}$/'],
+            'modalidad_id_bt' => ['required', 'integer', Rule::in(Aliado::modalidadesDisponibles()->pluck('id_bt')->all())],
+            'telefono'        => ['required', 'string', 'max:20', 'regex:' . self::REGEX_TELEFONO],
+            'correo'          => 'required|email|max:150',
+            'ciudad'          => 'required|string|max:100',
+            'direccion'       => 'required|string|max:255',
             'observaciones'   => 'nullable|string|max:2000',
-        ] + $this->reglasProyectos();
+        ] + $this->reglasProyectos() + $this->reglasJefe();
+    }
+
+    /** Jefe inmediato: obligatorio, uno de los usuarios que ofrece jefes(). */
+    private function reglasJefe(): array
+    {
+        return [
+            'jefe_inmediato_id' => ['required', 'integer', Rule::in(Aliado::jefesDisponibles()->pluck('id')->all())],
+        ];
     }
 
     /** Proyectos (ids de Parámetros) para los que trabaja el aliado: al menos uno, puede ser varios. */
@@ -315,10 +433,10 @@ class AliadoController extends Controller
     {
         return [
             'cedula'    => 'required|digits_between:5,15',
-            'nombres'   => 'required|string|max:100',
-            'apellidos' => 'required|string|max:100',
-            'movil'     => 'required|string|max:20',
-            'email'     => 'nullable|email|max:150',
+            'nombres'   => ['required', 'string', 'max:100', 'regex:' . self::REGEX_NOMBRE],
+            'apellidos' => ['required', 'string', 'max:100', 'regex:' . self::REGEX_NOMBRE],
+            'movil'     => ['required', 'string', 'max:20', 'regex:' . self::REGEX_TELEFONO],
+            'email'     => 'required|email|max:150',
         ];
     }
 

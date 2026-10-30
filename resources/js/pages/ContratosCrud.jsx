@@ -39,6 +39,8 @@ const CAMPOS_IMPORT_LABEL = {
 
 const TIPOS_CUENTA = ["Ahorros", "Corriente"];
 const ESTADOS_CONTRATO = ["Vigente", "Finalizado", "Traslado", "Finalizado traslado", "No ingreso"];
+// Contrato "Finalizado": por qué terminó.
+const MOTIVOS_FINALIZACION = ["Terminación", "Voluntario"];
 
 const COLORES_ESTADO = {
     "Vigente":             ["#e0f7f4", "#0d6e5a"],
@@ -121,6 +123,7 @@ const EMPTY_FORM = {
     tipo_cuenta: "",
     cuenta_bancaria: "",
     estado_contrato: "Vigente",
+    motivo_finalizacion: "",
     empleador: "",
     empresa: "",
     cliente_proyecto: "",
@@ -734,6 +737,7 @@ function Modal({
                 sede:               matchOpt(initial.sede,               catalogs.sedes)              ?? initial.sede               ?? "",
                 tipo_contrato:      matchOpt(initial.tipo_contrato,      TIPOS_CONTRATO)              ?? initial.tipo_contrato      ?? "",
                 estado_contrato:    matchOpt(initial.estado_contrato,    ESTADOS_CONTRATO)            ?? initial.estado_contrato    ?? "",
+                motivo_finalizacion: matchOpt(initial.motivo_finalizacion, MOTIVOS_FINALIZACION)      ?? initial.motivo_finalizacion ?? "",
                 tipo_vinculacion:   matchOpt(initial.tipo_vinculacion,   catalogs.tipos_vinculacion)  ?? initial.tipo_vinculacion   ?? "",
                 arl:                matchOpt(initial.arl,                catalogs.arls)               ?? initial.arl                ?? "",
                 caja_compensacion:  matchOpt(initial.caja_compensacion,  catalogs.cajas)              ?? initial.caja_compensacion  ?? "",
@@ -1067,6 +1071,11 @@ function Modal({
         if (!form.cargo) e.cargo = "Requerido";
         if (!form.sede) e.sede = "Requerido";
         if (!form.fecha_ingreso) e.fecha_ingreso = "Requerido";
+        // Al dejarlo Finalizado (nuevo, o que antes no lo estaba) hay que decir por qué.
+        if (form.estado_contrato === "Finalizado" && !form.motivo_finalizacion
+            && initial?.estado_contrato !== "Finalizado") {
+            e.motivo_finalizacion = "Selecciona Terminación o Voluntario";
+        }
 
         const ccList = form.centros_costos || [];
         const filaIncompleta = ccList.some(
@@ -1399,6 +1408,15 @@ function Modal({
                                     req
                                     {...fp}
                                 />
+                                {form.estado_contrato === "Finalizado" && (
+                                    <Field
+                                        label="Motivo de finalización"
+                                        k="motivo_finalizacion"
+                                        opts={MOTIVOS_FINALIZACION}
+                                        req
+                                        {...fp}
+                                    />
+                                )}
                             </div>
                             <div className="form-grid" style={{ ...S.grid3, marginTop: 16 }}>
                                 <Field
@@ -2664,6 +2682,10 @@ export default function ContratosCrud() {
         };
     }, [modalOpen, viewOpen, filterOpen]);
 
+    // Eliminar contrato: solo si la matriz de Permisos le da "Eliminar" al rol (por defecto, solo admin).
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
     const showToast = (msg, ms = 3000) => {
         setToast(msg);
         setTimeout(() => setToast(null), ms);
@@ -2745,6 +2767,27 @@ export default function ContratosCrud() {
         }),
         [contratos],
     );
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        try {
+            await api.delete(`/contratos/${deleteTarget.id}`);
+            setContratos((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+            qc.invalidateQueries({ queryKey: ["contratos"] });
+            qc.invalidateQueries({ queryKey: ["empleados"] });
+            qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
+            qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+            showToast("Contrato eliminado.");
+            setDeleteTarget(null);
+        } catch (err) {
+            showToast(err?.response?.status === 403
+                ? "Tu rol no tiene permiso para eliminar contratos."
+                : err?.response?.data?.message ?? "No se pudo eliminar el contrato.", 5000);
+        } finally {
+            setDeleting(false);
+        }
+    };
 
     const handleSave = async (form) => {
         try {
@@ -3225,6 +3268,13 @@ export default function ContratosCrud() {
                                             >
                                                 <IconEdit />
                                             </button>}
+                                            {puede.eliminar && <button
+                                                style={S.actionBtn("#fce8e8", "#a33")}
+                                                title="Eliminar"
+                                                onClick={() => setDeleteTarget(c)}
+                                            >
+                                                <IconTrash size={14} />
+                                            </button>}
                                         </div>
                                     </td>
                                 </tr>
@@ -3233,6 +3283,33 @@ export default function ContratosCrud() {
                     </table>
                 )}
             </div>
+
+            {deleteTarget && (
+                <div style={S.overlay}>
+                    <div style={{ ...S.modal, maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+                        <div style={S.modalHeaderGreen}>
+                            <span style={S.modalTitleWhite}>Eliminar contrato</span>
+                            <button style={S.closeBtnWhite} onClick={() => !deleting && setDeleteTarget(null)}>
+                                <IconClose size={14} />
+                            </button>
+                        </div>
+                        <div style={{ padding: 24, lineHeight: 1.6 }}>
+                            ¿Eliminar el contrato de <strong>{deleteTarget.empleado?.nombres} {deleteTarget.empleado?.apellidos}</strong>
+                            {deleteTarget.cargo ? <> ({deleteTarget.cargo})</> : null}?
+                            <p style={{ margin: "10px 0 0", color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                                Esta acción no se puede deshacer. Si el empleado aún no tenía alta y se queda sin contratos,
+                                también se elimina su usuario pendiente (su proceso de selección se conserva).
+                            </p>
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button style={S.btnSecondary} onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</button>
+                            <button style={{ ...S.btnPrimary, background: "#c0392b" }} onClick={handleDelete} disabled={deleting}>
+                                {deleting ? "Eliminando…" : "Eliminar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {importOpen && (
                 <div style={S.overlay}>

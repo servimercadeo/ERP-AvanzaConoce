@@ -80,8 +80,8 @@ class PermisosTest extends TestCase
     private function guardarMatriz(callable $cambio): void
     {
         $this->actuarComo('admin');
-        $filas = PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id'])
-            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id', 'archivo_id'));
+        $filas = PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id', 'accion'])
+            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id', 'archivo_id', 'accion'));
         $this->putJson('/api/permisos', ['denegados' => $cambio($filas)->values()->all()])->assertOk();
     }
 

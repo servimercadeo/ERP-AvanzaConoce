@@ -160,7 +160,7 @@ export const ERP_MODULES = [
         archivos: [
           { id: 'avales_contratacion', label: 'Avales de Contratación', acciones: ['editar'] },
           { id: 'respuestas_formulario', label: 'Respuestas Nuevos Ingresos', acciones: ['eliminar'] },
-          { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos', acciones: ['crear', 'editar', 'importar', 'exportar'] },
+          { id: 'ver_crear_contratos', label: 'Ver y Crear Contratos', acciones: ['crear', 'editar', 'eliminar', 'importar', 'exportar'] },
           { id: 'Seguros_medicos', label: 'Seguimiento', acciones: ['editar'] },
           { id: 'centros_costos_catalogo', label: 'Centros de Costos', acciones: ['crear', 'editar', 'eliminar'] },
           // { id: 'auxilios_contratos', label: 'Auxilios Contratos' },

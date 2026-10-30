@@ -26,6 +26,10 @@ class Contrato extends Model
         return $nombre !== '' ? $nombre : ($this->empleado?->name ?? ('#' . $this->id));
     }
 
+    public const FINALIZADO = 'Finalizado';
+    /** Motivo de un contrato Finalizado. */
+    public const MOTIVOS_FINALIZACION = ['Terminación', 'Voluntario'];
+
     protected $fillable = [
         'id_macaw',
         'empleado_id',
@@ -54,6 +58,7 @@ class Contrato extends Model
         'tipo_cuenta',
         'cuenta_bancaria',
         'estado_contrato',
+        'motivo_finalizacion',
         'completado',
         'empleador',
         'empresa',

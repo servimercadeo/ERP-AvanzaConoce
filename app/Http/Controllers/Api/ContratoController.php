@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ContratoController extends Controller
@@ -421,6 +422,7 @@ class ContratoController extends Controller
             'tipo_cuenta'             => 'nullable|string|max:30',
             'cuenta_bancaria'         => 'nullable|string|max:30',
             'estado_contrato'         => 'nullable|string',
+            'motivo_finalizacion'     => ['nullable', Rule::in(Contrato::MOTIVOS_FINALIZACION)],
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
@@ -443,6 +445,7 @@ class ContratoController extends Controller
         }
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
+        $data = $this->motivoFinalizacion($data);
 
         return DB::transaction(function() use ($data) {
             $data['completado'] = true;
@@ -548,6 +551,7 @@ class ContratoController extends Controller
             'tipo_cuenta'             => 'nullable|string|max:30',
             'cuenta_bancaria'         => 'nullable|string|max:30',
             'estado_contrato'         => 'nullable|string',
+            'motivo_finalizacion'     => ['nullable', Rule::in(Contrato::MOTIVOS_FINALIZACION)],
             'empleador'               => 'nullable|string',
             'empresa'                 => 'nullable|string',
             'cliente_proyecto'        => 'nullable|string',
@@ -573,6 +577,7 @@ class ContratoController extends Controller
         }
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
+        $data = $this->motivoFinalizacion($data, $contrato);
 
         $result = DB::transaction(function() use ($contrato, $data) {
             $data['completado'] = true;
@@ -614,6 +619,34 @@ class ContratoController extends Controller
         app(\App\Services\EmpleadoSyncService::class)->syncDesdeContrato($result);
 
         return response()->json($result);
+    }
+
+    /**
+     * Motivo de finalización (Terminación / Voluntario): obligatorio al pasar un contrato a
+     * "Finalizado" desde la edición; si el contrato no queda Finalizado, se borra. Al crear
+     * no se exige en el servidor: "Importar Excel" también crea por aquí contratos
+     * históricos ya finalizados sin ese dato (el formulario sí lo pide).
+     */
+    private function motivoFinalizacion(array $data, ?Contrato $contrato = null): array
+    {
+        $estado = array_key_exists('estado_contrato', $data) ? $data['estado_contrato'] : $contrato?->estado_contrato;
+
+        if ($estado !== Contrato::FINALIZADO) {
+            if ($contrato?->motivo_finalizacion || array_key_exists('motivo_finalizacion', $data)) {
+                $data['motivo_finalizacion'] = null;
+            }
+            return $data;
+        }
+
+        $motivo = array_key_exists('motivo_finalizacion', $data) ? $data['motivo_finalizacion'] : $contrato?->motivo_finalizacion;
+        $pasaAFinalizado = $contrato && $contrato->estado_contrato !== Contrato::FINALIZADO;
+        if ($pasaAFinalizado && !$motivo) {
+            throw ValidationException::withMessages([
+                'motivo_finalizacion' => 'Selecciona el motivo de finalización del contrato: Terminación o Voluntario.',
+            ]);
+        }
+
+        return $data;
     }
 
     public function destroy(Contrato $contrato)

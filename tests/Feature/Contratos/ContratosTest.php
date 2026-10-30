@@ -198,13 +198,81 @@ class ContratosTest extends TestCase
 
     // ── Listado y baja ───────────────────────────────────────────────────────
 
+    public function test_al_finalizar_el_contrato_se_pide_el_motivo(): void
+    {
+        $id = $this->postJson('/api/contratos', $this->payload(['estado_contrato' => 'Vigente']))->assertCreated()->json('id');
+
+        // Pasarlo a Finalizado sin motivo: error claro en español.
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Finalizado']))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.motivo_finalizacion.0', 'Selecciona el motivo de finalización del contrato: Terminación o Voluntario.');
+        // Solo Terminación o Voluntario.
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Despido']))
+            ->assertJsonValidationErrors('motivo_finalizacion');
+
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Voluntario']))->assertOk();
+        $this->assertDatabaseHas('contratos', ['id' => $id, 'estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Voluntario']);
+
+        // Ya finalizado: editar otros datos no vuelve a pedirlo y lo conserva.
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Finalizado', 'salario' => 2100000]))->assertOk();
+        $this->assertDatabaseHas('contratos', ['id' => $id, 'motivo_finalizacion' => 'Voluntario']);
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Terminación']))->assertOk();
+        $this->assertDatabaseHas('contratos', ['id' => $id, 'motivo_finalizacion' => 'Terminación']);
+
+        // Si vuelve a Vigente (o pasa a otro estado), el motivo se borra.
+        $this->putJson("/api/contratos/$id", $this->payload(['estado_contrato' => 'Vigente', 'motivo_finalizacion' => 'Terminación']))->assertOk();
+        $this->assertDatabaseHas('contratos', ['id' => $id, 'estado_contrato' => 'Vigente', 'motivo_finalizacion' => null]);
+    }
+
+    public function test_crear_contrato_finalizado_guarda_el_motivo_y_la_importacion_no_lo_exige(): void
+    {
+        $this->postJson('/api/contratos', $this->payload(['estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Terminación']))
+            ->assertCreated()->assertJsonPath('motivo_finalizacion', 'Terminación');
+        // Importar Excel crea contratos históricos ya finalizados sin ese dato.
+        $otro = $this->usuario('general', ['cedula' => '7001']);
+        $this->postJson('/api/contratos', $this->payload(['empleado_id' => $otro->id, 'estado_contrato' => 'Finalizado']))
+            ->assertCreated()->assertJsonPath('motivo_finalizacion', null);
+        // Fuera de Finalizado no se guarda.
+        $tercero = $this->usuario('general', ['cedula' => '7002']);
+        $this->postJson('/api/contratos', $this->payload(['empleado_id' => $tercero->id, 'estado_contrato' => 'Vigente', 'motivo_finalizacion' => 'Voluntario']))
+            ->assertCreated()->assertJsonPath('motivo_finalizacion', null);
+    }
+
     public function test_listar_ver_y_eliminar_contratos(): void
     {
         $id = $this->postJson('/api/contratos', $this->payload())->json('id');
 
         $this->getJson('/api/contratos')->assertOk()->assertJsonFragment(['id' => $id]);
+        // Por defecto solo el admin elimina contratos.
+        $this->deleteJson("/api/contratos/$id")->assertForbidden();
+        $this->actuarComo('admin');
         $this->deleteJson("/api/contratos/$id")->assertNoContent();
         $this->assertDatabaseMissing('contratos', ['id' => $id]);
+    }
+
+    public function test_eliminar_contratos_se_habilita_por_rol_desde_la_matriz(): void
+    {
+        $id = $this->postJson('/api/contratos', $this->payload())->json('id');
+        $destino = ['modulo_id' => 'administrativo', 'submodulo_id' => 'admin_contratos', 'archivo_id' => 'ver_crear_contratos', 'accion' => 'eliminar'];
+
+        // Viene negado para todos los roles gestionables.
+        foreach (\App\Models\PermisoDenegado::ROLES_GESTIONABLES as $rol) {
+            $this->assertDatabaseHas('permisos_denegados', ['rol' => $rol] + $destino);
+        }
+        $this->deleteJson("/api/contratos/$id")->assertForbidden();
+
+        // El admin se lo habilita a TH en la matriz (quita esa negación y conserva las demás).
+        $this->actuarComo('admin');
+        $filas = \App\Models\PermisoDenegado::all(['rol', 'modulo_id', 'submodulo_id', 'archivo_id', 'accion'])
+            ->map(fn ($f) => $f->only('rol', 'modulo_id', 'submodulo_id', 'archivo_id', 'accion'))
+            ->reject(fn ($f) => $f == ['rol' => 'th'] + $destino);
+        $this->putJson('/api/permisos', ['denegados' => $filas->values()->all()])->assertOk();
+
+        $this->actuarComo('th');
+        $this->getJson('/api/contratos')->assertOk();
+        $this->deleteJson("/api/contratos/$id")->assertNoContent();
+        // Los demás roles siguen sin poder.
+        $this->assertDatabaseHas('permisos_denegados', ['rol' => 'tic'] + $destino);
     }
 
     // ── Pedido automático de dotación al crear el contrato ───────────────────

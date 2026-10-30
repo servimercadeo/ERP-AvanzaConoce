@@ -38,6 +38,12 @@ class AltaEnAvanzaConoce
      */
     public const REINTENTABLES = [self::PENDIENTE, self::ERROR, self::SIN_ROL];
 
+    /** Empresa y empleador de los técnicos indirectos (opciones del formulario de AvanzaConoce). */
+    public const EMPRESA_TECNICOS_INDIRECTOS = 'SERVIMERCADEO COL';
+    public const EMPLEADOR_TECNICOS_INDIRECTOS = 'SERVIMERCADEO';
+    /** Cargo de todo técnico indirecto (catálogo `cargo` de AvanzaConoce). */
+    public const CARGO_TECNICOS_INDIRECTOS = 'TÉCNICO DE INSTALACIONES';
+
     public static function activo(): bool
     {
         return config('sso.crear_usuarios_en_avanza')
@@ -87,7 +93,10 @@ class AltaEnAvanzaConoce
         }
 
         // Contrato más reciente: de ahí salen proyecto, fecha de ingreso, empleador y regional.
-        $contrato = $user->contratos()->with('regional')->orderByDesc('fecha_ingreso')->orderByDesc('id')->first();
+        // El técnico indirecto (de un aliado) no tiene contrato: sus datos salen del aliado.
+        $contrato = $user->aliado_id
+            ? null
+            : $user->contratos()->with('regional')->orderByDesc('fecha_ingreso')->orderByDesc('id')->first();
         $rol = RolAvanzaConoce::para($user, $contrato?->cliente_proyecto);
         if ($rol === null) {
             return $this->fallo($user, self::SIN_ROL, sprintf(
@@ -103,7 +112,7 @@ class AltaEnAvanzaConoce
                 ->acceptJson()
                 ->timeout((int) config('sso.avanzaconoce_timeout', 10))
                 ->connectTimeout(5)
-                ->post($url, $this->payload($user, $contrato, $rol));
+                ->post($url, $user->aliado_id ? $this->payloadTecnicoIndirecto($user, $rol) : $this->payload($user, $contrato, $rol));
         } catch (\Throwable $e) {
             Log::warning("AvanzaConoce: no se pudo crear el usuario de la cédula {$user->cedula}: {$e->getMessage()}");
             return $this->fallo($user, self::ERROR, 'AvanzaConoce no respondió. Se reintentará automáticamente.');
@@ -228,6 +237,44 @@ class AltaEnAvanzaConoce
             'licencia_moto_vence'  => $fecha($user->licencia_moto_vence),
             'tiene_cert_alturas'   => (bool) $user->tiene_cert_alturas,
             'cert_alturas_vence'   => $fecha($user->cert_alturas_vence),
+        ];
+    }
+
+    /**
+     * Técnico indirecto (aliado / técnico indirecto de Operaciones > Aliados): mismo rol que
+     * el técnico directo (rol_erp "tecnico": allá queda como "Empleado" del portal "Solo
+     * Ausentismos", proceso OPERACIONES), con lo que pide el formulario del aliado más
+     * cargo Técnico de instalaciones, empresa y empleador Servimercadeo y tipo Indirecto. El
+     * país lo pone AvanzaConoce (config erp.pais). Lo demás (EPS, banco, sede...) va vacío.
+     */
+    private function payloadTecnicoIndirecto(User $user, string $rol): array
+    {
+        $aliado = $user->aliado()->with(['proyectos:id,nombre', 'jefeInmediato:id,name,email'])->first();
+        $jefe = $aliado?->jefeInmediato;
+
+        return [
+            'rol_avanza'        => $rol,
+            'rol_erp'           => $user->rol,
+            'proyecto'          => $aliado?->proyectos->pluck('nombre')->implode(', ') ?: null,
+            'erp_user_id'       => $user->id,
+            'cedula'            => trim((string) $user->cedula),
+            'password_hash'     => $user->getAuthPassword(),
+
+            'nombres'           => $user->nombres,
+            'apellidos'         => $user->apellidos,
+            'name'              => $user->name,
+            'email'             => mb_strtolower(trim((string) $user->email)),
+            'email_contacto'    => mb_strtolower(trim((string) $user->email)),
+            'movil'             => trim((string) $user->movil),
+            'direccion'         => $aliado?->direccion,
+            'ciudad'            => $aliado?->ciudad,
+
+            'cargo'             => self::CARGO_TECNICOS_INDIRECTOS,
+            'empresa'           => self::EMPRESA_TECNICOS_INDIRECTOS,
+            'empleador'         => self::EMPLEADOR_TECNICOS_INDIRECTOS,
+            'tipo_vinculacion'  => 'Indirecto',
+            'jefe_inmediato_nombre' => $jefe?->name,
+            'jefe_inmediato_correo' => $jefe ? mb_strtolower(trim((string) $jefe->email)) : null,
         ];
     }
 

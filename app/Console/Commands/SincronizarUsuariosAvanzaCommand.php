@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Aliado;
 use App\Models\User;
+use App\Services\AltaAliadoEnAvanzaConoce;
 use App\Services\AltaEnAvanzaConoce;
 use Illuminate\Console\Command;
 
@@ -18,7 +20,7 @@ class SincronizarUsuariosAvanzaCommand extends Command
 
     protected $description = 'Reintenta crear en AvanzaConoce los empleados con alta pendiente o fallida';
 
-    public function handle(AltaEnAvanzaConoce $avanza): int
+    public function handle(AltaEnAvanzaConoce $avanza, AltaAliadoEnAvanzaConoce $avanzaAliados): int
     {
         if (!AltaEnAvanzaConoce::activo()) {
             $this->info('La creación de usuarios en AvanzaConoce está apagada (AVANZACONOCE_CREAR_USUARIOS).');
@@ -43,6 +45,28 @@ class SincronizarUsuariosAvanzaCommand extends Command
         }
 
         $this->info("Sincronizados {$ok} de {$usuarios->count()}.");
+
+        // Aliados empresa (su usuario de AvanzaConoce no es un usuario del ERP).
+        $aliados = Aliado::where('tipo', Aliado::EMPRESA)
+            ->whereIn('avanza_sync_estado', AltaEnAvanzaConoce::REINTENTABLES)
+            ->where('activo', true)
+            ->orderBy('avanza_sync_at')
+            ->limit((int) $this->option('limite'))
+            ->get();
+
+        $okAliados = 0;
+        foreach ($aliados as $aliado) {
+            $resultado = $avanzaAliados->enviar($aliado);
+            if ($resultado['estado'] === AltaEnAvanzaConoce::OK) {
+                $okAliados++;
+            } else {
+                $this->warn("Aliado {$aliado->documento}: {$resultado['mensaje']}");
+            }
+        }
+        if ($aliados->isNotEmpty()) {
+            $this->info("Aliados sincronizados {$okAliados} de {$aliados->count()}.");
+        }
+
         return self::SUCCESS;
     }
 }

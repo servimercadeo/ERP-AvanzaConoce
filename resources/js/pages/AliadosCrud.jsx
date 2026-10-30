@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
+import SelectBuscable from "../components/SelectBuscable";
 import { useAcciones } from "../hooks/useAcciones";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 
@@ -34,8 +35,22 @@ const useProyectosAliado = () => useQuery({
 }).data ?? [];
 const nombresProyectos = (aliado) => (aliado.proyectos ?? []).map((p) => p.nombre).join(", ");
 
-const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", proyectos: [], contacto_nombre: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
-const TECNICO_VACIO = { tipo_documento: "CC", cedula: "", nombres: "", apellidos: "", movil: "", email: "", proyectos: [], ciudad: "", direccion: "", observaciones: "" };
+// Jefe inmediato: cualquier usuario activo del ERP menos los técnicos y los de rol general.
+const useJefesAliado = () => useQuery({
+    queryKey: ["aliados-jefes"],
+    queryFn: () => api.get("/aliados/jefes").then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+}).data ?? [];
+
+// Modalidad del aliado empresa: catálogo de AvanzaConoce (modalidades_bt), por id de Bitrix.
+const useModalidadesAliado = () => useQuery({
+    queryKey: ["aliados-modalidades"],
+    queryFn: () => api.get("/aliados/modalidades").then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+}).data ?? [];
+
+const ALIADO_VACIO = { tipo_documento: "NIT", documento: "", nombre: "", codigo_pdv: "", modalidad_id_bt: "", proyectos: [],jefe_inmediato_id: "", telefono: "", correo: "", ciudad: "", direccion: "", observaciones: "" };
+const TECNICO_VACIO = { tipo_documento: "CC", cedula: "", nombres: "", apellidos: "", movil: "", email: "", proyectos: [], jefe_inmediato_id: "", ciudad: "", direccion: "", observaciones: "" };
 
 const mensajeError = (err, fallback) => {
     const errores = err?.response?.data?.errors;
@@ -43,14 +58,36 @@ const mensajeError = (err, fallback) => {
     return err?.response?.data?.message ?? fallback;
 };
 
+// Errores de validación del servidor por campo ("proyectos.0" cuenta como "proyectos").
+const erroresPorCampo = (err) => {
+    const porCampo = {};
+    Object.entries(err?.response?.data?.errors ?? {}).forEach(([clave, mensajes]) => {
+        const campo = clave.split(".")[0];
+        if (!porCampo[campo]) porCampo[campo] = mensajes[0];
+    });
+    return porCampo;
+};
+
+// Muestra los errores junto a cada campo y lleva la vista al primero.
+const manejarError = (err, setErrores, setError, fallback) => {
+    const porCampo = erroresPorCampo(err);
+    const n = Object.keys(porCampo).length;
+    setErrores(porCampo);
+    setError(n > 0
+        ? (n === 1 ? "Revisa el campo marcado en rojo." : `Revisa los ${n} campos marcados en rojo.`)
+        : mensajeError(err, fallback));
+    if (n > 0) setTimeout(() => document.querySelector("[data-campo-error]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+};
+
 // span: columnas que ocupa; "full" = toda la fila.
-function Campo({ label, children, span, ayuda }) {
+// error: mensaje del servidor para este campo; lo marca en rojo.
+function Campo({ label, children, span, ayuda, error }) {
     const columna = span === "full" ? "1 / -1" : `span ${span}`;
     return (
-        <div style={{ ...S.formGroup, ...(span ? { gridColumn: columna } : {}) }}>
-            <label style={S.label}>{label}</label>
-            {children}
-            {ayuda && <span style={S.ayuda}>{ayuda}</span>}
+        <div style={{ ...S.formGroup, ...(span ? { gridColumn: columna } : {}) }} data-campo-error={error ? "1" : undefined}>
+            <label style={{ ...S.label, ...(error ? { color: "#c0392b" } : {}) }}>{label}</label>
+            <div style={error ? S.campoConError : undefined}>{children}</div>
+            {error ? <span style={S.errorCampo}>{error}</span> : ayuda && <span style={S.ayuda}>{ayuda}</span>}
         </div>
     );
 }
@@ -80,14 +117,14 @@ function SelectTipoDocumento({ value, onChange, disabled }) {
 }
 
 /* ─── Proyectos para los que trabaja: se marcan uno o varios ──────────── */
-function CampoProyectos({ value, set }) {
+function CampoProyectos({ value, set, error }) {
     const opciones = useProyectosAliado();
     const marcados = value ?? [];
     const alternar = (id) => set("proyectos")({
         target: { value: marcados.includes(id) ? marcados.filter((x) => x !== id) : [...marcados, id] },
     });
     return (
-        <Campo label="Proyecto(s) para los que trabaja *" span="full" ayuda="Marca todos los que apliquen (ej. HUGHES y DIRECTV). Salen de Parámetros > Proyectos.">
+        <Campo label="Proyecto(s) para los que trabaja *" span="full" error={error} ayuda="Marca todos los que apliquen (ej. HUGHES y DIRECTV). Salen de Parámetros > Proyectos.">
             <div style={S.checks}>
                 {opciones.map((p) => (
                     <label key={p.id} style={S.check(marcados.includes(p.id))}>
@@ -100,36 +137,67 @@ function CampoProyectos({ value, set }) {
     );
 }
 
+function CampoJefe({ value, set, error }) {
+    const jefes = useJefesAliado();
+    return (
+        <Campo label="Jefe inmediato *" span={2} error={error}>
+            <SelectBuscable style={S.input} value={value ?? ""} onChange={set("jefe_inmediato_id")}>
+                <option value="">Seleccione…</option>
+                {jefes.map((u) => <option key={u.id} value={u.id}>{u.name}{u.cargo ? ` (${u.cargo})` : ""}</option>)}
+            </SelectBuscable>
+        </Campo>
+    );
+}
+
+function CampoModalidad({ value, set, error }) {
+    const modalidades = useModalidadesAliado();
+    return (
+        <Campo label="Modalidad *" span={2} error={error}>
+            <SelectBuscable style={S.input} value={value ?? ""} onChange={set("modalidad_id_bt")}>
+                <option value="">Seleccione…</option>
+                {modalidades.map((m) => <option key={m.id_bt} value={m.id_bt}>{m.nombre}</option>)}
+            </SelectBuscable>
+        </Campo>
+    );
+}
+
 /* ─── Campos del aliado (empresa) ─────────────────────────────────────── */
-function CamposAliado({ form, set, documentoBloqueado }) {
+// esPersona: es un aliado / técnico indirecto (al editarlo): su documento no se cambia aquí.
+function CamposAliado({ form, set, errores = {}, esPersona }) {
     return (
         <div style={S.grid2}>
-            <Campo label="Tipo de documento *">
-                <SelectTipoDocumento value={form.tipo_documento} onChange={set("tipo_documento")} disabled={documentoBloqueado} />
+            <Campo label="Tipo de documento *" error={errores.tipo_documento}>
+                <SelectTipoDocumento value={form.tipo_documento} onChange={set("tipo_documento")} disabled={esPersona} />
             </Campo>
-            <Campo label="Número de documento *" ayuda={form.tipo_documento === "NIT" ? "Con o sin dígito de verificación, ej. 900123456-7" : null}>
-                <input style={S.input} value={form.documento} onChange={set("documento")} disabled={documentoBloqueado} />
+            <Campo label="Número de documento *" error={errores.documento} ayuda={form.tipo_documento === "NIT" ? "Con o sin dígito de verificación, ej. 900123456-7" : null}>
+                <input style={S.input} value={form.documento} onChange={set("documento")} disabled={esPersona} />
             </Campo>
-            <Campo label="Razón social o nombre *" span={2}>
+            <Campo label="Razón social o nombre *" span={2} error={errores.nombre}>
                 <input style={S.input} value={form.nombre} onChange={set("nombre")} placeholder="Ej. TECNOMARIN S.A.S" />
             </Campo>
-            <CampoProyectos value={form.proyectos} set={set} />
-            <Campo label="Persona de contacto">
-                <input style={S.input} value={form.contacto_nombre ?? ""} onChange={set("contacto_nombre")} />
+            {!esPersona && (
+                <>
+                    <Campo label="Código punto de venta (PDV) *" error={errores.codigo_pdv}>
+                        <input style={S.input} value={form.codigo_pdv ?? ""} onChange={set("codigo_pdv")} inputMode="numeric" placeholder="Ej. 39582" />
+                    </Campo>
+                    <CampoModalidad value={form.modalidad_id_bt} set={set} error={errores.modalidad_id_bt} />
+                </>
+            )}
+            <CampoProyectos value={form.proyectos} set={set} error={errores.proyectos} />
+            <CampoJefe value={form.jefe_inmediato_id} set={set} error={errores.jefe_inmediato_id} />
+            <Campo label="Teléfono *" error={errores.telefono}>
+                <input style={S.input} value={form.telefono ?? ""} onChange={set("telefono")} inputMode="tel" />
             </Campo>
-            <Campo label="Teléfono">
-                <input style={S.input} value={form.telefono ?? ""} onChange={set("telefono")} />
-            </Campo>
-            <Campo label="Correo">
+            <Campo label="Correo *" error={errores.correo}>
                 <input style={S.input} type="email" value={form.correo ?? ""} onChange={set("correo")} />
             </Campo>
-            <Campo label="Ciudad">
+            <Campo label="Ciudad *" error={errores.ciudad}>
                 <input style={S.input} value={form.ciudad ?? ""} onChange={set("ciudad")} />
             </Campo>
-            <Campo label="Dirección" span={2}>
+            <Campo label="Dirección *" span={2} error={errores.direccion}>
                 <input style={S.input} value={form.direccion ?? ""} onChange={set("direccion")} />
             </Campo>
-            <Campo label="Observaciones" span="full">
+            <Campo label="Observaciones" span="full" error={errores.observaciones}>
                 <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={form.observaciones ?? ""} onChange={set("observaciones")} />
             </Campo>
         </div>
@@ -139,43 +207,42 @@ function CamposAliado({ form, set, documentoBloqueado }) {
 /* ─── Campos de la persona (técnico) ──────────────────────────────────── */
 // conUbicacion: es el formulario del aliado / técnico indirecto (tipo de documento,
 // proyectos, ciudad...); sin él, es solo un técnico más de un aliado empresa.
-function CamposTecnico({ form, set, conUbicacion, cedulaBloqueada }) {
+function CamposTecnico({ form, set, errores = {}, conUbicacion, cedulaBloqueada }) {
     const esNit = conUbicacion && form.tipo_documento === "NIT";
-    const cedulaPersona = String(form.cedula ?? "").split("-")[0];
     return (
         <div style={S.grid2}>
             {conUbicacion && (
-                <Campo label="Tipo de documento *">
+                <Campo label="Tipo de documento *" error={errores.tipo_documento}>
                     <SelectTipoDocumento value={form.tipo_documento} onChange={set("tipo_documento")} />
                 </Campo>
             )}
-            <Campo label={conUbicacion ? "Número de documento *" : "Cédula *"}
+            <Campo label={conUbicacion ? "Número de documento *" : "Cédula *"} error={errores.cedula}
                 ayuda={esNit ? "NIT de persona natural: su cédula con el dígito de verificación, ej. 1020304050-3. Su usuario técnico queda con la cédula." : null}>
                 <input style={S.input} value={form.cedula} onChange={set("cedula")} inputMode={esNit ? "text" : "numeric"} disabled={cedulaBloqueada} />
             </Campo>
-            <Campo label="Celular *">
+            <Campo label="Celular *" error={errores.movil}>
                 <input style={S.input} value={form.movil} onChange={set("movil")} inputMode="tel" />
             </Campo>
-            <Campo label="Nombres *">
+            <Campo label="Nombres *" error={errores.nombres}>
                 <input style={S.input} value={form.nombres} onChange={set("nombres")} />
             </Campo>
-            <Campo label="Apellidos *">
+            <Campo label="Apellidos *" error={errores.apellidos}>
                 <input style={S.input} value={form.apellidos} onChange={set("apellidos")} />
             </Campo>
-            <Campo label={cedulaBloqueada ? "Correo (con el que entra al ERP) *" : "Correo (con el que entra al ERP)"} span={2}
-                ayuda={cedulaBloqueada ? null : `Si no tiene, se usa ${cedulaPersona || "{cédula}"}@avanzaconoce.com`}>
+            <Campo label="Correo (con el que entra al ERP) *" span={2} error={errores.email}>
                 <input style={S.input} type="email" value={form.email ?? ""} onChange={set("email")} />
             </Campo>
             {conUbicacion && (
                 <>
-                    <CampoProyectos value={form.proyectos} set={set} />
-                    <Campo label="Ciudad">
+                    <CampoProyectos value={form.proyectos} set={set} error={errores.proyectos} />
+                    <CampoJefe value={form.jefe_inmediato_id} set={set} error={errores.jefe_inmediato_id} />
+                    <Campo label="Ciudad *" error={errores.ciudad}>
                         <input style={S.input} value={form.ciudad} onChange={set("ciudad")} />
                     </Campo>
-                    <Campo label="Dirección">
+                    <Campo label="Dirección *" error={errores.direccion}>
                         <input style={S.input} value={form.direccion} onChange={set("direccion")} />
                     </Campo>
-                    <Campo label="Observaciones" span="full">
+                    <Campo label="Observaciones" span="full" error={errores.observaciones}>
                         <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={form.observaciones} onChange={set("observaciones")} />
                     </Campo>
                 </>
@@ -184,17 +251,22 @@ function CamposTecnico({ form, set, conUbicacion, cedulaBloqueada }) {
     );
 }
 
+// Al corregir un campo se quita su marca de error.
 const useFormulario = (inicial) => {
     const [form, setForm] = useState(inicial);
-    const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
-    return [form, set, setForm];
+    const [errores, setErrores] = useState({});
+    const set = (campo) => (e) => {
+        setForm((f) => ({ ...f, [campo]: e.target.value }));
+        setErrores((x) => (x[campo] ? { ...x, [campo]: undefined } : x));
+    };
+    return [form, set, errores, setErrores];
 };
 
 /* ─── Nuevo aliado: primero el tipo, luego los datos ──────────────────── */
 function NuevoAliadoModal({ onClose, onCreado }) {
     const [tipo, setTipo] = useState(null);
-    const [empresa, setEmpresa] = useFormulario(ALIADO_VACIO);
-    const [tecnico, setTecnico] = useFormulario(TECNICO_VACIO);
+    const [empresa, setEmpresa, erroresEmpresa, setErroresEmpresa] = useFormulario(ALIADO_VACIO);
+    const [tecnico, setTecnico, erroresTecnico, setErroresTecnico] = useFormulario(TECNICO_VACIO);
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -203,10 +275,10 @@ function NuevoAliadoModal({ onClose, onCreado }) {
         setError("");
         try {
             const datos = tipo === "empresa" ? empresa : tecnico;
-            const { data } = await api.post("/aliados", { tipo, ...datos, email: datos.email || null });
+            const { data } = await api.post("/aliados", { tipo, ...datos });
             onCreado(data);
         } catch (err) {
-            setError(mensajeError(err, "No se pudo crear el aliado."));
+            manejarError(err, tipo === "empresa" ? setErroresEmpresa : setErroresTecnico, setError, "No se pudo crear el aliado.");
         } finally {
             setSaving(false);
         }
@@ -254,11 +326,14 @@ function NuevoAliadoModal({ onClose, onCreado }) {
             }
         >
             {tipo === "tecnico" && (
-                <div style={S.info}>Se crearán el aliado <strong>y</strong> su usuario técnico con estos mismos datos. Al final verás sus credenciales de acceso.</div>
+                <div style={S.info}>Se crearán el aliado <strong>y</strong> su usuario técnico con estos mismos datos, en el ERP y en AvanzaConoce (como los técnicos directos: "Empleado" de Solo Ausentismos, con la misma contraseña). Al final verás sus credenciales de acceso.</div>
+            )}
+            {tipo === "empresa" && (
+                <div style={S.info}>Se creará el aliado aquí <strong>y</strong> su usuario en AvanzaConoce con rol "Aliado" (razón social, PDV, modalidad y su líder como supervisor). Al final verás su acceso a AvanzaConoce. Sus técnicos se agregan después desde su ficha.</div>
             )}
             {tipo === "empresa"
-                ? <CamposAliado form={empresa} set={setEmpresa} />
-                : <CamposTecnico form={tecnico} set={setTecnico} conUbicacion />}
+                ? <CamposAliado form={empresa} set={setEmpresa} errores={erroresEmpresa} />
+                : <CamposTecnico form={tecnico} set={setTecnico} errores={erroresTecnico} conUbicacion />}
             {error && <div style={S.errorMsg}>{error}</div>}
         </Modal>
     );
@@ -266,7 +341,7 @@ function NuevoAliadoModal({ onClose, onCreado }) {
 
 /* ─── Editar datos del aliado ─────────────────────────────────────────── */
 function EditarAliadoModal({ aliado, onClose, onGuardado }) {
-    const [form, set] = useFormulario({ ...ALIADO_VACIO, ...aliado, proyectos: (aliado.proyectos ?? []).map((p) => p.id) });
+    const [form, set, errores, setErrores] = useFormulario({ ...ALIADO_VACIO, ...aliado, proyectos: (aliado.proyectos ?? []).map((p) => p.id), jefe_inmediato_id: aliado.jefe_inmediato_id ?? "", codigo_pdv: aliado.codigo_pdv ?? "", modalidad_id_bt: aliado.modalidad_id_bt ?? "" });
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -277,7 +352,7 @@ function EditarAliadoModal({ aliado, onClose, onGuardado }) {
             await api.put(`/aliados/${aliado.id}`, form);
             onGuardado();
         } catch (err) {
-            setError(mensajeError(err, "No se pudo guardar."));
+            manejarError(err, setErrores, setError, "No se pudo guardar.");
         } finally {
             setSaving(false);
         }
@@ -297,7 +372,7 @@ function EditarAliadoModal({ aliado, onClose, onGuardado }) {
             {aliado.tipo === "tecnico" && (
                 <div style={S.info}>El documento es la cédula de su usuario técnico: no se cambia aquí. Los datos de acceso del técnico se editan en la lista de técnicos de su ficha.</div>
             )}
-            <CamposAliado form={form} set={set} documentoBloqueado={aliado.tipo === "tecnico"} />
+            <CamposAliado form={form} set={set} errores={errores} esPersona={aliado.tipo === "tecnico"} />
             <Campo label="Estado">
                 <select style={{ ...S.input, maxWidth: 220 }} value={form.activo ? "1" : "0"} onChange={(e) => set("activo")({ target: { value: e.target.value === "1" } })}>
                     <option value="1">Activo</option>
@@ -312,7 +387,7 @@ function EditarAliadoModal({ aliado, onClose, onGuardado }) {
 /* ─── Agregar o editar un técnico del aliado ──────────────────────────── */
 function TecnicoModal({ aliado, tecnico, onClose, onGuardado }) {
     const editando = !!tecnico;
-    const [form, set] = useFormulario(editando
+    const [form, set, errores, setErrores] = useFormulario(editando
         ? { ...TECNICO_VACIO, ...tecnico, email: tecnico.email ?? "", activo: tecnico.activo }
         : TECNICO_VACIO);
     const [error, setError] = useState("");
@@ -326,11 +401,11 @@ function TecnicoModal({ aliado, tecnico, onClose, onGuardado }) {
                 await api.put(`/aliados/${aliado.id}/tecnicos/${tecnico.id}`, form);
                 onGuardado(null);
             } else {
-                const { data } = await api.post(`/aliados/${aliado.id}/tecnicos`, { ...form, email: form.email || null });
+                const { data } = await api.post(`/aliados/${aliado.id}/tecnicos`, form);
                 onGuardado(data.credenciales);
             }
         } catch (err) {
-            setError(mensajeError(err, "No se pudo guardar el técnico."));
+            manejarError(err, setErrores, setError, "No se pudo guardar el técnico.");
         } finally {
             setSaving(false);
         }
@@ -347,7 +422,7 @@ function TecnicoModal({ aliado, tecnico, onClose, onGuardado }) {
                 </>
             }
         >
-            <CamposTecnico form={form} set={set} cedulaBloqueada={editando} />
+            <CamposTecnico form={form} set={set} errores={errores} cedulaBloqueada={editando} />
             {editando && (
                 <Campo label="Acceso al ERP">
                     <select style={{ ...S.input, maxWidth: 220 }} value={form.activo ? "1" : "0"} onChange={(e) => set("activo")({ target: { value: e.target.value === "1" } })}>
@@ -381,14 +456,25 @@ function CredencialesModal({ credenciales, onClose }) {
             }
         >
             <p style={{ marginTop: 0, color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.6 }}>
-                {deAvanza
-                    ? "Este técnico ya tiene usuario en AvanzaConoce: entra al ERP con su correo y la misma contraseña que usa allá."
-                    : "Guarda estas credenciales y compártelas con el técnico. La contraseña no podrá recuperarse después de cerrar esta ventana."}
+                {credenciales.solo_avanza
+                    // Aliado empresa: su usuario es solo de AvanzaConoce (no entra al ERP).
+                    ? (deAvanza
+                        ? "Este aliado ya tenía usuario en AvanzaConoce con este NIT: entra allá con su correo y la contraseña que ya usa."
+                        : "Acceso del aliado a AvanzaConoce (no al ERP). Guarda estas credenciales y compártelas con el aliado: la contraseña no podrá recuperarse después de cerrar esta ventana.")
+                    : deAvanza
+                        ? "Este técnico ya tiene usuario en AvanzaConoce: entra al ERP con su correo y la misma contraseña que usa allá."
+                        : "Guarda estas credenciales y compártelas con el técnico. La contraseña no podrá recuperarse después de cerrar esta ventana."}
             </p>
             <div style={S.credenciales}>
                 <div><span style={S.label}>Usuario</span><div style={S.credValor}>{credenciales.email}</div></div>
                 <div><span style={S.label}>Contraseña</span><div style={S.credValor}>{deAvanza ? "La misma de AvanzaConoce" : credenciales.password}</div></div>
             </div>
+            {/* Resultado de crear su usuario en AvanzaConoce. */}
+            {credenciales.avanza && (
+                <div style={S.avanza(["ok", "existente"].includes(credenciales.avanza.estado))}>
+                    <strong>AvanzaConoce:</strong> {credenciales.avanza.mensaje}
+                </div>
+            )}
         </Modal>
     );
 }
@@ -402,6 +488,7 @@ const CONTADORES = [
 
 function FichaModal({ aliadoId, puede, onClose, onCambio }) {
     const qc = useQueryClient();
+    const modalidades = useModalidadesAliado();
     const [filtroEstado, setFiltroEstado] = useState("");
     const [filtroTecnico, setFiltroTecnico] = useState("");
     const [tecnicoModal, setTecnicoModal] = useState(null); // null | "nuevo" | técnico
@@ -453,8 +540,13 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                 <p className="section-title" style={{ margin: "16px 0 10px" }}>Datos básicos</p>
                 <div style={S.datos}>
                     {[
+                        ...(aliado.tipo === "empresa" ? [
+                            ["Código PDV", aliado.codigo_pdv],
+                            ["Modalidad", modalidades.find((m) => m.id_bt === aliado.modalidad_id_bt)?.nombre],
+                        ] : []),
                         ["Proyecto(s)", nombresProyectos(aliado)],
-                        ["Contacto", aliado.contacto_nombre], ["Teléfono", aliado.telefono], ["Correo", aliado.correo],
+                        ["Jefe inmediato", aliado.jefe_inmediato?.name],
+                        ["Teléfono", aliado.telefono], ["Correo", aliado.correo],
                         ["Ciudad", aliado.ciudad], ["Dirección", aliado.direccion], ["Observaciones", aliado.observaciones],
                     ].map(([label, valor]) => (
                         <div key={label}><span style={S.label}>{label}</span><div style={{ fontSize: "0.88rem" }}>{valor || "—"}</div></div>
@@ -766,6 +858,12 @@ const S = {
     formGroup: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 },
     label: { fontSize: "0.78rem", fontWeight: 700, color: "var(--text)" },
     ayuda: { fontSize: "0.74rem", color: "var(--text-muted)" },
+    avanza: (ok) => ({
+        marginTop: 12, borderRadius: 6, padding: "9px 12px", fontSize: "0.82rem", lineHeight: 1.5,
+        background: ok ? "#e8f8f5" : "#fff4e0", color: ok ? "var(--primary-dark)" : "#8a5a00",
+    }),
+    errorCampo: { fontSize: "0.76rem", color: "#c0392b", fontWeight: 600, lineHeight: 1.4 },
+    campoConError: { borderRadius: "var(--radius-sm)", boxShadow: "0 0 0 1.5px #e57373" },
     paginationBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 4px", flexWrap: "wrap", gap: 10 },
     pageBtn: (disabled) => ({
         minWidth: 32, height: 32, padding: "0 8px", border: "1.5px solid var(--border)", borderRadius: 6,

@@ -518,6 +518,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Aliados (Operaciones > Aliados): subagentes de Work Orders y sus técnicos indirectos.
     // Antes del apiResource: si no, "proyectos" se tomaría como el id de un aliado.
     Route::get('aliados/proyectos', [App\Http\Controllers\Api\AliadoController::class, 'proyectos']);
+    Route::get('aliados/jefes', [App\Http\Controllers\Api\AliadoController::class, 'jefes']);
+    Route::get('aliados/modalidades', [App\Http\Controllers\Api\AliadoController::class, 'modalidades']);
     Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
     Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
         ->middleware(PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'));
