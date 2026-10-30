@@ -14,9 +14,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // TEXT por el límite de tamaño de fila de `work_orders` (ver 000004). Idempotente.
         Schema::table('work_orders', function (Blueprint $table) {
-            $table->string('nombre_tecnico_cierre', 150)->nullable()->after('cedula_tecnico_agendado');
-            $table->string('cedula_tecnico_cierre', 30)->nullable()->after('nombre_tecnico_cierre');
+            if (!Schema::hasColumn('work_orders', 'nombre_tecnico_cierre')) {
+                $table->text('nombre_tecnico_cierre')->nullable()->after('cedula_tecnico_agendado');
+            }
+            if (!Schema::hasColumn('work_orders', 'cedula_tecnico_cierre')) {
+                $table->text('cedula_tecnico_cierre')->nullable()->after('nombre_tecnico_cierre');
+            }
         });
     }
 
