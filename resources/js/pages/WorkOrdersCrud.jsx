@@ -4,7 +4,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
 import { useAuth } from "../context/AuthContext";
-import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
+import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit, IconDownload } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
 /**
@@ -192,7 +192,8 @@ const IMPORT_HEADER_MAP = {
 const COLUMNAS_EXPORTE_MACAW = [
     ["Sede", "sede_tecnico"],
     ["Subproducto", "subproducto"],
-    ["Tipo Servicio", "servicio"],
+    ["Servicio", "servicio"],
+    ["Tipo Servicio", "codigo_sl"],
     ["Tipo Producto", "tipo_producto"],
     ["Se Paga", "se_paga"],
     ["Consignada", "consignada"],
@@ -262,6 +263,13 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Auxilio", "auxilio"],
     ["Aplica Auxilio", "aplica_auxilio"],
 ];
+
+// Lista fija (no se calcula de los valores que ya existan en la BD): así el filtro y
+// "Cambiar estado" siempre ofrecen los 3 estados del ciclo de vida, aunque todavía ninguna
+// WO tenga ese valor puesto (si dependiera de los datos existentes, nunca se podría pasar a
+// un estado nuevo la primera vez). "Finalizado" es el string exacto que ya usa el backend
+// para poner fecha_finalizacion (ver WorkOrderController::update) — no cambiar sin tocar eso.
+const ESTADOS_WO = ["Asignado", "Atendido", "Finalizado"];
 
 const CAMPOS_PLANTILLA = [
     "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
@@ -775,7 +783,7 @@ export default function WorkOrdersCrud() {
         queryFn: () => api.get("/work-orders/resumen").then((r) => r.data),
         staleTime: 60 * 1000,
     });
-    const estados = resumen?.estados ?? [];
+    const estados = ESTADOS_WO;
     const proveedores = resumen?.proveedores ?? [];
 
     const invalidate = () => {
@@ -897,9 +905,16 @@ export default function WorkOrdersCrud() {
                         onChange={(e) => setFechaHasta(e.target.value)}
                     />
                 </div>
-                {puede.exportar && <button className="btn-secondary" onClick={handleExportar} disabled={exportando}>
-                    {exportando ? "Exportando…" : "Exportar Excel"}
-                </button>}
+                {puede.exportar && (
+                    <button
+                        className="btn-secondary"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: exportando ? 0.6 : 1 }}
+                        onClick={handleExportar}
+                        disabled={exportando}
+                    >
+                        <IconDownload size={14} /> {exportando ? "Exportando…" : "Exportar Excel"}
+                    </button>
+                )}
                 {puede.importar && <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
                     <IconPlus size={14} /> Importar
                 </button>}
@@ -917,13 +932,14 @@ export default function WorkOrdersCrud() {
                     <table className="data-table" style={{ fontSize: "0.85rem" }}>
                         <thead>
                             <tr>
-                                <th>N° WO</th>
+                                <th>IBS</th>
                                 <th>Ítem</th>
-                                <th>N° WO IBS</th>
+                                <th>Número Work Order</th>
                                 <th>Estado</th>
                                 <th>Servicio</th>
                                 <th>Proveedor</th>
                                 <th>Técnico</th>
+                                <th>Cédula del Técnico</th>
                                 <th>Perímetro</th>
                                 <th>Municipio</th>
                                 <th>Departamento</th>
@@ -936,13 +952,14 @@ export default function WorkOrdersCrud() {
                         <tbody>
                             {workOrders.map((w) => (
                                 <tr key={w.id}>
-                                    <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
-                                    <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.numero_wo_ibs || "—"}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
+                                    <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
                                     <td>{w.estado || "—"}</td>
                                     <td>{w.servicio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.proveedor || "—"}</td>
                                     <td title={w.cuadrilla_tecnico || ""}>{w.nombre_tecnico || w.cuadrilla_tecnico || "—"}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{w.cedula_tecnico || "—"}</td>
                                     <td>{w.perimetro || "—"}</td>
                                     <td>{w.municipio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.departamento || "—"}</td>

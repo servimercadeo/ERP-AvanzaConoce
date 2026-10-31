@@ -219,6 +219,8 @@ export default function VehiculosCrud() {
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 280);
+    const [vencDesde, setVencDesde] = useState("");
+    const [vencHasta, setVencHasta] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState(null);
     const [toast, setToast] = useState(null);
@@ -239,12 +241,34 @@ export default function VehiculosCrud() {
 
     const filtered = useMemo(() => {
         const q = debSearch.trim().toLowerCase();
-        if (!q) return vehiculos;
-        return vehiculos.filter((v) =>
-            (v.placa ?? "").toLowerCase().includes(q) ||
-            (v.cc_propietario ?? "").toLowerCase().includes(q) ||
-            (v.tecnico_asignado?.name ?? "").toLowerCase().includes(q));
-    }, [vehiculos, debSearch]);
+        let lista = vehiculos;
+        if (q) {
+            lista = lista.filter((v) =>
+                (v.placa ?? "").toLowerCase().includes(q) ||
+                (v.cc_propietario ?? "").toLowerCase().includes(q) ||
+                (v.tecnico_asignado?.name ?? "").toLowerCase().includes(q));
+        }
+        // "Próximos a vencer": si cualquiera de las dos fechas (SOAT o tecnomecánica) cae
+        // dentro del rango, el vehículo queda — no hace falta que las dos lo cumplan.
+        if (vencDesde || vencHasta) {
+            const enRango = (iso) => {
+                if (!iso) return false;
+                if (vencDesde && iso < vencDesde) return false;
+                if (vencHasta && iso > vencHasta) return false;
+                return true;
+            };
+            lista = lista.filter((v) => enRango(v.fecha_vence_soat) || enRango(v.fecha_vence_tecnomecanica));
+        }
+        return lista;
+    }, [vehiculos, debSearch, vencDesde, vencHasta]);
+
+    const proximosAVencer = () => {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const en30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+        setVencDesde(hoy);
+        setVencHasta(en30);
+    };
+    const limpiarFiltroVencimiento = () => { setVencDesde(""); setVencHasta(""); };
 
     const invalidate = () => qc.invalidateQueries({ queryKey: ["vehiculos"] });
 
@@ -291,6 +315,16 @@ export default function VehiculosCrud() {
                     <span style={S.searchIcon}><IconSearch size={15} /></span>
                     <input style={S.searchInput} placeholder="Buscar por placa, CC propietario o técnico…" value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>SOAT/Tecno desde</span>
+                    <input type="date" style={{ ...S.input, width: 150 }} value={vencDesde} onChange={(e) => setVencDesde(e.target.value)} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Hasta</span>
+                    <input type="date" style={{ ...S.input, width: 150 }} value={vencHasta} onChange={(e) => setVencHasta(e.target.value)} />
+                </div>
+                <button className="btn-secondary" onClick={proximosAVencer}>Próximos a vencer (30 días)</button>
+                {(vencDesde || vencHasta) && <button className="btn-secondary" onClick={limpiarFiltroVencimiento}>Quitar filtro</button>}
                 {puede.crear && <button className="btn-primary" onClick={handleCreate}>+ Nuevo Vehículo</button>}
             </div>
 
