@@ -80,6 +80,13 @@ class PerfilesAliadosTest extends TestCase
         $this->assertFalse(PermisoDenegado::permite($this->usuarioEmpresa, 'sedes', PermisoDenegado::SUBMODULO_RAIZ));
         $this->assertFalse(PermisoDenegado::permite($this->usuarioEmpresa, 'parametros', 'paramgrupo_operativos'));
 
+        // Auxilios (pagos de todos los técnicos directos): ningún aliado ni técnico lo ve.
+        foreach ([$this->directo, $this->deEmpresa, $this->indirecto, $this->usuarioEmpresa] as $u) {
+            $this->assertFalse($ve($u, 'auxilios'), PermisoDenegado::perfilDe($u) . ' no ve Auxilios');
+            $this->actingAs($u);
+            $this->getJson('/api/auxilios/reporte')->assertForbidden();
+        }
+
         // La sesión (menú) trae las reglas de su pestaña.
         $sesion = collect($this->indirecto->datosDeSesion()['permisos_denegados']);
         $this->assertTrue($sesion->contains(fn ($r) => $r['submodulo_id'] === 'work_orders' && $r['accion'] === ''));

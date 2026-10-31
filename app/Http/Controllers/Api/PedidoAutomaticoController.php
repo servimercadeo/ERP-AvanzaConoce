@@ -15,7 +15,9 @@ class PedidoAutomaticoController extends Controller
         // sedeCatalogo: el nombre de la sede de empleado y contrato sale del catálogo
         // (HasSedeCatalogo); precargado, no es una consulta por pedido.
         $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario'])
-            ->whereNotNull('codigo');
+            ->whereNotNull('codigo')
+            // Un aliado (o técnico de aliado) no ve la dotación de la empresa: solo la suya.
+            ->when(\App\Models\PedidoCompra::aliadoDe($request->user()), fn ($q) => $q->where('empleado_id', $request->user()->id));
 
         if ($request->search) {
             $s = $request->search;

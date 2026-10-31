@@ -336,7 +336,7 @@ function NuevoAliadoModal({ onClose, onCreado }) {
                 <div style={S.info}>Se crearán el aliado <strong>y</strong> su usuario técnico con estos mismos datos, en el ERP y en AvanzaConoce (como los técnicos directos: "Empleado" de Solo Ausentismos, con la misma contraseña). Al final verás sus credenciales de acceso.</div>
             )}
             {tipo === "empresa" && (
-                <div style={S.info}>Se creará el aliado aquí <strong>y</strong> su usuario en AvanzaConoce con rol "Aliado" (razón social, PDV, modalidad y su líder como supervisor). Al final verás su acceso a AvanzaConoce. Sus técnicos se agregan después desde su ficha.</div>
+                <div style={S.info}>Se creará el aliado aquí <strong>y</strong> su usuario en AvanzaConoce con rol "Aliado" (razón social, PDV, modalidad y su líder como supervisor). También se crea su usuario del ERP, con el mismo acceso. Al final verás sus credenciales. Sus técnicos se agregan después desde su ficha: ellos solo entran al ERP.</div>
             )}
             {tipo === "empresa"
                 ? <CamposAliado form={empresa} set={setEmpresa} errores={erroresEmpresa} />

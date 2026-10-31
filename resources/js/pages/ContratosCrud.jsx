@@ -99,6 +99,21 @@ const DOCS_MEDICOS = [
 ];
 const DOCS_MED_INIT = () => Object.fromEntries(DOCS_MEDICOS.map(d => [d.id, { file: null, status: "idle", name: null, error: null }]));
 
+// Opciones de "Anexo / Auxilio" del contrato. Un contrato con otro nombre guardado (de antes
+// o importado) lo conserva: se agrega como opción solo para él (ver opcionesAnexo).
+const ANEXOS_AUXILIOS = [
+    "AUXILIO EXTRALEGAL DE RODAMIENTO",
+    "AUXILIO EXTRALEGAL DE RODAMIENTO X W.O",
+    "VARIABLE",
+    "AUXILIO DE COMUNICACION",
+    "AUXILIO DE HERRAMIENTA",
+    "AUXILIO EXTRALEGAL DE CONECTIVIDAD",
+    "COMISION FIJA",
+    "BONO NO SALARIAL",
+];
+const opcionesAnexo = (actual) =>
+    actual && !ANEXOS_AUXILIOS.includes(actual) ? [actual, ...ANEXOS_AUXILIOS] : ANEXOS_AUXILIOS;
+
 const EMPTY_FORM = {
     empleado_id: "",
     tipo_contrato: "",
@@ -1555,6 +1570,7 @@ function Modal({
                                         <Field
                                             label="Anexo / Auxilio"
                                             k={`a_${i}_name`}
+                                            opts={opcionesAnexo(anexo.anexo_auxilio)}
                                             form={{
                                                 [`a_${i}_name`]:
                                                     anexo.anexo_auxilio,

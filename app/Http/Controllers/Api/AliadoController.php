@@ -400,8 +400,12 @@ class AliadoController extends Controller
         }
         $this->validarIdentidad($email, $data['movil'], $cedula);
 
-        // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
-        $credenciales = CredencialesAvanzaConoce::paraAlta($cedula);
+        // El técnico de un aliado empresa solo entra al ERP (no tiene AvanzaConoce): contraseña
+        // propia del ERP. El aliado / técnico indirecto sí usa AvanzaConoce: la misma de allá
+        // si ya existe; si no, una temporal (que también se le pone allá al crearlo).
+        $credenciales = $aliado->tipo === Aliado::EMPRESA
+            ? CredencialesAvanzaConoce::temporal()
+            : CredencialesAvanzaConoce::paraAlta($cedula);
 
         $tecnico = new User([
             'cedula'           => $cedula,

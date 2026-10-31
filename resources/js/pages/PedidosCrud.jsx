@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
+import { useAuth } from "../context/AuthContext";
 import {
     IconSearch,
     IconEmptySearch,
@@ -18,12 +19,22 @@ import SelectBuscable from "../components/SelectBuscable";
 
 // --- Valores estáticos para los filtros ---
 const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras", "Completado", "Rechazado"];
-const ALIADOS_MOCK = ["Aliado Norte S.A.S.", "Aliado Sur Limitada", "Distribuciones Avanza", "Punto de Venta Centro", "Aliado Alianza Oriente"];
 
 export default function PedidosCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
     const qc = useQueryClient();
+    // Un aliado (usuario de un aliado empresa o técnico de un aliado) pide siempre a nombre de
+    // su aliado y solo ve sus pedidos (el servidor lo vuelve a imponer).
+    const { user } = useAuth();
+    const esAliado = user?.rol === "aliado" || !!user?.aliado_id;
+
+    // Aliados reales para "Responsable" de tipo Aliado (a un aliado solo le llega el suyo).
+    const { data: aliadosData = [] } = useQuery({
+        queryKey: ["pedidos-compra-aliados"],
+        queryFn: () => api.get("/pedidos-compra/aliados").then((r) => r.data),
+    });
+    const ALIADOS = useMemo(() => aliadosData.map((a) => a.nombre), [aliadosData]);
 
     // --- Cargar datos dinámicos del backend si existen ---
     const { data: catalogos = {} } = useQuery({
@@ -254,23 +265,14 @@ export default function PedidosCrud() {
     // --- Listas de catálogos ---
     const sedesOptions = catalogos.sedes || [];
 
-    const responsablesOptions = useMemo(() => {
-        if (selCatalogos.responsables && selCatalogos.responsables.length > 0) {
-            return selCatalogos.responsables.map(r => r.name);
-        }
-        return [
-            "Juan Pérez",
-            "María Gómez",
-            "Carlos Rodríguez",
-            "Laura Martínez",
-            "Sofía Gallego",
-            "Andrés Mendoza"
-        ];
-    }, [selCatalogos]);
+    const responsablesOptions = useMemo(
+        () => (selCatalogos.responsables ?? []).map(r => r.name),
+        [selCatalogos]
+    );
 
     const todosResponsablesOptions = useMemo(
-        () => [...new Set([...responsablesOptions, ...ALIADOS_MOCK])],
-        [responsablesOptions]
+        () => [...new Set([...responsablesOptions, ...ALIADOS])],
+        [responsablesOptions, ALIADOS]
     );
 
     // --- Pedidos de insumos de oficina (datos reales del backend) ---
@@ -550,8 +552,8 @@ export default function PedidosCrud() {
         setModalMode("new");
         setModalData({
             id: null,
-            tipo_responsable: "Empleado",
-            responsable: responsablesOptions[0] || "",
+            tipo_responsable: esAliado ? "Aliado" : "Empleado",
+            responsable: esAliado ? (ALIADOS[0] || "") : (responsablesOptions[0] || ""),
             sede: sedesOptions[0] || "",
             clase: CLASES_PEDIDO[0] || "",
             concepto: CONCEPTOS_PEDIDO[0] || "",
@@ -580,7 +582,7 @@ export default function PedidosCrud() {
         setModalData(prev => ({
             ...prev,
             tipo_responsable: tipo,
-            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (ALIADOS_MOCK[0] || "")
+            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (ALIADOS[0] || "")
         }));
     };
 
@@ -1480,7 +1482,7 @@ export default function PedidosCrud() {
                                                     name="tipo_resp"
                                                     checked={modalData.tipo_responsable === "Empleado"}
                                                     onChange={() => handleTipoResponsableChange("Empleado")}
-                                                    disabled={modalMode === "view"}
+                                                    disabled={modalMode === "view" || esAliado}
                                                 />
                                                 Empleado
                                             </label>
@@ -1490,7 +1492,7 @@ export default function PedidosCrud() {
                                                     name="tipo_resp"
                                                     checked={modalData.tipo_responsable === "Aliado"}
                                                     onChange={() => handleTipoResponsableChange("Aliado")}
-                                                    disabled={modalMode === "view"}
+                                                    disabled={modalMode === "view" || esAliado}
                                                 />
                                                 Aliado
                                             </label>
@@ -1514,10 +1516,12 @@ export default function PedidosCrud() {
                                                 style={S.select} 
                                                 value={modalData.responsable} 
                                                 onChange={e => setModalData(prev => ({ ...prev, responsable: e.target.value }))}
-                                                disabled={modalMode === "view"}
+                                                disabled={modalMode === "view" || esAliado}
                                                 required
                                             >
-                                                {ALIADOS_MOCK.map(s => <option key={s} value={s}>{s}</option>)}
+                                                {/* Un pedido viejo con un aliado que ya no está activo lo conserva. */}
+                                                {(modalData.responsable && !ALIADOS.includes(modalData.responsable) ? [modalData.responsable, ...ALIADOS] : ALIADOS)
+                                                    .map(s => <option key={s} value={s}>{s}</option>)}
                                             </SelectBuscable>
                                         )}
                                     </div>

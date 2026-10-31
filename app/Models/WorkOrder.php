@@ -137,9 +137,12 @@ class WorkOrder extends Model
         'descarga_materiales_obligatoria',
         'descarga_materiales_confirmada',
         'id_encabezado_pedido',
+        // {"columna de material del Exporte Macaw": cantidad}
+        'materiales',
     ];
 
     protected $casts = [
+        'materiales'                   => 'array',
         'fecha_estado'                 => 'datetime:Y-m-d H:i',
         'fecha_creacion'               => 'datetime:Y-m-d H:i',
         'fecha_vencimiento'            => 'datetime:Y-m-d H:i',

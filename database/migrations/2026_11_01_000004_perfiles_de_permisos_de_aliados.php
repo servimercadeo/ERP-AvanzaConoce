@@ -26,7 +26,7 @@ return new class extends Migration
         'sedes'           => ['_modulo'],
         'administrativo'  => ['empleados', 'seleccion', 'admin_contratos'],
         'inventarios'     => ['dotacion', 'inv_activos', 'inv_materiales', 'inv_equipos', 'inv_epp', 'inv_herramientas', 'inv_general', 'asignacion_inventario', 'inventario_empleado'],
-        'operaciones'     => ['work_orders', 'aliados'],
+        'operaciones'     => ['work_orders', 'aliados', 'auxilios'],
         'pedidos_compras' => ['pedidos', 'compras', 'asignacion_pedidos'],
         'parametros'      => ['empleadores', 'empresas', 'regionales', 'centros_costos', 'proyectos', 'cargos', 'clases_pedido', 'conceptos_pedido', 'categoria_producto', 'proveedores', '_modulo'],
         'permisos'        => ['roles_permisos', 'auditoria'],

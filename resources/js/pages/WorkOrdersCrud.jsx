@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
-import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
+import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit, IconDownload } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
 /**
@@ -188,23 +188,81 @@ const IMPORT_HEADER_MAP = {
  * guarda en ningún lado ("subproducto" en minúscula, el código numérico duplicado — ver
  * nota en IMPORT_HEADER_MAP), así que esa sale "N/D" siempre.
  */
+/**
+ * Columnas de materiales del "Exporte Macaw" (archivo de Operaciones DTV), una por material,
+ * con la cantidad que consumió la WO. Van entre "Contrato enviado" y "Registrado por", con el
+ * nombre exacto del archivo (algunos traen espacios al final). Al importar se guardan en
+ * `work_orders.materiales` y el Exportar las devuelve en la misma posición.
+ */
+const MATERIALES_MACAW = [
+    "CABLE COAXIAL",
+    "GRAPAS",
+    "AMARRES PLÁSTICOS",
+    "CHAZOS METALICOS",
+    "CONECTORES",
+    "CABLE RG6 BLANCO",
+    "CABLE RG6 NEGRO ",
+    "CABLE UTP NEGRO (INTERNET)",
+    "CONECTORES RG6",
+    "CONECTOR RJ45 (INTERNET)",
+    "GRAPA BLANCA",
+    "GRAPA NEGRA",
+    "AMARRAS BLANCAS",
+    "AMARRAS NEGRAS",
+    "VASELINA",
+    "CINTA NEGRA",
+    "BROCA PARA METAL 1/4 5",
+    "BROCA PARA METAL 3/8  5",
+    "BROCA PARA METAL 5/16",
+    "BROCA PARA MURO 1/4",
+    "BROCA PARA MURO 3/8 - 5\" CORTA",
+    "BROCA PARA MURO 5/16 - 12",
+    "BROCA PARA MURO 5/16 - 5\" CORTA",
+    "BROCA ESPADA PARA MADERA 1/4    CORTA",
+    "BROCA ESPADA PARA MADERA 5/16  5",
+    "CABLE UTP BLANCO (INTERNET)",
+    "BROCA PARA MURO 3/8- 12\" LARGA",
+    "BROCA ESPADA PARA MADERA 5/16  12",
+    "SILICONA EN BARRA",
+    "CINTA AUTOFUNDENTE",
+    "BROCA HSS X 1/4",
+    "BROCA HSS 3/8",
+    "BROCA ESPADA PARA MADERA  3/8 (CORTA)",
+    "BROCA METAL 3/16 - 5\" CORTA",
+    "CLAVOS",
+    "CHAZOS MARIPOSA",
+    "CABLE ENCAUCHETADO",
+    "BROCA ESPADA PARA MADERA 3/4 (CORTA)",
+    "TELEFONO CELULAR SAMSUNG J2",
+    "TELEFONO CELULAR HUAWEI",
+    "MEMORIA MICRO SD 8 GB ADATA",
+    "CANALETA GALVANIZADA 40X25",
+    "CAJAS METÁLICAS 20X20X15 ",
+    "CABLE ELÉCTRICO ENCAUCHETADO 2X14",
+    "BREAKER INDIVIDUAL ",
+    "TOMA ELÉCTRICO DOBLE CON TAPA ",
+    "CAJA METALICA 30X30X15",
+    "SAMSUMG GALAXY J2",
+];
+const MATERIAL_POR_ENCABEZADO = new Map(MATERIALES_MACAW.map((m) => [normalizeHeader(m), m]));
+
 const COLUMNAS_EXPORTE_MACAW = [
     ["Sede", "sede_tecnico"],
     ["Subproducto", "subproducto"],
-    ["Tipo Servicio", "servicio"],
+    ["Tipo Servicio", "codigo_sl"],
     ["Tipo Producto", "tipo_producto"],
     ["Se Paga", "se_paga"],
     ["Consignada", "consignada"],
     ["Pago", "pago"],
     ["Técnico Agendado", ["tecnico_agendado", "nombre_tecnico"]],
-    ["Cédula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
+    ["Cedula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
     ["Técnico Atiende", "nombre_tecnico_atiende"],
-    ["Cédula Técnico", "cedula_tecnico_atiende"],
+    ["Cedula Técnico", "cedula_tecnico_atiende"],
     ["Tipo Vinculación", ["modalidad", "tipo_vinculacion_tecnico"]],
     ["Subagente/Aliado", "subagente_aliado_tecnico"],
     ["workorder", "numero_wo"],
     ["IBS", "numero_wo_ibs"],
-    ["Categoría", "categoria"],
+    ["Categoria", "categoria"],
     ["Problema", "problema"],
     ["Nombre Cliente", "nombre_cliente"],
     ["Apellido Cliente", "apellido_cliente"],
@@ -248,6 +306,7 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Numero de ticket de aprobación", "numero_ticket_aprobacion"],
     ["Razón de Prueba de Calidad Fallida", "razon_prueba_calidad_fallida"],
     ["Contrato enviado", "contrato_enviado"],
+    ...MATERIALES_MACAW.map((m) => [m, (w) => w.materiales?.[m]]),
     ["Registrado por", "registrado_por"],
     ["Fecha registro material", "fecha_registro_material"],
     ["Fecha Registro sin material", "fecha_registro_sin_material"],
@@ -261,6 +320,13 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Auxilio", "auxilio"],
     ["Aplica Auxilio", "aplica_auxilio"],
 ];
+
+// Lista fija (no se calcula de los valores que ya existan en la BD): así el filtro y
+// "Cambiar estado" siempre ofrecen los 3 estados del ciclo de vida, aunque todavía ninguna
+// WO tenga ese valor puesto (si dependiera de los datos existentes, nunca se podría pasar a
+// un estado nuevo la primera vez). "Finalizado" es el string exacto que ya usa el backend
+// para poner fecha_finalizacion (ver WorkOrderController::update) — no cambiar sin tocar eso.
+const ESTADOS_WO = ["Asignado", "Atendido", "Finalizado"];
 
 const CAMPOS_PLANTILLA = [
     "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
@@ -312,7 +378,16 @@ function ImportModal({ onClose, onImported }) {
             raw.forEach((row, idx) => {
                 const numFila = idx + 2;
                 const mapped = {};
+                const materiales = {};
+                let traeMateriales = false;
                 Object.entries(row).forEach(([k, v]) => {
+                    const material = MATERIAL_POR_ENCABEZADO.get(normalizeHeader(k));
+                    if (material) {
+                        traeMateriales = true;
+                        const cantidad = typeof v === "string" ? v.trim() : v;
+                        if (cantidad !== "" && cantidad !== null && cantidad !== undefined) materiales[material] = cantidad;
+                        return;
+                    }
                     const key = IMPORT_HEADER_MAP[normalizeHeader(k)];
                     // Gana la PRIMERA columna que matchee esa clave, no la última: el Exporte
                     // Macaw trae "Subproducto" (texto) y, mucho más adelante, otra columna
@@ -333,6 +408,7 @@ function ImportModal({ onClose, onImported }) {
                 // fila nueva con ítem "" en vez de actualizar las existentes.
                 const fila = { ...mapped, numero_wo: numeroWo };
                 if ("numero_item" in mapped) fila.numero_item = numeroItem;
+                if (traeMateriales) fila.materiales = materiales;
                 filasPorLlave.set(llave, fila);
             });
 
@@ -742,6 +818,8 @@ export default function WorkOrdersCrud() {
     const debSearch = useDebounce(search, 300);
     const [estadoFiltro, setEstadoFiltro] = useState("");
     const [proveedorFiltro, setProveedorFiltro] = useState("");
+    const [fechaDesde, setFechaDesde] = useState("");
+    const [fechaHasta, setFechaHasta] = useState("");
     const [importOpen, setImportOpen] = useState(false);
     const [verTarget, setVerTarget] = useState(null);
     const [estadoTarget, setEstadoTarget] = useState(null);
@@ -761,13 +839,13 @@ export default function WorkOrdersCrud() {
     // pintarse. La búsqueda y los filtros se siguen aplicando sobre todas en el servidor.
     const [pagina, setPagina] = useState(1);
     const [porPagina, setPorPagina] = useState(50);
-    useEffect(() => setPagina(1), [debSearch, estadoFiltro, proveedorFiltro]);
+    useEffect(() => setPagina(1), [debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta]);
 
     const { data: resultado, isLoading } = useQuery({
-        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro, porPagina, pagina],
+        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta, porPagina, pagina],
         queryFn: () =>
             api
-                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, page: pagina, per_page: porPagina } })
+                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined, page: pagina, per_page: porPagina } })
                 .then((r) => r.data),
         placeholderData: (prev) => prev,
     });
@@ -779,13 +857,16 @@ export default function WorkOrdersCrud() {
         if (pagina > ultimaPagina) setPagina(ultimaPagina);
     }, [pagina, ultimaPagina]);
 
-    // Total y opciones de los filtros, sin descargar todas las WOs.
+    // Indicadores (con los filtros puestos) y opciones de los filtros, sin descargar todas las WOs.
     const { data: resumen } = useQuery({
-        queryKey: ["work-orders", "resumen"],
-        queryFn: () => api.get("/work-orders/resumen").then((r) => r.data),
+        queryKey: ["work-orders", "resumen", debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta],
+        queryFn: () => api.get("/work-orders/resumen", {
+            params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined },
+        }).then((r) => r.data),
         staleTime: 60 * 1000,
+        placeholderData: (prev) => prev,
     });
-    const estados = resumen?.estados ?? [];
+    const estados = ESTADOS_WO;
     const proveedores = resumen?.proveedores ?? [];
 
     const invalidate = () => {
@@ -801,12 +882,13 @@ export default function WorkOrdersCrud() {
         setExportando(true);
         try {
             const { data: todas } = await api.get("/work-orders", {
-                params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined },
+                params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined },
             });
             const XLSX = await import("xlsx");
             const rows = todas.map((w) => Object.fromEntries(
                 COLUMNAS_EXPORTE_MACAW.map(([label, campo]) => {
                     if (!campo) return [label, "N/D"];
+                    if (typeof campo === "function") return [label, campo(w) ?? ""];
                     // Cadena de respaldo: el primer campo de la lista que tenga dato gana
                     // (ej. "Tipo Vinculación" sale de la WO si la trajo importada, si no de
                     // la ficha del técnico).
@@ -864,10 +946,19 @@ export default function WorkOrdersCrud() {
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
 
+            {/* Indicadores por estado: cuentan con los filtros puestos (búsqueda, fechas...). */}
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{resumen?.total ?? 0}</div>
-                    <div className="stat-label">Total Work Orders</div>
+                    <div className="stat-num">{resumen?.indicadores?.asignadas ?? 0}</div>
+                    <div className="stat-label">Asignadas</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num">{resumen?.indicadores?.atendidas ?? 0}</div>
+                    <div className="stat-label">Atendidas</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num">{resumen?.indicadores?.finalizadas ?? 0}</div>
+                    <div className="stat-label">Finalizadas</div>
                 </div>
             </div>
 
@@ -889,9 +980,34 @@ export default function WorkOrdersCrud() {
                     <option value="">Todos los proveedores</option>
                     {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
                 </SelectBuscable>
-                {puede.exportar && <button className="btn-secondary" onClick={handleExportar} disabled={exportando}>
-                    {exportando ? "Exportando…" : "Exportar Excel"}
-                </button>}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Desde</span>
+                    <input
+                        type="date"
+                        style={{ ...S.filtroSelect, minWidth: 150 }}
+                        value={fechaDesde}
+                        onChange={(e) => setFechaDesde(e.target.value)}
+                    />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Hasta</span>
+                    <input
+                        type="date"
+                        style={{ ...S.filtroSelect, minWidth: 150 }}
+                        value={fechaHasta}
+                        onChange={(e) => setFechaHasta(e.target.value)}
+                    />
+                </div>
+                {puede.exportar && (
+                    <button
+                        className="btn-secondary"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: exportando ? 0.6 : 1 }}
+                        onClick={handleExportar}
+                        disabled={exportando}
+                    >
+                        <IconDownload size={14} /> {exportando ? "Exportando…" : "Exportar Excel"}
+                    </button>
+                )}
                 {puede.importar && <button className="btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setImportOpen(true)}>
                     <IconPlus size={14} /> Importar
                 </button>}
@@ -909,13 +1025,14 @@ export default function WorkOrdersCrud() {
                     <table className="data-table" style={{ fontSize: "0.85rem" }}>
                         <thead>
                             <tr>
-                                <th>N° WO</th>
+                                <th>IBS</th>
                                 <th>Ítem</th>
-                                <th>N° WO IBS</th>
+                                <th>Número Work Order</th>
                                 <th>Estado</th>
                                 <th>Servicio</th>
                                 <th>Proveedor</th>
                                 <th>Técnico</th>
+                                <th>Cédula del Técnico</th>
                                 <th>Perímetro</th>
                                 <th>Municipio</th>
                                 <th>Departamento</th>
@@ -928,13 +1045,14 @@ export default function WorkOrdersCrud() {
                         <tbody>
                             {workOrders.map((w) => (
                                 <tr key={w.id}>
-                                    <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
-                                    <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.numero_wo_ibs || "—"}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
+                                    <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
                                     <td>{w.estado || "—"}</td>
                                     <td>{w.servicio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.proveedor || "—"}</td>
                                     <td title={w.cuadrilla_tecnico || ""}>{w.nombre_tecnico || w.cuadrilla_tecnico || "—"}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{w.cedula_tecnico || "—"}</td>
                                     <td>{w.perimetro || "—"}</td>
                                     <td>{w.municipio || "—"}</td>
                                     <td style={{ color: "var(--text-muted)" }}>{w.departamento || "—"}</td>

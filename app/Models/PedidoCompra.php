@@ -19,6 +19,36 @@ class PedidoCompra extends Model
         return 'Pedidos';
     }
 
+    /**
+     * Aliado del usuario si es un aliado (el usuario de un aliado empresa o un técnico de
+     * aliado, empresa o indirecto): sus pedidos son a nombre de ese aliado. Null para el resto.
+     */
+    public static function aliadoDe(?User $user): ?Aliado
+    {
+        if (!$user) {
+            return null;
+        }
+        if ($user->rol === \App\Services\UsuarioAliadoEmpresa::ROL) {
+            return $user->aliadoEmpresa;
+        }
+        return $user->aliado_id ? $user->aliado : null;
+    }
+
+    /**
+     * Pedidos que este usuario ve: el aliado empresa, los de su aliado (también los que
+     * crearon sus técnicos); un técnico de aliado, solo los que él registró; el resto, todos.
+     */
+    public static function visiblesPara(?User $user)
+    {
+        $query = static::query();
+        if ($user?->rol === \App\Services\UsuarioAliadoEmpresa::ROL) {
+            $query->where('aliado_id', $user->aliadoEmpresa?->id ?? 0);
+        } elseif ($user?->aliado_id) {
+            $query->where('registrado_por_id', $user->id);
+        }
+        return $query;
+    }
+
     protected $fillable = [
         'codigo',
         'fecha_registro',
@@ -32,6 +62,8 @@ class PedidoCompra extends Model
         'estado',
         'estado_compra',
         'registra',
+        'registrado_por_id',
+        'aliado_id',
         'asignado_a_user_id',
     ];
 

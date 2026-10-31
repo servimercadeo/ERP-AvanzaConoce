@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class WorkOrderController extends Controller
 {
+    /** Estados de los indicadores (los mismos que cuenta la ficha del aliado). */
+    private const ESTADO_ATENDIDA = 'Atendido';
+    private const ESTADO_FINALIZADA = 'Finalizado';
+
     /**
      * Con ?page= responde por páginas (?per_page=25|50|100, por defecto 50): con miles de
      * WOs, traerlas todas pesaba megas y la tabla tardaba en pintarse. Sin ?page= devuelve
@@ -85,15 +89,31 @@ class WorkOrderController extends Controller
         });
     }
 
-    /** Total y opciones de los filtros (estados, proveedores) sin descargar las WOs. */
+    /**
+     * Total, indicadores y opciones de los filtros (estados, proveedores) sin descargar las WOs.
+     * Los indicadores (asignadas = todas, atendidas, finalizadas; igual que en la ficha del
+     * aliado) cuentan con los filtros que vengan (búsqueda, fechas, proveedor...); las
+     * opciones de los filtros, sobre todas las que el usuario ve.
+     */
     public function resumen(Request $request)
     {
         $distintos = fn (string $columna) => $this->visibles($request)
             ->whereNotNull($columna)->where($columna, '!=', '')
             ->distinct()->orderBy($columna)->pluck($columna);
 
+        $indicadores = $this->filtrar($this->visibles($request), $request)
+            ->selectRaw('COUNT(*) as asignadas')
+            ->selectRaw('SUM(estado = ?) as atendidas', [self::ESTADO_ATENDIDA])
+            ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
+            ->first();
+
         return response()->json([
             'total'       => $this->visibles($request)->count(),
+            'indicadores' => [
+                'asignadas'   => (int) $indicadores->asignadas,
+                'atendidas'   => (int) $indicadores->atendidas,
+                'finalizadas' => (int) $indicadores->finalizadas,
+            ],
             'estados'     => $distintos('estado'),
             'proveedores' => $distintos('proveedor'),
         ]);
@@ -102,7 +122,7 @@ class WorkOrderController extends Controller
     /** Un técnico o un aliado solo modifica las WO que ve (las demás, como si no existieran). */
     private function soloLasQueVe(Request $request, WorkOrder $workOrder): void
     {
-        if (in_array($request->user()?->rol, ['tecnico', UsuarioAliadoEmpresa::ROL], true)) {
+        if (in_array($request->user()?->rol, ['tecnico', 'supervisores', UsuarioAliadoEmpresa::ROL], true)) {
             abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
         }
     }
@@ -122,9 +142,41 @@ class WorkOrderController extends Controller
         } elseif ($user?->rol === UsuarioAliadoEmpresa::ROL) {
             $aliadoId = $user->aliadoEmpresa()->value('id');
             $query->whereIn('cedula_tecnico', User::where('aliado_id', $aliadoId ?? 0)->whereNotNull('cedula')->select('cedula'));
+        } elseif ($user?->rol === 'supervisores') {
+            // El supervisor: solo las de los técnicos a su cargo (no las de otras ciudades).
+            $query->whereIn('cedula_tecnico', self::tecnicosACargoDe($user)->whereNotNull('cedula')->select('cedula'));
         }
 
         return $query;
+    }
+
+    /**
+     * Técnicos a cargo de un supervisor: los que lo tienen de jefe inmediato en su ficha o en
+     * su contrato (por correo, o por nombre en el texto "Nombre - correo" de antes), y los
+     * técnicos de los aliados que él lidera (jefe inmediato del aliado).
+     */
+    public static function tecnicosACargoDe(User $supervisor)
+    {
+        $correo = mb_strtolower(trim((string) $supervisor->email));
+        $nombre = mb_strtoupper(trim((string) $supervisor->name), 'UTF-8');
+
+        $esSuJefe = function ($q) use ($correo, $nombre) {
+            $q->whereRaw('1 = 0');
+            if ($correo !== '') {
+                $q->orWhereRaw('LOWER(TRIM(jefe_inmediato_correo)) = ?', [$correo])
+                    ->orWhereRaw('LOWER(jefe_inmediato) LIKE ?', ['%' . $correo . '%']);
+            }
+            if ($nombre !== '') {
+                $q->orWhereRaw("UPPER(TRIM(SUBSTRING_INDEX(jefe_inmediato, ' - ', 1))) = ?", [$nombre])
+                    ->orWhereRaw('UPPER(TRIM(jefe_inmediato_nombre)) = ?', [$nombre]);
+            }
+        };
+
+        return User::where('rol', 'tecnico')->where(function ($q) use ($esSuJefe, $supervisor) {
+            $q->where($esSuJefe)
+                ->orWhereHas('contratos', $esSuJefe)
+                ->orWhereIn('aliado_id', \App\Models\Aliado::where('jefe_inmediato_id', $supervisor->id)->select('id'));
+        });
     }
 
     private function filtrar($query, Request $request)
@@ -145,6 +197,12 @@ class WorkOrderController extends Controller
         }
         if ($request->proveedor) {
             $query->where('proveedor', $request->proveedor);
+        }
+        if ($request->fecha_desde) {
+            $query->whereDate('fecha_estado', '>=', $request->fecha_desde);
+        }
+        if ($request->fecha_hasta) {
+            $query->whereDate('fecha_estado', '<=', $request->fecha_hasta);
         }
 
         return $query;
@@ -289,6 +347,18 @@ class WorkOrderController extends Controller
                     continue;
                 }
                 $valores[$campo] = is_numeric($fila[$campo]) ? (int) $fila[$campo] : null;
+            }
+            // Materiales del Exporte Macaw ({columna: cantidad}): solo los que traen dato. Si
+            // el archivo no trae esas columnas no se manda la llave y se conservan los de antes.
+            if (array_key_exists('materiales', $fila)) {
+                $materiales = [];
+                foreach ((array) $fila['materiales'] as $nombre => $cantidad) {
+                    $cantidad = is_string($cantidad) ? trim($cantidad) : $cantidad;
+                    if (is_string($nombre) && trim($nombre) !== '' && $cantidad !== null && $cantidad !== '' && (is_scalar($cantidad))) {
+                        $materiales[mb_substr($nombre, 0, 120)] = is_numeric($cantidad) ? $cantidad + 0 : mb_substr((string) $cantidad, 0, 60);
+                    }
+                }
+                $valores['materiales'] = $materiales ?: null;
             }
 
             $llaveStr = $valores['numero_wo'] . '|' . ($tieneItem ? $valores['numero_item'] : '');

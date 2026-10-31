@@ -25,6 +25,9 @@ class SoloAccesoDeAliado
             'api/user', 'api/user/preferences', 'api/aliados/proyectos',
             // El menú (useErpModules) arma submódulos con estos dos catálogos.
             'api/tipos-parametro', 'api/categorias-producto',
+            // Pedidos (ver y crear los suyos): los controladores le dejan solo sus pedidos.
+            'api/pedidos-compra', 'api/pedidos-compra/{pedidoCompra}', 'api/pedidos-compra/aliados', 'api/pedidos-automaticos',
+            'api/clases-pedido', 'api/conceptos-pedido', 'api/tipos-producto',
         ],
         'POST' => ['api/user/preferences'],
     ];
