@@ -56,6 +56,20 @@ class WorkOrderImportTest extends TestCase
         $this->assertCount(30, $this->getJson('/api/work-orders')->assertOk()->json());
     }
 
+    public function test_filtra_por_rango_de_fecha_de_estado(): void
+    {
+        WorkOrder::create(['numero_wo' => 'WO-A', 'numero_item' => '', 'fecha_estado' => '2026-10-01']);
+        WorkOrder::create(['numero_wo' => 'WO-B', 'numero_item' => '', 'fecha_estado' => '2026-10-15']);
+        WorkOrder::create(['numero_wo' => 'WO-C', 'numero_item' => '', 'fecha_estado' => '2026-10-31']);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->getJson('/api/work-orders?fecha_desde=2026-10-10&fecha_hasta=2026-10-20')->assertOk()
+            ->assertJsonCount(1)->assertJsonFragment(['numero_wo' => 'WO-B']);
+
+        $this->getJson('/api/work-orders?fecha_desde=2026-10-15')->assertOk()->assertJsonCount(2);
+        $this->getJson('/api/work-orders?fecha_hasta=2026-10-15')->assertOk()->assertJsonCount(2);
+    }
+
     public function test_el_resumen_trae_total_y_filtros_solo_de_lo_que_el_usuario_puede_ver(): void
     {
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Finalizado', 'proveedor' => 'P-CALI']);

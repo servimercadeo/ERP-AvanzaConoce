@@ -132,6 +132,12 @@ class WorkOrderController extends Controller
         if ($request->proveedor) {
             $query->where('proveedor', $request->proveedor);
         }
+        if ($request->fecha_desde) {
+            $query->whereDate('fecha_estado', '>=', $request->fecha_desde);
+        }
+        if ($request->fecha_hasta) {
+            $query->whereDate('fecha_estado', '<=', $request->fecha_hasta);
+        }
 
         return $query;
     }

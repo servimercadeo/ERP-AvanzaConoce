@@ -531,6 +531,21 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.aliados.aliados_file'));
 
+    // Auxilios (Operaciones > Auxilios): auxilio por productividad de técnicos directos
+    // según cantidad de Work Orders finalizadas al mes. Expone el pago de TODOS los
+    // técnicos a la vez, así que (a diferencia de Work Orders) va detrás de un permiso:
+    // negado por completo a rol=tecnico (ver 2026_10_30_000006), nadie más lo ve ni edita.
+    Route::middleware('permiso:operaciones.auxilios.auxilios_file')->group(function () {
+        Route::get('auxilios/tramos', [App\Http\Controllers\Api\AuxilioController::class, 'tramos']);
+        Route::post('auxilios/tramos', [App\Http\Controllers\Api\AuxilioController::class, 'storeTramo'])
+            ->middleware(PermisoDenegado::middleware('editar', 'operaciones.auxilios.auxilios_file'));
+        Route::put('auxilios/tramos/{tramo}', [App\Http\Controllers\Api\AuxilioController::class, 'updateTramo'])
+            ->middleware(PermisoDenegado::middleware('editar', 'operaciones.auxilios.auxilios_file'));
+        Route::delete('auxilios/tramos/{tramo}', [App\Http\Controllers\Api\AuxilioController::class, 'destroyTramo'])
+            ->middleware(PermisoDenegado::middleware('editar', 'operaciones.auxilios.auxilios_file'));
+        Route::get('auxilios/reporte', [App\Http\Controllers\Api\AuxilioController::class, 'reporte']);
+    });
+
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
     // si la propia matriz les da "Roles y Permisos" (el resto de usuarios solo recibe lo
     // suyo, ya incluido en /user).

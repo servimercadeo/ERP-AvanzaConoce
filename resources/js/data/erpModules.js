@@ -411,6 +411,15 @@ export const ERP_MODULES = [
           { id: 'aliados_file', label: 'Aliados', acciones: ['crear', 'editar', 'eliminar'] },
         ]
       },
+      {
+        id: 'auxilios',
+        label: 'Auxilios',
+        icon: 'liquidacion_pagos',
+        desc: 'Auxilio por productividad de técnicos directos según Work Orders finalizadas al mes',
+        archivos: [
+          { id: 'auxilios_file', label: 'Auxilios', acciones: ['editar'] },
+        ]
+      },
     ],
     archivos: []
   },
