@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
-import { useAuth } from "../context/AuthContext";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -738,10 +737,6 @@ function VerModal({ item, onClose }) {
 export default function WorkOrdersCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
-    const { user } = useAuth();
-    // Un técnico indirecto (aliado, tiene aliado_id) no puede cambiar el estado de su propia
-    // WO — solo verla; el servidor vuelve a validar esto en WorkOrderController::update().
-    const esTecnicoIndirecto = user?.rol === "tecnico" && !!user?.aliado_id;
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
@@ -951,7 +946,7 @@ export default function WorkOrdersCrud() {
                                             <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver todos los datos" onClick={() => setVerTarget(w)}>
                                                 <IconEye size={14} />
                                             </button>
-                                            {puede.editar && !esTecnicoIndirecto && (
+                                            {puede.editar && (
                                                 <button style={S.actionBtn("#eaf3ff", "#2566af")} title="Cambiar estado" onClick={() => setEstadoTarget(w)}>
                                                     <IconEdit size={14} />
                                                 </button>

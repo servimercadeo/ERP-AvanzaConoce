@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Concerns\HasSedeCatalogo;
+use App\Services\UsuarioAliadoEmpresa;
 use App\Traits\RegistraAuditoria;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -104,6 +105,12 @@ class User extends Authenticatable
     public function aliado(): BelongsTo
     {
         return $this->belongsTo(Aliado::class);
+    }
+
+    /** Aliado empresa del que este es el usuario (rol `aliado`; ver UsuarioAliadoEmpresa). */
+    public function aliadoEmpresa(): HasOne
+    {
+        return $this->hasOne(Aliado::class, 'usuario_id');
     }
 
     public function preference(): HasOne
@@ -263,11 +270,14 @@ class User extends Authenticatable
      */
     public function datosDeSesion(): array
     {
+        // Las reglas son las de su pestaña en la matriz (su rol, o su perfil si es un aliado:
+        // PermisoDenegado::perfilDe). El aliado empresa recibe además el id de su aliado, para
+        // abrir directo su ficha.
         return array_merge($this->only('id', 'name', 'email', 'rol', 'sede_id', 'cedula', 'aliado_id'), [
             'permisos_denegados' => (!$this->rol || $this->rol === 'admin')
                 ? []
-                : PermisoDenegado::where('rol', $this->rol)->get(['modulo_id', 'submodulo_id', 'archivo_id', 'accion'])->toArray(),
-        ]);
+                : PermisoDenegado::where('rol', PermisoDenegado::perfilDe($this))->get(['modulo_id', 'submodulo_id', 'archivo_id', 'accion'])->toArray(),
+        ], $this->rol === UsuarioAliadoEmpresa::ROL ? ['aliado_empresa_id' => $this->aliadoEmpresa()->value('id')] : []);
     }
 
     /** true si la ruta apunta a un archivo que existe en el disco público. */

@@ -34,8 +34,10 @@ class CargosTest extends TestCase
         // Sale en todo lado: Contratos/Empleados/Seguimiento (catalogos) y Selección (requisición).
         $this->assertContains('COORDINADOR DE ZONA', $this->getJson('/api/catalogos')->json('cargos'));
         $sel = $this->getJson('/api/seleccion/catalogos')->assertOk();
-        $this->assertContains('COORDINADOR DE ZONA', collect($sel->json('cargos_requisicion'))->pluck('nombre')->all());
         $this->assertContains('COORDINADOR DE ZONA', collect($sel->json('cargos'))->pluck('nombre')->all());
+        // La requisición ofrece el catálogo completo: también los cargos antiguos sin la marca en_requisicion.
+        Cargo::create(['id' => $maxId + 50, 'nombre' => 'CARGO ANTIGUO SIN MARCA', 'en_requisicion' => false]);
+        $this->assertContains('CARGO ANTIGUO SIN MARCA', collect($this->getJson('/api/seleccion/catalogos')->json('cargos'))->pluck('nombre')->all());
 
         // Editar el nombre no le cambia en qué selects sale.
         $this->putJson('/api/cargos/' . $r->json('id'), ['nombre' => 'Coordinador regional'])->assertOk()->assertJsonPath('en_requisicion', true);

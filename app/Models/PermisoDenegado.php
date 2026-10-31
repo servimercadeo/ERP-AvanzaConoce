@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\UsuarioAliadoEmpresa;
 use App\Traits\RegistraAuditoria;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -39,6 +40,38 @@ class PermisoDenegado extends Model
 
     /** Acciones que se pueden negar dentro de una pestaña que el rol sí ve. */
     public const ACCIONES = ['crear', 'editar', 'eliminar', 'importar', 'exportar'];
+
+    /**
+     * Perfiles de la matriz que no son un rol que se asigne en Empleados, sino que salen del
+     * aliado del usuario (perfilDe): el usuario de un aliado empresa, el técnico de un aliado
+     * empresa y el aliado / técnico indirecto. El rol `tecnico` sin aliado es el técnico directo.
+     */
+    public const PERFIL_ALIADO_EMPRESA = 'aliado';
+    public const PERFIL_TECNICO_DE_ALIADO = 'tecnico_aliado';
+    public const PERFIL_TECNICO_INDIRECTO = 'tecnico_indirecto';
+    public const PERFILES_DE_ALIADOS = [self::PERFIL_ALIADO_EMPRESA, self::PERFIL_TECNICO_DE_ALIADO, self::PERFIL_TECNICO_INDIRECTO];
+
+    /** Pestañas de la matriz de Permisos: los roles y los perfiles de aliados. */
+    public const PERFILES = [...self::ROLES_GESTIONABLES, ...self::PERFILES_DE_ALIADOS];
+
+    /**
+     * Con qué pestaña de la matriz se decide lo que ve este usuario: su rol, salvo los
+     * aliados. El de un técnico con `aliado_id` depende del tipo de su aliado (empresa o
+     * técnico indirecto, que es su propio aliado).
+     */
+    public static function perfilDe(?User $user): ?string
+    {
+        if (!$user || $user->rol === 'admin') {
+            return $user?->rol;
+        }
+        if ($user->rol === UsuarioAliadoEmpresa::ROL) {
+            return self::PERFIL_ALIADO_EMPRESA;
+        }
+        if ($user->aliado_id) {
+            return $user->aliado?->tipo === Aliado::EMPRESA ? self::PERFIL_TECNICO_DE_ALIADO : self::PERFIL_TECNICO_INDIRECTO;
+        }
+        return $user->rol;
+    }
 
     /** Módulos que un usuario todavía sin rol no puede ver (igual que canAccessSubmodule). */
     private const SIN_ROL_DENEGADOS = ['administrativo', 'permisos'];
@@ -105,7 +138,7 @@ class PermisoDenegado extends Model
                 && in_array($n($r->accion), $acciones, true));
         }
 
-        return !static::where('rol', $user->rol)
+        return !static::where('rol', self::perfilDe($user))
             ->where('modulo_id', $modulo)
             ->where('submodulo_id', $submodulo)
             ->whereIn('archivo_id', $archivos)

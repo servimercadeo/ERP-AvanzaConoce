@@ -129,12 +129,15 @@ export default function SeleccionCrud() {
   const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
   const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
-  // Solo los cargos marcados para requisición; si la requisición ya tenía otro cargo, se conserva visible.
-  const cargosOpts       = (() => {
-    const lista = catalogs.cargos_requisicion || [];
-    const actual = (catalogs.cargos || []).find(c => String(c.id) === String(form?.cargo_id));
-    const conActual = actual && !lista.some(c => c.id === actual.id) ? [...lista, actual] : lista;
-    return conActual.map(c => ({ value: String(c.id), label: c.nombre }));
+  // Cargos del catálogo (Parámetros > Cargos): el requerido se guarda por id.
+  const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
+  // El del solicitante se guarda como texto (viene del empleado elegido): si ese texto no
+  // está en el catálogo, se conserva como opción para no perderlo.
+  const cargosSolicitanteOpts = (() => {
+    const nombres = (catalogs.cargos || []).map(c => c.nombre);
+    const actual = (form?.cargo_solicitante || '').trim();
+    const lista = actual && !nombres.includes(actual) ? [actual, ...nombres] : nombres;
+    return lista.map(n => ({ value: n, label: n }));
   })();
   // Sedes de la ciudad de operación; si la ciudad no tiene sedes registradas, se muestran todas.
   const sedesCiudad      = (catalogs.sedes || []).filter(s => form.ciudad_id && String(s.id_ciudad) === String(form.ciudad_id));
@@ -144,11 +147,15 @@ export default function SeleccionCrud() {
 
   const handleSolicitanteChange = (name) => {
     const user = (catalogs.responsables || []).find(u => u.name === name);
+    // Su cargo con el nombre exacto del catálogo (el del empleado puede venir en otra forma).
+    const cargoUser = user?.cargo
+      ? ((catalogs.cargos || []).find(c => c.nombre.trim().toUpperCase() === user.cargo.trim().toUpperCase())?.nombre ?? user.cargo)
+      : null;
     setForm(p => ({
       ...p,
       nombre_responsable:    name,
       numero_identificacion: user?.cedula ?? p.numero_identificacion ?? '',
-      cargo_solicitante:     user?.cargo  ?? p.cargo_solicitante ?? '',
+      cargo_solicitante:     cargoUser    ?? p.cargo_solicitante ?? '',
     }));
   };
 
@@ -387,7 +394,7 @@ export default function SeleccionCrud() {
                   />
                 </SField>
                 <F l="N° identificación"     k="numero_identificacion" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
-                <F l="Cargo del solicitante" k="cargo_solicitante"     req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Cargo del solicitante" k="cargo_solicitante"     req={!isRO(mode)} opts={cargosSolicitanteOpts} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Fecha de solicitud"          k="fecha_solicitud"              req={!isRO(mode)} dis form={form} ch={ch} />
                 <F l="Proceso"                     k="proceso"                      req={!isRO(mode)} opts={OPT.procesos} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />

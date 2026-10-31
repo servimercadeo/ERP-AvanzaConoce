@@ -35,8 +35,10 @@ class EmpleadoController extends Controller
             ])
             ->whereNotNull('cedula')
             ->where('cedula', '!=', '')
-            // Los técnicos de aliados (indirectos) no son empleados: se gestionan en Aliados.
+            // Los técnicos de aliados (indirectos) y el usuario de cada aliado empresa no son
+            // empleados: se gestionan en Aliados.
             ->whereNull('aliado_id')
+            ->where(fn ($q) => $q->whereNull('rol')->orWhere('rol', '!=', 'aliado'))
             // Por defecto solo se listan empleados ya dados de alta en este módulo.
             // Pedidos Automáticos / Contratos piden `con_contrato=1` para incluir también
             // a quienes aún no tienen la alta manual pero ya cuentan con un contrato

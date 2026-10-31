@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permiso' => \App\Http\Middleware\EnsureUserHasPermission::class,
             // Cierra la sesión de quien quedó inactivo mientras estaba conectado.
             'activo' => \App\Http\Middleware\EnsureUsuarioActivo::class,
+            // El usuario de un aliado empresa solo llega a su ficha y sus Work Orders.
+            'aliado.limitado' => \App\Http\Middleware\SoloAccesoDeAliado::class,
         ]);
         // El contenedor solo es alcanzable a través de Traefik (nunca directo desde
         // internet), así que confiar en cualquier origen es seguro aquí: sin esto, Laravel

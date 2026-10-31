@@ -4,6 +4,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import SelectBuscable from "../components/SelectBuscable";
 import { useAcciones } from "../hooks/useAcciones";
+import { useAuth } from "../context/AuthContext";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 
 /*
@@ -463,11 +464,12 @@ function CredencialesModal({ credenciales, onClose }) {
             }
         >
             <p style={{ marginTop: 0, color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.6 }}>
-                {credenciales.solo_avanza
-                    // Aliado empresa: su usuario es solo de AvanzaConoce (no entra al ERP).
+                {credenciales.erp
+                    // Aliado empresa: el mismo usuario sirve en AvanzaConoce y en el ERP (con
+                    // "Ir al ERP" desde AvanzaConoce, o con su correo y contraseña en el login).
                     ? (deAvanza
-                        ? "Este aliado ya tenía usuario en AvanzaConoce con este NIT: entra allá con su correo y la contraseña que ya usa."
-                        : "Acceso del aliado a AvanzaConoce (no al ERP). Guarda estas credenciales y compártelas con el aliado: la contraseña no podrá recuperarse después de cerrar esta ventana.")
+                        ? "Este aliado ya tenía usuario en AvanzaConoce con este NIT: entra allá y al ERP con su correo y la contraseña que ya usa (o con «Ir al ERP» desde AvanzaConoce)."
+                        : "Acceso del aliado a AvanzaConoce y al ERP (o con «Ir al ERP» desde AvanzaConoce). Guarda estas credenciales y compártelas con el aliado: la contraseña no podrá recuperarse después de cerrar esta ventana.")
                     : deAvanza
                         ? "Este técnico ya tiene usuario en AvanzaConoce: entra al ERP con su correo y la misma contraseña que usa allá."
                         : "Guarda estas credenciales y compártelas con el técnico. La contraseña no podrá recuperarse después de cerrar esta ventana."}
@@ -476,10 +478,15 @@ function CredencialesModal({ credenciales, onClose }) {
                 <div><span style={S.label}>Usuario</span><div style={S.credValor}>{credenciales.email}</div></div>
                 <div><span style={S.label}>Contraseña</span><div style={S.credValor}>{deAvanza ? "La misma de AvanzaConoce" : credenciales.password}</div></div>
             </div>
-            {/* Resultado de crear su usuario en AvanzaConoce. */}
+            {/* Resultado de crear su usuario en AvanzaConoce y (aliado empresa) en el ERP. */}
             {credenciales.avanza && (
                 <div style={S.avanza(["ok", "existente"].includes(credenciales.avanza.estado))}>
                     <strong>AvanzaConoce:</strong> {credenciales.avanza.mensaje}
+                </div>
+            )}
+            {credenciales.erp && (
+                <div style={S.avanza(["ok", "existente"].includes(credenciales.erp.estado))}>
+                    <strong>ERP:</strong> {credenciales.erp.mensaje}
                 </div>
             )}
         </Modal>
@@ -705,7 +712,12 @@ export default function AliadosCrud() {
     const [proyectoFiltro, setProyectoFiltro] = useState("");
     const proyectosOpciones = useProyectosAliado();
     const [nuevoOpen, setNuevoOpen] = useState(false);
-    const [fichaId, setFichaId] = useState(null);
+    // El usuario de un aliado empresa (rol "aliado") y el técnico indirecto solo ven su aliado:
+    // entran directo a su ficha, donde ven sus Work Orders.
+    const { user } = useAuth();
+    const [fichaId, setFichaId] = useState(
+        user?.rol === "aliado" ? (user.aliado_empresa_id ?? null) : (user?.aliado_id ?? null),
+    );
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
     const [credenciales, setCredenciales] = useState(null);

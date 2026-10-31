@@ -65,9 +65,9 @@ export function useErpModules() {
                 const submodsAgrupados = [...porGrupo.entries()].map(([grupo, tipos]) => {
                     const id = `paramgrupo_${slugCategoria(grupo).replace(/^inv_/, "")}`;
                     const archivos = tipos.map(archivoDe);
-                    // El grupo "Operaciones" trae además una pestaña fija (no un Tipo de
+                    // El grupo "Operativos" trae además una pestaña fija (no un Tipo de
                     // Parámetro más): Asignación de Vehículo, con su propio CRUD.
-                    if (id === "paramgrupo_operaciones") {
+                    if (id === "paramgrupo_operativos") {
                         archivos.push({ id: "asignacion_vehiculo_file", label: "Asignación de Vehículo", acciones: ["crear", "editar", "eliminar"] });
                     }
                     return {

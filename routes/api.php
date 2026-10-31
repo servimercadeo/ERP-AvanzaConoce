@@ -248,7 +248,7 @@ Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanz
 Route::post('/sso/token', [SsoController::class, 'generarToken']);
 
 // ── Protegido (Sanctum) ───────────────────────────────────────────────────────
-Route::middleware(['auth:sanctum', 'activo'])->group(function () {
+Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function () {
     // Actualizar configuración global (tema de color)
     Route::post('/settings', [AppSettingController::class, 'update']);
 
@@ -261,6 +261,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         return response()->json(
             App\Models\User::where('activo', true)
                 ->whereNotNull('name')->where('name', '!=', '')
+                // El usuario de un aliado empresa no es una persona de la empresa.
+                ->where(fn ($q) => $q->whereNull('rol')->orWhere('rol', '!=', 'aliado'))
                 ->orderBy('name')
                 ->get(['id', 'name', 'cargo'])
         );
@@ -498,14 +500,14 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
-    // Parametros > Operaciones > Asignación de Vehículo
+    // Parametros > Operativos > Asignación de Vehículo
     Route::get('vehiculos/tecnicos', [App\Http\Controllers\Api\VehiculoController::class, 'tecnicos']);
     Route::get('vehiculos/{vehiculo}/archivo/{cara}', [App\Http\Controllers\Api\VehiculoController::class, 'descargarArchivo']);
     Route::apiResource('vehiculos', App\Http\Controllers\Api\VehiculoController::class)
         ->only(['index', 'store', 'update', 'destroy'])
-        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'))
-        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'))
-        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.paramgrupo_operaciones.asignacion_vehiculo_file'));
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.paramgrupo_operativos.asignacion_vehiculo_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.paramgrupo_operativos.asignacion_vehiculo_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.paramgrupo_operativos.asignacion_vehiculo_file'));
 
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
@@ -537,12 +539,16 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
 
     // Work Orders (Operaciones > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
-    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen']);
+    // Ver: técnico directo (solo las suyas, ver WorkOrderController::visibles) y roles superiores
+    // con el submódulo; ningún aliado (PermisoDenegado::SOLO_PERSONAL_DIRECTO).
+    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen'])
+        ->middleware('permiso:operaciones.work_orders');
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
         ->middleware(PermisoDenegado::middleware('importar', 'operaciones.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'update', 'destroy'])
         ->parameters(['work-orders' => 'workOrder'])
+        ->middleware('permiso:operaciones.work_orders')
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.work_orders.work_orders_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.work_orders.work_orders_file'));
 
@@ -551,12 +557,14 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::get('aliados/proyectos', [App\Http\Controllers\Api\AliadoController::class, 'proyectos']);
     Route::get('aliados/jefes', [App\Http\Controllers\Api\AliadoController::class, 'jefes']);
     Route::get('aliados/modalidades', [App\Http\Controllers\Api\AliadoController::class, 'modalidades']);
-    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
+    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders'])
+        ->middleware('permiso:operaciones.aliados');
     Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
         ->middleware(PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'));
     Route::put('aliados/{aliado}/tecnicos/{tecnico}', [App\Http\Controllers\Api\AliadoController::class, 'actualizarTecnico'])
         ->middleware(PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'));
     Route::apiResource('aliados', App\Http\Controllers\Api\AliadoController::class)
+        ->middlewareFor(['index', 'show'], 'permiso:operaciones.aliados')
         ->middlewareFor('store', PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'))
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.aliados.aliados_file'));
@@ -851,14 +859,13 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::get('/seleccion/catalogos', function () {
         return response()->json([
             'cargos'       => DB::table('cargos')->select('id', 'nombre')->orderBy('nombre')->get(),
-            // Subconjunto ofrecido en "Cargo requerido" de las requisiciones
-            'cargos_requisicion' => DB::table('cargos')->where('en_requisicion', true)->select('id', 'nombre')->orderBy('nombre')->get(),
             'proyectos'    => DB::table('proyectos')->where('activo', true)->orderBy('nombre')
                                ->get(['id', 'nombre'])
                                ->map(fn($p) => ['value' => $p->id, 'label' => $p->nombre])
                                ->values(),
             'responsables' => DB::table('users')
                                ->whereNotNull('name')->where('name', '!=', '')
+                               ->where(fn ($q) => $q->whereNull('rol')->orWhere('rol', '!=', 'aliado'))
                                ->orderBy('name')
                                ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),

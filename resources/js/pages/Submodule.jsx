@@ -375,7 +375,7 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'par_comerciales_tecnicos':
         case 'par_auxilio_movilidad':
           return null;
-        case 'paramgrupo_operaciones':
+        case 'paramgrupo_operativos':
           if (archivoId === 'asignacion_vehiculo_file') return VehiculosCrud;
         // eslint-disable-next-line no-fallthrough
         default:

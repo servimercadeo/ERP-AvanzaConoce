@@ -30,7 +30,7 @@ class PermisoController extends Controller
     {
         $data = $request->validate([
             'denegados'                 => 'array',
-            'denegados.*.rol'           => 'required|string|in:' . implode(',', PermisoDenegado::ROLES_GESTIONABLES),
+            'denegados.*.rol'           => 'required|string|in:' . implode(',', PermisoDenegado::PERFILES),
             'denegados.*.modulo_id'     => 'required|string|max:60',
             'denegados.*.submodulo_id'  => 'required|string|max:60',
             // Vacío o ausente: todo el submódulo. Con valor: solo esa pestaña.

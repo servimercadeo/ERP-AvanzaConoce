@@ -10,8 +10,9 @@ use Illuminate\Validation\Rule;
 
 /**
  * Parámetros > Cargos: el catálogo `cargos` que usan los selects de cargo de Contratos,
- * Empleados, Seguimiento Médico y Selección. Un cargo creado aquí sale en todos ellos (en la
- * requisición, los marcados `en_requisicion`: todos los nuevos lo están).
+ * Empleados, Seguimiento Médico, Base de Ingreso y Selección (cargo requerido y cargo del
+ * solicitante de la requisición). Un cargo creado aquí sale en todos ellos. La columna
+ * `en_requisicion` ya no filtra nada (la requisición ofrece el catálogo completo).
  *
  * Contratos y empleados guardan el cargo como TEXTO (contratos.cargo, users.cargo), no por
  * id: por eso un renombre se propaga a ellos y un cargo en uso no se elimina. Las
@@ -85,7 +86,7 @@ class CargoController extends Controller
         if ($usos) {
             $detalle = collect($usos)->map(fn ($n, $donde) => "$n $donde")->implode(', ');
             return response()->json([
-                'message' => "No se puede eliminar «{$cargo->nombre}»: está en uso ({$detalle}). Si ya no se usa en requisiciones, desmárcalo de «Se ofrece en requisiciones».",
+                'message' => "No se puede eliminar «{$cargo->nombre}»: está en uso ({$detalle}).",
             ], 422);
         }
 

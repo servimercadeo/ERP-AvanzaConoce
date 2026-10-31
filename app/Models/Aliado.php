@@ -49,12 +49,12 @@ class Aliado extends Model
             ->get(['id', 'nombre']);
     }
 
-    /** Usuarios que pueden ser jefe inmediato de un aliado: activos, menos técnicos y rol general. */
+    /** Usuarios que pueden ser jefe inmediato de un aliado: activos, menos técnicos, aliados y rol general. */
     public static function jefesDisponibles()
     {
         return User::where('activo', true)
             ->whereNotNull('rol')
-            ->whereNotIn('rol', ['tecnico', 'general'])
+            ->whereNotIn('rol', ['tecnico', 'general', 'aliado'])
             ->orderBy('name')
             ->get(['id', 'name', 'cargo']);
     }
@@ -88,6 +88,12 @@ class Aliado extends Model
     public function tecnicos()
     {
         return $this->hasMany(User::class, 'aliado_id');
+    }
+
+    /** Usuario con el que el aliado EMPRESA entra al ERP (rol `aliado`; ver UsuarioAliadoEmpresa). */
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
     }
 
     public function jefeInmediato()

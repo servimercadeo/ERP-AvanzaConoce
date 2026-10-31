@@ -65,16 +65,19 @@ class AliadosTest extends TestCase
         return collect($respuesta->json($ruta))->pluck('nombre')->sort()->values()->all();
     }
 
-    public function test_aliado_tipo_empresa_crea_solo_el_aliado(): void
+    public function test_aliado_tipo_empresa_crea_el_aliado_y_su_usuario_del_erp(): void
     {
         $this->actuarComo('admin');
 
-        $this->postJson('/api/aliados', $this->empresa())
-            ->assertCreated()->assertJsonPath('credenciales', null);
+        $r = $this->postJson('/api/aliados', $this->empresa())
+            ->assertCreated()->assertJsonPath('credenciales.erp.estado', 'ok');
 
         $aliado = Aliado::firstOrFail();
         $this->assertSame('empresa', $aliado->tipo);
-        $this->assertSame(0, $aliado->tecnicos()->count());
+        $this->assertSame(0, $aliado->tecnicos()->count(), 'Su usuario no es uno de sus técnicos.');
+        $usuario = User::findOrFail($aliado->usuario_id);
+        $this->assertSame(['aliado', '9001234567', 'contacto@tecnomarin.co', null], [$usuario->rol, $usuario->cedula, $usuario->email, $usuario->aliado_id]);
+        $this->assertTrue(Hash::check($r->json('credenciales.password'), $usuario->password));
     }
 
     public function test_aliado_empresa_se_crea_completo_y_correcto(): void
@@ -86,8 +89,9 @@ class AliadosTest extends TestCase
             'nombre' => '  Satelital Carvajal Acevedo S.A.S ', 'correo' => 'Gerencia@SATELITAL.co', 'observaciones' => 'Opera en el Eje Cafetero',
         ]))->assertCreated();
 
-        // Respuesta (integración con AvanzaConoce apagada): sin credenciales y con sus relaciones.
-        $r->assertJsonPath('credenciales', null)
+        // Respuesta (integración con AvanzaConoce apagada): credenciales solo del ERP y sus relaciones.
+        $r->assertJsonPath('credenciales.avanza', null)
+            ->assertJsonPath('credenciales.erp.estado', 'ok')
             ->assertJsonPath('aliado.jefe_inmediato.name', 'COORDINADOR OPERACIONES');
         $this->assertSame(['DIRECTV', 'HUGHES COL'], $this->nombresProyectos($r));
 
@@ -105,7 +109,7 @@ class AliadosTest extends TestCase
         ])->all());
         $this->assertArrayNotHasKey('contacto_nombre', $aliado->getAttributes());
 
-        // Solo se crea el aliado: ningún usuario técnico ni del ERP; con la integración apagada nada se envía.
+        // El aliado y su usuario del ERP, ningún técnico; con la integración apagada nada se envía.
         $this->assertSame(0, $aliado->tecnicos()->count());
         $this->assertSame(0, User::where('rol', 'tecnico')->count());
         Http::assertNothingSent();
@@ -334,16 +338,20 @@ class AliadosTest extends TestCase
             'proyectos' => [$this->proyecto['HUGHES COL'], $this->proyecto['DIRECTV']],
         ]))->assertCreated();
 
-        // Credenciales de AvanzaConoce (no del ERP) y resultado del envío.
+        // Las mismas credenciales sirven en AvanzaConoce y en el ERP; resultado de ambos.
         $r->assertJsonPath('credenciales.email', 'gladiscarvajalace@gmail.com')
-            ->assertJsonPath('credenciales.solo_avanza', true)
-            ->assertJsonPath('credenciales.avanza.estado', 'ok');
+            ->assertJsonPath('credenciales.solo_avanza', false)
+            ->assertJsonPath('credenciales.avanza.estado', 'ok')
+            ->assertJsonPath('credenciales.erp.estado', 'ok');
         $aliado = Aliado::firstOrFail();
         $this->assertTrue(Hash::check($r->json('credenciales.password'), $aliado->avanza_password));
         $this->assertSame(['ok', 1196], [$aliado->avanza_sync_estado, (int) $aliado->avanzaconoce_id]);
         $this->assertArrayNotHasKey('avanza_password', $r->json('aliado'));
-        // La empresa no es usuario del ERP.
-        $this->assertSame(0, User::where('cedula', '9015381039')->count());
+        // Su usuario del ERP: el NIT sin guion como cédula (como en AvanzaConoce, para el SSO
+        // y la copia de contraseñas) y el mismo hash que se mandó allá.
+        $usuario = User::where('cedula', '9015381039')->firstOrFail();
+        $this->assertSame(['aliado', $aliado->id], [$usuario->rol, $usuario->aliadoEmpresa?->id]);
+        $this->assertSame($aliado->avanza_password, $usuario->password);
 
         Http::assertSentCount(1);
         Http::assertSent(function (Peticion $req) use ($aliado, $jefe, $r) {

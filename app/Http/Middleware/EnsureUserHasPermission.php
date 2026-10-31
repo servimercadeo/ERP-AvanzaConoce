@@ -27,7 +27,7 @@ class EnsureUserHasPermission
         if ($user?->rol && $user->rol !== 'admin') {
             $reglas = $request->attributes->get('permisos_del_rol');
             if ($reglas === null) {
-                $reglas = PermisoDenegado::reglasDe($user->rol);
+                $reglas = PermisoDenegado::reglasDe(PermisoDenegado::perfilDe($user));
                 $request->attributes->set('permisos_del_rol', $reglas);
             }
         }

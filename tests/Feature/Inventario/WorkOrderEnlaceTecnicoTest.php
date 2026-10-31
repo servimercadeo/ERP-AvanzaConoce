@@ -76,13 +76,44 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
         $this->assertSame($n, $creadas);
         $this->assertSame(0, WorkOrder::where('cedula_tecnico', 'regexp', '[[:space:].,]')->count(), 'Ninguna cédula queda con formato');
 
-        // Lo que ve cada técnico (solo las suyas).
-        foreach ([[$directo, '1085293826'], [$tecEmpresaA, '72243190'], [$tecEmpresaB, '1055834475'], [$tecIndNit, '1234567'], [$tecIndCe, '5544332']] as [$tec, $clave]) {
+        // El técnico directo ve solo las suyas y puede cambiarles el estado (no las de otro).
+        $this->actingAs($directo);
+        $r = $this->getJson('/api/work-orders?page=1&per_page=25')->assertOk();
+        $this->assertSame($esperado['1085293826']['total'], $r->json('total'), 'WO que ve el técnico directo');
+        $this->assertTrue(collect($r->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === '1085293826'));
+        $this->assertSame($esperado['1085293826']['total'], $this->getJson('/api/work-orders/resumen')->assertOk()->json('total'));
+        $suya = WorkOrder::where('cedula_tecnico', '1085293826')->where('estado', 'Atendido')->firstOrFail();
+        $this->putJson("/api/work-orders/{$suya->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->assertSame(['Finalizado', '1085293826'], [$suya->fresh()->estado, $suya->fresh()->cedula_tecnico_cierre]);
+        $ajena = WorkOrder::where('cedula_tecnico', '72243190')->firstOrFail();
+        $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Finalizado'])->assertNotFound();
+        $suya->forceFill(['estado' => 'Atendido'])->save(); // los conteos de abajo cuentan con el estado original
+
+        // Ningún aliado entra al módulo Work Orders (ni técnicos de un aliado empresa ni aliados
+        // indirectos): ven solo las suyas en la ficha de su aliado (Operaciones > Aliados), sin editar.
+        foreach ([[$tecEmpresaA, '72243190'], [$tecEmpresaB, '1055834475'], [$tecIndNit, '1234567'], [$tecIndCe, '5544332']] as [$tec, $clave]) {
             $this->actingAs($tec);
-            $r = $this->getJson('/api/work-orders?page=1&per_page=25')->assertOk();
-            $this->assertSame($esperado[$clave]['total'], $r->json('total'), "WO que ve el técnico {$clave}");
-            $this->assertTrue(collect($r->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === $clave));
+            $this->getJson('/api/work-orders?page=1&per_page=25')->assertForbidden();
+            $this->getJson('/api/work-orders/resumen')->assertForbidden();
+            $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Finalizado'])->assertForbidden();
+
+            $this->assertSame([$tec->aliado_id], collect($this->getJson('/api/aliados?page=1')->assertOk()->json('data'))->pluck('id')->all());
+            $ficha = $this->getJson("/api/aliados/{$tec->aliado_id}")->assertOk();
+            $this->assertSame([$clave], collect($ficha->json('tecnicos'))->pluck('cedula')->all(), 'Solo se ve a sí mismo');
+            $this->assertSame($esperado[$clave]['total'], $ficha->json('work_orders.asignadas'));
+            $wos = $this->getJson("/api/aliados/{$tec->aliado_id}/work-orders?page=1")->assertOk();
+            $this->assertSame($esperado[$clave]['total'], $wos->json('total'), "WO del técnico indirecto {$clave} en su ficha");
+            $this->assertTrue(collect($wos->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === $clave));
+            $otroAliado = $tec->aliado_id === $empresa->id ? $indNit->id : $empresa->id;
+            $this->getJson("/api/aliados/{$otroAliado}")->assertNotFound();
+            $this->getJson("/api/aliados/{$otroAliado}/work-orders?page=1")->assertNotFound();
+            $this->putJson("/api/aliados/{$tec->aliado_id}", ['nombre' => 'X'])->assertForbidden();
         }
+
+        // El técnico directo no ve Aliados (la matriz se lo niega a su rol).
+        $this->actingAs($directo);
+        $this->getJson('/api/aliados?page=1')->assertForbidden();
+        $this->getJson("/api/aliados/{$empresa->id}/work-orders?page=1")->assertForbidden();
 
         // Contadores de cada aliado = suma de las WO de sus técnicos.
         $this->actingAs($this->usuario('admin'));

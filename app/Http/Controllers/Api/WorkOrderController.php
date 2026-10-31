@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
+use App\Services\UsuarioAliadoEmpresa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -67,8 +68,8 @@ class WorkOrderController extends Controller
             $wo->subagente_aliado_tecnico = $tecnico ? ($tecnico->aliado?->nombre ?? 'NA') : null;
             $wo->placa_vehiculo_tecnico = $tecnico ? $vehiculosPorTecnico->get($tecnico->id)?->placa : null;
 
-            // "Técnico Atiende" del exporte: un técnico indirecto (aliado) no puede cerrar su
-            // propia WO (ver update()), así que ahí se deja el mismo técnico agendado. Si es
+            // "Técnico Atiende" del exporte: el de un técnico de aliado es siempre el mismo
+            // técnico agendado (por defecto la matriz no les deja cambiar el estado). Si es
             // directo (o no está registrado en el ERP), manda quien la haya cerrado de verdad
             // desde el sistema; si todavía nadie la cerró ahí (la mayoría: llegan ya cerradas
             // en el archivo del proveedor), se usa el "Técnico Atiende" que trajo el import.
@@ -98,16 +99,29 @@ class WorkOrderController extends Controller
         ]);
     }
 
+    /** Un técnico o un aliado solo modifica las WO que ve (las demás, como si no existieran). */
+    private function soloLasQueVe(Request $request, WorkOrder $workOrder): void
+    {
+        if (in_array($request->user()?->rol, ['tecnico', UsuarioAliadoEmpresa::ROL], true)) {
+            abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
+        }
+    }
+
     /** Las WOs que este usuario puede ver. */
     private function visibles(Request $request)
     {
         $query = WorkOrder::query();
 
-        // El rol "tecnico" solo ve las work orders asignadas a su propia cédula; el resto
-        // de roles con acceso al submódulo (operaciones, admin, etc.) las ve todas. Sin
-        // cédula registrada no ve ninguna (nunca todas por descarte de "IS NULL").
-        if ($request->user()?->rol === 'tecnico') {
-            $query->where('cedula_tecnico', $request->user()->cedula ?? '__sin_cedula__');
+        // El rol "tecnico" (directo o de un aliado) solo ve las asignadas a su propia cédula;
+        // el usuario de un aliado empresa, las de sus técnicos (si la matriz le abre el
+        // módulo); el resto de roles con acceso al submódulo las ve todas. Sin cédula no ve
+        // ninguna (nunca todas por descarte de "IS NULL").
+        $user = $request->user();
+        if ($user?->rol === 'tecnico') {
+            $query->where('cedula_tecnico', $user->cedula ?? '__sin_cedula__');
+        } elseif ($user?->rol === UsuarioAliadoEmpresa::ROL) {
+            $aliadoId = $user->aliadoEmpresa()->value('id');
+            $query->whereIn('cedula_tecnico', User::where('aliado_id', $aliadoId ?? 0)->whereNotNull('cedula')->select('cedula'));
         }
 
         return $query;
@@ -136,18 +150,18 @@ class WorkOrderController extends Controller
         return $query;
     }
 
-    public function destroy(WorkOrder $workOrder)
+    public function destroy(Request $request, WorkOrder $workOrder)
     {
+        $this->soloLasQueVe($request, $workOrder);
         $workOrder->delete();
 
         return response()->json(null, 204);
     }
 
     /**
-     * Cambia el estado de una WO. El rol "tecnico" solo puede tocar las que ya puede ver
-     * (las de su propia cédula, ver visibles()) y únicamente si es directo: un indirecto
-     * (aliado — tiene `aliado_id`) no puede cambiar el estado de su Work Order, solo verla.
-     * Cuando la cierra un técnico (directo) queda registrado en `*_cierre` para el exporte
+     * Cambia el estado de una WO. Quién puede, lo decide la matriz de Permisos (Editar en
+     * Work Orders, por rol o perfil de aliado); un técnico o un aliado solo toca las que ya
+     * puede ver (ver visibles()). Cuando la cierra un técnico queda registrado en `*_cierre` para el exporte
      * (ver conDatosDelTecnico, columna "Técnico Atiende"); si la cambia otro rol admin/
      * operaciones no se toca, porque ese cambio no es un técnico cerrando su WO. Si el nuevo
      * estado es "Finalizado" también se pone `fecha_finalizacion` (antes solo quedaba la de
@@ -158,10 +172,8 @@ class WorkOrderController extends Controller
         $data = $request->validate(['estado' => 'required|string|max:60']);
         $user = $request->user();
 
+        $this->soloLasQueVe($request, $workOrder);
         if ($user->rol === 'tecnico') {
-            abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
-            abort_if($user->aliado_id, 403, 'Los técnicos aliados (indirectos) no pueden cambiar el estado de la Work Order.');
-
             $workOrder->nombre_tecnico_cierre = $user->name;
             $workOrder->cedula_tecnico_cierre = $user->cedula;
         }
