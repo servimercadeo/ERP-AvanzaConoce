@@ -700,6 +700,33 @@ body {
     background: var(--primary-dark);
 }
 
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 24px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.18s, color 0.18s;
+    font-family: "Nunito", sans-serif;
+    text-decoration: none;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary-dark);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 /* ── MODULE PAGE ── */
 .mod-subgrid {
     display: grid;

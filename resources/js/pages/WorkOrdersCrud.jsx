@@ -182,15 +182,16 @@ const IMPORT_HEADER_MAP = {
  * mismo orden y con el mismo nombre exacto que trae ese archivo (confirmado por el usuario
  * pegando la fila 1 de su Excel). El segundo valor es el campo del que sale el dato real
  * cuando ya lo consumimos: la mayoría vienen de `work_orders` (mismo mapeo que
- * IMPORT_HEADER_MAP arriba), y los que terminan en "_tecnico" los agrega el backend desde
+ * IMPORT_HEADER_MAP arriba), los que terminan en "_tecnico" los agrega el backend desde
  * la ficha del técnico (ver WorkOrderController::conDatosDelTecnico) cuando esa WO trae
- * cédula y el técnico ya es empleado del ERP. Un arreglo de campos es una cadena de
+ * cédula y el técnico ya es empleado del ERP, y "sede_proveedor" sale de la sede a la que su
+ * proveedor está asociado (módulo Sedes). Un arreglo de campos es una cadena de
  * respaldo (el primero que tenga dato gana); `null` es la única columna que de verdad no se
  * guarda en ningún lado ("subproducto" en minúscula, el código numérico duplicado — ver
  * nota en IMPORT_HEADER_MAP), así que esa sale "N/D" siempre.
  */
 const COLUMNAS_EXPORTE_MACAW = [
-    ["Sede", "sede_tecnico"],
+    ["Sede", "sede_proveedor"],
     ["Subproducto", "subproducto"],
     ["Servicio", "servicio"],
     ["Tipo Servicio", "codigo_sl"],

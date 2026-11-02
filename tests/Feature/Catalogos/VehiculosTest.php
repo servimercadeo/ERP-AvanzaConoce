@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Catalogos;
 
+use App\Models\PermisoDenegado;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -92,5 +93,37 @@ class VehiculosTest extends TestCase
 
         $this->assertTrue($nombres->contains('Juan Técnico'));
         $this->assertFalse($nombres->contains('Ana Operaciones'));
+    }
+
+    private function negacion(string $submodulo, string $accion): array
+    {
+        return [
+            'rol' => 'operaciones', 'modulo_id' => 'parametros', 'submodulo_id' => $submodulo,
+            'archivo_id' => 'asignacion_vehiculo_file', 'accion' => $accion,
+        ];
+    }
+
+    public function test_negar_crear_en_el_grupo_operativos_bloquea_crear_vehiculos(): void
+    {
+        PermisoDenegado::create($this->negacion('paramgrupo_operativos', 'crear'));
+        $this->actuarComo('operaciones');
+
+        $this->postJson('/api/vehiculos', ['tipo' => 'Carro', 'placa' => 'ABC123'])->assertForbidden();
+    }
+
+    public function test_la_migracion_conserva_las_negaciones_del_nombre_anterior_del_grupo(): void
+    {
+        PermisoDenegado::create($this->negacion('paramgrupo_operaciones', 'crear'));
+        PermisoDenegado::create($this->negacion('paramgrupo_operaciones', 'editar'));
+        PermisoDenegado::create($this->negacion('paramgrupo_operativos', 'editar'));
+
+        $migracion = require database_path('migrations/2026_11_02_000005_mover_permisos_grupo_operaciones_a_operativos.php');
+        $migracion->up();
+
+        $this->assertSame(0, PermisoDenegado::where('submodulo_id', 'paramgrupo_operaciones')->count());
+        $this->assertSame(2, PermisoDenegado::where('submodulo_id', 'paramgrupo_operativos')->count());
+
+        $this->actuarComo('operaciones');
+        $this->postJson('/api/vehiculos', ['tipo' => 'Carro', 'placa' => 'ABC123'])->assertForbidden();
     }
 }

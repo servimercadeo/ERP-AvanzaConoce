@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProveedorWorkOrder;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
@@ -27,10 +28,21 @@ class WorkOrderController extends Controller
             return response()->json($query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50));
         }
 
-        // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con datos del
-        // técnico que la WO no trae (sede, vinculación, supervisor, aliado, vehículo
-        // asignado) en vez de dejarlos como "N/D" pudiéndolos sacar de su ficha.
-        return response()->json($this->conDatosDelTecnico($query->get()));
+        // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con la sede del
+        // proveedor y con datos del técnico que la WO no trae (vinculación, supervisor,
+        // aliado, vehículo asignado) en vez de dejarlos como "N/D" pudiéndolos sacar de su ficha.
+        return response()->json($this->conDatosDelTecnico($this->conSedeDelProveedor($query->get())));
+    }
+
+    // Sin asociación queda vacía: así se nota qué proveedor falta asociar en Sedes.
+    private function conSedeDelProveedor($workOrders)
+    {
+        $sedes = ProveedorWorkOrder::with('sede:id,nombre')->get()
+            ->mapWithKeys(fn (ProveedorWorkOrder $p) => [$p->codigo => $p->sede->nombre]);
+
+        return $workOrders->each(function (WorkOrder $wo) use ($sedes) {
+            $wo->sede_proveedor = $wo->proveedor ? $sedes->get(ProveedorWorkOrder::codigoDe($wo->proveedor)) : null;
+        });
     }
 
     /**
@@ -50,7 +62,7 @@ class WorkOrderController extends Controller
 
         $tecnicos = User::whereIn('cedula', $cedulas)
             ->with('aliado:id,nombre')
-            ->get(['id', 'cedula', 'sede', 'tipo_vinculacion', 'jefe_inmediato', 'aliado_id'])
+            ->get(['id', 'cedula', 'tipo_vinculacion', 'jefe_inmediato', 'aliado_id'])
             ->keyBy('cedula');
 
         $vehiculosPorTecnico = Vehiculo::whereIn('tecnico_asignado_id', $tecnicos->pluck('id')->filter())
@@ -59,7 +71,6 @@ class WorkOrderController extends Controller
 
         return $workOrders->map(function (WorkOrder $wo) use ($tecnicos, $vehiculosPorTecnico, $cedulaAsignado) {
             $tecnico = $tecnicos->get($cedulaAsignado($wo));
-            $wo->sede_tecnico = $tecnico?->sede;
             $wo->tipo_vinculacion_tecnico = $tecnico?->tipo_vinculacion;
             $wo->supervisor_tecnico = $tecnico?->jefe_inmediato;
             // "NA" (no "N/D"): si el técnico existe, SÍ sabemos si tiene aliado o no; "N/D"

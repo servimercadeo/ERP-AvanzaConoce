@@ -109,11 +109,11 @@ class WorkOrderImportTest extends TestCase
         $this->assertSame(['WO1'], $wos);
     }
 
-    public function test_sin_page_completa_sede_vinculacion_supervisor_aliado_y_vehiculo_del_tecnico(): void
+    public function test_sin_page_completa_vinculacion_supervisor_aliado_y_vehiculo_del_tecnico(): void
     {
         $this->actingAs($this->usuario('admin'));
         $tecnico = $this->usuario('tecnico', [
-            'cedula' => '9000000001', 'sede' => 'SYM PEREIRA 123', 'tipo_vinculacion' => 'Directa',
+            'cedula' => '9000000001', 'tipo_vinculacion' => 'Directa',
             'jefe_inmediato' => 'Juan Camilo Marín',
         ]);
         \App\Models\Vehiculo::create(['tipo' => 'Carro', 'placa' => 'XYZ123', 'tecnico_asignado_id' => $tecnico->id]);
@@ -121,7 +121,6 @@ class WorkOrderImportTest extends TestCase
 
         $wo = $this->getJson('/api/work-orders')->assertOk()->json()[0];
 
-        $this->assertSame('SYM PEREIRA 123', $wo['sede_tecnico']);
         $this->assertSame('Directa', $wo['tipo_vinculacion_tecnico']);
         $this->assertSame('Juan Camilo Marín', $wo['supervisor_tecnico']);
         $this->assertSame('NA', $wo['subagente_aliado_tecnico']);

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProveedorWorkOrder;
 use App\Models\Sede;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SedeController extends Controller
 {
@@ -46,7 +48,7 @@ class SedeController extends Controller
         $sedes = $query->orderBy('sedes.created_at', 'desc')->get();
 
         // Cargar relaciones
-        $sedes->load(['padre', 'almacenista', 'secretaria', 'jefe', 'regional', 'proyecto']);
+        $sedes->load(['padre', 'almacenista', 'secretaria', 'jefe', 'regional', 'proyecto', 'proveedoresWorkOrders']);
 
         return response()->json($sedes);
     }
@@ -84,10 +86,51 @@ class SedeController extends Controller
             'sedes' => $sedes,
             'regionales' => $regionales,
             'proyectos' => $proyectos,
+            'proveedores' => $this->proveedoresConocidos(),
             'tipos_sede' => ['Principal', 'Sucursal', 'Secundaria', 'Punto de Venta', 'Bodega', 'Oficina Administrativa'],
             'estados' => ['Activa', 'Inactiva', 'Cerrada'],
             'subcanales' => ['Retail', 'Corportivo', 'Directo', 'Online']
         ]);
+    }
+
+    // Primero los de las WO: unique() se queda con el primero y su nombre trae la ciudad.
+    private function proveedoresConocidos()
+    {
+        $enWorkOrders = DB::table('work_orders')->where('proveedor', '!=', '')->distinct()->pluck('proveedor');
+        $enCatalogo = DB::table('valores_parametro')
+            ->join('tipos_parametro', 'tipos_parametro.id', '=', 'valores_parametro.tipo_parametro_id')
+            ->where('tipos_parametro.nombre', 'Proveedor / Código Instalador')
+            ->pluck('valores_parametro.nombre');
+
+        return $enWorkOrders->concat($enCatalogo)
+            ->map(fn ($nombre) => ['codigo' => ProveedorWorkOrder::codigoDe($nombre), 'nombre' => $nombre])
+            ->unique('codigo')
+            ->sortBy('nombre')
+            ->values();
+    }
+
+    private function asociarProveedores(Sede $sede, array $data): void
+    {
+        if (!array_key_exists('proveedores_work_orders', $data)) {
+            return;
+        }
+
+        $nombres = collect($data['proveedores_work_orders'])->keyBy(fn ($nombre) => ProveedorWorkOrder::codigoDe($nombre));
+
+        $enOtraSede = ProveedorWorkOrder::with('sede:id,nombre')
+            ->whereIn('codigo', $nombres->keys())
+            ->where('sede_id', '!=', $sede->id)
+            ->first();
+        if ($enOtraSede) {
+            throw ValidationException::withMessages([
+                'proveedores_work_orders' => "{$enOtraSede->nombre} ya está asociado a la sede {$enOtraSede->sede->nombre}.",
+            ]);
+        }
+
+        $sede->proveedoresWorkOrders()->whereNotIn('codigo', $nombres->keys())->delete();
+        foreach ($nombres as $codigo => $nombre) {
+            $sede->proveedoresWorkOrders()->updateOrCreate(['codigo' => $codigo], ['nombre' => $nombre]);
+        }
     }
 
     public function store(Request $request)
@@ -112,9 +155,16 @@ class SedeController extends Controller
             'contacto_supervisor'     => 'nullable|string|max:50',
             'lider_regional'          => 'nullable|string|max:150',
             'contacto_lider_regional' => 'nullable|string|max:50',
+            'proveedores_work_orders'   => 'sometimes|array',
+            'proveedores_work_orders.*' => 'string|max:150',
         ]);
 
-        $sede = Sede::create($data);
+        $sede = DB::transaction(function () use ($data) {
+            $sede = Sede::create($data);
+            $this->asociarProveedores($sede, $data);
+
+            return $sede;
+        });
 
         return response()->json($this->conCiudad($sede), 201);
     }
@@ -131,7 +181,7 @@ class SedeController extends Controller
      */
     private function conCiudad(Sede $sede): Sede
     {
-        $sede->load('ciudad');
+        $sede->load('ciudad', 'proveedoresWorkOrders');
         $sede->ciudad_nombre = $sede->ciudad?->nombre;
         $sede->id_departamento = $sede->ciudad?->id_departamento;
 
@@ -160,9 +210,14 @@ class SedeController extends Controller
             'contacto_supervisor'     => 'nullable|string|max:50',
             'lider_regional'          => 'nullable|string|max:150',
             'contacto_lider_regional' => 'nullable|string|max:50',
+            'proveedores_work_orders'   => 'sometimes|array',
+            'proveedores_work_orders.*' => 'string|max:150',
         ]);
 
-        $sede->update($data);
+        DB::transaction(function () use ($sede, $data) {
+            $sede->update($data);
+            $this->asociarProveedores($sede, $data);
+        });
 
         return response()->json($this->conCiudad($sede->fresh(['padre', 'almacenista', 'secretaria', 'jefe', 'regional', 'proyecto'])));
     }
