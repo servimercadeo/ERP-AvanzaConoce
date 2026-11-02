@@ -192,8 +192,7 @@ const IMPORT_HEADER_MAP = {
  */
 const COLUMNAS_EXPORTE_MACAW = [
     ["Sede", "sede_proveedor"],
-    ["Subproducto", "subproducto"],
-    ["Servicio", "servicio"],
+    ["Subproducto", ["servicio", "subproducto"]],
     ["Tipo Servicio", "codigo_sl"],
     ["Tipo Producto", "tipo_producto"],
     ["Se Paga", "se_paga"],
@@ -266,11 +265,11 @@ const COLUMNAS_EXPORTE_MACAW = [
 ];
 
 // Lista fija (no se calcula de los valores que ya existan en la BD): así el filtro y
-// "Cambiar estado" siempre ofrecen los 3 estados del ciclo de vida, aunque todavía ninguna
+// "Cambiar estado" siempre ofrecen los estados del ciclo de vida, aunque todavía ninguna
 // WO tenga ese valor puesto (si dependiera de los datos existentes, nunca se podría pasar a
 // un estado nuevo la primera vez). "Finalizado" es el string exacto que ya usa el backend
 // para poner fecha_finalizacion (ver WorkOrderController::update) — no cambiar sin tocar eso.
-const ESTADOS_WO = ["Asignado", "Atendido", "Finalizado"];
+const ESTADOS_WO = ["Asignado", "Finalizado"];
 
 const CAMPOS_PLANTILLA = [
     "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
@@ -868,6 +867,12 @@ export default function WorkOrdersCrud() {
                     <div className="stat-num">{resumen?.total ?? 0}</div>
                     <div className="stat-label">Total Work Orders</div>
                 </div>
+                {ESTADOS_WO.map((e) => (
+                    <div className="stat-card" key={e}>
+                        <div className="stat-num">{resumen?.por_estado?.[e] ?? 0}</div>
+                        <div className="stat-label">{e}</div>
+                    </div>
+                ))}
             </div>
 
             <div style={S.toolbar}>

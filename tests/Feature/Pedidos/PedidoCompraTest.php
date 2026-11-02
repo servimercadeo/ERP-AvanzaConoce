@@ -48,6 +48,26 @@ class PedidoCompraTest extends TestCase
         $this->assertNotNull($r->json('registra'));
     }
 
+    public function test_la_observacion_es_opcional_se_guarda_y_se_puede_editar(): void
+    {
+        $this->postJson('/api/pedidos-compra', $this->payload())->assertCreated()->assertJsonPath('observacion', null);
+
+        $id = $this->postJson('/api/pedidos-compra', $this->payload(['observacion' => 'Entregar en la mañana']))
+            ->assertCreated()->assertJsonPath('observacion', 'Entregar en la mañana')->json('id');
+
+        $this->putJson("/api/pedidos-compra/{$id}", ['estado' => 'Aprobado'])->assertOk()
+            ->assertJsonPath('observacion', 'Entregar en la mañana');
+
+        $this->putJson("/api/pedidos-compra/{$id}", ['observacion' => 'Otra'])->assertOk()
+            ->assertJsonPath('observacion', 'Otra');
+    }
+
+    public function test_la_observacion_no_puede_pasar_de_1000_caracteres(): void
+    {
+        $this->postJson('/api/pedidos-compra', $this->payload(['observacion' => str_repeat('a', 1001)]))
+            ->assertUnprocessable()->assertJsonValidationErrors('observacion');
+    }
+
     public function test_el_nombre_del_producto_se_toma_del_catalogo_no_del_cliente(): void
     {
         $r = $this->postJson('/api/pedidos-compra', $this->payload([

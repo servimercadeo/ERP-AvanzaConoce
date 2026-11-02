@@ -70,6 +70,21 @@ class WorkOrderImportTest extends TestCase
         $this->getJson('/api/work-orders?fecha_hasta=2026-10-15')->assertOk()->assertJsonCount(2);
     }
 
+    public function test_el_resumen_cuenta_por_estado_solo_lo_que_el_usuario_puede_ver(): void
+    {
+        WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        WorkOrder::create(['numero_wo' => 'WO3', 'numero_item' => '', 'cedula_tecnico' => '666', 'estado' => 'Finalizado']);
+
+        $this->actingAs($this->usuario('admin'));
+        $this->getJson('/api/work-orders/resumen')->assertOk()
+            ->assertJsonPath('por_estado.Asignado', 2)->assertJsonPath('por_estado.Finalizado', 1);
+
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+        $this->getJson('/api/work-orders/resumen')->assertOk()
+            ->assertJsonPath('por_estado.Asignado', 2)->assertJsonMissingPath('por_estado.Finalizado');
+    }
+
     public function test_el_resumen_trae_total_y_filtros_solo_de_lo_que_el_usuario_puede_ver(): void
     {
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Finalizado', 'proveedor' => 'P-CALI']);

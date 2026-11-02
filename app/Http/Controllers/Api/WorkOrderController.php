@@ -95,7 +95,7 @@ class WorkOrderController extends Controller
         });
     }
 
-    /** Total y opciones de los filtros (estados, proveedores) sin descargar las WOs. */
+    /** Total, conteo por estado y opciones de los filtros sin descargar las WOs. */
     public function resumen(Request $request)
     {
         $distintos = fn (string $columna) => $this->visibles($request)
@@ -104,6 +104,7 @@ class WorkOrderController extends Controller
 
         return response()->json([
             'total'       => $this->visibles($request)->count(),
+            'por_estado'  => $this->visibles($request)->select('estado', DB::raw('COUNT(*) as total'))->groupBy('estado')->pluck('total', 'estado'),
             'estados'     => $distintos('estado'),
             'proveedores' => $distintos('proveedor'),
         ]);
@@ -296,8 +297,9 @@ class WorkOrderController extends Controller
 
         $creadas = 0;
         $actualizadas = 0;
+        $tecnicos = User::where('cedula', '!=', '')->pluck('aliado_id', 'cedula');
 
-        DB::transaction(function () use ($filas, &$creadas, &$actualizadas) {
+        DB::transaction(function () use ($filas, $tecnicos, &$creadas, &$actualizadas) {
             foreach ($filas as $entry) {
                 $valores = $entry['valores'];
 
@@ -309,10 +311,13 @@ class WorkOrderController extends Controller
                         // Solo se pisan los campos que vinieron en esta fila; lo que no se
                         // mandó conserva el valor que ya tenía la WO.
                         $existente->fill($valores);
+                        $this->aplicarEstadoPorTecnico($existente, $tecnicos);
                         $existente->save();
                         $actualizadas++;
                     } else {
-                        WorkOrder::create($valores);
+                        $nueva = new WorkOrder($valores);
+                        $this->aplicarEstadoPorTecnico($nueva, $tecnicos);
+                        $nueva->save();
                         $creadas++;
                     }
                     continue;
@@ -323,17 +328,37 @@ class WorkOrderController extends Controller
                 if ($existentes->isNotEmpty()) {
                     foreach ($existentes as $existente) {
                         $existente->fill($valores);
+                        $this->aplicarEstadoPorTecnico($existente, $tecnicos);
                         $existente->save();
                     }
                     $actualizadas += $existentes->count();
                 } else {
-                    WorkOrder::create(array_merge($valores, ['numero_item' => '']));
+                    $nueva = new WorkOrder(array_merge($valores, ['numero_item' => '']));
+                    $this->aplicarEstadoPorTecnico($nueva, $tecnicos);
+                    $nueva->save();
                     $creadas++;
                 }
             }
         });
 
         return response()->json(['creadas' => $creadas, 'actualizadas' => $actualizadas]);
+    }
+
+    // Un aliado no puede cambiar el estado: queda Finalizado. Un directo sí: queda Asignado, sin reabrir lo que ya avanzó.
+    private function aplicarEstadoPorTecnico(WorkOrder $wo, $tecnicos): void
+    {
+        $cedula = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+        // Cédula sin usuario en el ERP: decide la MODALIDAD que trae el archivo.
+        $tipo = $cedula && $tecnicos->has($cedula)
+            ? ($tecnicos->get($cedula) ? 'ALIADO' : 'DIRECTO')
+            : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8');
+
+        if ($tipo === 'ALIADO') {
+            $wo->estado = 'Finalizado';
+        } elseif ($tipo === 'DIRECTO') {
+            $anterior = $wo->getOriginal('estado');
+            $wo->estado = $anterior === 'Finalizado' ? $anterior : 'Asignado';
+        }
     }
 
     private function parsearFecha($valor): ?string

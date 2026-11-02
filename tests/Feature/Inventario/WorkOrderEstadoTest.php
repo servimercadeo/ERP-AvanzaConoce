@@ -12,6 +12,120 @@ class WorkOrderEstadoTest extends TestCase
 {
     use RefreshDatabase, ErpFixtures;
 
+    private function importar(array $fila): void
+    {
+        $this->actingAs($this->usuario('admin'));
+        $this->postJson('/api/work-orders/importar', ['items' => [['numero_wo' => 'WO1', 'numero_item' => '1', 'estado' => 'Completa'] + $fila]])->assertOk();
+    }
+
+    private function estadoImportado(): string
+    {
+        return WorkOrder::where('numero_wo', 'WO1')->value('estado');
+    }
+
+    private function tecnicoAliado(string $cedula): void
+    {
+        $aliado = Aliado::create(['tipo' => 'empresa', 'tipo_documento' => 'NIT', 'documento' => '900777888-1', 'nombre' => 'ALIADO SAS']);
+        $this->usuario('tecnico', ['cedula' => $cedula, 'aliado_id' => $aliado->id]);
+    }
+
+    public function test_importar_deja_finalizada_la_wo_de_un_tecnico_aliado(): void
+    {
+        $this->tecnicoAliado('777');
+
+        $this->importar(['cedula_tecnico' => '777']);
+
+        $this->assertSame('Finalizado', $this->estadoImportado());
+    }
+
+    public function test_importar_deja_asignada_la_wo_de_un_tecnico_directo(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+
+        $this->importar(['cedula_tecnico' => '555']);
+
+        $this->assertSame('Asignado', $this->estadoImportado());
+    }
+
+    public function test_el_tecnico_agendado_manda_sobre_la_cedula_del_que_atendio(): void
+    {
+        $this->tecnicoAliado('777');
+        $this->usuario('tecnico', ['cedula' => '555']);
+
+        $this->importar(['cedula_tecnico' => '555', 'cedula_tecnico_agendado' => '777']);
+
+        $this->assertSame('Finalizado', $this->estadoImportado());
+    }
+
+    public function test_cedula_sin_usuario_usa_la_modalidad_del_archivo(): void
+    {
+        $this->importar(['cedula_tecnico' => '999', 'modalidad' => 'ALIADO']);
+        $this->assertSame('Finalizado', $this->estadoImportado());
+
+        WorkOrder::query()->delete();
+        $this->importar(['cedula_tecnico' => '999', 'modalidad' => ' directo ']);
+        $this->assertSame('Asignado', $this->estadoImportado());
+    }
+
+    public function test_el_usuario_registrado_manda_sobre_la_modalidad_del_archivo(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+
+        $this->importar(['cedula_tecnico' => '555', 'modalidad' => 'ALIADO']);
+
+        $this->assertSame('Asignado', $this->estadoImportado());
+    }
+
+    public function test_sin_usuario_ni_modalidad_conserva_el_estado_del_archivo(): void
+    {
+        $this->importar(['cedula_tecnico' => '999']);
+
+        $this->assertSame('Completa', $this->estadoImportado());
+    }
+
+    public function test_reimportar_no_reabre_la_wo_que_un_directo_ya_cambio(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->importar(['cedula_tecnico' => '555']);
+        WorkOrder::where('numero_wo', 'WO1')->update(['estado' => 'Finalizado']);
+
+        $this->importar(['cedula_tecnico' => '555']);
+
+        $this->assertSame('Finalizado', $this->estadoImportado());
+    }
+
+    public function test_una_wo_de_directo_en_el_estado_atendido_que_ya_no_existe_vuelve_a_asignado(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->importar(['cedula_tecnico' => '555']);
+        WorkOrder::where('numero_wo', 'WO1')->update(['estado' => 'Atendido']);
+
+        $this->importar(['cedula_tecnico' => '555']);
+
+        $this->assertSame('Asignado', $this->estadoImportado());
+    }
+
+    public function test_la_migracion_aplica_la_regla_a_lo_ya_importado(): void
+    {
+        $this->tecnicoAliado('777');
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $crear = fn (string $wo, array $datos) => WorkOrder::create($datos + ['numero_wo' => $wo, 'numero_item' => '', 'estado' => 'Completa']);
+        $crear('ALIADO', ['cedula_tecnico' => '777']);
+        $crear('DIRECTO', ['cedula_tecnico' => '555']);
+        $crear('MOD-ALIADO', ['cedula_tecnico' => '999', 'modalidad' => 'ALIADO']);
+        $crear('MOD-DIRECTO', ['cedula_tecnico' => '999', 'modalidad' => 'DIRECTO']);
+        $crear('SIN-DATOS', ['cedula_tecnico' => '999']);
+        $crear('YA-CERRADA', ['cedula_tecnico' => '555', 'estado' => 'Finalizado']);
+
+        $migracion = require database_path('migrations/2026_11_02_000007_estado_work_orders_segun_tipo_de_tecnico.php');
+        $migracion->up();
+
+        $this->assertSame([
+            'ALIADO' => 'Finalizado', 'DIRECTO' => 'Asignado', 'MOD-ALIADO' => 'Finalizado',
+            'MOD-DIRECTO' => 'Asignado', 'SIN-DATOS' => 'Completa', 'YA-CERRADA' => 'Finalizado',
+        ], WorkOrder::orderBy('id')->pluck('estado', 'numero_wo')->all());
+    }
+
     public function test_tecnico_directo_puede_cambiar_el_estado_de_su_propia_wo(): void
     {
         $tecnico = $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Ruiz']);
@@ -33,9 +147,9 @@ class WorkOrderEstadoTest extends TestCase
         $wo = WorkOrder::create(['numero_wo' => 'WO1B', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Abierta']);
         $this->actingAs($tecnico);
 
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Atendido'])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Asignado'])->assertOk();
 
-        $this->assertSame('Atendido', $wo->fresh()->estado);
+        $this->assertSame('Asignado', $wo->fresh()->estado);
         $this->assertNull($wo->fresh()->fecha_finalizacion);
     }
 
