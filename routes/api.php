@@ -196,7 +196,7 @@ Route::get('/catalogos', function () {
     $hayAreas = \Illuminate\Support\Facades\Schema::hasTable('area_empresa');
     $listas = collect(['cargos' => 'cargos', 'eps' => 'eps', 'arls' => 'arls', 'cajas' => 'cajas_compensacion',
         'pensiones' => 'fondos_pensiones', 'cesantias' => 'fondos_cesantias', 'bancos' => 'bancos',
-        'tipos_rh' => 'tipos_rh', 'sedes' => 'sedes'])->map(fn ($tabla) => ['tabla' => $tabla, 'distinct' => true])->all();
+        'tipos_rh' => 'tipos_rh', 'sedes' => 'sedes', 'anexos_auxilios' => 'anexos_auxilios'])->map(fn ($tabla) => ['tabla' => $tabla, 'distinct' => true])->all();
     if ($hayAreas) {
         $listas['areas_empresa'] = ['tabla' => 'area_empresa'];
     }
@@ -220,6 +220,8 @@ Route::get('/catalogos', function () {
         'bancos'            => $lista('bancos'),
         'tipos_rh'          => $lista('tipos_rh'),
         'sedes'             => $lista('sedes'),
+        // Opciones de "Anexo / Auxilio" del contrato (Parámetros > Anexos y Auxilios).
+        'anexos_auxilios'   => $lista('anexos_auxilios'),
         'areas_empresa'     => $hayAreas ? $lista('areas_empresa') : [],
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
@@ -426,6 +428,15 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
         ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.regionales.regionales_file'))
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.regionales.regionales_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.regionales.regionales_file'));
+
+    // Parámetros > Anexos y Auxilios: las opciones de "Anexo / Auxilio" del contrato.
+    Route::apiResource('anexos-auxilios', App\Http\Controllers\Api\AnexoAuxilioController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['anexos-auxilios' => 'anexoAuxilio'])
+        ->middleware('permiso:parametros.anexos_auxilios')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.anexos_auxilios.anexos_auxilios_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.anexos_auxilios.anexos_auxilios_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.anexos_auxilios.anexos_auxilios_file'));
 
     // Catálogo de cargos (Parametros > Cargos): los selects de Contratos, Empleados y Selección.
     Route::apiResource('cargos', App\Http\Controllers\Api\CargoController::class)

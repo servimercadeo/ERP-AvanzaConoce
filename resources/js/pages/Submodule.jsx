@@ -28,6 +28,7 @@ const EmpresasCrud = lazy(() => import('./EmpresasCrud'));
 const RegionalesCrud = lazy(() => import('./RegionalesCrud'));
 const ProyectosCrud = lazy(() => import('./ProyectosCrud'));
 const CargosCrud = lazy(() => import('./CargosCrud'));
+const AnexosAuxiliosCrud = lazy(() => import('./AnexosAuxiliosCrud'));
 const PedidosCrud = lazy(() => import('./PedidosCrud'));
 const ComprasCrud = lazy(() => import('./ComprasCrud'));
 const OrdenCompraCrud = lazy(() => import('./OrdenCompraCrud'));
@@ -353,6 +354,11 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
         case 'cargos':
           switch (archivoId) {
             case 'cargos_file': return CargosCrud;
+            default: return null;
+          }
+        case 'anexos_auxilios':
+          switch (archivoId) {
+            case 'anexos_auxilios_file': return AnexosAuxiliosCrud;
             default: return null;
           }
         case 'clases_pedido':

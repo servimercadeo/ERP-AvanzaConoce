@@ -572,6 +572,15 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'anexos_auxilios',
+        label: 'Anexos y Auxilios',
+        icon: 'administrativo',
+        desc: 'Opciones de "Anexo / Auxilio" de los contratos',
+        archivos: [
+          { id: 'anexos_auxilios_file', label: 'Anexos y Auxilios', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
+      {
         id: 'clases_pedido',
         label: 'Clases de Pedidos',
         icon: 'pedidos',

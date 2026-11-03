@@ -777,7 +777,9 @@ function CampoSoloLectura({ label, valor, span }) {
     );
 }
 
-function VerModal({ item, onClose }) {
+/** Todos los datos de una WO. También la usa la ficha del aliado (AliadosCrud). */
+export function VerModal({ item, onClose }) {
+    const materiales = Object.entries(item.materiales ?? {});
     return (
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
@@ -796,6 +798,16 @@ function VerModal({ item, onClose }) {
                             </div>
                         </div>
                     ))}
+                    {materiales.length > 0 && (
+                        <div style={{ marginBottom: 18 }}>
+                            <p className="section-title" style={{ marginBottom: 10 }}>Materiales</p>
+                            <div className="form-grid" style={S.grid4}>
+                                {materiales.map(([nombre, cantidad]) => (
+                                    <CampoSoloLectura key={nombre} label={nombre.trim()} valor={String(cantidad)} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <p className="section-title" style={{ marginBottom: 10 }}>Descripción</p>
                     <div className="form-grid" style={S.grid4}>
                         <CampoSoloLectura label="Descripción de IBS" valor={item.descripcion} span={4} />
@@ -1000,7 +1012,7 @@ export default function WorkOrdersCrud() {
                 </div>
                 {puede.exportar && (
                     <button
-                        className="btn-secondary"
+                        className="btn-primary"
                         style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: exportando ? 0.6 : 1 }}
                         onClick={handleExportar}
                         disabled={exportando}

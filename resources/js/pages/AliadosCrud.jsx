@@ -4,6 +4,7 @@ import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import SelectBuscable from "../components/SelectBuscable";
 import { useAcciones } from "../hooks/useAcciones";
+import { VerModal as VerWorkOrderModal } from "./WorkOrdersCrud";
 import { useAuth } from "../context/AuthContext";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit } from "../components/Icons";
 
@@ -507,8 +508,13 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
     const [filtroTecnico, setFiltroTecnico] = useState("");
     const [buscarWo, setBuscarWo] = useState("");
     const debBuscarWo = useDebounce(buscarWo, 300);
+    // Rango por fecha de atención (como en Operaciones > Work Orders).
+    const [buscarTecnico, setBuscarTecnico] = useState(""); // técnicos del aliado empresa: nombre o cédula
+    const [fechaDesde, setFechaDesde] = useState("");
+    const [fechaHasta, setFechaHasta] = useState("");
     const [paginaWo, setPaginaWo] = useState(1);
     const [tecnicoModal, setTecnicoModal] = useState(null); // null | "nuevo" | técnico
+    const [verWo, setVerWo] = useState(null); // WO abierta en "Ver todos los datos"
     const [editarOpen, setEditarOpen] = useState(false);
     const [credenciales, setCredenciales] = useState(null);
 
@@ -518,11 +524,14 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
     });
 
     // De 25 en 25: un aliado puede tener miles de WO. Cambiar un filtro vuelve a la página 1.
-    useEffect(() => setPaginaWo(1), [filtroEstado, filtroTecnico, debBuscarWo]);
+    useEffect(() => setPaginaWo(1), [filtroEstado, filtroTecnico, debBuscarWo, fechaDesde, fechaHasta]);
     const { data: paginaWoData, isLoading: cargandoWo } = useQuery({
-        queryKey: ["aliado-work-orders", aliadoId, filtroEstado, filtroTecnico, debBuscarWo, paginaWo],
+        queryKey: ["aliado-work-orders", aliadoId, filtroEstado, filtroTecnico, debBuscarWo, fechaDesde, fechaHasta, paginaWo],
         queryFn: () => api.get(`/aliados/${aliadoId}/work-orders`, {
-            params: { estado: filtroEstado || undefined, cedula_tecnico: filtroTecnico || undefined, search: debBuscarWo || undefined, page: paginaWo },
+            params: {
+                estado: filtroEstado || undefined, cedula_tecnico: filtroTecnico || undefined, search: debBuscarWo || undefined,
+                fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined, page: paginaWo,
+            },
         }).then((r) => r.data),
         placeholderData: (prev) => prev,
     });
@@ -541,10 +550,21 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
     }
 
     const tecnicoFiltrado = aliado.tecnicos.find((t) => t.cedula === filtroTecnico);
+    // Búsqueda en la tabla de técnicos: por nombre (sin tildes ni mayúsculas) o por cédula.
+    const sinTildes = (v) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const textoTecnico = sinTildes(buscarTecnico.trim());
+    const tecnicosVisibles = textoTecnico
+        ? aliado.tecnicos.filter((t) => sinTildes(t.name).includes(textoTecnico) || String(t.cedula ?? "").includes(buscarTecnico.trim()))
+        : aliado.tecnicos;
+    // Indicadores con los filtros puestos (técnico, fechas, búsqueda); mientras cargan, los totales.
+    const indicadores = paginaWoData?.indicadores ?? aliado.work_orders;
+    const hayFiltrosWo = filtroTecnico || fechaDesde || fechaHasta || buscarWo;
+    const limpiarFiltrosWo = () => { setFiltroTecnico(""); setFechaDesde(""); setFechaHasta(""); setBuscarWo(""); };
 
     return (
         <>
-            <Modal titulo={aliado.nombre} onClose={onClose} maxWidth="min(1100px, 94vw)"
+            {/* Casi toda la pantalla: la tabla de WO tiene las mismas columnas que Operaciones > Work Orders. */}
+            <Modal titulo={aliado.nombre} onClose={onClose} maxWidth="98vw"
                 footer={<button style={S.btnSecondary} onClick={onClose}>Cerrar</button>}>
 
                 <div style={S.fichaCabecera}>
@@ -587,8 +607,16 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                         </button>
                     )}
                 </div>
+                {aliado.tipo === "empresa" && aliado.tecnicos.length > 0 && (
+                    <div style={{ ...S.searchWrap, maxWidth: 360, marginBottom: 12 }}>
+                        <span style={S.searchIcon}><IconSearch size={15} /></span>
+                        <input style={S.searchInput} placeholder="Buscar técnico por nombre o cédula…" value={buscarTecnico} onChange={(e) => setBuscarTecnico(e.target.value)} />
+                    </div>
+                )}
                 {aliado.tecnicos.length === 0 ? (
                     <div style={S.info}>Este aliado todavía no tiene técnicos. Agrégalos con el botón "Agregar técnico" cuando se sepa quiénes son.</div>
+                ) : tecnicosVisibles.length === 0 ? (
+                    <div style={S.info}>Ningún técnico coincide con «{buscarTecnico.trim()}».</div>
                 ) : (
                     <div style={S.tableWrap}>
                         <table className="data-table" style={{ fontSize: "0.85rem" }}>
@@ -599,7 +627,7 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {aliado.tecnicos.map((t) => (
+                                {tecnicosVisibles.map((t) => (
                                     <tr key={t.id}>
                                         <td style={{ fontWeight: 700 }}>{t.name}</td>
                                         <td>{t.cedula}</td>
@@ -630,19 +658,40 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                 <div style={S.contadores}>
                     {CONTADORES.map((c) => (
                         <button key={c.campo} style={S.contador(filtroEstado === c.id)} onClick={() => setFiltroEstado(c.id)}>
-                            <span style={{ fontSize: "1.5rem", fontWeight: 800 }}>{aliado.work_orders[c.campo]}</span>
+                            <span style={{ fontSize: "1.5rem", fontWeight: 800 }}>{indicadores[c.campo]}</span>
                             <span style={{ fontSize: "0.8rem", fontWeight: 700 }}>{c.label}</span>
                         </button>
                     ))}
                 </div>
-                <div style={{ ...S.searchWrap, marginBottom: 12, maxWidth: 360 }}>
-                    <span style={S.searchIcon}><IconSearch size={15} /></span>
-                    <input style={S.searchInput} placeholder="Buscar por N° de WO…" value={buscarWo} onChange={(e) => setBuscarWo(e.target.value)} />
+                <div style={S.filtrosWo}>
+                    <div style={{ ...S.searchWrap, maxWidth: 300, minWidth: 200 }}>
+                        <span style={S.searchIcon}><IconSearch size={15} /></span>
+                        <input style={S.searchInput} placeholder="Buscar por N° de WO…" value={buscarWo} onChange={(e) => setBuscarWo(e.target.value)} />
+                    </div>
+                    {/* Aliado empresa: varias personas, se filtra por técnico (también desde el ojo de cada uno). */}
+                    {aliado.tipo === "empresa" && aliado.tecnicos.length > 0 && (
+                        <label style={S.filtroWo}>
+                            <span style={S.label}>Técnico</span>
+                            <SelectBuscable style={{ ...S.input, minWidth: 240 }} value={filtroTecnico} onChange={(e) => setFiltroTecnico(e.target.value)}>
+                                <option value="">Todos los técnicos</option>
+                                {aliado.tecnicos.map((t) => <option key={t.id} value={t.cedula}>{t.name}</option>)}
+                            </SelectBuscable>
+                        </label>
+                    )}
+                    <label style={S.filtroWo}>
+                        <span style={S.label}>Atención desde</span>
+                        <input type="date" style={S.input} value={fechaDesde} max={fechaHasta || undefined} onChange={(e) => setFechaDesde(e.target.value)} />
+                    </label>
+                    <label style={S.filtroWo}>
+                        <span style={S.label}>Atención hasta</span>
+                        <input type="date" style={S.input} value={fechaHasta} min={fechaDesde || undefined} onChange={(e) => setFechaHasta(e.target.value)} />
+                    </label>
+                    {hayFiltrosWo && <button style={S.btnSecondary} onClick={limpiarFiltrosWo}>Quitar filtros</button>}
                 </div>
                 {tecnicoFiltrado && (
                     <div style={{ ...S.info, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>Mostrando solo las de <strong>{tecnicoFiltrado.name}</strong></span>
-                        <button style={S.btnSecondary} onClick={() => setFiltroTecnico("")}>Ver todas</button>
+                        <button style={S.btnSecondary} onClick={() => setFiltroTecnico("")}>Ver todos los técnicos</button>
                     </div>
                 )}
                 <div style={S.tableWrap}>
@@ -651,20 +700,37 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                     ) : workOrders.length === 0 ? (
                         <div style={S.empty}><IconEmptySearch size={36} /><p style={{ margin: 0 }}>No hay Work Orders para mostrar.</p></div>
                     ) : (
-                        <table className="data-table" style={{ fontSize: "0.84rem" }}>
+                        <table className="data-table" style={{ fontSize: "0.85rem" }}>
                             <thead>
-                                <tr><th>N° WO</th><th>Estado</th><th>Técnico</th><th>Servicio</th><th>Municipio</th><th>Fecha de atención</th><th>Fecha de finalización</th></tr>
+                                {/* Mismas columnas que Operaciones > Work Orders. */}
+                                <tr>
+                                    <th>IBS</th><th>Ítem</th><th>Número Work Order</th><th>Estado</th><th>Servicio</th><th>Proveedor</th>
+                                    <th>Técnico</th><th>Cédula del Técnico</th><th>Perímetro</th><th>Municipio</th><th>Departamento</th>
+                                    <th>Fecha de atención</th><th>Fecha de finalización</th><th>Aging</th><th style={{ textAlign: "center" }}>Acciones</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 {workOrders.map((w) => (
                                     <tr key={w.id}>
-                                        <td style={{ fontWeight: 700 }}>{w.numero_wo}{w.numero_item ? <span style={{ color: "var(--text-muted)" }}> · {w.numero_item}</span> : null}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{w.numero_wo_ibs || "—"}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{w.numero_item || "—"}</td>
+                                        <td style={{ fontWeight: 700 }}>{w.numero_wo}</td>
                                         <td>{w.estado || "—"}</td>
-                                        <td>{w.nombre_tecnico || w.cedula_tecnico}</td>
                                         <td>{w.servicio || "—"}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{w.proveedor || "—"}</td>
+                                        <td title={w.cuadrilla_tecnico || ""}>{w.nombre_tecnico || w.cuadrilla_tecnico || "—"}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{w.cedula_tecnico || "—"}</td>
+                                        <td>{w.perimetro || "—"}</td>
                                         <td>{w.municipio || "—"}</td>
+                                        <td style={{ color: "var(--text-muted)" }}>{w.departamento || "—"}</td>
                                         <td>{w.fecha_estado || "—"}</td>
                                         <td>{w.fecha_finalizacion || "—"}</td>
+                                        <td style={{ textAlign: "center" }}>{w.aging ?? "—"}</td>
+                                        <td style={{ textAlign: "center" }}>
+                                            <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver todos los datos" onClick={() => setVerWo(w)}>
+                                                <IconEye size={14} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -684,6 +750,8 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                     </div>
                 )}
             </Modal>
+
+            {verWo && <VerWorkOrderModal item={verWo} onClose={() => setVerWo(null)} />}
 
             {editarOpen && (
                 <EditarAliadoModal aliado={aliado} onClose={() => setEditarOpen(false)} onGuardado={() => { setEditarOpen(false); refrescar(); }} />
@@ -931,6 +999,8 @@ const S = {
     fichaCabecera: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
     datos: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(220px, 100%), 1fr))", gap: 12, background: "var(--bg)", borderRadius: "var(--radius-sm)", padding: 14 },
     contadores: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 },
+    filtrosWo: { display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 12 },
+    filtroWo: { display: "flex", flexDirection: "column", gap: 4 },
     contador: (activo) => ({
         display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "12px 8px", cursor: "pointer", fontFamily: "Nunito,sans-serif",
         border: `1.5px solid ${activo ? "var(--primary)" : "var(--border)"}`, borderRadius: "var(--radius-sm)",

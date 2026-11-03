@@ -190,7 +190,10 @@ class AliadoController extends Controller
 
     /**
      * Work Orders de los técnicos del aliado (por Cédula Técnico), de 25 en 25 con ?page=.
-     * Filtros: ?estado=atendidas|finalizadas, ?cedula_tecnico= y ?search= (N° de WO o ítem).
+     * Filtros: ?estado=atendidas|finalizadas, ?cedula_tecnico=, ?search= (N° de WO o ítem) y
+     * ?fecha_desde= / ?fecha_hasta= (fecha de atención, como en Operaciones > Work Orders).
+     * Con ?page= trae además los indicadores (asignadas, atendidas, finalizadas) con esos
+     * mismos filtros menos el estado, que es lo que eligen los indicadores.
      * Sin ?page= devuelve las 500 más recientes (compatibilidad).
      */
     public function workOrders(Request $request, Aliado $aliado)
@@ -198,19 +201,31 @@ class AliadoController extends Controller
         $this->soloElSuyo($request, $aliado);
         $cedulas = $this->tecnicosVisibles($request, $aliado)->whereNotNull('cedula')->pluck('cedula');
 
-        $query = WorkOrder::whereIn('cedula_tecnico', $cedulas)
-            ->when($request->estado === 'atendidas', fn ($q) => $q->where('estado', self::ESTADO_ATENDIDA))
-            ->when($request->estado === 'finalizadas', fn ($q) => $q->where('estado', self::ESTADO_FINALIZADA))
+        $base = WorkOrder::whereIn('cedula_tecnico', $cedulas)
             ->when($request->cedula_tecnico, fn ($q, $c) => $q->where('cedula_tecnico', $c))
             ->when(trim((string) $request->search), fn ($q, $s) => $q->where(fn ($w) => $w
                 ->where('numero_wo', 'like', "%{$s}%")->orWhere('numero_wo_ibs', 'like', "%{$s}%")))
+            ->when($request->fecha_desde, fn ($q, $f) => $q->whereDate('fecha_estado', '>=', $f))
+            ->when($request->fecha_hasta, fn ($q, $f) => $q->whereDate('fecha_estado', '<=', $f));
+
+        $query = (clone $base)
+            ->when($request->estado === 'atendidas', fn ($q) => $q->where('estado', self::ESTADO_ATENDIDA))
+            ->when($request->estado === 'finalizadas', fn ($q) => $q->where('estado', self::ESTADO_FINALIZADA))
             ->orderByDesc('fecha_finalizacion')->orderByDesc('id');
 
         if ($request->has('page')) {
-            return response()->json($query->paginate(25, [
-                'id', 'numero_wo', 'numero_item', 'estado', 'nombre_tecnico', 'cedula_tecnico', 'servicio', 'municipio',
-                'fecha_estado', 'fecha_finalizacion',
-            ]));
+            $conteo = (clone $base)
+                ->selectRaw('COUNT(*) as asignadas')
+                ->selectRaw('SUM(estado = ?) as atendidas', [self::ESTADO_ATENDIDA])
+                ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
+                ->first();
+
+            // Fila completa: la tabla tiene las columnas de Work Orders y el ojo muestra todos sus datos.
+            return response()->json($query->paginate(25)->toArray() + ['indicadores' => [
+                'asignadas'   => (int) $conteo->asignadas,
+                'atendidas'   => (int) $conteo->atendidas,
+                'finalizadas' => (int) $conteo->finalizadas,
+            ]]);
         }
 
         return response()->json($query->limit(500)->get());

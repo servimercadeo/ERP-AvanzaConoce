@@ -232,6 +232,32 @@ class RequerimientosOperacionesTest extends TestCase
         $this->assertSame(['S03', 3], [$fila['codigo_sl'], $fila['materiales']['GRAPA BLANCA']]);
     }
 
+    public function test_ficha_del_aliado_filtra_por_fechas_y_por_tecnico_con_indicadores(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '2003', 'name' => 'OTRO TEC EMPRESA', 'aliado_id' => $this->empresa->id]);
+        foreach ([['2002', 'Atendido', '2026-09-05'], ['2002', 'Finalizado', '2026-10-10'], ['2003', 'Finalizado', '2026-10-12'], ['2003', 'Asignado', '2026-11-01']] as $i => [$ced, $estado, $fecha]) {
+            WorkOrder::create(['numero_wo' => "AL-{$i}", 'numero_item' => '1', 'cedula_tecnico' => $ced, 'estado' => $estado, 'fecha_estado' => "{$fecha} 09:00:00"]);
+        }
+        $this->actuarComo('operaciones');
+        $url = "/api/aliados/{$this->empresa->id}/work-orders?page=1";
+
+        $this->getJson($url)->assertOk()->assertJsonPath('total', 4)
+            ->assertJsonPath('indicadores', ['asignadas' => 4, 'atendidas' => 1, 'finalizadas' => 2]);
+        // Octubre: solo las 2 finalizadas.
+        $oct = $this->getJson("{$url}&fecha_desde=2026-10-01&fecha_hasta=2026-10-31")->assertOk();
+        $this->assertSame(['AL-1', 'AL-2'], collect($oct->json('data'))->pluck('numero_wo')->sort()->values()->all());
+        $oct->assertJsonPath('indicadores', ['asignadas' => 2, 'atendidas' => 0, 'finalizadas' => 2]);
+        // Por técnico (y combinado con fechas y estado).
+        $this->getJson("{$url}&cedula_tecnico=2003")->assertJsonPath('total', 2)->assertJsonPath('indicadores.asignadas', 2);
+        $this->getJson("{$url}&cedula_tecnico=2003&fecha_desde=2026-10-01&fecha_hasta=2026-10-31&estado=finalizadas")
+            ->assertJsonPath('total', 1)->assertJsonPath('data.0.numero_wo', 'AL-2');
+
+        // Un técnico de la empresa no puede ver las de su compañero aunque filtre por su cédula.
+        $this->actingAs($this->tecDeEmpresa);
+        $this->getJson("{$url}&cedula_tecnico=2003")->assertOk()->assertJsonPath('total', 0);
+        $this->getJson($url)->assertJsonPath('indicadores', ['asignadas' => 2, 'atendidas' => 1, 'finalizadas' => 1]);
+    }
+
     public function test_operaciones_ve_y_gestiona_todas_las_wo(): void
     {
         $this->wos();
