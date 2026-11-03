@@ -738,6 +738,7 @@ export default function WorkOrdersCrud() {
     const debSearch = useDebounce(search, 300);
     const [estadoFiltro, setEstadoFiltro] = useState("");
     const [proveedorFiltro, setProveedorFiltro] = useState("");
+    const [tipoTecnicoFiltro, setTipoTecnicoFiltro] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
     const [importOpen, setImportOpen] = useState(false);
@@ -759,13 +760,13 @@ export default function WorkOrdersCrud() {
     // pintarse. La búsqueda y los filtros se siguen aplicando sobre todas en el servidor.
     const [pagina, setPagina] = useState(1);
     const [porPagina, setPorPagina] = useState(50);
-    useEffect(() => setPagina(1), [debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta]);
+    useEffect(() => setPagina(1), [debSearch, estadoFiltro, proveedorFiltro, tipoTecnicoFiltro, fechaDesde, fechaHasta]);
 
     const { data: resultado, isLoading } = useQuery({
-        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta, porPagina, pagina],
+        queryKey: ["work-orders", debSearch, estadoFiltro, proveedorFiltro, tipoTecnicoFiltro, fechaDesde, fechaHasta, porPagina, pagina],
         queryFn: () =>
             api
-                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined, page: pagina, per_page: porPagina } })
+                .get("/work-orders", { params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, tipo_tecnico: tipoTecnicoFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined, page: pagina, per_page: porPagina } })
                 .then((r) => r.data),
         placeholderData: (prev) => prev,
     });
@@ -799,7 +800,7 @@ export default function WorkOrdersCrud() {
         setExportando(true);
         try {
             const { data: todas } = await api.get("/work-orders", {
-                params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined },
+                params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, tipo_tecnico: tipoTecnicoFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined },
             });
             const XLSX = await import("xlsx");
             const rows = todas.map((w) => Object.fromEntries(
@@ -893,6 +894,13 @@ export default function WorkOrdersCrud() {
                     <option value="">Todos los proveedores</option>
                     {proveedores.map((p) => <option key={p} value={p}>{p}</option>)}
                 </SelectBuscable>
+                {user?.rol !== "tecnico" && (
+                    <SelectBuscable style={S.filtroSelect} value={tipoTecnicoFiltro} onChange={(e) => setTipoTecnicoFiltro(e.target.value)}>
+                        <option value="">Todos los técnicos</option>
+                        <option value="directo">Técnicos directos</option>
+                        <option value="indirecto">Técnicos indirectos</option>
+                    </SelectBuscable>
+                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Desde</span>
                     <input

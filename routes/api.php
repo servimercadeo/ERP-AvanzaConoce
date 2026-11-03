@@ -532,9 +532,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.aliados.aliados_file'));
 
     // Auxilios (Operaciones > Auxilios): auxilio por productividad de técnicos directos
-    // según cantidad de Work Orders finalizadas al mes. Expone el pago de TODOS los
-    // técnicos a la vez, así que (a diferencia de Work Orders) va detrás de un permiso:
-    // negado por completo a rol=tecnico (ver 2026_10_30_000006), nadie más lo ve ni edita.
+    // según cantidad de Work Orders finalizadas al mes. Va detrás de un permiso: el admin ve
+    // el pago de todos, rol=tecnico solo el suyo sin editar escalas (AuxilioController::reporte)
+    // y a los demás roles se les niega (ver 2026_11_03_000001).
     Route::middleware('permiso:operaciones.auxilios.auxilios_file')->group(function () {
         Route::get('auxilios/tramos', [App\Http\Controllers\Api\AuxilioController::class, 'tramos']);
         Route::post('auxilios/tramos', [App\Http\Controllers\Api\AuxilioController::class, 'storeTramo'])

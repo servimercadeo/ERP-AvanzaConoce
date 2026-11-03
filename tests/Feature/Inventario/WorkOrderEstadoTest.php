@@ -94,6 +94,17 @@ class WorkOrderEstadoTest extends TestCase
         $this->assertSame('Finalizado', $this->estadoImportado());
     }
 
+    public function test_reimportar_no_cambia_la_fecha_de_finalizacion_de_lo_que_un_directo_ya_cerro(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->importar(['cedula_tecnico' => '555', 'fecha_finalizacion' => '2026-09-25 10:00:00']);
+        WorkOrder::where('numero_wo', 'WO1')->update(['estado' => 'Finalizado', 'fecha_finalizacion' => '2026-11-02 08:00:00']);
+
+        $this->importar(['cedula_tecnico' => '555', 'fecha_finalizacion' => '2026-09-25 10:00:00']);
+
+        $this->assertStringStartsWith('2026-11-02', (string) WorkOrder::where('numero_wo', 'WO1')->value('fecha_finalizacion'));
+    }
+
     public function test_una_wo_de_directo_en_el_estado_atendido_que_ya_no_existe_vuelve_a_asignado(): void
     {
         $this->usuario('tecnico', ['cedula' => '555']);
@@ -124,6 +135,49 @@ class WorkOrderEstadoTest extends TestCase
             'ALIADO' => 'Finalizado', 'DIRECTO' => 'Asignado', 'MOD-ALIADO' => 'Finalizado',
             'MOD-DIRECTO' => 'Asignado', 'SIN-DATOS' => 'Completa', 'YA-CERRADA' => 'Finalizado',
         ], WorkOrder::orderBy('id')->pluck('estado', 'numero_wo')->all());
+    }
+
+    public function test_filtra_por_tecnicos_directos_e_indirectos(): void
+    {
+        $this->tecnicoAliado('777');
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $crear = fn (string $wo, array $datos) => WorkOrder::create($datos + ['numero_wo' => $wo, 'numero_item' => '']);
+        $crear('USUARIO-DIRECTO', ['cedula_tecnico' => '555']);
+        $crear('USUARIO-ALIADO', ['cedula_tecnico' => '777']);
+        $crear('AGENDADO-ALIADO', ['cedula_tecnico' => '555', 'cedula_tecnico_agendado' => '777']);
+        $crear('AGENDADO-VACIO', ['cedula_tecnico' => '555', 'cedula_tecnico_agendado' => '']);
+        $crear('USUARIO-MANDA', ['cedula_tecnico' => '555', 'modalidad' => 'ALIADO']);
+        $crear('MODALIDAD-DIRECTO', ['cedula_tecnico' => '999', 'modalidad' => ' directo ']);
+        $crear('MODALIDAD-ALIADO', ['cedula_tecnico' => '999', 'modalidad' => 'ALIADO']);
+        $crear('SIN-CEDULA', ['modalidad' => 'ALIADO']);
+        $crear('SIN-DATOS', ['cedula_tecnico' => '999']);
+        $this->actingAs($this->usuario('admin'));
+
+        $numeros = fn (string $url) => collect($this->getJson($url)->assertOk()->json())->pluck('numero_wo')->sort()->values()->all();
+
+        $this->assertSame(
+            ['AGENDADO-VACIO', 'MODALIDAD-DIRECTO', 'USUARIO-DIRECTO', 'USUARIO-MANDA'],
+            $numeros('/api/work-orders?tipo_tecnico=directo'),
+        );
+        $this->assertSame(
+            ['AGENDADO-ALIADO', 'MODALIDAD-ALIADO', 'SIN-CEDULA', 'USUARIO-ALIADO'],
+            $numeros('/api/work-orders?tipo_tecnico=indirecto'),
+        );
+        $this->assertCount(9, $numeros('/api/work-orders'));
+        $this->assertCount(9, $numeros('/api/work-orders?tipo_tecnico=otro'));
+    }
+
+    public function test_el_filtro_de_tipo_se_combina_con_los_demas_y_con_la_paginacion(): void
+    {
+        $crear = fn (string $wo, array $datos) => WorkOrder::create($datos + ['numero_wo' => $wo, 'numero_item' => '', 'cedula_tecnico' => '999']);
+        $crear('D1', ['modalidad' => 'DIRECTO', 'estado' => 'Asignado']);
+        $crear('D2', ['modalidad' => 'DIRECTO', 'estado' => 'Finalizado']);
+        $crear('A1', ['modalidad' => 'ALIADO', 'estado' => 'Finalizado']);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->getJson('/api/work-orders?tipo_tecnico=directo&estado=Finalizado&page=1')->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.numero_wo', 'D2');
     }
 
     public function test_tecnico_directo_puede_cambiar_el_estado_de_su_propia_wo(): void

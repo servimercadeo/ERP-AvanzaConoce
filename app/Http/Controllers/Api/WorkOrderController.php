@@ -150,8 +150,29 @@ class WorkOrderController extends Controller
         if ($request->fecha_hasta) {
             $query->whereDate('fecha_estado', '<=', $request->fecha_hasta);
         }
+        if (in_array($request->tipo_tecnico, ['directo', 'indirecto'], true)) {
+            $this->filtrarPorTipoDeTecnico($query, $request->tipo_tecnico);
+        }
 
         return $query;
+    }
+
+    // Misma regla de aplicarEstadoPorTecnico: manda el usuario de la cédula; sin usuario, la MODALIDAD del archivo.
+    private function filtrarPorTipoDeTecnico($query, string $tipo): void
+    {
+        $usuarioDeLaWo = fn ($q) => $q->selectRaw('1')->from('users')
+            ->where('users.cedula', '!=', '')
+            ->whereRaw("users.cedula = COALESCE(NULLIF(work_orders.cedula_tecnico_agendado, ''), work_orders.cedula_tecnico)");
+
+        $query->where(function ($w) use ($usuarioDeLaWo, $tipo) {
+            $w->whereExists(function ($q) use ($usuarioDeLaWo, $tipo) {
+                $usuarioDeLaWo($q);
+                $tipo === 'indirecto' ? $q->whereNotNull('users.aliado_id') : $q->whereNull('users.aliado_id');
+            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $tipo) {
+                $sinUsuario->whereNotExists($usuarioDeLaWo)
+                    ->whereRaw('UPPER(TRIM(work_orders.modalidad)) = ?', [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
+            });
+        });
     }
 
     public function destroy(WorkOrder $workOrder)
@@ -358,6 +379,10 @@ class WorkOrderController extends Controller
         } elseif ($tipo === 'DIRECTO') {
             $anterior = $wo->getOriginal('estado');
             $wo->estado = $anterior === 'Finalizado' ? $anterior : 'Asignado';
+            // Reimportar no le cambia el mes del auxilio a lo que ya se finalizó.
+            if ($anterior === 'Finalizado' && $wo->getOriginal('fecha_finalizacion')) {
+                $wo->fecha_finalizacion = $wo->getOriginal('fecha_finalizacion');
+            }
         }
     }
 
