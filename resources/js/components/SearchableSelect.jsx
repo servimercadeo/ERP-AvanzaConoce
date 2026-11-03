@@ -258,18 +258,18 @@ export function SearchableSelect({
                                             key={`${o.value}__${i}`}
                                             style={{
                                                 padding: "10px 12px",
-                                                cursor: "pointer",
+                                                cursor: o.disabled ? "not-allowed" : "pointer",
                                                 fontSize: "0.9rem",
-                                                background: hovered === i ? "rgba(26,155,140,0.08)" : "transparent",
+                                                background: hovered === i && !o.disabled ? "rgba(26,155,140,0.08)" : "transparent",
                                                 borderRadius: "10px",
                                                 marginBottom: 4,
                                                 fontWeight: String(value) === String(o.value) ? 700 : 400,
-                                                color: String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
+                                                color: o.disabled ? "var(--text-muted)" : String(value) === String(o.value) ? "var(--primary)" : "var(--text)",
                                                 transition: "background 0.15s ease",
                                             }}
                                             onMouseEnter={() => setHovered(i)}
                                             onMouseLeave={() => setHovered(-1)}
-                                            onClick={() => handleSelect(o.value, o.label)}
+                                            onClick={() => { if (!o.disabled) handleSelect(o.value, o.label); }}
                                         >
                                             {o.label}
                                         </div>

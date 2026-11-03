@@ -117,6 +117,14 @@ class SedeController extends Controller
 
         $nombres = collect($data['proveedores_work_orders'])->keyBy(fn ($nombre) => ProveedorWorkOrder::codigoDe($nombre));
 
+        // Solo bloquea agregar: una sede que ya tenía dos se puede seguir editando.
+        $actuales = $sede->proveedoresWorkOrders()->pluck('codigo');
+        if ($nombres->count() > 1 && $nombres->keys()->diff($actuales)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'proveedores_work_orders' => 'Una sede solo puede tener un proveedor. Quita el que tiene para cambiarlo.',
+            ]);
+        }
+
         $enOtraSede = ProveedorWorkOrder::with('sede:id,nombre')
             ->whereIn('codigo', $nombres->keys())
             ->where('sede_id', '!=', $sede->id)
