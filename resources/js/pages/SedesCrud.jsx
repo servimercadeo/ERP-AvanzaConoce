@@ -48,37 +48,39 @@ const EMPTY_FORM = {
 
 function ProveedoresWorkOrders({ sedeId, value, onChange, proveedores, sedes, disabled }) {
     const opciones = useMemo(() => {
-        const ocupados = new Set(
+        const sedeDe = new Map(
             sedes
                 .filter((s) => s.id !== sedeId)
-                .flatMap((s) => s.proveedores_work_orders ?? [])
-                .concat(value)
-                .map((p) => p.codigo),
+                .flatMap((s) => (s.proveedores_work_orders ?? []).map((p) => [p.codigo, s.nombre])),
         );
-        return proveedores
-            .filter((p) => !ocupados.has(p.codigo))
-            .map((p) => ({ value: p.codigo, label: p.nombre }));
-    }, [sedes, sedeId, value, proveedores]);
+        const conSede = proveedores.map((p) => {
+            const sede = sedeDe.get(p.codigo);
+            return sede
+                ? { value: p.codigo, label: `${p.nombre} (ya está en ${sede})`, disabled: true }
+                : { value: p.codigo, label: p.nombre };
+        });
+        return [...conSede.filter((o) => !o.disabled), ...conSede.filter((o) => o.disabled)];
+    }, [sedes, sedeId, proveedores]);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-            {!disabled && (
+            {!disabled && value.length === 0 && (
                 <div style={{ ...S.formGroup, maxWidth: 460 }}>
-                    <label style={S.label}>Agregar proveedor</label>
+                    <label style={S.label}>Proveedor</label>
                     <SearchableSelect
                         value=""
                         defaultValue=""
                         options={opciones}
                         onChange={(codigo) => {
                             const elegido = proveedores.find((p) => p.codigo === codigo);
-                            if (elegido) onChange([...value, elegido]);
+                            if (elegido) onChange([elegido]);
                         }}
                     />
-                    <span style={S.hint}>Los que ya están en otra sede no aparecen aquí.</span>
+                    <span style={S.hint}>Los que están en otra sede salen en gris: primero hay que quitarlos de allá.</span>
                 </div>
             )}
             {value.length === 0 ? (
-                <span style={S.hint}>Sin proveedores asociados.</span>
+                disabled && <span style={S.hint}>Sin proveedor asociado.</span>
             ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {value.map((p) => (
@@ -97,6 +99,9 @@ function ProveedoresWorkOrders({ sedeId, value, onChange, proveedores, sedes, di
                         </span>
                     ))}
                 </div>
+            )}
+            {!disabled && value.length > 0 && (
+                <span style={S.hint}>Para cambiarlo, quítalo con la X y elige otro.</span>
             )}
         </div>
     );
@@ -359,7 +364,7 @@ function Modal({
                     </div>
 
                     <div style={{ ...S.sectionLabel, marginTop: 10 }}>
-                        Proveedores de Work Orders
+                        Proveedor de Work Orders
                     </div>
                     <ProveedoresWorkOrders
                         sedeId={initial.id}

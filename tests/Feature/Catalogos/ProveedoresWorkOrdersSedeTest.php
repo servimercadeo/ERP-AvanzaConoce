@@ -62,18 +62,47 @@ class ProveedoresWorkOrdersSedeTest extends TestCase
         $this->assertSame('SEDE DTV', $this->sedeExportada('WO1'));
     }
 
-    public function test_una_sede_puede_tener_varios_proveedores(): void
+    public function test_una_sede_solo_admite_un_proveedor(): void
     {
-        $id = $this->postJson('/api/sedes', [
-            'nombre' => 'SERVIMERCADEO VALLE',
-            'proveedores_work_orders' => ['CO-I005135-SERVIMERCADEO TULUA', 'CO-I005299-SERVIMERCADEO VALLE OCCIDENTE'],
-        ])->assertCreated()->json('id');
-        $this->crearWo('WO1', 'CO-I005135-SERVIMERCADEO TULUA');
-        $this->crearWo('WO2', 'CO-I005299-SERVIMERCADEO VALLE OCCIDENTE');
+        $this->postJson('/api/sedes', ['nombre' => 'SEDE NUEVA', 'proveedores_work_orders' => ['CO-I005135-X', 'CO-I005299-Y']])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.proveedores_work_orders.0', 'Una sede solo puede tener un proveedor. Quita el que tiene para cambiarlo.');
+        $this->assertDatabaseMissing('sedes', ['nombre' => 'SEDE NUEVA']);
 
-        $this->assertSame(2, ProveedorWorkOrder::where('sede_id', $id)->count());
-        $this->assertSame('SERVIMERCADEO VALLE', $this->sedeExportada('WO1'));
-        $this->assertSame('SERVIMERCADEO VALLE', $this->sedeExportada('WO2'));
+        $id = $this->postJson('/api/sedes', ['nombre' => 'SEDE A', 'proveedores_work_orders' => ['CO-I005135-X']])
+            ->assertCreated()->json('id');
+
+        $this->putJson("/api/sedes/{$id}", ['nombre' => 'SEDE A', 'proveedores_work_orders' => ['CO-I005135-X', 'CO-I005299-Y']])
+            ->assertUnprocessable();
+        $this->assertSame(['CO-I005135'], ProveedorWorkOrder::where('sede_id', $id)->pluck('codigo')->all());
+    }
+
+    public function test_quitar_el_proveedor_permite_poner_otro_y_lo_libera_para_otra_sede(): void
+    {
+        $id = $this->postJson('/api/sedes', ['nombre' => 'SEDE A', 'proveedores_work_orders' => ['CO-I005135-X']])
+            ->assertCreated()->json('id');
+        $otra = Sede::create(['nombre' => 'SEDE B']);
+
+        $this->putJson("/api/sedes/{$id}", ['nombre' => 'SEDE A', 'proveedores_work_orders' => []])->assertOk();
+        $this->putJson("/api/sedes/{$id}", ['nombre' => 'SEDE A', 'proveedores_work_orders' => ['CO-I005299-Y']])->assertOk();
+        $this->putJson("/api/sedes/{$otra->id}", ['nombre' => 'SEDE B', 'proveedores_work_orders' => ['CO-I005135-X']])->assertOk();
+
+        $this->assertDatabaseHas('proveedores_work_orders', ['codigo' => 'CO-I005299', 'sede_id' => $id]);
+        $this->assertDatabaseHas('proveedores_work_orders', ['codigo' => 'CO-I005135', 'sede_id' => $otra->id]);
+    }
+
+    public function test_la_sede_que_ya_tenia_dos_proveedores_se_puede_editar_y_quitarle_uno(): void
+    {
+        $sede = Sede::create(['nombre' => 'SERVIMERCADEO PEREIRA']);
+        ProveedorWorkOrder::create(['sede_id' => $sede->id, 'codigo' => 'CO-I004174', 'nombre' => 'CO-I004174-X']);
+        ProveedorWorkOrder::create(['sede_id' => $sede->id, 'codigo' => 'CO-I005115', 'nombre' => 'CO-I005115-Y']);
+
+        $this->putJson("/api/sedes/{$sede->id}", ['nombre' => 'PEREIRA', 'proveedores_work_orders' => ['CO-I004174-X', 'CO-I005115-Y']])
+            ->assertOk()->assertJsonCount(2, 'proveedores_work_orders');
+        $this->putJson("/api/sedes/{$sede->id}", ['nombre' => 'PEREIRA', 'proveedores_work_orders' => ['CO-I004174-X', 'CO-I009999-Z']])
+            ->assertUnprocessable();
+        $this->putJson("/api/sedes/{$sede->id}", ['nombre' => 'PEREIRA', 'proveedores_work_orders' => ['CO-I004174-X']])
+            ->assertOk()->assertJsonCount(1, 'proveedores_work_orders');
     }
 
     public function test_sin_asociacion_o_sin_proveedor_la_sede_queda_vacia(): void
