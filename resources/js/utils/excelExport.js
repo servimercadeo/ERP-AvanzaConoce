@@ -10,7 +10,7 @@
  *   - "moneda":  número con separador de miles.
  *   - "numero":  número tal cual.
  *   - "entero":  número sin decimales.
- *   - "porcentaje": número (ej. 50 = 50%) con hasta 2 decimales.
+ *   - "porcentaje": número (ej. 50) que se muestra con su signo (50%), con hasta 2 decimales.
  *   - "booleano": "Sí" / "No".
  * Un valor vacío o inválido deja la celda vacía en vez de escribir basura.
  */
@@ -121,13 +121,17 @@ const FORMATOS = {
     moneda: "#,##0",
     numero: "General",
     entero: "0",
-    porcentaje: "0.##",
 };
+
+// El "%" va entre comillas para que Excel no divida entre 100: la celda sigue valiendo 100.
+// Los enteros llevan su propio formato porque "0.##" deja el separador suelto ("100,%").
+const formatoPorcentaje = (num) => (Number.isInteger(num) ? '0"%"' : '0.##"%"');
 
 function celda(tipo, value) {
     const limpio = valorCelda(tipo, value);
     if (limpio === null) return null;
     if (tipo === "fecha") return { t: "n", v: serialExcel(limpio), z: FORMATOS.fecha };
+    if (tipo === "porcentaje") return { t: "n", v: limpio, z: formatoPorcentaje(limpio) };
     if (FORMATOS[tipo]) return { t: "n", v: limpio, z: FORMATOS[tipo] };
     return { t: "s", v: limpio };
 }

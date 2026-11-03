@@ -7,6 +7,28 @@ import { buildContratoPayloadFromExcelRows, parsearResumenAnexos } from "./contr
 import { COLUMNAS_IMPORTABLES } from "./empleadosImport.js";
 import { crearParser } from "./excelImport.js";
 
+test("los porcentajes se ven con su signo y la celda conserva el número", async () => {
+    const XLSX = await import("xlsx");
+    const hoja = {
+        nombre: "H",
+        columnas: [{ titulo: "% CC", tipo: "porcentaje", valor: (f) => f.p }],
+        filas: [{ p: "100.00" }, { p: "25.50" }, { p: "33.33" }, { p: null }],
+    };
+    const ws = construirLibro(XLSX, [hoja]).Sheets.H;
+    const visto = (ref) => XLSX.utils.format_cell(ws[ref]);
+
+    assert.equal(visto("A2"), "100%");
+    assert.equal(visto("A3"), "25.5%");
+    assert.equal(visto("A4"), "33.33%");
+    assert.equal(ws.A5, undefined);
+    assert.deepEqual([ws.A2.v, ws.A3.v], [100, 25.5]);
+
+    // Al reimportar el archivo sigue valiendo 100, no 1.
+    const salida = XLSX.write(construirLibro(XLSX, [hoja]), { type: "buffer", bookType: "xlsx" });
+    const leido = XLSX.read(salida, { type: "buffer" });
+    assert.equal(XLSX.utils.sheet_to_json(leido.Sheets.H, { defval: "" })[0]["% CC"], 100);
+});
+
 test("valida fechas sin correrlas de día por la zona horaria", () => {
     assert.equal(aFecha("2019-01-01T00:00:00.000000Z"), "2019-01-01");
     assert.equal(aFecha("2024-02-29"), "2024-02-29");

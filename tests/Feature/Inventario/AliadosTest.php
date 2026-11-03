@@ -658,14 +658,60 @@ class AliadosTest extends TestCase
         $this->assertNotContains('1020304050', $cedulas);
     }
 
-    public function test_un_aliado_con_tecnicos_no_se_elimina(): void
+    public function test_eliminar_un_aliado_borra_sus_tecnicos_pero_no_sus_work_orders(): void
     {
         $this->actuarComo('admin');
         $this->postJson('/api/aliados', ['tipo' => 'tecnico'] + $this->persona())->assertCreated();
+        $indirecto = Aliado::where('tipo', 'tecnico')->firstOrFail();
+        WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
         $vacio = Aliado::create($this->empresa());
 
-        $this->deleteJson('/api/aliados/' . Aliado::where('tipo', 'tecnico')->value('id'))->assertStatus(422);
+        $this->deleteJson("/api/aliados/{$indirecto->id}")->assertOk();
         $this->deleteJson("/api/aliados/{$vacio->id}")->assertOk();
+
+        $this->assertNull(Aliado::find($indirecto->id));
+        $this->assertNull(User::where('cedula', '1020304050')->first());
+        $this->assertSame(1, WorkOrder::where('numero_wo', 'WO1')->count());
+    }
+
+    public function test_no_se_elimina_el_aliado_de_tu_propio_usuario(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        $yo = $this->actuarComo('admin', ['aliado_id' => $aliado->id]);
+
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertStatus(422);
+        $this->assertNotNull($yo->fresh());
+        $this->assertNotNull(Aliado::find($aliado->id));
+    }
+
+    public function test_de_entrada_solo_el_admin_elimina_y_solo_admin_y_operaciones_editan(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        // `activo` es el cambio de estado: se guarda con el resto de la edición.
+        $inactivo = $this->empresa(['activo' => false]);
+
+        $this->actuarComo('operaciones');
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertForbidden();
+        $this->putJson("/api/aliados/{$aliado->id}", $inactivo)->assertOk()->assertJsonPath('activo', false);
+
+        foreach (['th', 'tic', 'financiera', 'supervisores', 'general'] as $rol) {
+            $this->actuarComo($rol);
+            $this->deleteJson("/api/aliados/{$aliado->id}")->assertForbidden();
+            $this->putJson("/api/aliados/{$aliado->id}", $inactivo)->assertForbidden();
+        }
+
+        $this->assertNotNull(Aliado::find($aliado->id));
+    }
+
+    public function test_a_otro_rol_se_le_habilita_eliminar_y_editar_desde_la_matriz(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        \App\Models\PermisoDenegado::where(['rol' => 'th', 'modulo_id' => 'operaciones', 'submodulo_id' => 'aliados'])
+            ->whereIn('accion', ['editar', 'eliminar'])->delete();
+
+        $this->actuarComo('th');
+        $this->putJson("/api/aliados/{$aliado->id}", $this->empresa(['activo' => false]))->assertOk();
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertOk();
     }
 
     public function test_el_rol_tecnico_no_administra_aliados(): void

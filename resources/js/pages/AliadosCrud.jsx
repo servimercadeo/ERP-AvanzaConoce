@@ -897,7 +897,7 @@ export default function AliadosCrud() {
                                             <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver ficha" onClick={() => setFichaId(a.id)}>
                                                 <IconEye size={14} />
                                             </button>
-                                            {puede.eliminar && a.tecnicos_count === 0 && (
+                                            {puede.eliminar && (
                                                 <button style={S.actionBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => setDeleteTarget(a)}>
                                                     <IconTrash size={14} />
                                                 </button>
@@ -950,6 +950,13 @@ export default function AliadosCrud() {
                         </>
                     }>
                     <p style={{ margin: 0 }}>¿Eliminar el aliado <strong>{deleteTarget.nombre}</strong>?</p>
+                    {deleteTarget.tecnicos_count > 0 && (
+                        <p style={{ margin: "12px 0 0", color: "#a33" }}>
+                            También se eliminarán por completo sus {deleteTarget.tecnicos_count} técnico(s), sin posibilidad de recuperarlos.
+                            Sus Work Orders ({deleteTarget.work_orders?.total ?? 0}) no se borran, pero quedan sin técnico ni aliado.
+                            Para conservar el historial, mejor edítalo y déjalo Inactivo.
+                        </p>
+                    )}
                 </Modal>
             )}
         </div>

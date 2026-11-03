@@ -9,6 +9,7 @@ use App\Models\WorkOrder;
 use App\Services\AltaAliadoEnAvanzaConoce;
 use App\Services\AltaEnAvanzaConoce;
 use App\Services\CredencialesAvanzaConoce;
+use App\Services\EliminacionEmpleado;
 use App\Services\UsuarioAliadoEmpresa;
 use App\Services\IdentidadUnica;
 use Illuminate\Http\Request;
@@ -340,11 +341,15 @@ class AliadoController extends Controller
     public function destroy(Request $request, Aliado $aliado)
     {
         $this->soloElSuyo($request, $aliado);
-        if ($aliado->tecnicos()->exists()) {
-            return response()->json([
-                'message' => 'Este aliado tiene técnicos registrados: inactívalo en vez de eliminarlo, así se conserva su historial de Work Orders.',
-            ], 422);
+        $yo = $request->user()->id;
+        if ($aliado->usuario_id === $yo || $aliado->tecnicos()->whereKey($yo)->exists()) {
+            return response()->json(['message' => 'No puedes eliminar el aliado al que pertenece tu propio usuario.'], 422);
         }
+
+        // Sus técnicos existían solo por él: se borran por completo. Fuera de la transacción de
+        // abajo porque EliminacionEmpleado borra archivos al confirmar cada uno. Sus Work Orders
+        // no se borran (se enlazan por cédula, sin llave foránea).
+        $aliado->tecnicos()->where('rol', 'tecnico')->get()->each(fn (User $t) => EliminacionEmpleado::eliminar($t));
 
         DB::transaction(function () use ($aliado) {
             $usuarioId = $aliado->usuario_id;
