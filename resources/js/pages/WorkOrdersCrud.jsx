@@ -193,7 +193,7 @@ const IMPORT_HEADER_MAP = {
  * Columnas de materiales del "Exporte Macaw" (archivo de Operaciones DTV), una por material,
  * con la cantidad que consumió la WO. Van entre "Contrato enviado" y "Registrado por", con el
  * nombre exacto del archivo (algunos traen espacios al final). Al importar se guardan en
- * `work_orders.materiales` y el Exportar las devuelve en la misma posición.
+ * `work_orders.materiales` (se ven en "Ver todos los datos"); el Exportar NO las incluye.
  */
 const MATERIALES_MACAW = [
     "CABLE COAXIAL",
@@ -307,7 +307,6 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Numero de ticket de aprobación", "numero_ticket_aprobacion"],
     ["Razón de Prueba de Calidad Fallida", "razon_prueba_calidad_fallida"],
     ["Contrato enviado", "contrato_enviado"],
-    ...MATERIALES_MACAW.map((m) => [m, (w) => w.materiales?.[m]]),
     ["Registrado por", "registrado_por"],
     ["Fecha registro material", "fecha_registro_material"],
     ["Fecha Registro sin material", "fecha_registro_sin_material"],
@@ -901,7 +900,6 @@ export default function WorkOrdersCrud() {
             const rows = todas.map((w) => Object.fromEntries(
                 COLUMNAS_EXPORTE_MACAW.map(([label, campo]) => {
                     if (!campo) return [label, "N/D"];
-                    if (typeof campo === "function") return [label, campo(w) ?? ""];
                     // Cadena de respaldo: el primer campo de la lista que tenga dato gana
                     // (ej. "Tipo Vinculación" sale de la WO si la trajo importada, si no de
                     // la ficha del técnico).
