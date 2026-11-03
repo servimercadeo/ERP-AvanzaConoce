@@ -30,8 +30,11 @@ use Illuminate\Validation\ValidationException;
  */
 class AliadoController extends Controller
 {
-    /** Estado de la Work Order (columna "Estado" del export) que cuenta en cada contador. */
-    private const ESTADO_ATENDIDA = 'Atendido';
+    /**
+     * Estado de la Work Order (columna "Estado" del export) que cuenta en cada contador. Una WO
+     * solo está Asignada o Finalizada (WorkOrderController::aplicarEstadoPorTecnico).
+     */
+    private const ESTADO_ASIGNADA = 'Asignado';
     private const ESTADO_FINALIZADA = 'Finalizado';
 
     /** Teléfono / celular: números, con + inicial, espacios o guiones opcionales. */
@@ -190,9 +193,9 @@ class AliadoController extends Controller
 
     /**
      * Work Orders de los técnicos del aliado (por Cédula Técnico), de 25 en 25 con ?page=.
-     * Filtros: ?estado=atendidas|finalizadas, ?cedula_tecnico=, ?search= (N° de WO o ítem) y
+     * Filtros: ?estado=asignadas|finalizadas, ?cedula_tecnico=, ?search= (N° de WO o ítem) y
      * ?fecha_desde= / ?fecha_hasta= (fecha de atención, como en Operaciones > Work Orders).
-     * Con ?page= trae además los indicadores (asignadas, atendidas, finalizadas) con esos
+     * Con ?page= trae además los indicadores (total, asignadas, finalizadas) con esos
      * mismos filtros menos el estado, que es lo que eligen los indicadores.
      * Sin ?page= devuelve las 500 más recientes (compatibilidad).
      */
@@ -209,21 +212,21 @@ class AliadoController extends Controller
             ->when($request->fecha_hasta, fn ($q, $f) => $q->whereDate('fecha_estado', '<=', $f));
 
         $query = (clone $base)
-            ->when($request->estado === 'atendidas', fn ($q) => $q->where('estado', self::ESTADO_ATENDIDA))
+            ->when($request->estado === 'asignadas', fn ($q) => $q->where('estado', self::ESTADO_ASIGNADA))
             ->when($request->estado === 'finalizadas', fn ($q) => $q->where('estado', self::ESTADO_FINALIZADA))
             ->orderByDesc('fecha_finalizacion')->orderByDesc('id');
 
         if ($request->has('page')) {
             $conteo = (clone $base)
-                ->selectRaw('COUNT(*) as asignadas')
-                ->selectRaw('SUM(estado = ?) as atendidas', [self::ESTADO_ATENDIDA])
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw('SUM(estado = ?) as asignadas', [self::ESTADO_ASIGNADA])
                 ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
                 ->first();
 
             // Fila completa: la tabla tiene las columnas de Work Orders y el ojo muestra todos sus datos.
             return response()->json($query->paginate(25)->toArray() + ['indicadores' => [
+                'total'       => (int) $conteo->total,
                 'asignadas'   => (int) $conteo->asignadas,
-                'atendidas'   => (int) $conteo->atendidas,
                 'finalizadas' => (int) $conteo->finalizadas,
             ]]);
         }
@@ -571,9 +574,9 @@ class AliadoController extends Controller
 
     /**
      * Work Orders por $columna (users.aliado_id o users.id), contando cada WO una vez
-     * aunque traiga varias filas (una por ítem). Asignadas = todas las de sus técnicos.
+     * aunque traiga varias filas (una por ítem). Total = todas las de sus técnicos.
      *
-     * @return array<int, array{asignadas: int, atendidas: int, finalizadas: int}>
+     * @return array<int, array{total: int, asignadas: int, finalizadas: int}>
      */
     private function conteosWorkOrders(string $columna, array $ids): array
     {
@@ -589,13 +592,13 @@ class AliadoController extends Controller
             ->whereIn($columna, $ids)
             ->groupBy($columna)
             ->selectRaw("{$prefijo}{$columna} as llave")
-            ->selectRaw("COUNT(DISTINCT {$wo}.numero_wo) as asignadas")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as atendidas", [self::ESTADO_ATENDIDA])
+            ->selectRaw("COUNT(DISTINCT {$wo}.numero_wo) as total")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as asignadas", [self::ESTADO_ASIGNADA])
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as finalizadas", [self::ESTADO_FINALIZADA])
             ->get()
             ->mapWithKeys(fn ($f) => [(int) $f->llave => [
+                'total'       => (int) $f->total,
                 'asignadas'   => (int) $f->asignadas,
-                'atendidas'   => (int) $f->atendidas,
                 'finalizadas' => (int) $f->finalizadas,
             ]])
             ->all();
@@ -603,6 +606,6 @@ class AliadoController extends Controller
 
     private function conteoVacio(): array
     {
-        return ['asignadas' => 0, 'atendidas' => 0, 'finalizadas' => 0];
+        return ['total' => 0, 'asignadas' => 0, 'finalizadas' => 0];
     }
 }

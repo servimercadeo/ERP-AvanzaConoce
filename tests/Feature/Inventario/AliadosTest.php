@@ -632,18 +632,18 @@ class AliadosTest extends TestCase
         // WO1 trae dos ítems: cuenta una vez.
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '1', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '2', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
-        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'estado' => 'Atendido', 'cedula_tecnico' => '1020304050']);
+        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'estado' => 'Asignado', 'cedula_tecnico' => '1020304050']);
         WorkOrder::create(['numero_wo' => 'WO3', 'numero_item' => '', 'estado' => 'Finalizado', 'cedula_tecnico' => '4444444']);
 
         $this->getJson('/api/aliados')->assertOk()
-            ->assertJsonPath('0.work_orders', ['asignadas' => 2, 'atendidas' => 1, 'finalizadas' => 1])
+            ->assertJsonPath('0.work_orders', ['total' => 2, 'asignadas' => 1, 'finalizadas' => 1])
             ->assertJsonPath('0.tecnicos_count', 1);
 
         $this->getJson("/api/aliados/{$empresa->id}")->assertOk()
-            ->assertJsonPath('tecnicos.0.work_orders.asignadas', 2);
+            ->assertJsonPath('tecnicos.0.work_orders.total', 2);
 
         $this->assertCount(3, $this->getJson("/api/aliados/{$empresa->id}/work-orders")->json());
-        $this->assertSame(['WO2'], collect($this->getJson("/api/aliados/{$empresa->id}/work-orders?estado=atendidas")->json())->pluck('numero_wo')->all());
+        $this->assertSame(['WO2'], collect($this->getJson("/api/aliados/{$empresa->id}/work-orders?estado=asignadas")->json())->pluck('numero_wo')->all());
     }
 
     public function test_los_tecnicos_de_aliados_no_aparecen_en_empleados(): void

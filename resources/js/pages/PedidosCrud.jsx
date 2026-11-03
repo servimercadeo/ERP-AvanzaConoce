@@ -558,6 +558,7 @@ export default function PedidosCrud() {
             clase: CLASES_PEDIDO[0] || "",
             concepto: CONCEPTOS_PEDIDO[0] || "",
             estado: "Pendiente Aprobación",
+            observacion: "",
             items: []
         });
         handleCambiarItemCategoria(CATEGORIAS_PRODUCTO[0] || "");
@@ -648,6 +649,7 @@ export default function PedidosCrud() {
             clase: modalData.clase,
             concepto: modalData.concepto,
             estado: modalData.estado,
+            observacion: modalData.observacion,
             items: modalData.items.map(({ tipo_producto_id, cantidad }) => ({
                 tipo_producto_id,
                 cantidad: Number(cantidad),
@@ -1525,6 +1527,17 @@ export default function PedidosCrud() {
                                             </SelectBuscable>
                                         )}
                                     </div>
+                                </div>
+
+                                <div style={{ ...S.formGroup, marginTop: 14 }}>
+                                    <label style={S.label}>Observación</label>
+                                    <textarea
+                                        style={{ ...S.input, minHeight: 72, resize: 'vertical' }}
+                                        maxLength={1000}
+                                        value={modalData.observacion ?? ""}
+                                        onChange={e => setModalData(prev => ({ ...prev, observacion: e.target.value }))}
+                                        disabled={modalMode === "view"}
+                                    />
                                 </div>
 
                                 <hr style={{ border: 'none', borderBottom: '1.5px solid var(--border)', margin: '20px 0' }} />

@@ -54,17 +54,23 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
             'SIN_ERP'    => ['99999999', '88.888.888'], // técnicos que no están en el ERP
         ];
         $claves = array_keys($formatos);
-        $esperado = array_fill_keys($claves, ['total' => 0, 'finalizadas' => 0, 'atendidas' => 0]);
+        $esperado = array_fill_keys($claves, ['total' => 0, 'asignadas' => 0, 'finalizadas' => 0]);
+        // Estado con que queda cada WO al importar (WorkOrderController::aplicarEstadoPorTecnico):
+        // la de un técnico de aliado, Finalizado; la de un directo, Asignado; sin usuario en el
+        // ERP ni modalidad, la que trae el archivo.
+        $aliados = ['72243190', '1055834475', '1234567', '5544332'];
         $items = [];
         $n = 3000;
         for ($i = 0; $i < $n; $i++) {
             $clave = $claves[$i % count($claves)];
             $variantes = $formatos[$clave];
-            $estado = $i % 5 === 0 ? 'Atendido' : 'Finalizado';
+            $estado = $i % 5 === 0 ? 'Asignado' : 'Finalizado';
             $items[] = ['numero_wo' => "WO-{$i}", 'numero_item' => '1', 'estado' => $estado, 'cedula_tecnico' => $variantes[$i % count($variantes)],
                 'nombre_tecnico' => "TECNICO {$clave}", 'servicio' => 'INSTALACION', 'fecha_finalizacion' => '2026-10-01 10:00'];
             $esperado[$clave]['total']++;
-            $esperado[$clave][$estado === 'Atendido' ? 'atendidas' : 'finalizadas']++;
+            // (string): PHP vuelve números las llaves numéricas del arreglo de cédulas.
+            $final = in_array((string) $clave, $aliados, true) ? 'Finalizado' : ((string) $clave === '1085293826' ? 'Asignado' : $estado);
+            $esperado[$clave][$final === 'Asignado' ? 'asignadas' : 'finalizadas']++;
         }
 
         // Igual que la pantalla: lotes de 1000.
@@ -82,12 +88,12 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
         $this->assertSame($esperado['1085293826']['total'], $r->json('total'), 'WO que ve el técnico directo');
         $this->assertTrue(collect($r->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === '1085293826'));
         $this->assertSame($esperado['1085293826']['total'], $this->getJson('/api/work-orders/resumen')->assertOk()->json('total'));
-        $suya = WorkOrder::where('cedula_tecnico', '1085293826')->where('estado', 'Atendido')->firstOrFail();
+        $suya = WorkOrder::where('cedula_tecnico', '1085293826')->where('estado', 'Asignado')->firstOrFail();
         $this->putJson("/api/work-orders/{$suya->id}", ['estado' => 'Finalizado'])->assertOk();
         $this->assertSame(['Finalizado', '1085293826'], [$suya->fresh()->estado, $suya->fresh()->cedula_tecnico_cierre]);
         $ajena = WorkOrder::where('cedula_tecnico', '72243190')->firstOrFail();
         $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Finalizado'])->assertNotFound();
-        $suya->forceFill(['estado' => 'Atendido'])->save(); // los conteos de abajo cuentan con el estado original
+        $suya->forceFill(['estado' => 'Asignado'])->save(); // los conteos de abajo cuentan con el estado original
 
         // Ningún aliado entra al módulo Work Orders (ni técnicos de un aliado empresa ni aliados
         // indirectos): ven solo las suyas en la ficha de su aliado (Operaciones > Aliados), sin editar.
@@ -100,7 +106,7 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
             $this->assertSame([$tec->aliado_id], collect($this->getJson('/api/aliados?page=1')->assertOk()->json('data'))->pluck('id')->all());
             $ficha = $this->getJson("/api/aliados/{$tec->aliado_id}")->assertOk();
             $this->assertSame([$clave], collect($ficha->json('tecnicos'))->pluck('cedula')->all(), 'Solo se ve a sí mismo');
-            $this->assertSame($esperado[$clave]['total'], $ficha->json('work_orders.asignadas'));
+            $this->assertSame($esperado[$clave]['total'], $ficha->json('work_orders.total'));
             $wos = $this->getJson("/api/aliados/{$tec->aliado_id}/work-orders?page=1")->assertOk();
             $this->assertSame($esperado[$clave]['total'], $wos->json('total'), "WO del técnico indirecto {$clave} en su ficha");
             $this->assertTrue(collect($wos->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === $clave));
@@ -118,8 +124,8 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
         // Contadores de cada aliado = suma de las WO de sus técnicos.
         $this->actingAs($this->usuario('admin'));
         $aliados = collect($this->getJson('/api/aliados')->assertOk()->json())->keyBy('id');
-        $suma = fn (array $cl) => ['asignadas' => array_sum(array_map(fn ($c) => $esperado[$c]['total'], $cl)),
-            'atendidas' => array_sum(array_map(fn ($c) => $esperado[$c]['atendidas'], $cl)),
+        $suma = fn (array $cl) => ['total' => array_sum(array_map(fn ($c) => $esperado[$c]['total'], $cl)),
+            'asignadas' => array_sum(array_map(fn ($c) => $esperado[$c]['asignadas'], $cl)),
             'finalizadas' => array_sum(array_map(fn ($c) => $esperado[$c]['finalizadas'], $cl))];
         $this->assertEquals($suma(['72243190', '1055834475']), $aliados[$empresa->id]['work_orders']);
         $this->assertEquals($suma(['1234567']), $aliados[$indNit->id]['work_orders']);
@@ -128,13 +134,13 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
         $base = "/api/aliados/{$empresa->id}/work-orders";
         $p1 = $this->getJson("{$base}?page=1")->assertOk();
         $total = $suma(['72243190', '1055834475']);
-        $this->assertSame([25, $total['asignadas'], (int) ceil($total['asignadas'] / 25)], [count($p1->json('data')), $p1->json('total'), $p1->json('last_page')]);
+        $this->assertSame([25, $total['total'], (int) ceil($total['total'] / 25)], [count($p1->json('data')), $p1->json('total'), $p1->json('last_page')]);
         $ultima = $this->getJson("{$base}?page=" . $p1->json('last_page'))->assertOk();
-        $this->assertSame($total['asignadas'] - 25 * ($p1->json('last_page') - 1), count($ultima->json('data')));
+        $this->assertSame($total['total'] - 25 * ($p1->json('last_page') - 1), count($ultima->json('data')));
         $vistas = collect(range(1, $p1->json('last_page')))->flatMap(fn ($p) => $this->getJson("{$base}?page={$p}")->json('data'))->pluck('id');
-        $this->assertSame($total['asignadas'], $vistas->unique()->count(), 'Recorriendo las páginas se ven todas, sin repetir');
+        $this->assertSame($total['total'], $vistas->unique()->count(), 'Recorriendo las páginas se ven todas, sin repetir');
         // Filtros sobre todas (no solo la página): estado, técnico y N° de WO.
-        $this->assertSame($total['atendidas'], $this->getJson("{$base}?page=1&estado=atendidas")->json('total'));
+        $this->assertSame($total['asignadas'], $this->getJson("{$base}?page=1&estado=asignadas")->json('total'));
         $this->assertSame($total['finalizadas'], $this->getJson("{$base}?page=1&estado=finalizadas")->json('total'));
         $this->assertSame($esperado['72243190']['total'], $this->getJson("{$base}?page=1&cedula_tecnico=72243190")->json('total'));
         $unaWo = WorkOrder::where('cedula_tecnico', '1055834475')->orderByDesc('id')->value('numero_wo'); // ej. WO-2998: ningún otro número lo contiene

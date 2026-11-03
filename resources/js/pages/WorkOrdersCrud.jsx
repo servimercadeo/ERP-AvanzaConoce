@@ -181,9 +181,10 @@ const IMPORT_HEADER_MAP = {
  * mismo orden y con el mismo nombre exacto que trae ese archivo (confirmado por el usuario
  * pegando la fila 1 de su Excel). El segundo valor es el campo del que sale el dato real
  * cuando ya lo consumimos: la mayoría vienen de `work_orders` (mismo mapeo que
- * IMPORT_HEADER_MAP arriba), y los que terminan en "_tecnico" los agrega el backend desde
+ * IMPORT_HEADER_MAP arriba), los que terminan en "_tecnico" los agrega el backend desde
  * la ficha del técnico (ver WorkOrderController::conDatosDelTecnico) cuando esa WO trae
- * cédula y el técnico ya es empleado del ERP. Un arreglo de campos es una cadena de
+ * cédula y el técnico ya es empleado del ERP, y "sede_proveedor" sale de la sede a la que su
+ * proveedor está asociado (módulo Sedes). Un arreglo de campos es una cadena de
  * respaldo (el primero que tenga dato gana); `null` es la única columna que de verdad no se
  * guarda en ningún lado ("subproducto" en minúscula, el código numérico duplicado — ver
  * nota en IMPORT_HEADER_MAP), así que esa sale "N/D" siempre.
@@ -247,8 +248,8 @@ const MATERIALES_MACAW = [
 const MATERIAL_POR_ENCABEZADO = new Map(MATERIALES_MACAW.map((m) => [normalizeHeader(m), m]));
 
 const COLUMNAS_EXPORTE_MACAW = [
-    ["Sede", "sede_tecnico"],
-    ["Subproducto", "subproducto"],
+    ["Sede", "sede_proveedor"],
+    ["Subproducto", ["servicio", "subproducto"]],
     ["Tipo Servicio", "codigo_sl"],
     ["Tipo Producto", "tipo_producto"],
     ["Se Paga", "se_paga"],
@@ -322,11 +323,11 @@ const COLUMNAS_EXPORTE_MACAW = [
 ];
 
 // Lista fija (no se calcula de los valores que ya existan en la BD): así el filtro y
-// "Cambiar estado" siempre ofrecen los 3 estados del ciclo de vida, aunque todavía ninguna
+// "Cambiar estado" siempre ofrecen los estados del ciclo de vida, aunque todavía ninguna
 // WO tenga ese valor puesto (si dependiera de los datos existentes, nunca se podría pasar a
 // un estado nuevo la primera vez). "Finalizado" es el string exacto que ya usa el backend
 // para poner fecha_finalizacion (ver WorkOrderController::update) — no cambiar sin tocar eso.
-const ESTADOS_WO = ["Asignado", "Atendido", "Finalizado"];
+const ESTADOS_WO = ["Asignado", "Finalizado"];
 
 const CAMPOS_PLANTILLA = [
     "Nº de cliente", "N° de item", "N° de WO de IBS", "Estado", "Fecha de Estado de Orden de Trabajo", "Servicio", "Tipo de cliente", "Prioridad",
@@ -961,12 +962,12 @@ export default function WorkOrdersCrud() {
             {/* Indicadores por estado: cuentan con los filtros puestos (búsqueda, fechas...). */}
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{resumen?.indicadores?.asignadas ?? 0}</div>
-                    <div className="stat-label">Asignadas</div>
+                    <div className="stat-num">{resumen?.indicadores?.total ?? 0}</div>
+                    <div className="stat-label">Total Work Orders</div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-num">{resumen?.indicadores?.atendidas ?? 0}</div>
-                    <div className="stat-label">Atendidas</div>
+                    <div className="stat-num">{resumen?.indicadores?.asignadas ?? 0}</div>
+                    <div className="stat-label">Asignadas</div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-num">{resumen?.indicadores?.finalizadas ?? 0}</div>

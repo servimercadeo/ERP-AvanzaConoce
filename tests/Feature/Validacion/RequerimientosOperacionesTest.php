@@ -156,26 +156,26 @@ class RequerimientosOperacionesTest extends TestCase
 
     private function wos(): void
     {
-        foreach ([['1001', 'Asignado'], ['1001', 'Atendido'], ['1001', 'Finalizado'], ['1001', 'Finalizado'], ['2002', 'Atendido'], ['8888', 'Finalizado']] as $i => [$cedula, $estado]) {
+        foreach ([['1001', 'Asignado'], ['1001', 'Asignado'], ['1001', 'Finalizado'], ['1001', 'Finalizado'], ['2002', 'Asignado'], ['8888', 'Finalizado']] as $i => [$cedula, $estado]) {
             WorkOrder::create(['numero_wo' => "WO-{$i}", 'numero_item' => '1', 'cedula_tecnico' => $cedula, 'estado' => $estado,
                 'fecha_estado' => '2026-10-' . str_pad((string) ($i + 1), 2, '0', STR_PAD_LEFT) . ' 10:00:00']);
         }
     }
 
-    public function test_tecnico_directo_ve_solo_las_suyas_con_indicadores_y_la_pasa_a_atendida(): void
+    public function test_tecnico_directo_ve_solo_las_suyas_con_indicadores_y_la_finaliza(): void
     {
         $this->wos();
         $this->actingAs($this->directo);
 
         $this->getJson('/api/work-orders/resumen')->assertOk()
-            ->assertJsonPath('indicadores', ['asignadas' => 4, 'atendidas' => 1, 'finalizadas' => 2]);
+            ->assertJsonPath('indicadores', ['total' => 4, 'asignadas' => 2, 'finalizadas' => 2]);
         $wos = collect($this->getJson('/api/work-orders')->json());
         $this->assertSame(['1001'], $wos->pluck('cedula_tecnico')->unique()->values()->all());
 
         $asignada = WorkOrder::where('cedula_tecnico', '1001')->where('estado', 'Asignado')->firstOrFail();
-        $this->putJson("/api/work-orders/{$asignada->id}", ['estado' => 'Atendido'])->assertOk();
-        $this->assertSame(['Atendido', '1001'], [$asignada->fresh()->estado, $asignada->fresh()->cedula_tecnico_cierre]);
-        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores', ['asignadas' => 4, 'atendidas' => 2, 'finalizadas' => 2]);
+        $this->putJson("/api/work-orders/{$asignada->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->assertSame(['Finalizado', '1001'], [$asignada->fresh()->estado, $asignada->fresh()->cedula_tecnico_cierre]);
+        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores', ['total' => 4, 'asignadas' => 1, 'finalizadas' => 3]);
     }
 
     public function test_indicadores_y_lista_respetan_el_filtro_de_fechas(): void
@@ -184,7 +184,7 @@ class RequerimientosOperacionesTest extends TestCase
         $this->actuarComo('operaciones');
         $q = 'fecha_desde=2026-10-02&fecha_hasta=2026-10-05';
 
-        $this->getJson("/api/work-orders/resumen?{$q}")->assertJsonPath('indicadores', ['asignadas' => 4, 'atendidas' => 2, 'finalizadas' => 2]);
+        $this->getJson("/api/work-orders/resumen?{$q}")->assertJsonPath('indicadores', ['total' => 4, 'asignadas' => 2, 'finalizadas' => 2]);
         $this->assertSame(['WO-1', 'WO-2', 'WO-3', 'WO-4'], collect($this->getJson("/api/work-orders?{$q}")->json())->pluck('numero_wo')->sort()->values()->all());
         $this->assertSame(4, $this->getJson("/api/work-orders?page=1&per_page=25&{$q}")->json('total'));
     }
@@ -203,9 +203,9 @@ class RequerimientosOperacionesTest extends TestCase
         $this->actingAs($sup);
         $vistas = collect($this->getJson('/api/work-orders')->assertOk()->json())->pluck('cedula_tecnico')->unique()->sort()->values()->all();
         $this->assertSame(['1001', '2002'], $vistas);
-        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores.asignadas', 5);
+        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores.total', 5);
         $ajena = WorkOrder::where('cedula_tecnico', '8888')->firstOrFail();
-        $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Atendido'])->assertNotFound();
+        $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Finalizado'])->assertNotFound();
 
         // Si el otro técnico pasa a su cargo (por nombre, como en contratos viejos), ya lo ve.
         $otro->update(['jefe_inmediato' => 'Carlos Ruiz']);
@@ -235,27 +235,27 @@ class RequerimientosOperacionesTest extends TestCase
     public function test_ficha_del_aliado_filtra_por_fechas_y_por_tecnico_con_indicadores(): void
     {
         $this->usuario('tecnico', ['cedula' => '2003', 'name' => 'OTRO TEC EMPRESA', 'aliado_id' => $this->empresa->id]);
-        foreach ([['2002', 'Atendido', '2026-09-05'], ['2002', 'Finalizado', '2026-10-10'], ['2003', 'Finalizado', '2026-10-12'], ['2003', 'Asignado', '2026-11-01']] as $i => [$ced, $estado, $fecha]) {
+        foreach ([['2002', 'Asignado', '2026-09-05'], ['2002', 'Finalizado', '2026-10-10'], ['2003', 'Finalizado', '2026-10-12'], ['2003', 'Asignado', '2026-11-01']] as $i => [$ced, $estado, $fecha]) {
             WorkOrder::create(['numero_wo' => "AL-{$i}", 'numero_item' => '1', 'cedula_tecnico' => $ced, 'estado' => $estado, 'fecha_estado' => "{$fecha} 09:00:00"]);
         }
         $this->actuarComo('operaciones');
         $url = "/api/aliados/{$this->empresa->id}/work-orders?page=1";
 
         $this->getJson($url)->assertOk()->assertJsonPath('total', 4)
-            ->assertJsonPath('indicadores', ['asignadas' => 4, 'atendidas' => 1, 'finalizadas' => 2]);
+            ->assertJsonPath('indicadores', ['total' => 4, 'asignadas' => 2, 'finalizadas' => 2]);
         // Octubre: solo las 2 finalizadas.
         $oct = $this->getJson("{$url}&fecha_desde=2026-10-01&fecha_hasta=2026-10-31")->assertOk();
         $this->assertSame(['AL-1', 'AL-2'], collect($oct->json('data'))->pluck('numero_wo')->sort()->values()->all());
-        $oct->assertJsonPath('indicadores', ['asignadas' => 2, 'atendidas' => 0, 'finalizadas' => 2]);
+        $oct->assertJsonPath('indicadores', ['total' => 2, 'asignadas' => 0, 'finalizadas' => 2]);
         // Por técnico (y combinado con fechas y estado).
-        $this->getJson("{$url}&cedula_tecnico=2003")->assertJsonPath('total', 2)->assertJsonPath('indicadores.asignadas', 2);
+        $this->getJson("{$url}&cedula_tecnico=2003")->assertJsonPath('total', 2)->assertJsonPath('indicadores.total', 2);
         $this->getJson("{$url}&cedula_tecnico=2003&fecha_desde=2026-10-01&fecha_hasta=2026-10-31&estado=finalizadas")
             ->assertJsonPath('total', 1)->assertJsonPath('data.0.numero_wo', 'AL-2');
 
         // Un técnico de la empresa no puede ver las de su compañero aunque filtre por su cédula.
         $this->actingAs($this->tecDeEmpresa);
         $this->getJson("{$url}&cedula_tecnico=2003")->assertOk()->assertJsonPath('total', 0);
-        $this->getJson($url)->assertJsonPath('indicadores', ['asignadas' => 2, 'atendidas' => 1, 'finalizadas' => 1]);
+        $this->getJson($url)->assertJsonPath('indicadores', ['total' => 2, 'asignadas' => 1, 'finalizadas' => 1]);
     }
 
     public function test_operaciones_ve_y_gestiona_todas_las_wo(): void
@@ -264,9 +264,9 @@ class RequerimientosOperacionesTest extends TestCase
         $this->actuarComo('operaciones');
 
         $this->assertSame(6, count($this->getJson('/api/work-orders')->assertOk()->json()));
-        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores', ['asignadas' => 6, 'atendidas' => 2, 'finalizadas' => 3]);
+        $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores', ['total' => 6, 'asignadas' => 3, 'finalizadas' => 3]);
         $wo = WorkOrder::where('cedula_tecnico', '8888')->firstOrFail();
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Atendido'])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Asignado'])->assertOk();
         $this->assertNull($wo->fresh()->cedula_tecnico_cierre, 'Operaciones no queda como técnico que atiende');
         $this->postJson('/api/work-orders/importar', ['items' => [['numero_wo' => 'WO-NUEVA', 'numero_item' => '1', 'estado' => 'Asignado', 'cedula_tecnico' => '1001']]])->assertOk();
         $this->getJson('/api/aliados?page=1')->assertOk();

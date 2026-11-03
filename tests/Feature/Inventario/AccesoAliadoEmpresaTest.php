@@ -30,7 +30,7 @@ class AccesoAliadoEmpresaTest extends TestCase
 
         $tecnico = $this->usuario('general', ['cedula' => $cedulaTecnico, 'email' => "{$cedulaTecnico}@tecnicos.co"]);
         $tecnico->forceFill(['rol' => 'tecnico', 'aliado_id' => $aliado->id])->save();
-        WorkOrder::create(['numero_wo' => "WO-{$cedulaTecnico}", 'numero_item' => '1', 'cedula_tecnico' => $cedulaTecnico, 'estado' => 'Atendido']);
+        WorkOrder::create(['numero_wo' => "WO-{$cedulaTecnico}", 'numero_item' => '1', 'cedula_tecnico' => $cedulaTecnico, 'estado' => 'Asignado']);
 
         return $aliado->fresh();
     }
@@ -69,7 +69,7 @@ class AccesoAliadoEmpresaTest extends TestCase
     {
         $suyo = $this->aliadoConTecnico('900111222-3', 'gerencia@empresa.co', '7001');
         $otro = $this->aliadoConTecnico('800333444-5', 'otra@empresa.co', '7002');
-        WorkOrder::create(['numero_wo' => 'WO-SUELTA', 'numero_item' => '1', 'cedula_tecnico' => '7999', 'estado' => 'Atendido']);
+        WorkOrder::create(['numero_wo' => 'WO-SUELTA', 'numero_item' => '1', 'cedula_tecnico' => '7999', 'estado' => 'Asignado']);
         $this->actingAs(User::findOrFail($suyo->usuario_id));
 
         $lista = $this->getJson('/api/aliados?page=1')->assertOk();
@@ -96,7 +96,7 @@ class AccesoAliadoEmpresaTest extends TestCase
         $this->putJson("/api/aliados/{$aliado->id}", ['nombre' => 'X'])->assertForbidden();
         $this->postJson("/api/aliados/{$aliado->id}/tecnicos", [])->assertForbidden();
         $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado'])->assertForbidden();
-        $this->assertSame('Atendido', $wo->fresh()->estado);
+        $this->assertSame('Asignado', $wo->fresh()->estado);
     }
 
     public function test_su_usuario_no_es_empleado_y_sigue_al_aliado(): void

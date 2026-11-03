@@ -43,7 +43,64 @@ const EMPTY_FORM = {
     contacto_supervisor: "",
     lider_regional: "",
     contacto_lider_regional: "",
+    proveedores_work_orders: [],
 };
+
+function ProveedoresWorkOrders({ sedeId, value, onChange, proveedores, sedes, disabled }) {
+    const opciones = useMemo(() => {
+        const ocupados = new Set(
+            sedes
+                .filter((s) => s.id !== sedeId)
+                .flatMap((s) => s.proveedores_work_orders ?? [])
+                .concat(value)
+                .map((p) => p.codigo),
+        );
+        return proveedores
+            .filter((p) => !ocupados.has(p.codigo))
+            .map((p) => ({ value: p.codigo, label: p.nombre }));
+    }, [sedes, sedeId, value, proveedores]);
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+            {!disabled && (
+                <div style={{ ...S.formGroup, maxWidth: 460 }}>
+                    <label style={S.label}>Agregar proveedor</label>
+                    <SearchableSelect
+                        value=""
+                        defaultValue=""
+                        options={opciones}
+                        onChange={(codigo) => {
+                            const elegido = proveedores.find((p) => p.codigo === codigo);
+                            if (elegido) onChange([...value, elegido]);
+                        }}
+                    />
+                    <span style={S.hint}>Los que ya están en otra sede no aparecen aquí.</span>
+                </div>
+            )}
+            {value.length === 0 ? (
+                <span style={S.hint}>Sin proveedores asociados.</span>
+            ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {value.map((p) => (
+                        <span key={p.codigo} style={S.chip}>
+                            {p.nombre}
+                            {!disabled && (
+                                <button
+                                    type="button"
+                                    style={S.chipBtn}
+                                    title="Quitar"
+                                    onClick={() => onChange(value.filter((v) => v.codigo !== p.codigo))}
+                                >
+                                    <IconClose size={12} />
+                                </button>
+                            )}
+                        </span>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 function Field({
     label,
@@ -119,6 +176,7 @@ function Modal({
     initial,
     title,
     options,
+    sedes = [],
     readOnly = false,
 }) {
     const [form, setForm] = useState(initial);
@@ -161,6 +219,7 @@ function Modal({
                 id_almacenista_mac: form.id_almacenista_mac || 0,
                 id_secretaria_mac: form.id_secretaria_mac || 0,
                 id_jefe_mac: form.id_jefe_mac || 0,
+                proveedores_work_orders: (form.proveedores_work_orders ?? []).map((p) => p.nombre),
             });
         } catch {
             // handled in parent
@@ -298,6 +357,20 @@ function Modal({
                             {...fp}
                         />
                     </div>
+
+                    <div style={{ ...S.sectionLabel, marginTop: 10 }}>
+                        Proveedores de Work Orders
+                    </div>
+                    <ProveedoresWorkOrders
+                        sedeId={initial.id}
+                        value={form.proveedores_work_orders ?? []}
+                        onChange={(lista) =>
+                            setForm((f) => ({ ...f, proveedores_work_orders: lista }))
+                        }
+                        proveedores={options.proveedores}
+                        sedes={sedes}
+                        disabled={readOnly}
+                    />
                 </div>
 
                 <div style={S.modalFooter}>
@@ -356,6 +429,7 @@ export default function SedesCrud() {
         sedes: [],
         regionales: [],
         proyectos: [],
+        proveedores: [],
         tipos_sede: [],
         estados: [],
         subcanales: [],
@@ -382,6 +456,8 @@ export default function SedesCrud() {
 
     const { data: _qSedes, refetch: refetchSedes } = useQuery({
         queryKey: ['sedes-full'],
+        // Sin caché: el selector debe traer lo recién creado en Parámetros o importado en Work Orders.
+        staleTime: 0,
         queryFn: async () => {
             const [r1, r2] = await Promise.all([api.get('/sedes'), api.get('/sedes/options')]);
             return { sedes: r1.data, options: r2.data };
@@ -431,6 +507,7 @@ export default function SedesCrud() {
                         s.almacenista?.nombres,
                         s.almacenista?.apellidos,
                         s.almacenista?.name,
+                        ...(s.proveedores_work_orders ?? []).map((p) => p.nombre),
                     ].some((field) => normalizeSearch(field).includes(q));
                 const matchSede =
                     filtroSede === "Todas" || String(s.id) === filtroSede;
@@ -521,7 +598,7 @@ export default function SedesCrud() {
             }
             setModalOpen(false);
         } catch (err) {
-            showToast("Error al guardar la sede.");
+            showToast(err?.response?.data?.message ?? "Error al guardar la sede.");
         }
     };
 
@@ -916,6 +993,7 @@ export default function SedesCrud() {
                 initial={editTarget || EMPTY_FORM}
                 title={editTarget ? "Sedes [ Edita ]" : "Sedes [ Crea ]"}
                 options={options}
+                sedes={sedes}
             />
             <Modal
                 open={viewOpen}
@@ -1159,6 +1237,26 @@ const S = {
     },
     inputErr: { borderColor: "#e74c3c" },
     err: { color: "#e74c3c", fontSize: "0.7rem", marginTop: 2 },
+    hint: { fontSize: "0.76rem", color: "var(--text-muted)" },
+    chip: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        background: "var(--primary-light)",
+        color: "var(--primary-dark)",
+        borderRadius: 20,
+        padding: "4px 10px",
+        fontSize: "0.8rem",
+        fontWeight: 700,
+    },
+    chipBtn: {
+        display: "flex",
+        background: "none",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        color: "inherit",
+    },
     btnPrimary: {
         padding: "10px 20px",
         background: "var(--primary)",

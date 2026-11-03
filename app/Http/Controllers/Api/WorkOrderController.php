@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProveedorWorkOrder;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
@@ -13,8 +14,11 @@ use Illuminate\Support\Facades\DB;
 
 class WorkOrderController extends Controller
 {
-    /** Estados de los indicadores (los mismos que cuenta la ficha del aliado). */
-    private const ESTADO_ATENDIDA = 'Atendido';
+    /**
+     * Estados de los indicadores (los mismos que cuenta la ficha del aliado). Una WO solo está
+     * Asignada o Finalizada: el estado "Atendido" ya no existe (ver aplicarEstadoPorTecnico).
+     */
+    private const ESTADO_ASIGNADA = 'Asignado';
     private const ESTADO_FINALIZADA = 'Finalizado';
 
     /**
@@ -32,10 +36,21 @@ class WorkOrderController extends Controller
             return response()->json($query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50));
         }
 
-        // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con datos del
-        // técnico que la WO no trae (sede, vinculación, supervisor, aliado, vehículo
-        // asignado) en vez de dejarlos como "N/D" pudiéndolos sacar de su ficha.
-        return response()->json($this->conDatosDelTecnico($query->get()));
+        // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con la sede del
+        // proveedor y con datos del técnico que la WO no trae (vinculación, supervisor,
+        // aliado, vehículo asignado) en vez de dejarlos como "N/D" pudiéndolos sacar de su ficha.
+        return response()->json($this->conDatosDelTecnico($this->conSedeDelProveedor($query->get())));
+    }
+
+    // Sin asociación queda vacía: así se nota qué proveedor falta asociar en Sedes.
+    private function conSedeDelProveedor($workOrders)
+    {
+        $sedes = ProveedorWorkOrder::with('sede:id,nombre')->get()
+            ->mapWithKeys(fn (ProveedorWorkOrder $p) => [$p->codigo => $p->sede->nombre]);
+
+        return $workOrders->each(function (WorkOrder $wo) use ($sedes) {
+            $wo->sede_proveedor = $wo->proveedor ? $sedes->get(ProveedorWorkOrder::codigoDe($wo->proveedor)) : null;
+        });
     }
 
     /**
@@ -55,7 +70,7 @@ class WorkOrderController extends Controller
 
         $tecnicos = User::whereIn('cedula', $cedulas)
             ->with('aliado:id,nombre')
-            ->get(['id', 'cedula', 'sede', 'tipo_vinculacion', 'jefe_inmediato', 'aliado_id'])
+            ->get(['id', 'cedula', 'tipo_vinculacion', 'jefe_inmediato', 'aliado_id'])
             ->keyBy('cedula');
 
         $vehiculosPorTecnico = Vehiculo::whereIn('tecnico_asignado_id', $tecnicos->pluck('id')->filter())
@@ -64,7 +79,6 @@ class WorkOrderController extends Controller
 
         return $workOrders->map(function (WorkOrder $wo) use ($tecnicos, $vehiculosPorTecnico, $cedulaAsignado) {
             $tecnico = $tecnicos->get($cedulaAsignado($wo));
-            $wo->sede_tecnico = $tecnico?->sede;
             $wo->tipo_vinculacion_tecnico = $tecnico?->tipo_vinculacion;
             $wo->supervisor_tecnico = $tecnico?->jefe_inmediato;
             // "NA" (no "N/D"): si el técnico existe, SÍ sabemos si tiene aliado o no; "N/D"
@@ -90,9 +104,9 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Total, indicadores y opciones de los filtros (estados, proveedores) sin descargar las WOs.
-     * Los indicadores (asignadas = todas, atendidas, finalizadas; igual que en la ficha del
-     * aliado) cuentan con los filtros que vengan (búsqueda, fechas, proveedor...); las
+     * Total, conteo por estado, indicadores y opciones de los filtros sin descargar las WOs.
+     * Los indicadores (total, asignadas, finalizadas; igual que en la ficha del aliado) cuentan
+     * con los filtros que vengan (búsqueda, fechas, proveedor...); `total`, `por_estado` y las
      * opciones de los filtros, sobre todas las que el usuario ve.
      */
     public function resumen(Request $request)
@@ -102,16 +116,17 @@ class WorkOrderController extends Controller
             ->distinct()->orderBy($columna)->pluck($columna);
 
         $indicadores = $this->filtrar($this->visibles($request), $request)
-            ->selectRaw('COUNT(*) as asignadas')
-            ->selectRaw('SUM(estado = ?) as atendidas', [self::ESTADO_ATENDIDA])
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(estado = ?) as asignadas', [self::ESTADO_ASIGNADA])
             ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
             ->first();
 
         return response()->json([
             'total'       => $this->visibles($request)->count(),
+            'por_estado'  => $this->visibles($request)->select('estado', DB::raw('COUNT(*) as total'))->groupBy('estado')->pluck('total', 'estado'),
             'indicadores' => [
+                'total'       => (int) $indicadores->total,
                 'asignadas'   => (int) $indicadores->asignadas,
-                'atendidas'   => (int) $indicadores->atendidas,
                 'finalizadas' => (int) $indicadores->finalizadas,
             ],
             'estados'     => $distintos('estado'),
@@ -367,8 +382,9 @@ class WorkOrderController extends Controller
 
         $creadas = 0;
         $actualizadas = 0;
+        $tecnicos = User::where('cedula', '!=', '')->pluck('aliado_id', 'cedula');
 
-        DB::transaction(function () use ($filas, &$creadas, &$actualizadas) {
+        DB::transaction(function () use ($filas, $tecnicos, &$creadas, &$actualizadas) {
             foreach ($filas as $entry) {
                 $valores = $entry['valores'];
 
@@ -380,10 +396,13 @@ class WorkOrderController extends Controller
                         // Solo se pisan los campos que vinieron en esta fila; lo que no se
                         // mandó conserva el valor que ya tenía la WO.
                         $existente->fill($valores);
+                        $this->aplicarEstadoPorTecnico($existente, $tecnicos);
                         $existente->save();
                         $actualizadas++;
                     } else {
-                        WorkOrder::create($valores);
+                        $nueva = new WorkOrder($valores);
+                        $this->aplicarEstadoPorTecnico($nueva, $tecnicos);
+                        $nueva->save();
                         $creadas++;
                     }
                     continue;
@@ -394,17 +413,37 @@ class WorkOrderController extends Controller
                 if ($existentes->isNotEmpty()) {
                     foreach ($existentes as $existente) {
                         $existente->fill($valores);
+                        $this->aplicarEstadoPorTecnico($existente, $tecnicos);
                         $existente->save();
                     }
                     $actualizadas += $existentes->count();
                 } else {
-                    WorkOrder::create(array_merge($valores, ['numero_item' => '']));
+                    $nueva = new WorkOrder(array_merge($valores, ['numero_item' => '']));
+                    $this->aplicarEstadoPorTecnico($nueva, $tecnicos);
+                    $nueva->save();
                     $creadas++;
                 }
             }
         });
 
         return response()->json(['creadas' => $creadas, 'actualizadas' => $actualizadas]);
+    }
+
+    // Un aliado no puede cambiar el estado: queda Finalizado. Un directo sí: queda Asignado, sin reabrir lo que ya avanzó.
+    private function aplicarEstadoPorTecnico(WorkOrder $wo, $tecnicos): void
+    {
+        $cedula = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+        // Cédula sin usuario en el ERP: decide la MODALIDAD que trae el archivo.
+        $tipo = $cedula && $tecnicos->has($cedula)
+            ? ($tecnicos->get($cedula) ? 'ALIADO' : 'DIRECTO')
+            : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8');
+
+        if ($tipo === 'ALIADO') {
+            $wo->estado = 'Finalizado';
+        } elseif ($tipo === 'DIRECTO') {
+            $anterior = $wo->getOriginal('estado');
+            $wo->estado = $anterior === 'Finalizado' ? $anterior : 'Asignado';
+        }
     }
 
     private function parsearFecha($valor): ?string

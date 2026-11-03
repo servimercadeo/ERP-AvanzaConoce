@@ -495,9 +495,10 @@ function CredencialesModal({ credenciales, onClose }) {
 }
 
 /* ─── Ficha del aliado: datos, técnicos y Work Orders ─────────────────── */
+// Una WO solo está Asignada o Finalizada (el estado "Atendido" ya no existe).
 const CONTADORES = [
-    { id: "", campo: "asignadas", label: "Asignadas" },
-    { id: "atendidas", campo: "atendidas", label: "Atendidas" },
+    { id: "", campo: "total", label: "Total" },
+    { id: "asignadas", campo: "asignadas", label: "Asignadas" },
     { id: "finalizadas", campo: "finalizadas", label: "Finalizadas" },
 ];
 
@@ -623,7 +624,7 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                             <thead>
                                 <tr>
                                     <th>Técnico</th><th>Cédula</th><th>Celular</th><th>Usuario (correo)</th><th>Acceso</th>
-                                    <th style={{ textAlign: "center" }}>Asig. / Aten. / Final.</th><th style={{ textAlign: "center" }}>Acciones</th>
+                                    <th style={{ textAlign: "center" }}>Total / Asig. / Final.</th><th style={{ textAlign: "center" }}>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -634,7 +635,7 @@ function FichaModal({ aliadoId, puede, onClose, onCambio }) {
                                         <td>{t.movil || "—"}</td>
                                         <td style={{ color: "var(--text-muted)" }}>{t.email}</td>
                                         <td>{t.activo ? <span style={S.badge(TIPOS.tecnico)}>Activo</span> : <span style={S.badge({ color: "#a33", bg: "#fce8e8" })}>Inactivo</span>}</td>
-                                        <td style={{ textAlign: "center" }}>{t.work_orders.asignadas} / {t.work_orders.atendidas} / {t.work_orders.finalizadas}</td>
+                                        <td style={{ textAlign: "center" }}>{t.work_orders.total} / {t.work_orders.asignadas} / {t.work_orders.finalizadas}</td>
                                         <td style={{ textAlign: "center" }}>
                                             <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
                                                 <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver sus Work Orders" onClick={() => setFiltroTecnico(t.cedula)}>
@@ -874,7 +875,7 @@ export default function AliadosCrud() {
                         <thead>
                             <tr>
                                 <th>Aliado</th><th>Documento</th><th>Tipo</th><th>Proyecto(s)</th><th>Ciudad</th><th style={{ textAlign: "center" }}>Técnicos</th>
-                                <th style={{ textAlign: "center" }}>Asignadas</th><th style={{ textAlign: "center" }}>Atendidas</th><th style={{ textAlign: "center" }}>Finalizadas</th>
+                                <th style={{ textAlign: "center" }}>Total WO</th><th style={{ textAlign: "center" }}>Asignadas</th><th style={{ textAlign: "center" }}>Finalizadas</th>
                                 <th>Estado</th><th style={{ textAlign: "center" }}>Acciones</th>
                             </tr>
                         </thead>
@@ -887,8 +888,8 @@ export default function AliadosCrud() {
                                     <td>{nombresProyectos(a) || <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                                     <td>{a.ciudad || "—"}</td>
                                     <td style={{ textAlign: "center" }}>{a.tecnicos_count}</td>
+                                    <td style={{ textAlign: "center" }}>{a.work_orders.total}</td>
                                     <td style={{ textAlign: "center" }}>{a.work_orders.asignadas}</td>
-                                    <td style={{ textAlign: "center" }}>{a.work_orders.atendidas}</td>
                                     <td style={{ textAlign: "center" }}>{a.work_orders.finalizadas}</td>
                                     <td>{a.activo ? "Activo" : <span style={{ color: "#a33" }}>Inactivo</span>}</td>
                                     <td style={{ textAlign: "center" }}>

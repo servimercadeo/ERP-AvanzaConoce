@@ -59,6 +59,7 @@ class PedidoCompra extends Model
         'sede_id',
         'clase',
         'concepto',
+        'observacion',
         'estado',
         'estado_compra',
         'registra',

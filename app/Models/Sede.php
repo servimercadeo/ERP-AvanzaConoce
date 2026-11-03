@@ -79,4 +79,9 @@ class Sede extends Model
     {
         return $this->belongsToMany(Proyecto::class, 'proyecto_sede');
     }
+
+    public function proveedoresWorkOrders()
+    {
+        return $this->hasMany(ProveedorWorkOrder::class);
+    }
 }

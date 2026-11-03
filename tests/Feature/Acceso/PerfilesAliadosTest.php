@@ -41,7 +41,7 @@ class PerfilesAliadosTest extends TestCase
         $this->deEmpresa = $this->usuario('tecnico', ['cedula' => '2002', 'aliado_id' => $this->empresa->id]);
         $this->indirecto = $this->usuario('tecnico', ['cedula' => '3003', 'aliado_id' => $this->aliadoIndirecto->id]);
         foreach (['1001', '2002', '3003'] as $cedula) {
-            WorkOrder::create(['numero_wo' => "WO-{$cedula}", 'numero_item' => '1', 'cedula_tecnico' => $cedula, 'estado' => 'Atendido']);
+            WorkOrder::create(['numero_wo' => "WO-{$cedula}", 'numero_item' => '1', 'cedula_tecnico' => $cedula, 'estado' => 'Asignado']);
         }
     }
 
