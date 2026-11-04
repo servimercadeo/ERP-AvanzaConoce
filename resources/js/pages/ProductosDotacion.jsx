@@ -7,11 +7,12 @@ import { useAuth } from '../context/AuthContext';
 import { IconEdit, IconTrash, IconClose, IconLoading, IconEmptySearch, IconFile } from '../components/Icons';
 import { SearchableSelect } from '../components/SearchableSelect';
 import SelectBuscable from "../components/SelectBuscable";
+import { filaExportInventario, leerFilaImportInventario } from '../utils/dotacion';
 
 const POR_PAGINA = 50;
 
 const GENEROS     = ['Masculino', 'Femenino'];
-const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL'];
+const TALLAS_ROPA = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'XXL', 'XXXL', '6 (XS)', '8 (S)', '10 (M)', '12 (L)', '14 (XL)', '16 (2XL)', '18 (3XL)', '20 (4XL)'];
 const TALLAS_JEAN = ['4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48'];
 const TALLAS_TENIS = ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'];
 const TALLAS_UNICA = ['N/A'];
@@ -271,17 +272,6 @@ function BulkModal({ proyectos, sedesPorProyecto, onClose, onSaved }) {
 // ─── Modal importar Excel ─────────────────────────────────────────────────────
 const STOCK_MINIMO_IMPORT_DEFAULT = 10;
 
-const IMPORT_HEADER_MAP = {
-    proyecto: 'proyecto',
-    sede: 'sede',
-    prenda: 'prenda',
-    genero: 'genero',
-    talla: 'talla',
-    cantidad: 'cantidad',
-};
-
-const normalizeHeader = (s) => (s ?? '').toString().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
-
 function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
     const [fileName, setFileName] = useState('');
     const [validRows, setValidRows] = useState([]);
@@ -307,42 +297,9 @@ function ImportModal({ proyectos, sedesPorProyecto, onClose, onImported }) {
             const invalid = [];
 
             raw.forEach((row, idx) => {
-                const mapped = {};
-                Object.entries(row).forEach(([k, v]) => {
-                    const key = IMPORT_HEADER_MAP[normalizeHeader(k)];
-                    if (key) mapped[key] = typeof v === 'string' ? v.trim() : v;
-                });
-
-                const motivos = [];
-                if (!proyectos.includes(mapped.proyecto)) motivos.push('proyecto inválido');
-                if (!mapped.prenda) motivos.push('prenda vacía');
-                if (!GENEROS.includes(mapped.genero)) motivos.push('género inválido');
-                if (!mapped.talla && mapped.talla !== 0) motivos.push('talla vacía');
-                const cantidad = Number(mapped.cantidad);
-                if (!Number.isFinite(cantidad) || cantidad < 0) motivos.push('cantidad inválida');
-
-                let sedeId = null;
-                const sedeTexto = (mapped.sede ?? '').toString().trim();
-                if (sedeTexto && proyectos.includes(mapped.proyecto)) {
-                    const sede = (sedesPorProyecto?.[mapped.proyecto] ?? [])
-                        .find(s => s.nombre.toLowerCase() === sedeTexto.toLowerCase());
-                    if (sede) sedeId = sede.id;
-                    else motivos.push('sede inválida para el proyecto');
-                }
-
-                if (motivos.length) {
-                    invalid.push({ fila: idx + 2, motivos: motivos.join(', ') });
-                } else {
-                    valid.push({
-                        proyecto: mapped.proyecto,
-                        sede_id: sedeId,
-                        prenda: mapped.prenda,
-                        genero: mapped.genero,
-                        talla: String(mapped.talla),
-                        cantidad,
-                        stock_minimo: STOCK_MINIMO_IMPORT_DEFAULT,
-                    });
-                }
+                const { item, motivos } = leerFilaImportInventario(row, proyectos, sedesPorProyecto, STOCK_MINIMO_IMPORT_DEFAULT);
+                if (motivos) invalid.push({ fila: idx + 2, motivos: motivos.join(', ') });
+                else valid.push(item);
             });
 
             setValidRows(valid);
@@ -572,8 +529,15 @@ export default function ProductosDotacion() {
 
     const handleImported = (result) => {
         invalidate();
+        qc.invalidateQueries({ queryKey: ['pedidos-automaticos'] });
         setImportOpen(false);
-        showToast(`Importación completa: ${result.creados} creado${result.creados !== 1 ? 's' : ''}, ${result.actualizados} sumado${result.actualizados !== 1 ? 's' : ''} al stock existente.`);
+        const asignados = result.asignados_a_pedidos ?? [];
+        const omitidas = result.omitidas ?? [];
+        showToast(asignados.length || omitidas.length
+            ? `Importación completa: ${asignados.reduce((s, a) => s + a.cantidad, 0)} prenda(s) asignadas a su pedido`
+              + `${result.pedidos_completos?.length ? `; pedidos completos: ${result.pedidos_completos.join(', ')}` : ''}`
+              + `${omitidas.length ? `. ${omitidas.length} fila(s) omitidas: ${omitidas.map(o => `${o.pedido} ${o.prenda}`).join('; ')} (sin nada pendiente, ¿ya se importó?)` : ''}.`
+            : `Importación completa: ${result.creados} creado${result.creados !== 1 ? 's' : ''}, ${result.actualizados} sumado${result.actualizados !== 1 ? 's' : ''} al stock existente.`);
     };
 
     const handleDeleted = (id) => {
@@ -594,17 +558,7 @@ export default function ProductosDotacion() {
         try {
             const { data: todos } = await api.get('/inventario-dotacion', { params: filtrosActivos });
             const XLSX = await import('xlsx');
-            const rows = todos.map(i => ({
-                Proyecto: i.proyecto,
-                Sede: i.sede_nombre ?? '',
-                Prenda: i.prenda,
-                Género: i.genero,
-                Talla: i.talla,
-                Precio: Number(i.precio ?? 0),
-                Cantidad: i.cantidad,
-                'Stock mínimo': i.stock_minimo,
-                Estado: badgeStock(i.cantidad, i.stock_minimo).label,
-            }));
+            const rows = todos.map(i => filaExportInventario(i, badgeStock(i.cantidad, i.stock_minimo).label));
 
             const ws = XLSX.utils.json_to_sheet(rows);
             ws['!cols'] = [

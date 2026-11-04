@@ -236,12 +236,8 @@ class ContratoController extends Controller
     {
         $pedidos = PedidoAutomatico::where('contrato_id', $contrato->id)->get();
         foreach ($pedidos as $pedido) {
-            if (in_array($pedido->estado, ['Activo', 'Completado'], true)) {
-                foreach ($pedido->items()->with('inventario')->get() as $item) {
-                    if ($item->inventario) {
-                        $item->inventario->increment('cantidad', $item->cantidad);
-                    }
-                }
+            if (in_array($pedido->estado, ['Activo', 'Completado', 'Enviar a compras'], true)) {
+                $pedido->restaurarInventario();
             }
             $pedido->delete();
         }
@@ -446,6 +442,9 @@ class ContratoController extends Controller
 
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
         $data = $this->motivoFinalizacion($data);
+        // Sin estado (Excel sin esa columna) el contrato es vigente; el modelo debe saberlo para
+        // generar el pedido automático.
+        $data['estado_contrato'] = ($data['estado_contrato'] ?? null) ?: 'Vigente';
 
         return DB::transaction(function() use ($data) {
             $data['completado'] = true;
@@ -491,20 +490,16 @@ class ContratoController extends Controller
         $pedidoAutomatico = null;
         $motivoSinPedido = null;
         $faltantes = [];
-        if ($contrato->estado_contrato !== 'No ingreso') {
-            $dotacion = app(\App\Services\DotacionAutoPedidoService::class);
-            try {
-                $pedidoAutomatico = $dotacion->generarPedidoParaContrato($contrato);
-                $motivoSinPedido = $dotacion->motivoSinPedido;
-                $faltantes = $dotacion->faltantes;
-            } catch (\Throwable $e) {
-                Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
-                    'error' => $e->getMessage(),
-                ]);
-                $motivoSinPedido = 'No se generó el pedido automático de dotación por un error inesperado. Créalo manualmente en Pedidos automáticos.';
-            }
-        } else {
-            $motivoSinPedido = 'No se generó el pedido automático de dotación: el contrato está como "No ingreso".';
+        $dotacion = app(\App\Services\DotacionAutoPedidoService::class);
+        try {
+            $pedidoAutomatico = $dotacion->generarPedidoParaContrato($contrato);
+            $motivoSinPedido = $dotacion->motivoSinPedido;
+            $faltantes = $dotacion->faltantes;
+        } catch (\Throwable $e) {
+            Log::error('No se pudo generar el pedido automático de dotación para el contrato ' . $contrato->id, [
+                'error' => $e->getMessage(),
+            ]);
+            $motivoSinPedido = 'No se generó el pedido automático de dotación por un error inesperado. Créalo manualmente en Pedidos automáticos.';
         }
 
         $contratoData = $contrato->load(['empleado', 'centrosCostos', 'anexos', 'eventosMedicos', 'regional', 'sedeCatalogo'])->toArray();
@@ -581,13 +576,19 @@ class ContratoController extends Controller
         $data['centros_costos'] = $this->validarYResolverCentrosCosto($data['centros_costos'] ?? []);
         $data = $this->motivoFinalizacion($data, $contrato);
 
-        $result = DB::transaction(function() use ($contrato, $data) {
+        $proyectoAntes = EmpresaProyectoRules::nombreActual($contrato->cliente_proyecto);
+        $estadoAntes = $contrato->estado_contrato;
+        $avisoPedido = null;
+
+        $result = DB::transaction(function() use ($contrato, $data, $proyectoAntes, &$avisoPedido) {
             $data['completado'] = true;
 
             $contrato->update($data);
 
             if ($contrato->estado_contrato === 'No ingreso') {
                 $this->eliminarPedidosAutomaticosDeContrato($contrato);
+            } elseif (EmpresaProyectoRules::nombreActual($contrato->cliente_proyecto) !== $proyectoAntes) {
+                $avisoPedido = app(\App\Services\DotacionAutoPedidoService::class)->actualizarPorCambioDeProyecto($contrato);
             }
 
             // Sincronizar centros de costos
@@ -622,7 +623,33 @@ class ContratoController extends Controller
         // Contrato finalizado sin otro vigente: la persona queda Inactiva (ERP y AvanzaConoce).
         app(\App\Services\AccesoEmpleado::class)->alGuardarContrato($result);
 
-        return response()->json($result);
+        $avisoPedido ??= $this->pedidoAlVolverAVigente($result, $estadoAntes);
+
+        return response()->json($result->toArray() + ['pedido_automatico_aviso' => $avisoPedido]);
+    }
+
+    /**
+     * Un contrato corregido a vigente (se marcó "No ingreso" por error, por ejemplo) y sin pedido
+     * es un ingreso como cualquier otro: recibe su pedido con las mismas reglas de crear.
+     */
+    private function pedidoAlVolverAVigente(Contrato $contrato, ?string $estadoAntes): ?string
+    {
+        $vigentes = \App\Services\DotacionAutoPedidoService::ESTADOS_CON_DOTACION;
+        if (in_array($estadoAntes, $vigentes, true) || !in_array($contrato->estado_contrato, $vigentes, true)
+            || PedidoAutomatico::where('contrato_id', $contrato->id)->exists()) {
+            return null;
+        }
+
+        $dotacion = app(\App\Services\DotacionAutoPedidoService::class);
+        try {
+            $pedido = $dotacion->generarPedidoParaContrato($contrato);
+        } catch (\Throwable $e) {
+            Log::error("No se pudo generar el pedido automático del contrato {$contrato->id}: {$e->getMessage()}");
+
+            return 'No se generó el pedido automático de dotación por un error inesperado. Créalo manualmente en Pedidos automáticos.';
+        }
+
+        return $pedido ? "Se generó el pedido automático {$pedido->codigo}." : $dotacion->motivoSinPedido;
     }
 
     /**

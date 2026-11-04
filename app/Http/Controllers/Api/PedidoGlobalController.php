@@ -64,6 +64,22 @@ class PedidoGlobalController extends Controller
                     'message' => 'Primero debes confirmar el pedido antes de confirmar la entrega.',
                 ], 422);
             }
+
+            // La entrega es de todo el pedido global: solo cuando ya se tienen todas las prendas.
+            $pendientes = $pedidoGlobal->pedidosAutomaticos()
+                ->whereNotIn('estado', ['Devolución', 'Devolución usada', 'Cancelado'])
+                ->where(fn ($q) => $q
+                    ->where('estado', PedidoAutomatico::ENVIAR_A_COMPRAS)
+                    ->orWhereNotNull('prendas_sin_definir')
+                    ->orWhereHas('items', fn ($i) => $i->where('cantidad_por_comprar', '>', 0)))
+                ->orderBy('codigo')
+                ->pluck('codigo');
+            if ($pendientes->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'No se puede confirmar la entrega: faltan prendas por comprar, están en Compras o falta el género o la talla del empleado en los pedidos '
+                        . $pendientes->implode(', ') . '. Cuando estén todas las prendas ya se podrá confirmar.',
+                ], 422);
+            }
         }
 
         $seAcabaDeConfirmarEntrega = ($data['entrega_confirmada'] ?? false) && !$pedidoGlobal->entrega_confirmada;
@@ -114,7 +130,8 @@ class PedidoGlobalController extends Controller
         $resumen = ['enviadas' => [], 'omitidas' => [], 'fallidas' => []];
 
         foreach ($global->pedidosAutomaticos as $pedido) {
-            if (!$pedido->codigo || $pedido->items->isEmpty()) {
+            // Sin nada que entregar (todo está por comprar) no hay acta que enviar.
+            if (!$pedido->codigo || $pedido->items->every(fn ($it) => $it->cantidadEnStock() === 0)) {
                 continue;
             }
 
@@ -155,16 +172,20 @@ class PedidoGlobalController extends Controller
 
     public function destroy(PedidoGlobal $pedidoGlobal)
     {
-        DB::transaction(function () use ($pedidoGlobal) {
-            // Revertir los pedidos automáticos a Activo y desligarlos del global
-            PedidoAutomatico::where('pedido_global_id', $pedidoGlobal->id)
-                ->update([
-                    'pedido_global_id' => null,
-                    'estado'           => 'Activo',
-                ]);
+        try {
+            DB::transaction(function () use ($pedidoGlobal) {
+                // Revertir los pedidos automáticos a Activo y desligarlos del global. Con
+                // cambiarEstado: uno que se devolvió volvió al stock y debe descontarse de nuevo.
+                foreach (PedidoAutomatico::where('pedido_global_id', $pedidoGlobal->id)->lockForUpdate()->get() as $pedido) {
+                    $pedido->cambiarEstado('Activo');
+                    $pedido->update(['pedido_global_id' => null]);
+                }
 
-            $pedidoGlobal->delete();
-        });
+                $pedidoGlobal->delete();
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(null, 204);
     }
@@ -237,6 +258,15 @@ class PedidoGlobalController extends Controller
             'pedidos.*.items.*.cantidad'                   => 'required|integer|min:1',
         ]);
 
+        try {
+            return $this->importarGlobal($data);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    private function importarGlobal(array $data)
+    {
         return DB::transaction(function () use ($data) {
             $global = PedidoGlobal::create([
                 'codigo'           => PedidoGlobal::generarCodigo(),
@@ -271,10 +301,20 @@ class PedidoGlobalController extends Controller
                     continue;
                 }
 
+                // Igual que un pedido individual: ligado al contrato del empleado y solo con
+                // dotación de su proyecto.
+                $contrato = PedidoAutomatico::contratoDelEmpleado((int) $p['empleado_id'], !empty($p['contrato_id']) ? (int) $p['contrato_id'] : null);
+                if (!$contrato) {
+                    throw new InvalidArgumentException("El empleado {$p['empleado_id']} no tiene contrato: no se le puede crear un pedido de dotación.");
+                }
+                if ($msg = PedidoAutomatico::prendasDeOtroProyecto($contrato, $p['items'])) {
+                    throw new InvalidArgumentException($msg);
+                }
+
                 $pedido = PedidoAutomatico::create([
-                    'codigo'           => $p['codigo'] ?: PedidoAutomatico::generarCodigo(),
+                    'codigo'           => !empty($p['codigo']) ? $p['codigo'] : PedidoAutomatico::generarCodigo(),
                     'empleado_id'      => $p['empleado_id'],
-                    'contrato_id'      => $p['contrato_id'] ?? null,
+                    'contrato_id'      => $contrato->id,
                     'estado'           => 'Completado',
                     'fecha_pedido'     => $p['fecha_pedido'] ?? now()->toDateString(),
                     'notas'            => $p['notas'] ?? null,

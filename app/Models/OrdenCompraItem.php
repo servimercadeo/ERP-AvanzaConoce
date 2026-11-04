@@ -8,9 +8,14 @@ class OrdenCompraItem extends Model
 {
     protected $table = 'orden_compra_items';
 
+    /** Categoría con la que las prendas de dotación aparecen en la orden. */
+    public const CATEGORIA_DOTACION = 'Dotación';
+
     protected $fillable = [
         'orden_compra_id',
         'pedido_compra_item_id',
+        'pedido_automatico_id',
+        'inventario_dotacion_id',
         'tipo_producto_id',
         'producto',
         'categoria',
@@ -40,6 +45,16 @@ class OrdenCompraItem extends Model
     public function pedidoCompraItem()
     {
         return $this->belongsTo(PedidoCompraItem::class);
+    }
+
+    public function pedidoAutomatico()
+    {
+        return $this->belongsTo(PedidoAutomatico::class);
+    }
+
+    public function inventarioDotacion()
+    {
+        return $this->belongsTo(InventarioDotacion::class);
     }
 
     public function tipoProducto()

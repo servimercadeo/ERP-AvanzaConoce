@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\InventarioDotacion;
+use App\Models\PedidoAutomatico;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Services\EmpresaProyectoRules;
@@ -179,7 +180,7 @@ class InventarioDotacionController extends Controller
         return $item;
     }
 
-    private const CACHE_KEY_FLAT = 'inventario-dotacion:flat';
+    private const CACHE_KEY_FLAT = InventarioDotacion::CACHE_KEY_FLAT;
 
     /**
      * Invalida la caché del catálogo completo (usada por el fetch "sin filtros" de abajo).
@@ -390,49 +391,112 @@ class InventarioDotacionController extends Controller
             'items.*.precio'       => 'nullable|integer|min:0',
             'items.*.cantidad'     => 'required|integer|min:0',
             'items.*.stock_minimo' => 'nullable|integer|min:0',
+            // Excel de una compra de dotación: cada fila dice para qué pedido se compró.
+            'items.*.pedido_codigo' => 'nullable|string|max:10',
+            'items.*.sede_nombre'   => 'nullable|string|max:150',
         ]);
 
         foreach ($request->items as $item) {
             if ($error = $this->validarProyectoPermitido($request->user(), $item['proyecto'])) {
                 return response()->json(['message' => $error], 403);
             }
-            if ($error = $this->validarSedeParaProyecto($item['sede_id'] ?? null, $item['proyecto'])) {
+            // La fila de una compra ya existe (el pedido la creó): su sede puede no ser del proyecto.
+            if (empty($item['pedido_codigo']) && $error = $this->validarSedeParaProyecto($item['sede_id'] ?? null, $item['proyecto'])) {
                 return response()->json(['message' => $error], 422);
             }
         }
 
-        $creados = 0;
-        $actualizados = 0;
+        $resultado = ['creados' => 0, 'actualizados' => 0, 'asignados_a_pedidos' => [], 'pedidos_completos' => [], 'omitidas' => []];
 
-        foreach ($request->items as $item) {
-            $existente = InventarioDotacion::where([
-                'proyecto' => $item['proyecto'],
-                'sede_id'  => $item['sede_id'] ?? null,
-                'prenda'   => $item['prenda'],
-                'genero'   => $item['genero'],
-                'talla'    => $item['talla'],
-            ])->first();
+        DB::transaction(function () use ($request, &$resultado) {
+            $pedidosTocados = [];
 
-            if ($existente) {
-                $existente->increment('cantidad', $item['cantidad']);
-                $actualizados++;
-            } else {
-                InventarioDotacion::create([
-                    'proyecto'     => $item['proyecto'],
-                    'sede_id'      => $item['sede_id'] ?? null,
-                    'prenda'       => $item['prenda'],
-                    'genero'       => $item['genero'],
-                    'talla'        => $item['talla'],
-                    'precio'       => $item['precio'] ?? 0,
-                    'cantidad'     => $item['cantidad'],
-                    'stock_minimo' => $item['stock_minimo'] ?? 10,
-                ]);
-                $creados++;
+            foreach ($request->items as $item) {
+                if (!empty($item['pedido_codigo'])) {
+                    $this->importarFilaDeCompra($item, $resultado, $pedidosTocados);
+                    continue;
+                }
+
+                $existente = InventarioDotacion::where([
+                    'proyecto' => $item['proyecto'],
+                    'sede_id'  => $item['sede_id'] ?? null,
+                    'prenda'   => $item['prenda'],
+                    'genero'   => $item['genero'],
+                    'talla'    => $item['talla'],
+                ])->first();
+
+                if ($existente) {
+                    $existente->increment('cantidad', $item['cantidad']);
+                    $resultado['actualizados']++;
+                } else {
+                    InventarioDotacion::create([
+                        'proyecto'     => $item['proyecto'],
+                        'sede_id'      => $item['sede_id'] ?? null,
+                        'prenda'       => $item['prenda'],
+                        'genero'       => $item['genero'],
+                        'talla'        => $item['talla'],
+                        'precio'       => $item['precio'] ?? 0,
+                        'cantidad'     => $item['cantidad'],
+                        'stock_minimo' => $item['stock_minimo'] ?? 10,
+                    ]);
+                    $resultado['creados']++;
+                }
             }
-        }
+
+            // Con todo comprado, el pedido sale de Compras y vuelve a Dotación.
+            foreach ($pedidosTocados as $pedido) {
+                if ($pedido->estado === PedidoAutomatico::ENVIAR_A_COMPRAS && !$pedido->items()->where('cantidad_por_comprar', '>', 0)->exists()) {
+                    $pedido->cambiarEstado($pedido->estadoAlSalirDeCompras());
+                    $resultado['pedidos_completos'][] = $pedido->codigo;
+                }
+            }
+        });
 
         $this->olvidarCacheFlat();
-        return response()->json(['creados' => $creados, 'actualizados' => $actualizados]);
+        return response()->json($resultado);
+    }
+
+    /**
+     * Lo comprado es del pedido que lo pidió: no pasa por stock libre, baja lo que tiene por
+     * comprar. Solo lo que sobre entra al inventario. Si la línea ya no tiene nada pendiente
+     * (el mismo Excel importado dos veces) la fila se omite, para no inflar el inventario.
+     */
+    private function importarFilaDeCompra(array $item, array &$resultado, array &$pedidosTocados): void
+    {
+        $descripcion = "{$item['prenda']} talla {$item['talla']}";
+        $omitir = function (string $motivo) use ($item, $descripcion, &$resultado) {
+            $resultado['omitidas'][] = ['pedido' => $item['pedido_codigo'], 'prenda' => $descripcion, 'motivo' => $motivo];
+        };
+
+        $pedido = PedidoAutomatico::where('codigo', $item['pedido_codigo'])->lockForUpdate()->first();
+        if (!$pedido) {
+            $omitir('El pedido no existe.');
+            return;
+        }
+
+        $sedeId = $item['sede_id'] ?? (!empty($item['sede_nombre'])
+            ? \App\Models\Sede::whereRaw('UPPER(nombre) = ?', [mb_strtoupper($item['sede_nombre'], 'UTF-8')])->value('id')
+            : null);
+        $fila = InventarioDotacion::where([
+            'proyecto' => $item['proyecto'], 'sede_id' => $sedeId, 'prenda' => $item['prenda'], 'genero' => $item['genero'], 'talla' => $item['talla'],
+        ])->lockForUpdate()->first();
+        $linea = $fila
+            ? $pedido->items()->where('inventario_dotacion_id', $fila->id)->where('cantidad_por_comprar', '>', 0)->lockForUpdate()->first()
+            : null;
+        if (!$linea) {
+            $omitir('El pedido no tiene esa prenda pendiente por comprar (¿ya se importó?).');
+            return;
+        }
+
+        $asignado = min($item['cantidad'], $linea->cantidad_por_comprar);
+        $linea->decrement('cantidad_por_comprar', $asignado);
+        // Si el pedido aún no descuenta stock (Pendiente), lo comprado queda en inventario y lo
+        // descuenta al activarse.
+        $fila->increment('cantidad', PedidoAutomatico::descuentaStock($pedido->estado) ? $item['cantidad'] - $asignado : $item['cantidad']);
+
+        $resultado['actualizados']++;
+        $resultado['asignados_a_pedidos'][] = ['pedido' => $pedido->codigo, 'prenda' => $descripcion, 'cantidad' => $asignado];
+        $pedidosTocados[$pedido->id] = $pedido;
     }
 
     public function update(Request $request, InventarioDotacion $inventarioDotacion)

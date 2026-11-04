@@ -11,6 +11,7 @@ import {
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
 import SelectBuscable from "../components/SelectBuscable";
+import { agruparPedidosImportados } from "../utils/dotacion";
 
 const POR_PAGINA = 8;
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
@@ -18,44 +19,13 @@ const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 // ─── Excel: mismo espíritu de simplificación que "Pedidos automáticos", con
 // Regional como columna adicional porque cada combinación Proyecto+Regional
 // del archivo termina siendo un pedido global independiente. ─────────────────
-const PEDIDO_HEADER_MAP = {
-    cedula: "cedula",
-    regional: "regional",
-    proyecto: "proyecto",
-    prenda: "prenda",
-    talla: "talla",
-    cantidad: "cantidad",
-};
-
-const normalizeHeaderPA = (s) =>
+const normalizeTextPA = (s) =>
     (s ?? "")
         .toString()
         .normalize("NFD")
         .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
         .toLowerCase()
         .trim();
-
-const normalizeTextPA = normalizeHeaderPA;
-
-// Índice O(1) de inventarioFlat para no escanear las ~8-9 mil filas por cada fila de un
-// Excel importado. Clave = proyecto|prenda|talla(lower)|genero, primer ítem encontrado gana
-// (mismo criterio que un .find() en el orden en que llega inventarioFlat, agrupado por
-// proyecto/prenda/genero/talla desde el backend).
-function buildInventarioIndex(inventarioFlat) {
-    const idx = new Map();
-    for (const i of inventarioFlat) {
-        const key = `${i.proyecto}|${i.prenda}|${String(i.talla).toLowerCase()}|${i.genero}`;
-        if (!idx.has(key)) idx.set(key, i);
-    }
-    return idx;
-}
-
-// Replica exactamente `inventarioFlat.find(i => i.proyecto===p && i.prenda===pr &&
-// i.genero===genero && i.talla.toLowerCase()===talla.toLowerCase())` pero usando el índice.
-function lookupInventario(idx, proyecto, prenda, talla, genero) {
-    const tallaLower = String(talla ?? "").toLowerCase();
-    return idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ?? null;
-}
 
 function parseDateLocal(str) {
     return new Date(String(str).split("T")[0] + "T00:00:00");
@@ -294,6 +264,7 @@ function PedidoIncluidoModal({ pedido, global: g, onClose, onDevuelto }) {
                                             }}
                                         >
                                             ×{it.cantidad}
+                                            {it.cantidad_por_comprar > 0 && ` (${it.cantidad_por_comprar} por comprar)`}
                                         </span>
                                     </div>
                                 ))}
@@ -910,89 +881,18 @@ function ImportPedidosGlobalesModal({
                 return;
             }
 
-            const filas = raw.map((row) => {
-                const mapped = {};
-                Object.entries(row).forEach(([k, v]) => {
-                    const key = PEDIDO_HEADER_MAP[normalizeHeaderPA(k)];
-                    if (key) mapped[key] = typeof v === "string" ? v.trim() : v;
-                });
-                return mapped;
-            });
-
             // Un pedido nuevo por cada combinación cédula + proyecto + regional:
             // todas sus filas (prendas) se agrupan en ese único pedido. Cada
             // combinación proyecto + regional distinta que aparezca en el
             // archivo termina en su propio pedido global.
             const hoy = new Date().toISOString().split("T")[0];
-            const gruposMap = new Map();
-            const orden = [];
-            const invIndex = buildInventarioIndex(inventarioFlat);
-            filas.forEach((fila, idx) => {
-                const cedula = String(fila.cedula ?? "").trim();
-                const proyecto = String(fila.proyecto ?? "").trim();
-                const regionalTexto = String(fila.regional ?? "").trim();
-                if (!cedula) return;
-                const key = `${cedula}|${proyecto}|${normalizeTextPA(regionalTexto)}`;
-
-                if (!gruposMap.has(key)) {
-                    gruposMap.set(key, {
-                        cedula,
-                        proyecto,
-                        regionalTexto,
-                        empleado:
-                            empleados.find((e) => e.cedula === cedula) ?? null,
-                        fecha_pedido: hoy,
-                        notas: "",
-                        items: [],
-                        erroresItems: [],
-                    });
-                    orden.push(key);
-                }
-                const grupo = gruposMap.get(key);
-                if (!fila.prenda) return;
-
-                const generoEmpleado = grupo.empleado?.genero ?? "";
-                const cantidad = Number(fila.cantidad) || 0;
-                const inv = lookupInventario(
-                    invIndex,
-                    proyecto,
-                    fila.prenda,
-                    fila.talla,
-                    generoEmpleado,
-                );
-
-                if (!inv || cantidad <= 0) {
-                    grupo.erroresItems.push(
-                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${proyecto}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
-                    );
-                    return;
-                }
-                grupo.items.push({
-                    inventario_dotacion_id: inv.id,
-                    cantidad,
-                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
-                });
-            });
-
-            const gruposFinal = orden.map((key) => {
-                const g = gruposMap.get(key);
-                const contrato = g.empleado
-                    ? contratos.find((c) => c.empleado_id === g.empleado.id)
-                    : null;
+            const gruposFinal = agruparPedidosImportados(raw, { empleados, contratos, inventarioFlat, porProyectoYRegional: true }).map((g) => {
                 const regional = regionales.find(
                     (r) =>
                         normalizeTextPA(r.nombre) ===
                         normalizeTextPA(g.regionalTexto),
                 );
-                const errores = [...g.erroresItems];
-                if (!g.empleado)
-                    errores.unshift(
-                        `No se encontró un empleado con cédula "${g.cedula}".`,
-                    );
-                else if (!g.empleado.genero)
-                    errores.unshift(
-                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
-                    );
+                const errores = [...g.errores];
                 if (!g.proyecto)
                     errores.unshift(
                         `Falta el proyecto para la cédula ${g.cedula}.`,
@@ -1003,7 +903,8 @@ function ImportPedidosGlobalesModal({
                     );
                 return {
                     ...g,
-                    contrato_id: contrato?.id ?? null,
+                    fecha_pedido: hoy,
+                    notas: "",
                     regional_id: regional?.id ?? null,
                     regionalNombre: regional?.nombre ?? g.regionalTexto,
                     errores,
@@ -1428,7 +1329,7 @@ export default function PedidosGlobalesCrud() {
                             (ss, p) =>
                                 ss +
                                 (p.items ?? []).reduce(
-                                    (sss, it) => sss + it.cantidad,
+                                    (sss, it) => sss + it.cantidad - (it.cantidad_por_comprar ?? 0),
                                     0,
                                 ),
                             0,
@@ -2612,6 +2513,7 @@ export default function PedidosGlobalesCrud() {
                                                                                                     {
                                                                                                         it.cantidad
                                                                                                     }
+                                                                                                    {it.cantidad_por_comprar > 0 && ` (${it.cantidad_por_comprar} por comprar)`}
                                                                                                 </span>
                                                                                             ),
                                                                                         )}

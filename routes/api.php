@@ -524,6 +524,9 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);
     Route::get('ordenes-compra/{ordenCompra}/pdf', [App\Http\Controllers\Api\OrdenCompraController::class, 'pdf']);
+    Route::get('ordenes-compra/{ordenCompra}/excel-dotacion', [App\Http\Controllers\Api\OrdenCompraController::class, 'excelDotacion']);
+    Route::put('ordenes-compra/{ordenCompra}/completar', [App\Http\Controllers\Api\OrdenCompraController::class, 'completar'])
+        ->middleware(PermisoDenegado::middleware('crear', 'pedidos_compras.compras.ver_crear_orden_compra'));
     Route::apiResource('ordenes-compra', App\Http\Controllers\Api\OrdenCompraController::class)
         ->parameters(['ordenes-compra' => 'ordenCompra'])
         ->only(['index', 'show', 'store', 'destroy'])

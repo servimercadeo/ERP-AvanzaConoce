@@ -22,11 +22,10 @@ use InvalidArgumentException;
 class RevisionStockDotacionController extends Controller
 {
     /**
-     * El check "Enviar a Compras" de la fila solo se puede marcar una vez la revisión de
-     * stock concluyó, para AL MENOS una prenda, que no hay existencias en ninguna sede
-     * (estado_revision = 'Enviado a Compras'). Si ninguna prenda llegó a esa conclusión
-     * (se resolvieron con stock propio o traslado, o aún faltan por revisar), el check
-     * se rechaza server-side aunque alguien intente forzarlo desde el frontend.
+     * Entra o sale de la pantalla de Compras. La dotación va directo a Compras desde Pedidos
+     * globales ("Enviar a compras"), sin pasar por la pantalla de Pedidos: regresarlo es
+     * devolverlo a Dotación, al estado que le corresponde (Completado si está en un pedido
+     * global, en proceso si no). Ninguno de los dos mueve stock.
      */
     public function marcarRecibido(Request $request, PedidoAutomatico $pedidoAutomatico)
     {
@@ -34,32 +33,24 @@ class RevisionStockDotacionController extends Controller
             'recibido' => 'required|boolean',
         ]);
 
-        if ($data['recibido']) {
-            $tieneItemParaComprar = $pedidoAutomatico->items()
-                ->where('estado_revision', 'Enviado a Compras')
-                ->exists();
+        $estado = $data['recibido']
+            ? PedidoAutomatico::ENVIAR_A_COMPRAS
+            : $pedidoAutomatico->estadoAlSalirDeCompras();
 
-            if (!$tieneItemParaComprar) {
-                return response()->json([
-                    'message' => 'Primero confirma, revisando cada prenda, que no hay stock en ninguna sede.',
-                ], 422);
-            }
+        try {
+            $pedidoAutomatico->exigirGlobalParaCompras($estado);
+            DB::transaction(fn () => $pedidoAutomatico->cambiarEstado($estado));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $pedidoAutomatico->update([
-            'recibido_pedidos' => $data['recibido'],
-            // Al confirmar el check entra a Compras arrancando en "Cotizando"; al
-            // regresarlo a Pedidos se limpia para no dejar un estado de compra huérfano.
-            'estado_compra' => $data['recibido'] ? 'Cotizando' : null,
-        ]);
 
         return response()->json($pedidoAutomatico->fresh()->load(['empleado', 'contrato', 'items.inventario']));
     }
 
     /**
-     * Cambia el estado de compra (Cotizando / Pendiente Aprobación) desde la pantalla de
-     * Compras. Solo aplica a pedidos que ya pasaron el check (recibido_pedidos = true);
-     * si alguien intenta forzarlo antes, se rechaza.
+     * Cambia el estado de compra (Cotizando / Pendiente Aprobación) desde la pantalla de Compras,
+     * solo para pedidos que están allá. "Completada" no se elige aquí: lo pone la Orden de Compra
+     * al completarse (OrdenCompraController::completar), y solo se quita eliminando esa orden.
      */
     public function actualizarEstadoCompra(Request $request, PedidoAutomatico $pedidoAutomatico)
     {
@@ -70,10 +61,13 @@ class RevisionStockDotacionController extends Controller
         if (!$pedidoAutomatico->recibido_pedidos) {
             return response()->json(['message' => 'Este pedido todavía no fue confirmado para Compras.'], 422);
         }
+        if ($pedidoAutomatico->estado_compra === 'Completada') {
+            return response()->json(['message' => 'La compra de este pedido ya se completó en su Orden de Compra.'], 422);
+        }
 
         $pedidoAutomatico->update(['estado_compra' => $data['estado_compra']]);
 
-        return response()->json($pedidoAutomatico->fresh()->load(['empleado', 'contrato', 'items.inventario']));
+        return response()->json($pedidoAutomatico->fresh()->load(['empleado', 'contrato', 'items.inventario.sede:id,nombre']));
     }
 
     public function stockPorPedido(PedidoAutomatico $pedidoAutomatico)
@@ -185,6 +179,7 @@ class RevisionStockDotacionController extends Controller
 
         try {
             return DB::transaction(function () use ($data, $pedidoAutomaticoItem) {
+                $this->exigirSinRevisar($pedidoAutomaticoItem);
                 $inv = $pedidoAutomaticoItem->inventario;
                 $sedePedida = $pedidoAutomaticoItem->pedido->contrato?->sedeCatalogo;
 
@@ -192,10 +187,10 @@ class RevisionStockDotacionController extends Controller
                     throw new InvalidArgumentException('No se pudo determinar la sede real del pedido.');
                 }
 
-                // "Aprobado por Stock" significa que se despacha con lo que ya hay en la
-                // sede pedida: hay que confirmar que de verdad alcanza y descontarlo, igual
-                // que un traslado descuenta la sede de origen. Si no alcanza, se rechaza
-                // para forzar al usuario a usar un traslado o enviar a Compras.
+                // "Aprobado por Stock": se despacha con lo que hay en la sede pedida. Un pedido
+                // en "Enviar a compras" YA descontó sus prendas (PedidoAutomatico::
+                // ESTADOS_CON_STOCK_DESCONTADO): si salieron de esa sede no se vuelve a
+                // descontar; si salieron de otra, el descuento se pasa a la sede pedida.
                 $filaSedePedida = InventarioDotacion::where('proyecto', $inv->proyecto)
                     ->where('prenda', $inv->prenda)
                     ->where('genero', $inv->genero)
@@ -204,16 +199,20 @@ class RevisionStockDotacionController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (!$filaSedePedida || $filaSedePedida->cantidad < $pedidoAutomaticoItem->cantidad) {
+                if (!$filaSedePedida || ($filaSedePedida->id !== $inv->id && $filaSedePedida->cantidad < $pedidoAutomaticoItem->cantidad)) {
                     $disponible = $filaSedePedida->cantidad ?? 0;
                     throw new InvalidArgumentException("Solo hay {$disponible} disponibles en la sede pedida, no alcanza para {$pedidoAutomaticoItem->cantidad}. Usa un traslado o envía a Compras.");
                 }
 
-                $filaSedePedida->decrement('cantidad', $pedidoAutomaticoItem->cantidad);
+                if ($filaSedePedida->id !== $inv->id) {
+                    $inv->increment('cantidad', $pedidoAutomaticoItem->cantidad);
+                    $filaSedePedida->decrement('cantidad', $pedidoAutomaticoItem->cantidad);
+                }
 
                 $pedidoAutomaticoItem->update([
-                    'estado_revision' => 'Aprobado por Stock',
-                    'observacion'     => $data['observacion'],
+                    'inventario_dotacion_id' => $filaSedePedida->id,
+                    'estado_revision'        => 'Aprobado por Stock',
+                    'observacion'            => $data['observacion'],
                 ]);
                 $this->sincronizarEstadoPedido($pedidoAutomaticoItem->pedido);
 
@@ -235,6 +234,7 @@ class RevisionStockDotacionController extends Controller
 
         try {
             return DB::transaction(function () use ($data, $pedidoAutomaticoItem, $request) {
+                $this->exigirSinRevisar($pedidoAutomaticoItem);
                 $inv = $pedidoAutomaticoItem->inventario;
                 $sedePedida = $pedidoAutomaticoItem->pedido->contrato?->sedeCatalogo;
 
@@ -270,6 +270,10 @@ class RevisionStockDotacionController extends Controller
                 if ($origen->id === $destino->id) {
                     throw new InvalidArgumentException('La sede de origen no puede ser la misma sede pedida.');
                 }
+                if ($origen->proyecto !== $destino->proyecto || $origen->prenda !== $destino->prenda
+                    || $origen->genero !== $destino->genero || $origen->talla !== $destino->talla) {
+                    throw new InvalidArgumentException('El origen del traslado debe ser la misma prenda, género y talla del pedido.');
+                }
                 if ($origen->cantidad < $data['cantidad']) {
                     throw new InvalidArgumentException("Solo hay {$origen->cantidad} disponibles en esa sede.");
                 }
@@ -304,6 +308,12 @@ class RevisionStockDotacionController extends Controller
 
     public function enviarACompras(Request $request, PedidoAutomaticoItem $pedidoAutomaticoItem)
     {
+        try {
+            $this->exigirSinRevisar($pedidoAutomaticoItem);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $pedidoAutomaticoItem->update(['estado_revision' => 'Enviado a Compras']);
         $this->sincronizarEstadoPedido($pedidoAutomaticoItem->pedido);
 
@@ -325,66 +335,74 @@ class RevisionStockDotacionController extends Controller
             return response()->json(['message' => 'Esta prenda todavía no tiene una revisión que deshacer.'], 422);
         }
 
-        return DB::transaction(function () use ($pedidoAutomaticoItem) {
-            if ($pedidoAutomaticoItem->estado_revision === 'Traslado Solicitado') {
-                $traslado = TrasladoDotacion::where('pedido_automatico_item_id', $pedidoAutomaticoItem->id)
-                    ->where('estado', 'Completado')
-                    ->latest()
+        try {
+            return DB::transaction(fn () => $this->deshacer($pedidoAutomaticoItem));
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    private function deshacer(PedidoAutomaticoItem $pedidoAutomaticoItem)
+    {
+        if ($pedidoAutomaticoItem->estado_revision === 'Traslado Solicitado') {
+            $traslado = TrasladoDotacion::where('pedido_automatico_item_id', $pedidoAutomaticoItem->id)
+                ->where('estado', 'Completado')
+                ->latest()
+                ->first();
+
+            if ($traslado) {
+                $origen = InventarioDotacion::lockForUpdate()->find($traslado->inventario_dotacion_origen_id);
+                $destino = InventarioDotacion::where('proyecto', $pedidoAutomaticoItem->inventario?->proyecto)
+                    ->where('prenda', $traslado->prenda)
+                    ->where('genero', $traslado->genero)
+                    ->where('talla', $traslado->talla)
+                    ->where('sede_id', $traslado->sede_destino_id)
+                    ->lockForUpdate()
                     ->first();
 
-                if ($traslado) {
-                    $origen = InventarioDotacion::lockForUpdate()->find($traslado->inventario_dotacion_origen_id);
-                    $destino = InventarioDotacion::where('proyecto', $pedidoAutomaticoItem->inventario?->proyecto)
-                        ->where('prenda', $traslado->prenda)
-                        ->where('genero', $traslado->genero)
-                        ->where('talla', $traslado->talla)
-                        ->where('sede_id', $traslado->sede_destino_id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($origen) {
-                        $origen->increment('cantidad', $traslado->cantidad);
-                    }
-                    if ($destino) {
-                        $destino->decrement('cantidad', $traslado->cantidad);
-                    }
-
-                    $traslado->update(['estado' => 'Cancelado']);
+                if ($destino && $destino->cantidad < $traslado->cantidad) {
+                    throw new InvalidArgumentException("No se puede deshacer el traslado: en la sede destino solo quedan {$destino->cantidad} de los {$traslado->cantidad} trasladados.");
                 }
-            }
-
-            if ($pedidoAutomaticoItem->estado_revision === 'Aprobado por Stock') {
-                $inv = $pedidoAutomaticoItem->inventario;
-                $sedePedida = $pedidoAutomaticoItem->pedido->contrato?->sedeCatalogo;
-
-                if ($inv && $sedePedida) {
-                    $filaSedePedida = InventarioDotacion::where('proyecto', $inv->proyecto)
-                        ->where('prenda', $inv->prenda)
-                        ->where('genero', $inv->genero)
-                        ->where('talla', $inv->talla)
-                        ->where('sede_id', $sedePedida->id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($filaSedePedida) {
-                        $filaSedePedida->increment('cantidad', $pedidoAutomaticoItem->cantidad);
-                    }
+                if ($origen) {
+                    $origen->increment('cantidad', $traslado->cantidad);
                 }
+                if ($destino) {
+                    $destino->decrement('cantidad', $traslado->cantidad);
+                }
+
+                $traslado->update(['estado' => 'Cancelado']);
             }
+        }
 
-            $pedidoAutomaticoItem->update(['estado_revision' => null, 'observacion' => null]);
+        // "Aprobado por Stock" no movió inventario propio (ver marcarStockLocal): las
+        // prendas siguen descontadas por el pedido, solo se borra la revisión.
+        $pedidoAutomaticoItem->update(['estado_revision' => null, 'observacion' => null]);
 
-            $pedido = $pedidoAutomaticoItem->pedido;
-            $siguesTeniendoItemParaComprar = $pedido->items()
-                ->where('estado_revision', 'Enviado a Compras')
-                ->exists();
+        $pedido = $pedidoAutomaticoItem->pedido;
+        $siguesTeniendoItemParaComprar = $pedido->items()
+            ->where('estado_revision', 'Enviado a Compras')
+            ->exists();
 
-            if (!$siguesTeniendoItemParaComprar && $pedido->recibido_pedidos) {
-                $pedido->update(['recibido_pedidos' => false, 'estado_compra' => null]);
-            }
+        if (!$siguesTeniendoItemParaComprar && $pedido->recibido_pedidos) {
+            $pedido->update(['recibido_pedidos' => false, 'estado_compra' => null]);
+        }
 
-            return response()->json($pedido->fresh()->load('items.inventario'));
-        });
+        return response()->json($pedido->fresh()->load('items.inventario'));
+    }
+
+    /**
+     * Solo se revisan pedidos en "Enviar a compras" (los que tienen el stock ya descontado), y
+     * una prenda ya revisada se deshace antes de revisarla otra vez: si no, su movimiento de
+     * inventario quedaría sin poder revertirse.
+     */
+    private function exigirSinRevisar(PedidoAutomaticoItem $item): void
+    {
+        if ($item->pedido->estado !== 'Enviar a compras') {
+            throw new InvalidArgumentException('Solo se revisan pedidos en estado "Enviar a compras".');
+        }
+        if ($item->estado_revision) {
+            throw new InvalidArgumentException("Esta prenda ya está revisada (\"{$item->estado_revision}\"): deshaz la revisión antes de cambiarla.");
+        }
     }
 
     /**

@@ -2814,7 +2814,8 @@ export default function ContratosCrud() {
                 qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
                 // El aval con contrato ya no muestra "Anular aval".
                 qc.invalidateQueries({ queryKey: ["base-ingresos"] });
-                showToast("Contrato actualizado.");
+                if (data.pedido_automatico_aviso) showToast(`Contrato actualizado. ${data.pedido_automatico_aviso}`, 8000);
+                else showToast("Contrato actualizado.");
             } else {
                 const { data } = await api.post("/contratos", form);
                 setContratos((prev) => [data, ...prev]);
@@ -2830,7 +2831,7 @@ export default function ContratosCrud() {
                     data.pedido_automatico
                         ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado.` +
                           (data.pedido_automatico_faltantes?.length
-                              ? ` Faltaron: ${data.pedido_automatico_faltantes.join("; ")}.`
+                              ? ` Pendiente: ${data.pedido_automatico_faltantes.join("; ")}.`
                               : "")
                         : `Contrato creado. ${data.pedido_automatico_motivo ?? "No se generó el pedido automático de dotación."}`,
                     data.pedido_automatico && !data.pedido_automatico_faltantes?.length ? 4000 : 10000,
@@ -2921,6 +2922,8 @@ export default function ContratosCrud() {
 
             let created = 0;
             let nuevosPendientes = 0;
+            let pedidosGenerados = 0;
+            const sinPedido = [];
             const errors = [];
             // Cédulas que ya tienen contrato: no se crea otro, se rellenan los campos vacíos
             // de su contrato vigente (nunca se sobrescribe un dato existente).
@@ -2960,8 +2963,11 @@ export default function ContratosCrud() {
 
                 const payloadConEmpleado = empleado ? { ...payloadLimpio, empleado_id: empleado.id } : payloadLimpio;
                 try {
-                    await api.post("/contratos", payloadConEmpleado);
+                    const { data: creado } = await api.post("/contratos", payloadConEmpleado);
                     created += 1;
+                    // Un contrato histórico (finalizado) nunca lleva pedido: no hay nada que avisar.
+                    if (creado.pedido_automatico) pedidosGenerados += 1;
+                    else if (creado.estado_contrato === "Vigente") sinPedido.push(`Cédula ${documento}: ${creado.pedido_automatico_motivo ?? "no se generó el pedido automático."}`);
                     if (!empleado) nuevosPendientes += 1;
                     if (documento) cedulasExistentes.add(documento);
                 } catch (err) {
@@ -3013,12 +3019,15 @@ export default function ContratosCrud() {
             if (completados > 0) resumen.push(`${completados} existente${completados === 1 ? "" : "s"} completado${completados === 1 ? "" : "s"} (solo campos vacíos)`);
             if (sinCambios > 0) resumen.push(`${sinCambios} existente${sinCambios === 1 ? "" : "s"} sin cambios (ya tenían todo)`);
             if (nuevosPendientes > 0) resumen.push(`${nuevosPendientes} empleado${nuevosPendientes === 1 ? "" : "s"} nuevo${nuevosPendientes === 1 ? "" : "s"} pendiente${nuevosPendientes === 1 ? "" : "s"} de alta (complétalos en Empleados > Importar Excel para entregar credenciales)`);
+            if (pedidosGenerados > 0) resumen.push(`${pedidosGenerados} pedido${pedidosGenerados === 1 ? "" : "s"} automático${pedidosGenerados === 1 ? "" : "s"} de dotación generado${pedidosGenerados === 1 ? "" : "s"}`);
             const textoResumen = resumen.length ? resumen.join(", ") : "No se importó ningún contrato.";
 
-            // Con errores el modal queda abierto mostrándolos: un aviso de 3 segundos no
-            // alcanza para saber qué filas corregir.
-            if (errors.length) {
-                setImportError(`${textoResumen}.\n\n${errors.length} fila(s) con problemas:\n• ${errors.join("\n• ")}`);
+            // Con errores o contratos sin pedido el modal queda abierto mostrándolos: un aviso de
+            // 3 segundos no alcanza para saber qué filas corregir.
+            if (errors.length || sinPedido.length) {
+                const problemas = errors.length ? `\n\n${errors.length} fila(s) con problemas:\n• ${errors.join("\n• ")}` : "";
+                const sinKit = sinPedido.length ? `\n\n${sinPedido.length} contrato(s) vigente(s) sin pedido automático:\n• ${sinPedido.join("\n• ")}` : "";
+                setImportError(`${textoResumen}.${problemas}${sinKit}`);
                 return;
             }
             showToast(textoResumen);

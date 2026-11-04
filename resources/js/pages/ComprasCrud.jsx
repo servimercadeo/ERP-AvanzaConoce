@@ -13,6 +13,8 @@ import { SearchableSelect as FilterSelect } from "../components/SearchableSelect
 import SelectBuscable from "../components/SelectBuscable";
 
 const ESTADOS_COMPRA = ["Cotizando", "Pendiente Aprobación"];
+// La dotación llega a "Completada" al completar su Orden de Compra; no se elige aquí.
+const COMPLETADA = "Completada";
 
 export default function ComprasCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
@@ -25,9 +27,8 @@ export default function ComprasCrud() {
         queryFn: () => api.get("/pedidos-compra").then((r) => r.data),
     });
 
-    // --- Pedidos de Dotación: solo los que YA pasaron el check "Enviar a Compras" en
-    // Pedidos (recibido_pedidos = true). Mientras ese check no esté marcado, no aparecen
-    // aquí: siguen en revisión en Pedidos (ver PedidosCrud.jsx). ---
+    // --- Pedidos de Dotación: llegan directo desde Pedidos globales ("Enviar a compras"), sin
+    // pasar por la pantalla de Pedidos, que es solo de oficina. ---
     const { data: pedidosDotacion = [] } = useQuery({
         queryKey: ["pedidos-automaticos"],
         queryFn: () => api.get("/pedidos-automaticos").then((r) => r.data),
@@ -73,12 +74,15 @@ export default function ComprasCrud() {
                 clase: "Pedido Interno",
                 concepto: "REPOSICION",
                 estado_compra: p.estado_compra,
-                items: (p.items ?? [])
-                    .filter(it => it.estado_revision === "Enviado a Compras")
-                    .map(it => ({
+                // Compras ve lo que hay que comprar; si nada faltó, todas las prendas del pedido.
+                items: (() => {
+                    const todas = p.items ?? [];
+                    const porComprar = todas.filter(it => it.cantidad_por_comprar > 0);
+                    return (porComprar.length ? porComprar : todas).map(it => ({
                         producto: `${it.inventario?.prenda ?? "Prenda"} · ${it.inventario?.genero ?? ""} · T:${it.inventario?.talla ?? ""}`,
-                        cantidad: it.cantidad,
-                    })),
+                        cantidad: porComprar.length ? it.cantidad_por_comprar : it.cantidad,
+                    }));
+                })(),
                 _dotacionRaw: p,
             })),
         [pedidosDotacion]
@@ -159,7 +163,8 @@ export default function ComprasCrud() {
     };
 
     const handleRegresarAPedidos = async (pedido) => {
-        if (!window.confirm(`¿Regresar el pedido ${pedido.codigo} a Pedidos?`)) return;
+        const destino = pedido.origen === "dotacion" ? "Dotación" : "Pedidos";
+        if (!window.confirm(`¿Regresar el pedido ${pedido.codigo} a ${destino}?`)) return;
         setActualizandoId(pedido.id);
         try {
             if (pedido.origen === "dotacion") {
@@ -172,7 +177,7 @@ export default function ComprasCrud() {
                 });
                 invalidatePedidos();
             }
-            showToast(`Pedido ${pedido.codigo} regresado a Pedidos.`);
+            showToast(`Pedido ${pedido.codigo} regresado a ${destino}.`);
         } catch (err) {
             showToast(err?.response?.data?.message ?? "No se pudo regresar el pedido.", "error");
         } finally {
@@ -244,7 +249,7 @@ export default function ComprasCrud() {
                     <div style={S.emptyState}>
                         <IconEmptySearch size={48} />
                         <h3>No hay pedidos en Compras</h3>
-                        <p>Los pedidos aparecen aquí cuando se marca "Enviar a Compras" desde Pedidos (de oficina o confirmados desde Dotación).</p>
+                        <p>Los pedidos aparecen aquí cuando se marca "Enviar a Compras" en Pedidos (los de oficina) o en Pedidos globales (los de dotación).</p>
                     </div>
                 ) : (
                     <table className="data-table">
@@ -277,14 +282,23 @@ export default function ComprasCrud() {
                                     <td>{p.clase}</td>
                                     <td>{p.concepto}</td>
                                     <td>
-                                        <SelectBuscable
-                                            style={S.selectInline}
-                                            value={p.estado_compra || "Cotizando"}
-                                            disabled={actualizandoId === p.id}
-                                            onChange={e => handleCambiarEstadoCompra(p, e.target.value)}
-                                        >
-                                            {ESTADOS_COMPRA.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </SelectBuscable>
+                                        {p.estado_compra === COMPLETADA ? (
+                                            <span
+                                                style={{ fontWeight: 700, color: "var(--primary-dark)" }}
+                                                title="Falta importar el Excel de la Orden de Compra en Inventario de dotación"
+                                            >
+                                                {COMPLETADA}
+                                            </span>
+                                        ) : (
+                                            <SelectBuscable
+                                                style={S.selectInline}
+                                                value={p.estado_compra || "Cotizando"}
+                                                disabled={actualizandoId === p.id}
+                                                onChange={e => handleCambiarEstadoCompra(p, e.target.value)}
+                                            >
+                                                {ESTADOS_COMPRA.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </SelectBuscable>
+                                        )}
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
@@ -297,7 +311,7 @@ export default function ComprasCrud() {
                                             </button>
                                             {puede.editar && <button
                                                 style={{ ...S.actionIconBtn("#fce8e8", "#a33"), fontWeight: 800, fontSize: "0.9rem" }}
-                                                title="Regresar a Pedidos"
+                                                title={p.origen === "dotacion" ? "Regresar a Dotación" : "Regresar a Pedidos"}
                                                 disabled={actualizandoId === p.id}
                                                 onClick={() => handleRegresarAPedidos(p)}
                                             >
@@ -330,7 +344,7 @@ export default function ComprasCrud() {
                                         value={filtroEstadoCompra}
                                         onChange={setFiltroEstadoCompra}
                                         defaultValue="Todos"
-                                        options={ESTADOS_COMPRA.map(s => ({ label: s, value: s }))}
+                                        options={[...ESTADOS_COMPRA, COMPLETADA].map(s => ({ label: s, value: s }))}
                                     />
                                 </div>
                                 <div style={S.formGroup}>

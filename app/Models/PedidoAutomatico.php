@@ -20,11 +20,13 @@ class PedidoAutomatico extends Model
         'estado_compra',
         'fecha_pedido',
         'notas',
+        'prendas_sin_definir',
     ];
 
     protected $casts = [
-        'fecha_pedido'     => 'date',
-        'recibido_pedidos' => 'boolean',
+        'fecha_pedido'        => 'date',
+        'recibido_pedidos'    => 'boolean',
+        'prendas_sin_definir' => 'array',
     ];
 
     public function empleado()
@@ -49,14 +51,32 @@ class PedidoAutomatico extends Model
 
     /**
      * Proyecto del contrato (tabla `proyectos`) => proyecto del inventario de dotación. Lo
-     * que no está aquí usa la dotación administrativa.
+     * que no está aquí usa la dotación administrativa. HUGHES y FT&H no tienen inventario
+     * propio: usan la dotación de técnico de DIRECTV. Igual en PedidosAutomaticosCrud.jsx
+     * (utils/dotacion.js).
      */
     public const PROYECTO_A_INVENTARIO = [
         'TIGO EXPRESS' => 'SYM TIGO EXPRESS',
         'TIGO HOME'    => 'SYM TIGO HOME',
         'DIRECTV'      => 'DIRECTV',
         'DIRECTV ECU'  => 'DIRECTV',
+        'HUGHES COL'   => 'DIRECTV',
+        'HUGHES ECU'   => 'DIRECTV',
+        'FT&H'         => 'DIRECTV',
     ];
+
+    /**
+     * Otros inventarios cuyas prendas hacen parte del kit del proyecto (DotacionAutoPedidoService):
+     * el carnet y la gorra de Tigo salen de SYM ADMINISTRATIVO. Sin esto no se podría editar su
+     * propio pedido.
+     */
+    private const INVENTARIOS_DEL_KIT = [
+        'SYM TIGO EXPRESS' => ['SYM ADMINISTRATIVO'],
+        'SYM TIGO HOME'    => ['SYM ADMINISTRATIVO'],
+    ];
+
+    /** Marca (al inicio de las notas) de los pedidos creados por DotacionAutoPedidoService. */
+    public const NOTA_AUTOMATICO = 'Generado automáticamente';
 
     public static function proyectoInventarioDe(?string $proyectoContrato): ?string
     {
@@ -64,6 +84,21 @@ class PedidoAutomatico extends Model
         $proyectoContrato = \App\Services\EmpresaProyectoRules::nombreActual($proyectoContrato);
 
         return $proyectoContrato === '' ? null : (self::PROYECTO_A_INVENTARIO[$proyectoContrato] ?? 'SYM ADMINISTRATIVO');
+    }
+
+    /**
+     * El contrato al que queda ligado un pedido: el indicado si es de ese empleado o, si no,
+     * su vigente (el activo más reciente). Null si el empleado no tiene contrato.
+     */
+    public static function contratoDelEmpleado(int $empleadoId, ?int $contratoId = null): ?Contrato
+    {
+        $indicado = $contratoId ? Contrato::where('empleado_id', $empleadoId)->find($contratoId) : null;
+
+        return $indicado ?? Contrato::where('empleado_id', $empleadoId)
+            // "Vigente" (antes "Activo", ver migración renombrar_estados_contrato).
+            ->orderByRaw("estado_contrato IN ('Vigente', 'Activo') DESC")
+            ->orderByDesc('fecha_ingreso')->orderByDesc('id')
+            ->first();
     }
 
     /**
@@ -79,17 +114,39 @@ class PedidoAutomatico extends Model
             return null;
         }
 
+        $permitidos = [$proyecto, ...(self::INVENTARIOS_DEL_KIT[$proyecto] ?? [])];
         $ajenas = InventarioDotacion::whereIn('id', array_column($items, 'inventario_dotacion_id'))
-            ->where('proyecto', '!=', $proyecto)
+            ->whereNotIn('proyecto', $permitidos)
             ->get(['prenda', 'proyecto']);
 
         return $ajenas->isEmpty() ? null
-            : "El empleado es del proyecto {$contrato->cliente_proyecto}: solo se le puede asignar dotación de {$proyecto}. "
+            : "El empleado es del proyecto {$contrato->cliente_proyecto}: solo se le puede asignar dotación de " . implode(' o ', $permitidos) . '. '
                 . 'No corresponden: ' . $ajenas->map(fn ($i) => "{$i->prenda} ({$i->proyecto})")->implode(', ') . '.';
     }
 
     /** Todos los estados válidos de un pedido de dotación ("Activo" se muestra "En proceso"). */
     public const ESTADOS = ['Pendiente', 'Activo', 'Completado', 'Cancelado', 'Enviar a compras', 'Devolución', 'Devolución usada'];
+
+    public const ENVIAR_A_COMPRAS = 'Enviar a compras';
+
+    public const SOLO_DESDE_GLOBAL = 'A Compras solo se envía desde Pedidos globales: primero incluye el pedido en un pedido global.';
+
+    /** A Compras se llega únicamente desde un pedido global. */
+    public function exigirGlobalParaCompras(string $nuevo): void
+    {
+        if ($nuevo === self::ENVIAR_A_COMPRAS && $this->estado !== $nuevo && !$this->pedido_global_id) {
+            throw new InvalidArgumentException("Pedido {$this->codigo}: " . self::SOLO_DESDE_GLOBAL);
+        }
+    }
+
+    /** A dónde vuelve al salir de Compras: Completado si está en un pedido global, si no en proceso. */
+    public function estadoAlSalirDeCompras(): string
+    {
+        return $this->pedido_global_id ? 'Completado' : 'Activo';
+    }
+
+    /** Cómo entra un pedido a la pantalla de Compras. */
+    public const EN_COMPRAS = ['recibido_pedidos' => true, 'estado_compra' => 'Cotizando'];
 
     /** Estados con las prendas ya entregadas: no se anulan (el stock no vuelve). */
     public const ESTADOS_ENTREGADOS = ['Completado', 'Devolución', 'Devolución usada'];
@@ -123,18 +180,25 @@ class PedidoAutomatico extends Model
         $despues = self::descuentaStock($nuevo);
 
         if ($items !== null || $nuevo === 'Cancelado') {
+            // Lo que estaba por comprar lo sigue estando (editar el pedido no exige ese stock), y lo
+            // que ya está en una orden de compra sigue ahí: si no, se volvería a comprar.
+            $porComprar = $this->items()->pluck('cantidad_por_comprar', 'inventario_dotacion_id')->all();
+            $enOrden = $this->items()->pluck('orden_compra_id', 'inventario_dotacion_id')->all();
             if ($antes) {
                 $this->restaurarInventario();
             }
             $this->items()->delete();
             $items = $nuevo === 'Cancelado' ? [] : ($items ?? []);
             if ($despues) {
-                $this->asignarItems($items);
+                $this->asignarItems($items, $porComprar, $enOrden);
             } else {
                 foreach ($items as $item) {
+                    $sinStock = min($porComprar[$item['inventario_dotacion_id']] ?? 0, $item['cantidad']);
                     $this->items()->create([
                         'inventario_dotacion_id' => $item['inventario_dotacion_id'],
                         'cantidad'               => $item['cantidad'],
+                        'cantidad_por_comprar'   => $sinStock,
+                        'orden_compra_id'        => $sinStock > 0 ? ($enOrden[$item['inventario_dotacion_id']] ?? null) : null,
                     ]);
                 }
             }
@@ -145,8 +209,20 @@ class PedidoAutomatico extends Model
         }
 
         $cambios = ['estado' => $nuevo];
+        // Lo que se agregó a mano ya no está sin definir.
+        if ($items !== null && $this->prendas_sin_definir) {
+            $agregadas = InventarioDotacion::whereIn('id', array_column($items, 'inventario_dotacion_id'))->pluck('prenda')->all();
+            $cambios['prendas_sin_definir'] = array_values(array_diff($this->prendas_sin_definir, $agregadas)) ?: null;
+        }
         if ($nuevo === 'Cancelado') {
             $cambios['pedido_global_id'] = null;
+        }
+        // "Enviar a compras" lo lleva directo a la pantalla de Compras; al salir de ese estado
+        // deja de estar allá.
+        if ($nuevo !== self::ENVIAR_A_COMPRAS) {
+            $cambios += ['recibido_pedidos' => false, 'estado_compra' => null];
+        } elseif ($this->estado !== self::ENVIAR_A_COMPRAS || !$this->recibido_pedidos) {
+            $cambios += self::EN_COMPRAS;
         }
         $this->update($cambios);
     }
@@ -159,13 +235,14 @@ class PedidoAutomatico extends Model
             if (!$inv) {
                 continue;
             }
-            if ($inv->cantidad < $item->cantidad) {
+            $enStock = $item->cantidadEnStock();
+            if ($inv->cantidad < $enStock) {
                 throw new InvalidArgumentException(
                     "Stock insuficiente para {$inv->prenda} {$inv->genero} T:{$inv->talla}. " .
-                    "Disponible: {$inv->cantidad}, solicitado: {$item->cantidad}."
+                    "Disponible: {$inv->cantidad}, solicitado: {$enStock}."
                 );
             }
-            $inv->decrement('cantidad', $item->cantidad);
+            $inv->decrement('cantidad', $enStock);
         }
     }
 
@@ -174,7 +251,7 @@ class PedidoAutomatico extends Model
     {
         foreach ($this->items()->with('inventario')->get() as $item) {
             if ($item->inventario) {
-                $item->inventario->increment('cantidad', $item->cantidad);
+                $item->inventario->increment('cantidad', $item->cantidadEnStock());
             }
         }
     }
@@ -220,24 +297,32 @@ class PedidoAutomatico extends Model
         return str_pad((int)$max + 1, 5, '0', STR_PAD_LEFT);
     }
 
-    public function asignarItems(array $items): void
+    /**
+     * @param array<int, int> $porComprar por fila de inventario, lo que no se exige en stock
+     * @param array<int, int|null> $enOrden por fila de inventario, la orden de compra que ya la incluye
+     */
+    public function asignarItems(array $items, array $porComprar = [], array $enOrden = []): void
     {
         foreach ($items as $item) {
             $inv = InventarioDotacion::lockForUpdate()->findOrFail($item['inventario_dotacion_id']);
+            $sinStock = min($porComprar[$item['inventario_dotacion_id']] ?? 0, $item['cantidad']);
+            $enStock = $item['cantidad'] - $sinStock;
 
-            if ($inv->cantidad < $item['cantidad']) {
+            if ($inv->cantidad < $enStock) {
                 throw new InvalidArgumentException(
                     "Stock insuficiente para {$inv->prenda} {$inv->genero} T:{$inv->talla}. " .
-                    "Disponible: {$inv->cantidad}, solicitado: {$item['cantidad']}."
+                    "Disponible: {$inv->cantidad}, solicitado: {$enStock}."
                 );
             }
 
             $this->items()->create([
                 'inventario_dotacion_id' => $item['inventario_dotacion_id'],
                 'cantidad'               => $item['cantidad'],
+                'cantidad_por_comprar'   => $sinStock,
+                'orden_compra_id'        => $sinStock > 0 ? ($enOrden[$item['inventario_dotacion_id']] ?? null) : null,
             ]);
 
-            $inv->decrement('cantidad', $item['cantidad']);
+            $inv->decrement('cantidad', $enStock);
         }
     }
 }

@@ -173,6 +173,20 @@ class User extends Authenticatable
             PedidoAutomatico::anularSinContrato($user->id, aunqueTengaContrato: true);
         });
 
+        // El contrato se crea antes de completar la ficha: al llegar el género o una talla, su
+        // pedido automático recibe las prendas que quedaron sin definir. Un error aquí no debe
+        // impedir guardar al empleado: el pedido sigue marcado y se puede completar a mano.
+        static::updated(function (User $user) {
+            if (!$user->wasChanged(['genero', 'talla_camisa', 'talla_pantalon', 'talla_zapatos'])) {
+                return;
+            }
+            try {
+                app(\App\Services\DotacionAutoPedidoService::class)->completarPedidosDe(static::find($user->id));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("No se pudo completar el pedido automático del empleado {$user->id}: {$e->getMessage()}");
+            }
+        });
+
         // El rol se elige en Empleados ("Tipo de funcionario"). El cargo solo sugiere uno
         // (th/tic/supervisores/tecnico) a quien todavía no tiene rol asignado; nunca cambia ni quita
         // uno elegido. Los asesores comerciales se quedan en "general".

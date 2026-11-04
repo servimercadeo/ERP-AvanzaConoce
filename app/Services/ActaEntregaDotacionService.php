@@ -17,10 +17,11 @@ class ActaEntregaDotacionService
     {
         $empleado = $pedido->empleado;
 
-        $items = $pedido->items->map(fn ($it) => [
+        // El acta solo lleva lo que se entrega: lo que está por comprar aún no existe.
+        $items = $pedido->items->filter(fn ($it) => $it->cantidadEnStock() > 0)->map(fn ($it) => [
             'producto'  => $it->inventario?->prenda ?? '—',
             'tipo'      => $it->inventario?->talla ?? '—',
-            'cantidad'  => $it->cantidad,
+            'cantidad'  => $it->cantidadEnStock(),
         ])->values()->all();
 
         $data = [

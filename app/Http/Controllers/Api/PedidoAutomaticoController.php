@@ -14,7 +14,7 @@ class PedidoAutomaticoController extends Controller
     {
         // sedeCatalogo: el nombre de la sede de empleado y contrato sale del catálogo
         // (HasSedeCatalogo); precargado, no es una consulta por pedido.
-        $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario'])
+        $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario.sede:id,nombre'])
             ->whereNotNull('codigo')
             // Un aliado (o técnico de aliado) no ve la dotación de la empresa: solo la suya.
             ->when(\App\Models\PedidoCompra::aliadoDe($request->user()), fn ($q) => $q->where('empleado_id', $request->user()->id));
@@ -51,19 +51,25 @@ class PedidoAutomaticoController extends Controller
             'items.*.inventario_dotacion_id' => 'required|exists:inventario_dotacion,id',
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
+        if (($data['estado'] ?? null) === PedidoAutomatico::ENVIAR_A_COMPRAS) {
+            return response()->json(['message' => PedidoAutomatico::SOLO_DESDE_GLOBAL], 422);
+        }
         if (!\App\Models\Contrato::where('empleado_id', $data['empleado_id'])->exists()) {
             return response()->json(['message' => 'El empleado no tiene contrato: no se le puede crear un pedido de dotación.'], 422);
         }
-        if ($msg = PedidoAutomatico::prendasDeOtroProyecto($this->contratoDelPedido($data), $data['items'] ?? [])) {
+        $contrato = $this->contratoDelPedido($data);
+        if ($msg = PedidoAutomatico::prendasDeOtroProyecto($contrato, $data['items'] ?? [])) {
             return response()->json(['message' => $msg], 422);
         }
+        // Sin contrato ligado el pedido no se puede revisar en Compras (la sede pedida sale de
+        // ahí) ni agrupar en un pedido global.
+        $data['contrato_id'] = $contrato?->id;
 
         try {
             return DB::transaction(function () use ($data) {
                 $data['codigo']       = $data['codigo'] ?? PedidoAutomatico::generarCodigo();
                 $data['estado']       = $data['estado'] ?? 'Activo';
                 $data['fecha_pedido'] = $data['fecha_pedido'] ?? now()->toDateString();
-
                 $pedido = PedidoAutomatico::create($data);
 
                 if (!empty($data['items'])) {
@@ -104,6 +110,9 @@ class PedidoAutomaticoController extends Controller
             'items.*.cantidad'               => 'required|integer|min:1',
         ]);
 
+        if (($data['estado'] ?? null) === PedidoAutomatico::ENVIAR_A_COMPRAS && $pedidoAutomatico->estado !== PedidoAutomatico::ENVIAR_A_COMPRAS) {
+            return response()->json(['message' => PedidoAutomatico::SOLO_DESDE_GLOBAL], 422);
+        }
         if ($msg = PedidoAutomatico::prendasDeOtroProyecto($this->contratoDelPedido($data), $data['items'] ?? [])) {
             return response()->json(['message' => $msg], 422);
         }
@@ -191,6 +200,7 @@ class PedidoAutomaticoController extends Controller
                 ->get();
 
             foreach ($pedidos as $pedido) {
+                $pedido->exigirGlobalParaCompras($data['estado']);
                 $pedido->cambiarEstado($data['estado']);
             }
 
@@ -218,18 +228,9 @@ class PedidoAutomaticoController extends Controller
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** El contrato indicado o, si no viene, el vigente del empleado (activo más reciente). */
     private function contratoDelPedido(array $data): ?\App\Models\Contrato
     {
-        if (!empty($data['contrato_id'])) {
-            return \App\Models\Contrato::find($data['contrato_id']);
-        }
-
-        return \App\Models\Contrato::where('empleado_id', $data['empleado_id'])
-            // "Vigente" (antes "Activo", ver migración renombrar_estados_contrato).
-            ->orderByRaw("estado_contrato IN ('Vigente', 'Activo') DESC")
-            ->orderByDesc('fecha_ingreso')->orderByDesc('id')
-            ->first();
+        return PedidoAutomatico::contratoDelEmpleado((int) $data['empleado_id'], !empty($data['contrato_id']) ? (int) $data['contrato_id'] : null);
     }
 
     private function guardarItemsSinDescontar(PedidoAutomatico $pedido, array $items): void

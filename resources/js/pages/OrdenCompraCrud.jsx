@@ -4,6 +4,23 @@ import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
 import { IconClose, IconEmptySearch, IconLoading, IconTrash } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
+import { filasExcelCompra } from "../utils/dotacion";
+
+// Productos y prendas salen de tablas distintas: sus ids se repiten.
+const claveDe = (it) => `${it.origen}-${it.id}`;
+const tieneDotacion = (orden) => (orden.items ?? []).some((it) => it.inventario_dotacion_id);
+
+// Excel de la compra, listo para Inventario de dotación > Importar Excel. Falso si no queda nada.
+async function descargarExcelCompra(codigo, filas) {
+    if (filas.length === 0) return false;
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(filasExcelCompra(filas));
+    ws["!cols"] = [{ wch: 10 }, { wch: 20 }, { wch: 28 }, { wch: 34 }, { wch: 12 }, { wch: 10 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Compra");
+    XLSX.writeFile(wb, `Compra_dotacion_${codigo}.xlsx`);
+    return true;
+}
 
 // Pesos con centavos solo si los tiene: $ 1.500 / $ 1.500,5
 const money = (n) => `$ ${Number(n ?? 0).toLocaleString("es-CO", { maximumFractionDigits: 2 })}`;
@@ -22,11 +39,11 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
         queryFn: () => api.get("/ordenes-compra-items-pendientes", { params: { categoria } }).then((r) => r.data),
     });
 
-    const disponibles = pendientes.filter((p) => !yaAgregados.includes(p.id));
+    const disponibles = pendientes.filter((p) => !yaAgregados.includes(claveDe(p)));
     const [seleccionados, setSeleccionados] = useState([]);
 
-    const toggle = (id) => {
-        setSeleccionados((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    const toggle = (clave) => {
+        setSeleccionados((prev) => prev.includes(clave) ? prev.filter((x) => x !== clave) : [...prev, clave]);
     };
 
     return (
@@ -47,8 +64,8 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
                     ) : (
                         <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
                             {disponibles.map((p) => (
-                                <label key={p.id} style={S.pickerRow}>
-                                    <input type="checkbox" checked={seleccionados.includes(p.id)} onChange={() => toggle(p.id)} />
+                                <label key={claveDe(p)} style={S.pickerRow}>
+                                    <input type="checkbox" checked={seleccionados.includes(claveDe(p))} onChange={() => toggle(claveDe(p))} />
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 700 }}>{p.producto}</div>
                                         <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
@@ -67,11 +84,47 @@ function PickerPendientesModal({ categoria, yaAgregados, onClose, onAgregar }) {
                         className="btn-primary"
                         disabled={seleccionados.length === 0}
                         onClick={() => {
-                            onAgregar(disponibles.filter((p) => seleccionados.includes(p.id)));
+                            onAgregar(disponibles.filter((p) => seleccionados.includes(claveDe(p))));
                             onClose();
                         }}
                     >
                         Agregar {seleccionados.length > 0 ? `(${seleccionados.length})` : ""}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ConfirmarAccionModal({ titulo, mensaje, detalle, textoBoton, peligro, onClose, onConfirmar }) {
+    const [enviando, setEnviando] = useState(false);
+
+    const confirmar = async () => {
+        setEnviando(true);
+        await onConfirmar();
+        onClose();
+    };
+
+    return (
+        <div style={S.overlay}>
+            <div style={{ ...S.modal, maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+                <div style={S.modalHeaderGreen}>
+                    <span style={S.modalTitleWhite}>{titulo}</span>
+                    <button style={S.closeBtnWhite} disabled={enviando} onClick={onClose}><IconClose size={14} /></button>
+                </div>
+                <div style={{ ...S.modalBody, gap: 10 }}>
+                    <p style={{ margin: 0, fontSize: "0.92rem", fontWeight: 700, color: "var(--text)" }}>{mensaje}</p>
+                    <p style={{ margin: 0, fontSize: "0.86rem", lineHeight: 1.5, color: "var(--text-muted)" }}>{detalle}</p>
+                </div>
+                <div style={S.modalFooter}>
+                    <button className="btn-secondary" disabled={enviando} onClick={onClose}>Cancelar</button>
+                    <button
+                        className="btn-primary"
+                        style={peligro ? { background: "#c0392b", borderColor: "#c0392b" } : undefined}
+                        disabled={enviando}
+                        onClick={confirmar}
+                    >
+                        {enviando ? "Procesando…" : textoBoton}
                     </button>
                 </div>
             </div>
@@ -191,10 +244,10 @@ export default function OrdenCompraCrud() {
         ]);
     };
 
-    const quitarItem = (id) => setItems((prev) => prev.filter((it) => it.id !== id));
+    const quitarItem = (clave) => setItems((prev) => prev.filter((it) => claveDe(it) !== clave));
 
-    const actualizarItem = (id, campo, valor) => {
-        setItems((prev) => prev.map((it) => it.id === id ? { ...it, [campo]: valor } : it));
+    const actualizarItem = (clave, campo, valor) => {
+        setItems((prev) => prev.map((it) => claveDe(it) === clave ? { ...it, [campo]: valor } : it));
     };
 
     const totales = useMemo(() => {
@@ -218,6 +271,7 @@ export default function OrdenCompraCrud() {
 
     const [verOrden, setVerOrden] = useState(null);
     const [imprimiendoId, setImprimiendoId] = useState(null);
+    const [confirmacion, setConfirmacion] = useState(null);
 
     /**
      * La pestaña hay que abrirla YA, en el mismo instante del clic (antes de cualquier
@@ -273,7 +327,7 @@ export default function OrdenCompraCrud() {
                 observaciones: observaciones.trim() || null,
                 valor_transporte: Number(valorTransporte) || 0,
                 items: items.map((it) => ({
-                    pedido_compra_item_id: it.id,
+                    [it.origen === "dotacion" ? "pedido_automatico_item_id" : "pedido_compra_item_id"]: it.id,
                     precio_unitario: Number(it.precio_unitario) || 0,
                     iva_porcentaje: Number(it.iva_porcentaje) || 0,
                 })),
@@ -289,11 +343,60 @@ export default function OrdenCompraCrud() {
         }
     };
 
-    const handleEliminarOrden = async (orden) => {
-        if (!confirm(`¿Eliminar la orden ${orden.codigo}? Sus productos vuelven a quedar pendientes.`)) return;
+    // Las prendas que ya no están en su pedido no se pueden asignar: quien compra debe saberlo.
+    const avisoExcel = (generado, sinPedido) => {
+        const base = generado
+            ? "Importa el Excel descargado en Inventario de dotación: las prendas quedan asignadas a su pedido."
+            : "No queda nada por importar de esta orden.";
+        return sinPedido.length > 0
+            ? `${base} Sin pedido (ingrésalas al inventario a mano): ${sinPedido.join(", ")}.`
+            : base;
+    };
+
+    const handleCompletar = (orden) => setConfirmacion({
+        titulo: `Completar orden ${orden.codigo}`,
+        mensaje: "¿La compra de esta orden ya se realizó?",
+        detalle: "Se descargará el Excel para importar en Inventario de dotación. Las prendas quedarán asignadas al pedido que las solicitó.",
+        textoBoton: "Completar y descargar Excel",
+        onConfirmar: () => completarOrden(orden),
+    });
+
+    const completarOrden = async (orden) => {
+        try {
+            const { data } = await api.put(`/ordenes-compra/${orden.id}/completar`);
+            qc.invalidateQueries({ queryKey: ["ordenes-compra"] });
+            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
+            const generado = await descargarExcelCompra(orden.codigo, data.filas);
+            showToast(`Orden ${orden.codigo} completada. ${avisoExcel(generado, data.sin_pedido)}`);
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo completar la orden.", true);
+        }
+    };
+
+    const handleExcel = async (orden) => {
+        try {
+            const { data } = await api.get(`/ordenes-compra/${orden.id}/excel-dotacion`);
+            const generado = await descargarExcelCompra(orden.codigo, data.filas);
+            showToast(avisoExcel(generado, data.sin_pedido), !generado);
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo generar el Excel.", true);
+        }
+    };
+
+    const handleEliminarOrden = (orden) => setConfirmacion({
+        titulo: `Eliminar orden ${orden.codigo}`,
+        mensaje: "¿Seguro que quieres eliminar esta orden?",
+        detalle: "Sus productos volverán a quedar pendientes para incluirlos en otra orden de compra.",
+        textoBoton: "Eliminar orden",
+        peligro: true,
+        onConfirmar: () => eliminarOrden(orden),
+    });
+
+    const eliminarOrden = async (orden) => {
         try {
             await api.delete(`/ordenes-compra/${orden.id}`);
             qc.invalidateQueries({ queryKey: ["ordenes-compra"] });
+            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
             invalidarPendientes();
             showToast(`Orden ${orden.codigo} eliminada.`);
         } catch (err) {
@@ -427,8 +530,9 @@ export default function OrdenCompraCrud() {
                                     {items.map((it) => {
                                         const sub = subtotalDe(it);
                                         const iva = ivaDe(sub, it);
+                                        const clave = claveDe(it);
                                         return (
-                                            <tr key={it.id}>
+                                            <tr key={clave}>
                                                 <td style={{ fontWeight: 600 }}>{it.producto}</td>
                                                 <td style={{ color: "var(--text-muted)" }}>{it.pedido_codigo}</td>
                                                 <td style={{ color: "var(--text-muted)" }}>{it.empresa ?? "—"}</td>
@@ -437,20 +541,20 @@ export default function OrdenCompraCrud() {
                                                     <input
                                                         type="number" min={0} step="0.01" style={S.inputSmall}
                                                         value={it.precio_unitario}
-                                                        onChange={(e) => actualizarItem(it.id, "precio_unitario", e.target.value)}
+                                                        onChange={(e) => actualizarItem(clave, "precio_unitario", e.target.value)}
                                                     />
                                                 </td>
                                                 <td>
                                                     <input
                                                         type="number" min={0} max={100} style={S.inputSmall}
                                                         value={it.iva_porcentaje}
-                                                        onChange={(e) => actualizarItem(it.id, "iva_porcentaje", e.target.value)}
+                                                        onChange={(e) => actualizarItem(clave, "iva_porcentaje", e.target.value)}
                                                     />
                                                 </td>
                                                 <td>{money(sub)}</td>
                                                 <td style={{ fontWeight: 700 }}>{money(sub + iva)}</td>
                                                 <td>
-                                                    <button style={S.btnQuitar} title="Quitar" onClick={() => quitarItem(it.id)}>
+                                                    <button style={S.btnQuitar} title="Quitar" onClick={() => quitarItem(clave)}>
                                                         <IconTrash size={13} />
                                                     </button>
                                                 </td>
@@ -524,6 +628,12 @@ export default function OrdenCompraCrud() {
                                                 >
                                                     {imprimiendoId === o.id ? "Abriendo…" : "🖨 Imprimir"}
                                                 </button>
+                                                {tieneDotacion(o) && o.estado !== "Completada" && puede.crear && (
+                                                    <button style={{ ...S.btnSecondary, color: "var(--primary-dark)" }} onClick={() => handleCompletar(o)}>Completar</button>
+                                                )}
+                                                {tieneDotacion(o) && o.estado === "Completada" && (
+                                                    <button style={S.btnSecondary} title="Descargar el Excel con lo que falta importar" onClick={() => handleExcel(o)}>⭳ Excel</button>
+                                                )}
                                                 {puede.eliminar && <button style={{ ...S.btnSecondary, color: "#a33" }} onClick={() => handleEliminarOrden(o)}>Eliminar</button>}
                                             </div>
                                         </td>
@@ -538,10 +648,14 @@ export default function OrdenCompraCrud() {
             {pickerCategoria && (
                 <PickerPendientesModal
                     categoria={pickerCategoria}
-                    yaAgregados={items.map((it) => it.id)}
+                    yaAgregados={items.map(claveDe)}
                     onClose={() => setPickerCategoria(null)}
                     onAgregar={agregarItems}
                 />
+            )}
+
+            {confirmacion && (
+                <ConfirmarAccionModal {...confirmacion} onClose={() => setConfirmacion(null)} />
             )}
 
             {verOrden && (

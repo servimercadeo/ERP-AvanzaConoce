@@ -18,6 +18,7 @@ import {
     IconFile,
 } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
+import { agruparPedidosImportados, contratoVigenteDe, estadoEnPedidosAutomaticos, inventariosPermitidos, mismaTalla, opcionesEstadoPedido, proyectoInventarioDe } from "../utils/dotacion";
 
 const POR_PAGINA = 8;
 const ESTADOS = ["Pendiente", "Activo", "Completado", "Cancelado"];
@@ -49,35 +50,6 @@ const ESTADO_LABEL = {
 };
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
-
-// El proyecto del contrato (tabla `proyectos`, ej. "TIGO EXPRESS", "DIRECTV CO")
-// no coincide en texto con el proyecto del inventario de dotación (tabla
-// `inventario_dotacion`, ej. "SYM TIGO EXPRESS", "DIRECTV"), así que hay que
-// mapear explícitamente entre los dos catálogos en vez de comparar por igualdad.
-const PROYECTO_A_INVENTARIO = {
-    "TIGO EXPRESS": "SYM TIGO EXPRESS",
-    "TIGO HOME": "SYM TIGO HOME",
-    "DIRECTV CO": "DIRECTV",
-    "DIRECTV ECU": "DIRECTV",
-};
-const proyectoInventarioDe = (nombreProyecto) =>
-    nombreProyecto
-        ? (PROYECTO_A_INVENTARIO[nombreProyecto] ?? "SYM ADMINISTRATIVO")
-        : null;
-
-// Contrato vigente del empleado: el activo más reciente (si no hay activo, el más reciente).
-// De él salen el proyecto y la sede de la dotación que se le puede asignar.
-const contratoVigenteDe = (contratos, empleadoId) => {
-    const suyos = contratos.filter((c) => String(c.empleado_id) === String(empleadoId));
-    const reciente = (a, b) =>
-        String(b.fecha_ingreso ?? "").localeCompare(String(a.fecha_ingreso ?? "")) || (b.id ?? 0) - (a.id ?? 0);
-    return (
-        // "Vigente" (antes "Activo").
-        suyos.filter((c) => ["Vigente", "Activo"].includes(c.estado_contrato)).sort(reciente)[0] ??
-        suyos.sort(reciente)[0] ??
-        null
-    );
-};
 
 const EMPTY_FORM = {
     empleado_id: "",
@@ -258,26 +230,6 @@ function tallaPorPrenda(prenda, tallasEmpleado) {
     return null;
 }
 
-// Índice O(1) de inventarioFlat para no escanear las ~8-9 mil filas por cada fila de un
-// Excel importado. Clave = proyecto|prenda|talla(lower)|genero, primer ítem encontrado gana
-// (mismo criterio que un .find() en el orden en que llega inventarioFlat, agrupado por
-// proyecto/prenda/genero/talla desde el backend).
-function buildInventarioIndex(inventarioFlat) {
-    const idx = new Map();
-    for (const i of inventarioFlat) {
-        const key = `${i.proyecto}|${i.prenda}|${String(i.talla).toLowerCase()}|${i.genero}`;
-        if (!idx.has(key)) idx.set(key, i);
-    }
-    return idx;
-}
-
-// Replica exactamente `inventarioFlat.find(i => i.proyecto===p && i.prenda===pr &&
-// i.genero===genero && i.talla.toLowerCase()===talla.toLowerCase())` pero usando el índice.
-function lookupInventario(idx, proyecto, prenda, talla, genero) {
-    const tallaLower = String(talla ?? "").toLowerCase();
-    return idx.get(`${proyecto}|${prenda}|${tallaLower}|${genero}`) ?? null;
-}
-
 // Vuelve a resolver una prenda de un pedido anterior contra el inventario ACTUAL:
 // mismo proyecto/prenda/género, pero con la talla VIGENTE del empleado
 // (no la que tenía congelada el pedido viejo, por si cambió de talla) y apuntando a
@@ -293,7 +245,7 @@ function resolverItemRenovacion(invOriginal, tallasEmpleado, inventarioFlat) {
                 i.proyecto === invOriginal.proyecto &&
                 i.prenda === invOriginal.prenda &&
                 i.genero === invOriginal.genero &&
-                i.talla === tallaActual,
+                mismaTalla(tallaActual, i.talla),
         ) ?? null
     );
 }
@@ -320,7 +272,8 @@ function InventarioItemSelect({
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
         // Sin proyecto (empleado sin contrato) no se ofrece nada: nunca la dotación de todos.
         if (!proyecto) return [];
-        let base = inventarioFlat.filter((i) => i.cantidad > 0 && i.proyecto === proyecto);
+        const permitidos = inventariosPermitidos(proyecto);
+        let base = inventarioFlat.filter((i) => i.cantidad > 0 && permitidos.includes(i.proyecto));
 
         // Género del empleado ("Otro" o sin registrar: ambos).
         if (generoEmpleado && ["masculino", "femenino"].includes(generoEmpleado.toLowerCase())) {
@@ -332,7 +285,7 @@ function InventarioItemSelect({
             base = base.filter((i) => {
                 const tallaEsperada = tallaPorPrenda(i.prenda, tallasEmpleado);
                 if (!tallaEsperada) return true; // sin mapeo conocido → mostrar siempre
-                return i.talla?.toLowerCase() === tallaEsperada.toLowerCase();
+                return mismaTalla(tallaEsperada, i.talla);
             });
         }
 
@@ -613,8 +566,10 @@ function Modal({
                 const inv = inventarioAjustado.find(
                     (i) => String(i.id) === String(it.inventario_dotacion_id),
                 );
-                if (inv && it.cantidad > inv.cantidad)
-                    e[`item_${idx}_cant`] = `Máx. disponible: ${inv.cantidad}`;
+                // Lo que ya está por comprar no se exige en stock.
+                const maximo = inv ? inv.cantidad + (it.cantidad_por_comprar ?? 0) : 0;
+                if (inv && it.cantidad > maximo)
+                    e[`item_${idx}_cant`] = `Máx. disponible: ${maximo}`;
             });
         }
         return e;
@@ -1013,9 +968,9 @@ function Modal({
                                         onChange={setEv("estado")}
                                         disabled={readOnly}
                                     >
-                                        {ESTADOS.map((s) => (
-                                            <option key={s} value={s}>
-                                                {ESTADO_LABEL[s] ?? s}
+                                        {opcionesEstadoPedido(form.estado, ESTADOS, ESTADO_LABEL).map((o) => (
+                                            <option key={o.value} value={o.value}>
+                                                {o.label}
                                             </option>
                                         ))}
                                     </SelectBuscable>
@@ -1234,7 +1189,7 @@ function Modal({
                             )}
                             {proyectoEmpleado && !readOnly && (() => {
                                 const hayStock = inventarioAjustado.some(
-                                    (i) => i.proyecto === proyectoInventarioEmpleado && i.cantidad > 0
+                                    (i) => inventariosPermitidos(proyectoInventarioEmpleado).includes(i.proyecto) && i.cantidad > 0
                                 );
                                 return !hayStock ? (
                                     <div style={{
@@ -1309,7 +1264,7 @@ function Modal({
                                     // tiene de esa prenda (al guardar se devuelve y se
                                     // vuelve a descontar).
                                     const maxDisp = invRow
-                                        ? invRow.cantidad
+                                        ? invRow.cantidad + (it.cantidad_por_comprar ?? 0)
                                         : Infinity;
                                     const stockReal =
                                         inventarioFlat.find(
@@ -1401,6 +1356,11 @@ function Modal({
                                                     }}
                                                 >
                                                     Cantidad
+                                                    {it.cantidad_por_comprar > 0 && (
+                                                        <span style={{ color: "#92400e", fontWeight: 800 }}>
+                                                            {` · ${it.cantidad_por_comprar} por comprar`}
+                                                        </span>
+                                                    )}
                                                     {invRow && !readOnly
                                                         ? yaEnPedido > 0
                                                             ? ` (máx ${maxDisp}: ${stockReal} en stock + ${yaEnPedido} ya en este pedido)`
@@ -1528,22 +1488,6 @@ function Modal({
 // El código se genera automático, el estado siempre queda "En proceso", la
 // fecha es la del día de la importación, el género se toma del empleado, y
 // las notas se agregan luego desde la interfaz (no van en el archivo).
-const PEDIDO_HEADER_MAP = {
-    cedula: "cedula",
-    proyecto: "proyecto",
-    prenda: "prenda",
-    talla: "talla",
-    cantidad: "cantidad",
-};
-
-const normalizeHeaderPA = (s) =>
-    (s ?? "")
-        .toString()
-        .normalize("NFD")
-        .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
-        .toLowerCase()
-        .trim();
-
 function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventarioFlat }) {
     const [fileName, setFileName] = useState("");
     const [grupos, setGrupos] = useState([]);
@@ -1570,73 +1514,13 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 return;
             }
 
-            const filas = raw.map((row) => {
-                const mapped = {};
-                Object.entries(row).forEach(([k, v]) => {
-                    const key = PEDIDO_HEADER_MAP[normalizeHeaderPA(k)];
-                    if (key) mapped[key] = typeof v === "string" ? v.trim() : v;
-                });
-                return mapped;
-            });
-
             // Un pedido nuevo por cada cédula distinta en el archivo: todas sus
             // filas (prendas) se agrupan en ese único pedido.
             const hoy = new Date().toISOString().split("T")[0];
-            const gruposMap = new Map();
-            const orden = [];
-            const invIndex = buildInventarioIndex(inventarioFlat);
-            filas.forEach((fila, idx) => {
-                const cedula = String(fila.cedula ?? "").trim();
-                if (!cedula) return;
-                const key = cedula;
-
-                if (!gruposMap.has(key)) {
-                    gruposMap.set(key, {
-                        cedula,
-                        empleado: empleados.find((e) => e.cedula === cedula) ?? null,
-                        estado: "Activo",
-                        fecha_pedido: hoy,
-                        notas: "",
-                        items: [],
-                        erroresItems: [],
-                    });
-                    orden.push(key);
-                }
-                const grupo = gruposMap.get(key);
-                if (!fila.prenda && !fila.proyecto) return;
-
-                const generoEmpleado = grupo.empleado?.genero ?? "";
-                const cantidad = Number(fila.cantidad) || 0;
-                const inv = lookupInventario(invIndex, fila.proyecto, fila.prenda, fila.talla, generoEmpleado);
-
-                if (!inv || cantidad <= 0) {
-                    grupo.erroresItems.push(
-                        `Fila ${idx + 2}: no se encontró "${fila.prenda ?? ""}" (${fila.proyecto ?? ""}, talla ${fila.talla ?? ""}) para el género del empleado, o la cantidad no es válida.`,
-                    );
-                    return;
-                }
-                grupo.items.push({
-                    inventario_dotacion_id: inv.id,
-                    cantidad,
-                    descripcion: `${inv.prenda} · ${inv.genero} · T:${inv.talla} x${cantidad}`,
-                });
-            });
-
-            const gruposFinal = orden.map((key) => {
-                const g = gruposMap.get(key);
-                const contrato = g.empleado
-                    ? contratos.find((c) => c.empleado_id === g.empleado.id)
-                    : null;
-                const errores = [...g.erroresItems];
-                if (!g.empleado) errores.unshift(`No se encontró un empleado con cédula "${g.cedula}".`);
-                else if (!g.empleado.genero)
-                    errores.unshift(
-                        `El empleado ${g.cedula} no tiene género registrado; no se le pueden asignar prendas.`,
-                    );
-                return { ...g, contrato_id: contrato?.id ?? null, errores };
-            });
-
-            setGrupos(gruposFinal);
+            setGrupos(
+                agruparPedidosImportados(raw, { empleados, contratos, inventarioFlat })
+                    .map((g) => ({ ...g, estado: "Activo", fecha_pedido: hoy, notas: "" })),
+            );
         } catch {
             setError("No se pudo leer el archivo. Verifica que sea un Excel válido (.xlsx).");
         }
@@ -1950,7 +1834,7 @@ export default function PedidosAutomaticosCrud() {
                         .includes(q) ||
                     (p.empleado?.cedula ?? "").includes(q);
                 const matchE =
-                    filtroEstado === "Todos" || p.estado === filtroEstado;
+                    filtroEstado === "Todos" || estadoEnPedidosAutomaticos(p.estado) === filtroEstado;
                 const proyectoPedido = p.contrato_id
                     ? (contratoProyectoMap[String(p.contrato_id)] ?? "")
                     : "";
@@ -1990,7 +1874,7 @@ export default function PedidosAutomaticosCrud() {
                 Código: p.codigo ?? "",
                 Cédula: p.empleado?.cedula ?? "",
                 Empleado: `${p.empleado?.nombres ?? ""} ${p.empleado?.apellidos ?? ""}`.trim(),
-                Estado: p.estado ?? "",
+                Estado: estadoEnPedidosAutomaticos(p.estado) ?? "",
                 "Fecha Pedido": dateOnly(p.fecha_pedido),
             };
             const itemRow = (inv, cantidad) => ({
@@ -2028,7 +1912,7 @@ export default function PedidosAutomaticosCrud() {
     }, [empleados, contratos]);
 
     const estadosUsados = useMemo(() => {
-        const usados = new Set(pedidos.map((p) => p.estado).filter(Boolean));
+        const usados = new Set(pedidos.map((p) => estadoEnPedidosAutomaticos(p.estado)).filter(Boolean));
         return ESTADOS.filter((e) => usados.has(e));
     }, [pedidos]);
 
@@ -2037,7 +1921,7 @@ export default function PedidosAutomaticosCrud() {
             total: pedidos.length,
             pendientes: pedidos.filter((p) => p.estado === "Pendiente").length,
             enProceso: pedidos.filter((p) => p.estado === "Activo").length,
-            completados: pedidos.filter((p) => p.estado === "Completado")
+            completados: pedidos.filter((p) => estadoEnPedidosAutomaticos(p.estado) === "Completado")
                 .length,
             cancelados: pedidos.filter((p) => p.estado === "Cancelado").length,
         }),
@@ -2208,6 +2092,7 @@ export default function PedidosAutomaticosCrud() {
             inventario_dotacion_id:
                 it.inventario_dotacion_id ?? it.inventario?.id ?? "",
             cantidad: it.cantidad,
+            cantidad_por_comprar: it.cantidad_por_comprar ?? 0,
             _inv: it.inventario ?? null,
             inventario: it.inventario ?? null,
         })),
@@ -2414,7 +2299,8 @@ export default function PedidosAutomaticosCrud() {
                         </thead>
                         <tbody>
                             {paginated.map((p) => {
-                                const badge = estadoBadge(p.estado);
+                                const estadoVisible = estadoEnPedidosAutomaticos(p.estado);
+                                const badge = estadoBadge(estadoVisible);
                                 const empData = empleados.find(
                                     (e) =>
                                         String(e.id) === String(p.empleado_id),
@@ -2521,8 +2407,8 @@ export default function PedidosAutomaticosCrud() {
                                                     ),
                                                 }}
                                             >
-                                                {ESTADO_LABEL[p.estado] ??
-                                                    p.estado}
+                                                {ESTADO_LABEL[estadoVisible] ??
+                                                    estadoVisible}
                                             </span>
                                         </td>
                                         <td>
