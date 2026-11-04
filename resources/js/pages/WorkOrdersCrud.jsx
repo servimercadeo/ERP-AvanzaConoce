@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
+import { useAuth } from "../context/AuthContext";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus, IconEye, IconEdit, IconDownload } from "../components/Icons";
 import SelectBuscable from "../components/SelectBuscable";
 
@@ -825,6 +826,7 @@ export function VerModal({ item, onClose }) {
 export default function WorkOrdersCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
+    const { user } = useAuth();
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
