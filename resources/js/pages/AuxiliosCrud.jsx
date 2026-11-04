@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "../hooks/useDebounce";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
+import { useAuth } from "../context/AuthContext";
 import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlus } from "../components/Icons";
 
 /**
@@ -16,6 +17,8 @@ const mesActual = () => new Date().toISOString().slice(0, 7);
 
 export default function AuxiliosCrud() {
     const puede = useAcciones();
+    const { user } = useAuth();
+    const esTecnico = user?.rol === "tecnico";
     const qc = useQueryClient();
     const [mes, setMes] = useState(mesActual());
     const [search, setSearch] = useState("");
@@ -33,6 +36,8 @@ export default function AuxiliosCrud() {
         queryFn: () =>
             api.get("/auxilios/reporte", { params: { mes, search: debSearch || undefined } }).then((r) => r.data),
         placeholderData: (prev) => prev,
+        // Sin caché: una WO recién finalizada debe verse al entrar aquí.
+        staleTime: 0,
     });
     const resultados = resultado?.resultados ?? [];
 
@@ -40,23 +45,27 @@ export default function AuxiliosCrud() {
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
 
-            <div className="stats-row">
-                <div className="stat-card">
-                    <div className="stat-num">{resultados.length}</div>
-                    <div className="stat-label">Técnicos con auxilio este mes</div>
+            {!esTecnico && (
+                <div className="stats-row">
+                    <div className="stat-card">
+                        <div className="stat-num">{resultados.length}</div>
+                        <div className="stat-label">Técnicos con auxilio este mes</div>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div style={S.toolbar}>
-                <div style={S.searchWrap}>
-                    <span style={S.searchIcon}><IconSearch size={15} /></span>
-                    <input
-                        style={S.searchInput}
-                        placeholder="Buscar por técnico o cédula…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
+                {!esTecnico && (
+                    <div style={S.searchWrap}>
+                        <span style={S.searchIcon}><IconSearch size={15} /></span>
+                        <input
+                            style={S.searchInput}
+                            placeholder="Buscar por técnico o cédula…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                )}
                 <input
                     type="month"
                     style={{ ...S.filtroSelect, minWidth: 160 }}
@@ -76,7 +85,11 @@ export default function AuxiliosCrud() {
                 ) : resultados.length === 0 ? (
                     <div style={S.empty}>
                         <IconEmptySearch size={44} />
-                        <p>Ningún técnico directo cumple un tramo de auxilio en este mes.</p>
+                        <p>
+                            {esTecnico
+                                ? "No tienes Work Orders finalizadas que den auxilio en este mes."
+                                : "Ningún técnico directo cumple un tramo de auxilio en este mes."}
+                        </p>
                     </div>
                 ) : (
                     <table className="data-table" style={{ fontSize: "0.85rem" }}>

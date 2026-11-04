@@ -219,8 +219,33 @@ class WorkOrderController extends Controller
         if ($request->fecha_hasta) {
             $query->whereDate('fecha_estado', '<=', $request->fecha_hasta);
         }
+        if (in_array($request->tipo_tecnico, ['directo', 'indirecto'], true)) {
+            $this->filtrarPorTipoDeTecnico($query, $request->tipo_tecnico);
+        }
 
         return $query;
+    }
+
+    // Misma regla de aplicarEstadoPorTecnico: manda el usuario de la cédula; sin usuario, la MODALIDAD del archivo.
+    private function filtrarPorTipoDeTecnico($query, string $tipo): void
+    {
+        // En SQL crudo Laravel no agrega el prefijo de tablas (`erp_` en producción).
+        $prefijo = DB::getTablePrefix();
+        $wo = "{$prefijo}work_orders";
+
+        $usuarioDeLaWo = fn ($q) => $q->selectRaw('1')->from('users')
+            ->where('users.cedula', '!=', '')
+            ->whereRaw("{$prefijo}users.cedula = COALESCE(NULLIF({$wo}.cedula_tecnico_agendado, ''), {$wo}.cedula_tecnico)");
+
+        $query->where(function ($w) use ($usuarioDeLaWo, $tipo, $wo) {
+            $w->whereExists(function ($q) use ($usuarioDeLaWo, $tipo) {
+                $usuarioDeLaWo($q);
+                $tipo === 'indirecto' ? $q->whereNotNull('users.aliado_id') : $q->whereNull('users.aliado_id');
+            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $tipo, $wo) {
+                $sinUsuario->whereNotExists($usuarioDeLaWo)
+                    ->whereRaw("UPPER(TRIM({$wo}.modalidad)) = ?", [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
+            });
+        });
     }
 
     public function destroy(Request $request, WorkOrder $workOrder)
@@ -443,6 +468,10 @@ class WorkOrderController extends Controller
         } elseif ($tipo === 'DIRECTO') {
             $anterior = $wo->getOriginal('estado');
             $wo->estado = $anterior === 'Finalizado' ? $anterior : 'Asignado';
+            // Reimportar no le cambia el mes del auxilio a lo que ya se finalizó.
+            if ($anterior === 'Finalizado' && $wo->getOriginal('fecha_finalizacion')) {
+                $wo->fecha_finalizacion = $wo->getOriginal('fecha_finalizacion');
+            }
         }
     }
 

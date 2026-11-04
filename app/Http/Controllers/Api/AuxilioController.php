@@ -48,10 +48,11 @@ class AuxilioController extends Controller
     }
 
     /**
-     * Reporte de Auxilio por Productividad: por cada técnico DIRECTO (sin aliado_id) con al
-     * menos una Work Order finalizada en el mes, cuenta cuántas finalizó, ubica el tramo que
-     * alcanzó con ese total y calcula el auxilio (cantidad × valor del tramo). Un técnico
-     * indirecto (aliado) nunca aparece aquí: el auxilio es solo para directos.
+     * Reporte de Auxilio por Productividad: por cada técnico DIRECTO con al menos una Work
+     * Order finalizada en el mes, cuenta cuántas finalizó, ubica el tramo que alcanzó con ese
+     * total y calcula el auxilio (cantidad × valor del tramo). Directo es igual que en
+     * WorkOrderController::aplicarEstadoPorTecnico: usuario sin aliado_id o, si la cédula no
+     * tiene usuario, MODALIDAD DIRECTO en el archivo. Un aliado nunca aparece aquí.
      */
     public function reporte(Request $request)
     {
@@ -59,37 +60,50 @@ class AuxilioController extends Controller
         $inicio = Carbon::createFromFormat('Y-m', $mes)->startOfMonth();
         $fin = $inicio->copy()->endOfMonth();
 
-        $conteos = WorkOrder::query()
-            ->selectRaw('COALESCE(cedula_tecnico_agendado, cedula_tecnico) as cedula, COUNT(*) as total')
-            ->where('estado', 'Finalizado')
-            ->whereBetween('fecha_finalizacion', [$inicio, $fin])
-            ->whereRaw('COALESCE(cedula_tecnico_agendado, cedula_tecnico) IS NOT NULL')
-            ->groupBy('cedula')
-            ->get()
-            ->keyBy('cedula');
-
         $tramos = AuxilioTramo::orderBy('desde')->get();
         $tramoDe = function (int $total) use ($tramos) {
             return $tramos->first(fn (AuxilioTramo $t) => $total >= $t->desde && ($t->hasta === null || $total <= $t->hasta));
         };
 
-        $tecnicos = User::where('rol', 'tecnico')
-            ->whereNull('aliado_id')
-            ->whereIn('cedula', $conteos->keys())
-            ->get(['cedula', 'name']);
+        $usuarios = User::where('cedula', '!=', '')->get(['cedula', 'name', 'aliado_id'])->keyBy('cedula');
+        $cedulaDe = fn (WorkOrder $wo) => $wo->cedula_tecnico_cierre ?: $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+        $esDirecto = function (WorkOrder $wo) use ($usuarios, $cedulaDe) {
+            $cedula = $cedulaDe($wo);
+            if (!$cedula) {
+                return false;
+            }
+            $usuario = $usuarios->get($cedula);
 
-        $resultados = $tecnicos->map(function (User $tecnico) use ($conteos, $tramoDe) {
-            $total = (int) $conteos->get($tecnico->cedula)->total;
-            $tramo = $tramoDe($total);
+            return $usuario
+                ? !$usuario->aliado_id
+                : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8') === 'DIRECTO';
+        };
 
-            return [
-                'cedula'        => $tecnico->cedula,
-                'nombre'        => $tecnico->name,
-                'total_wo'      => $total,
-                'tramo'         => $tramo,
-                'total_auxilio' => $tramo ? $total * $tramo->valor_por_orden : 0,
-            ];
-        });
+        $resultados = WorkOrder::query()
+            ->where('estado', 'Finalizado')
+            ->whereBetween('fecha_finalizacion', [$inicio, $fin])
+            ->get(['numero_wo', 'modalidad', 'cedula_tecnico_cierre', 'cedula_tecnico_agendado', 'cedula_tecnico', 'nombre_tecnico_cierre', 'tecnico_agendado', 'nombre_tecnico'])
+            ->filter($esDirecto)
+            ->groupBy($cedulaDe)
+            ->map(function ($ordenes, $cedula) use ($usuarios, $tramoDe) {
+                // Un mismo WO trae una fila por ítem: se paga por orden, no por fila.
+                $total = $ordenes->unique('numero_wo')->count();
+                $tramo = $tramoDe($total);
+                $wo = $ordenes->first();
+
+                return [
+                    'cedula'        => (string) $cedula,
+                    'nombre'        => $usuarios->get($cedula)?->name ?: $wo->nombre_tecnico_cierre ?: $wo->tecnico_agendado ?: $wo->nombre_tecnico ?: (string) $cedula,
+                    'total_wo'      => $total,
+                    'tramo'         => $tramo,
+                    'total_auxilio' => $tramo ? $total * $tramo->valor_por_orden : 0,
+                ];
+            });
+
+        // El técnico solo ve su propio auxilio; el reporte completo es para los demás con permiso.
+        if ($request->user()->rol === 'tecnico') {
+            $resultados = $resultados->filter(fn ($r) => $r['cedula'] === (string) $request->user()->cedula);
+        }
 
         if ($request->search) {
             $q = mb_strtolower($request->search, 'UTF-8');
