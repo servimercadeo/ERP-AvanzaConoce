@@ -25,7 +25,8 @@ class CredencialesAvanzaConoceTest extends TestCase
         // Tabla temporal que hace de `users` de AvanzaConoce (no rompe la transacción del test).
         DB::statement('CREATE TEMPORARY TABLE avanza_users_test (nit BIGINT, password VARCHAR(255))');
         $this->hashAvanza = Hash::make('ClaveDeAvanza1');
-        DB::table('avanza_users_test')->insert(['nit' => 123456789, 'password' => $this->hashAvanza]);
+        // Con DB::raw: como en el servicio, esta tabla no lleva el prefijo del ERP.
+        DB::table(DB::raw('`avanza_users_test`'))->insert(['nit' => 123456789, 'password' => $this->hashAvanza]);
         config(['sso.avanzaconoce_users_table' => 'avanza_users_test']);
     }
 
@@ -74,7 +75,7 @@ class CredencialesAvanzaConoceTest extends TestCase
 
     public function test_solo_acepta_contrasenas_bcrypt(): void
     {
-        DB::table('avanza_users_test')->insert(['nit' => 555, 'password' => '$argon2id$v=19$otra']);
+        DB::table(DB::raw('`avanza_users_test`'))->insert(['nit' => 555, 'password' => '$argon2id$v=19$otra']);
 
         $credenciales = $this->enProduccion(fn () => CredencialesAvanzaConoce::paraAlta('555'));
 

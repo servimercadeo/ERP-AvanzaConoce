@@ -3,6 +3,8 @@
 namespace App\Traits;
 
 use App\Models\Auditoria;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Se agrega a un modelo para que cada creación/edición/borrado quede en la Auditoría del
@@ -13,6 +15,9 @@ use App\Models\Auditoria;
  */
 trait RegistraAuditoria
 {
+    /** Bloqueo mutuo, espera de bloqueo agotada y conexión perdida (códigos de MySQL). */
+    private static array $erroresQueDeshacenLaTransaccion = [1213, 1205, 2002, 2006, 2013];
+
     public static function bootRegistraAuditoria(): void
     {
         static::created(fn ($modelo) => $modelo->registrarAuditoria('creado'));
@@ -30,23 +35,35 @@ trait RegistraAuditoria
         static::deleted(fn ($modelo) => $modelo->registrarAuditoria('eliminado'));
     }
 
+    /**
+     * Un fallo de la auditoría no debe tumbar lo que el usuario estaba haciendo: queda en el log.
+     * La excepción son los errores que ya deshicieron la transacción (bloqueo mutuo, conexión
+     * perdida): si se ignoraran, el resto de la operación se guardaría a medias.
+     */
     public function registrarAuditoria(string $accion): void
     {
-        $user = auth()->user();
-        $proceso = method_exists($this, 'auditoriaProceso') ? $this->auditoriaProceso() : class_basename($this);
-        $verbo = ['creado' => 'Creó', 'actualizado' => 'Actualizó', 'eliminado' => 'Eliminó'][$accion];
+        try {
+            $user = auth()->user();
+            $proceso = method_exists($this, 'auditoriaProceso') ? $this->auditoriaProceso() : class_basename($this);
+            $verbo = ['creado' => 'Creó', 'actualizado' => 'Actualizó', 'eliminado' => 'Eliminó'][$accion];
 
-        Auditoria::create([
-            'user_id'     => $user?->id,
-            'usuario'     => $user?->name ?? 'Sistema',
-            'rol'         => $user?->rol,
-            'accion'      => $accion,
-            'proceso'     => $proceso,
-            'modelo'      => static::class,
-            'registro_id' => $this->getKey(),
-            'descripcion' => "{$verbo} {$proceso}: {$this->auditoriaNombreRegistroResuelto()}",
-            'created_at'  => now(),
-        ]);
+            Auditoria::create([
+                'user_id'     => $user?->id,
+                'usuario'     => mb_substr($user?->name ?? 'Sistema', 0, 150),
+                'rol'         => $user?->rol,
+                'accion'      => $accion,
+                'proceso'     => mb_substr($proceso, 0, 100),
+                'modelo'      => static::class,
+                'registro_id' => $this->getKey(),
+                'descripcion' => mb_substr("{$verbo} {$proceso}: {$this->auditoriaNombreRegistroResuelto()}", 0, 500),
+                'created_at'  => now(),
+            ]);
+        } catch (\Throwable $e) {
+            if ($e instanceof QueryException && in_array($e->errorInfo[1] ?? null, self::$erroresQueDeshacenLaTransaccion, true)) {
+                throw $e;
+            }
+            Log::error('No se pudo registrar la auditoría de ' . static::class . " #{$this->getKey()} ({$accion}): {$e->getMessage()}");
+        }
     }
 
     private function auditoriaNombreRegistroResuelto(): string
