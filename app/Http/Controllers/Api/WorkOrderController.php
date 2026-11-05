@@ -160,17 +160,19 @@ class WorkOrderController extends Controller
     // Misma regla de aplicarEstadoPorTecnico: manda el usuario de la cédula; sin usuario, la MODALIDAD del archivo.
     private function filtrarPorTipoDeTecnico($query, string $tipo): void
     {
+        // wrap(): en SQL crudo Laravel no pone el prefijo de tablas que hay en producción.
+        $columna = fn (string $nombre) => DB::getQueryGrammar()->wrap($nombre);
         $usuarioDeLaWo = fn ($q) => $q->selectRaw('1')->from('users')
             ->where('users.cedula', '!=', '')
-            ->whereRaw("users.cedula = COALESCE(NULLIF(work_orders.cedula_tecnico_agendado, ''), work_orders.cedula_tecnico)");
+            ->whereRaw("{$columna('users.cedula')} = COALESCE(NULLIF({$columna('work_orders.cedula_tecnico_agendado')}, ''), {$columna('work_orders.cedula_tecnico')})");
 
-        $query->where(function ($w) use ($usuarioDeLaWo, $tipo) {
+        $query->where(function ($w) use ($usuarioDeLaWo, $columna, $tipo) {
             $w->whereExists(function ($q) use ($usuarioDeLaWo, $tipo) {
                 $usuarioDeLaWo($q);
                 $tipo === 'indirecto' ? $q->whereNotNull('users.aliado_id') : $q->whereNull('users.aliado_id');
-            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $tipo) {
+            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $columna, $tipo) {
                 $sinUsuario->whereNotExists($usuarioDeLaWo)
-                    ->whereRaw('UPPER(TRIM(work_orders.modalidad)) = ?', [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
+                    ->whereRaw("UPPER(TRIM({$columna('work_orders.modalidad')})) = ?", [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
             });
         });
     }
