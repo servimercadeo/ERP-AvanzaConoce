@@ -18,8 +18,29 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Un archivo del build que ya no existe (pestaña abierta con la versión anterior) da 404,
+    # no la página de la app: así el navegador lo reporta como fallo de carga y recarga.
+    RewriteCond %{REQUEST_URI} ^/build/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# Comprimir lo que viaja como texto (JS, CSS, JSON de la API, HTML): ~5-10 veces menos
+# datos. Si el módulo no está activo en Apache, se ignora.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+# Los archivos de /build/assets llevan un hash en el nombre (cambia con cada build): el
+# navegador los puede guardar un año sin volver a pedirlos. Solo esa carpeta; fotos y
+# documentos subidos no se tocan.
+<IfModule mod_headers.c>
+    <If "%{REQUEST_URI} =~ m#^/build/assets/#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
 </IfModule>

@@ -120,8 +120,9 @@ class VehiculosTest extends TestCase
         $migracion = require database_path('migrations/2026_11_02_000005_mover_permisos_grupo_operaciones_a_operativos.php');
         $migracion->up();
 
+        // Solo las de este rol: los perfiles de aliados ya traen sus propias negaciones del grupo.
         $this->assertSame(0, PermisoDenegado::where('submodulo_id', 'paramgrupo_operaciones')->count());
-        $this->assertSame(2, PermisoDenegado::where('submodulo_id', 'paramgrupo_operativos')->count());
+        $this->assertSame(2, PermisoDenegado::where('rol', 'operaciones')->where('submodulo_id', 'paramgrupo_operativos')->count());
 
         $this->actuarComo('operaciones');
         $this->postJson('/api/vehiculos', ['tipo' => 'Carro', 'placa' => 'ABC123'])->assertForbidden();

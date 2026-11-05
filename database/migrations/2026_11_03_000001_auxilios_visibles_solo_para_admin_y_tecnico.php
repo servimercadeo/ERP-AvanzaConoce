@@ -10,7 +10,8 @@ return new class extends Migration
 
     private const VER_TODO = ['archivo_id' => PermisoDenegado::TODO_EL_SUBMODULO, 'accion' => PermisoDenegado::VER];
 
-    private const EDITAR_ESCALAS = ['archivo_id' => 'auxilios_file', 'accion' => 'editar'];
+    // Con archivo_id vacío, como guarda la matriz las acciones de un submódulo de una sola pestaña.
+    private const EDITAR_ESCALAS = ['archivo_id' => PermisoDenegado::TODO_EL_SUBMODULO, 'accion' => 'editar'];
 
     // El técnico entra a ver solo su auxilio (AuxilioController::reporte), sin tocar las escalas; el resto de roles deja de verlo.
     public function up(): void

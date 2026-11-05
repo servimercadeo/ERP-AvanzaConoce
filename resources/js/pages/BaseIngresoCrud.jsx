@@ -223,6 +223,8 @@ export default function BaseIngresoCrud() {
   const { data: _qSeleccionCatalogos } = useQuery({ queryKey: ['seleccion-catalogos'], queryFn: () => api.get('/seleccion/catalogos').then(r => r.data), staleTime: 10 * 60 * 1000 });
   const tiposVinculacion = _qCatalogos?.tipos_vinculacion ?? [];
   const empleadorOpts = (_qSeleccionCatalogos?.empleadores ?? []).map(e => e.nombre);
+  // Cargos del catálogo (Parámetros > Cargos); si el registro trae uno que no está, se conserva.
+  const cargosCatalogo = _qCatalogos?.cargos ?? [];
 
   useEffect(() => {
     if (_qBaseIngresos) { setData(_qBaseIngresos); setLoading(false); }
@@ -549,7 +551,7 @@ export default function BaseIngresoCrud() {
 
               <label style={S.sectionLabel}>Datos laborales</label>
               <div className="form-grid" style={{ ...S.grid3, marginBottom: 18 }}>
-                <Field label="Cargo" k="cargo" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label="Cargo" k="cargo" opts={form.cargo && !cargosCatalogo.includes(form.cargo) ? [form.cargo, ...cargosCatalogo] : cargosCatalogo} form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Ciudad" k="ciudad" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Empresa" k="empresa" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />

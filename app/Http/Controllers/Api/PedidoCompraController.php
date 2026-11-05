@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Aliado;
 use App\Models\PedidoCompra;
 use App\Models\TipoProducto;
 use App\Models\User;
@@ -12,10 +13,23 @@ use Illuminate\Support\Facades\DB;
 
 class PedidoCompraController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         return response()->json(
-            PedidoCompra::with(['items.tipoProducto:id,nombre,categoria', 'asignadoA:id,name', 'empresa:id,nombre'])->orderBy('id', 'desc')->get()
+            PedidoCompra::visiblesPara($request->user())
+                ->with(['items.tipoProducto:id,nombre,categoria', 'asignadoA:id,name', 'empresa:id,nombre'])->orderBy('id', 'desc')->get()
+        );
+    }
+
+    /** Aliados activos para "Responsable" cuando el pedido es de tipo Aliado (nombre, por id). */
+    public function aliados(Request $request)
+    {
+        $soloElSuyo = PedidoCompra::aliadoDe($request->user());
+
+        return response()->json(
+            Aliado::where('activo', true)
+                ->when($soloElSuyo, fn ($q, $aliado) => $q->whereKey($aliado->id))
+                ->orderBy('nombre')->get(['id', 'nombre'])
         );
     }
 
@@ -77,7 +91,16 @@ class PedidoCompraController extends Controller
             'items.*.cantidad'         => 'required|integer|min:1',
         ]);
 
-        return DB::transaction(function () use ($data, $request) {
+        // Un aliado (o técnico de aliado) solo pide a nombre de su aliado.
+        $user = $request->user();
+        $aliado = PedidoCompra::aliadoDe($user);
+        if ($aliado) {
+            $data['tipo_responsable'] = 'Aliado';
+            $data['responsable'] = $aliado->nombre;
+        }
+        $aliadoId = $aliado?->id ?? ($data['tipo_responsable'] === 'Aliado' ? $this->aliadoPorNombre($data['responsable']) : null);
+
+        return DB::transaction(function () use ($data, $request, $aliadoId) {
             $pedido = PedidoCompra::create([
                 'codigo'           => PedidoCompra::generarCodigo(),
                 'fecha_registro'   => now()->toDateString(),
@@ -91,6 +114,8 @@ class PedidoCompraController extends Controller
                 'estado'           => $data['estado'] ?? 'Pendiente Aprobación',
                 'estado_compra'    => $data['estado_compra'] ?? null,
                 'registra'         => $request->user()?->name ?? 'Sistema',
+                'registrado_por_id' => $request->user()?->id,
+                'aliado_id'        => $aliadoId,
             ]);
 
             $pedido->items()->createMany($this->resolverItems($data['items']));
@@ -99,8 +124,9 @@ class PedidoCompraController extends Controller
         });
     }
 
-    public function show(PedidoCompra $pedidoCompra)
+    public function show(Request $request, PedidoCompra $pedidoCompra)
     {
+        $this->soloLosSuyos($request, $pedidoCompra);
         return response()->json($pedidoCompra->load('items'));
     }
 
@@ -112,6 +138,7 @@ class PedidoCompraController extends Controller
      */
     public function update(Request $request, PedidoCompra $pedidoCompra)
     {
+        $this->soloLosSuyos($request, $pedidoCompra);
         $data = $request->validate([
             'tipo_responsable'         => 'sometimes|required|in:Empleado,Aliado',
             'responsable'              => 'sometimes|required|string|max:150',
@@ -149,6 +176,13 @@ class PedidoCompraController extends Controller
                 $data['tipo_responsable'] ?? $pedidoCompra->tipo_responsable,
                 $data['responsable'] ?? $pedidoCompra->responsable,
             );
+            // Un aliado no cambia a nombre de quién está su pedido.
+            if (PedidoCompra::aliadoDe($request->user())) {
+                unset($data['tipo_responsable'], $data['responsable'], $data['empresa_id']);
+            } else {
+                $tipo = $data['tipo_responsable'] ?? $pedidoCompra->tipo_responsable;
+                $data['aliado_id'] = $tipo === 'Aliado' ? $this->aliadoPorNombre($data['responsable'] ?? $pedidoCompra->responsable) : null;
+            }
         }
 
         return DB::transaction(function () use ($data, $pedidoCompra) {
@@ -163,8 +197,9 @@ class PedidoCompraController extends Controller
         });
     }
 
-    public function destroy(PedidoCompra $pedidoCompra)
+    public function destroy(Request $request, PedidoCompra $pedidoCompra)
     {
+        $this->soloLosSuyos($request, $pedidoCompra);
         $pedidoCompra->delete();
         return response()->json(null, 204);
     }
@@ -175,6 +210,17 @@ class PedidoCompraController extends Controller
      * encontrar al responsable). Los "Aliado" no son usuarios del ERP, así que quedan
      * sin empresa (null) — no hay de dónde resolverla.
      */
+    /** Un aliado solo abre o modifica sus propios pedidos (los demás, como si no existieran). */
+    private function soloLosSuyos(Request $request, PedidoCompra $pedido): void
+    {
+        abort_unless(PedidoCompra::visiblesPara($request->user())->whereKey($pedido->id)->exists(), 404);
+    }
+
+    private function aliadoPorNombre(string $nombre): ?int
+    {
+        return Aliado::whereRaw('UPPER(TRIM(nombre)) = ?', [mb_strtoupper(trim($nombre), 'UTF-8')])->value('id');
+    }
+
     private function resolverEmpresaId(string $tipoResponsable, string $responsable): ?int
     {
         if ($tipoResponsable !== 'Empleado') {

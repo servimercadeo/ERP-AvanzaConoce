@@ -1,0 +1,5450 @@
+{
+    "aliado_proyecto": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "aliado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "proyecto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "aliados": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "tipo_documento": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "documento": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "representante_legal_nombre": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "representante_legal_documento": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_pdv": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "modalidad_id_bt": {
+            "tipo": "int unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "telefono": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "correo": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "ciudad": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "direccion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "observaciones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "usuario_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "avanza_password": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanzaconoce_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "avanza_sync_estado": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanza_sync_error": {
+            "tipo": "varchar(500)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanza_sync_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "anexos_auxilios": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "app_settings": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "key": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "value": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "area_empresa": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "arls": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "asignaciones_inventario": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "inventario_producto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "serial": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_asignacion": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "fecha_devolucion": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "observacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "asignado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "auditorias": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "usuario": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "rol": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "accion": {
+            "tipo": "enum('creado','actualizado','eliminado')",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "proceso": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "modelo": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "registro_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "descripcion": {
+            "tipo": "varchar(500)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "auxilio_tramos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "desde": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "hasta": {
+            "tipo": "int unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "valor_por_orden": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "bancos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "base_ingresos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "candidato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_aval": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "documento_identificacion": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre_completo": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "cargo": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "ciudad": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empresa": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "proyecto": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "telefono": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "correo": {
+            "tipo": "varchar(180)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_ingreso": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_vinculacion": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "lugar_trabajo": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "lider_inmediato": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empleador": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_programacion_ingreso": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_correccion": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tasa_riesgo_arl": {
+            "tipo": "varchar(10)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "salario_basico": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_transporte": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "otrosi_variable": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_rodamiento": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_comunicacion": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_alimentacion": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado": {
+            "tipo": "varchar(40)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "alerta_enviada": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "deleted_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "cache": {
+        "key": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "value": {
+            "tipo": "mediumtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "expiration": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
+    "cache_locks": {
+        "key": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "owner": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "expiration": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
+    "cajas_compensacion": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "candidato_documentos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "candidato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(120)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "ruta": {
+            "tipo": "varchar(500)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre_original": {
+            "tipo": "varchar(300)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "candidatos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "requisicion_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombres": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "tipo_documento": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "identificacion": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha_expedicion": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "lugar_expedicion": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "edad": {
+            "tipo": "smallint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "genero": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "correo": {
+            "tipo": "varchar(180)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "celular": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_postulacion": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "fuente": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fuente_especifica": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "pruebas": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "aval": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_vinculacion": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empleador_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "correos_aval": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_aval": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "negocio": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fotografia": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "observaciones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "asmt_ejercicio": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "asmt_nombre_ejercicio": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "asmt_claridad_mensaje": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asmt_conviccion_energia": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asmt_adaptabilidad_escucha": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asmt_orientacion_accion": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asmt_manejo_presion": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asmt_prom": {
+            "tipo": "decimal(4,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_trayectoria": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_conexion_cliente": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_aprendizaje_madurez": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_motivacion": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_disposicion_proyecto": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entv_prom": {
+            "tipo": "decimal(4,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "retroalimentacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "ref_laboral_1": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "ref_laboral_2": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fraude_nro_seguimiento": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fraude_respuesta": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fraude_ciudad": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fraude_fecha_consulta": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fraude_fuente": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "seguridad_estudio": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tasa_riesgo_arl": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "arl": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "caja_compensacion": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "salario_basico": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_transporte": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "otrosi_variable": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_rodamiento": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_comunicacion": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_alimentacion": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "lugar_trabajo": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_programacion_ingreso": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_correccion": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "ciudad_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "cargos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "en_requisicion": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "categorias_producto": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "centros_costo_catalogo": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "ciudad": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "proyecto": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "ciudades": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "id_departamento": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "valor_flete": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo_dane": {
+            "tipo": "varchar(10)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_dep": {
+            "tipo": "varchar(5)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_ciu": {
+            "tipo": "varchar(5)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "perimetro": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "clases_pedido": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "conceptos_pedido": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "contrato_anexos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "contrato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "anexo_auxilio": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "valor": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_entrega_firma": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "contrato_centros_costos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "contrato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "centro_costo_catalogo_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "centro_costos": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "porcentaje": {
+            "tipo": "decimal(5,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "contrato_eventos_medicos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "contrato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "fecha_ingreso_seguimiento": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_evento": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "origen_diagnostico": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "diagnostico": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "recomendaciones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "vigencia_desde": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "vigencia_hasta": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "condicion": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_cierre": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "observaciones": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "contratos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_macaw": {
+            "tipo": "int unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_contrato": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_vinculacion": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cargo": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "sede": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "area_empresa": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato_nombre": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato_correo": {
+            "tipo": "varchar(180)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_ingreso": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_retiro": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "salario": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "auxilio_transporte_legal": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "arl": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_vinculacion_arl": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "lps_afiliado": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_vinculacion_lps": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "caja_compensacion": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_vinculacion_caja": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fondo_pensiones": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fondo_cesantias": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "banco": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_cuenta": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cuenta_bancaria": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_contrato": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "motivo_finalizacion": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "completado": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleador": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empresa": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cliente_proyecto": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "regional_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "origen_seguimiento": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "seguimiento_fecha_cierre": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "seguimiento_observaciones": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "cronograma_dotacion": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proyecto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "fecha_entrega": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "ciclo_meses": {
+            "tipo": "tinyint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "documentos_empleado": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre_documento": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre_seguimiento": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha_seguimiento": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "responsable": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "ruta": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombre_original": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "empleador_contactos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleador_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "correo": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "regional_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "empleadores": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nit": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "empresas": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nit": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "pais": {
+            "tipo": "varchar(80)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "eps": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "estados_civil": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "failed_jobs": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "uuid": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "connection": {
+            "tipo": "text",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "queue": {
+            "tipo": "text",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "payload": {
+            "tipo": "longtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "exception": {
+            "tipo": "longtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "failed_at": {
+            "tipo": "timestamp",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "fondos_cesantias": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "fondos_pensiones": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "formas_pago": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "inventario_dotacion": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proyecto": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "prenda": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "genero": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "talla": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "precio": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "stock_minimo": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "inventario_producto_series": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "inventario_producto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "serial": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "inventario_productos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_producto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "talla": {
+            "tipo": "varchar(50)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "precio": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "stock_minimo": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "job_batches": {
+        "id": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "name": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "total_jobs": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "pending_jobs": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "failed_jobs": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "failed_job_ids": {
+            "tipo": "longtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "options": {
+            "tipo": "mediumtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cancelled_at": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "finished_at": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "jobs": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "queue": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "payload": {
+            "tipo": "longtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "attempts": {
+            "tipo": "tinyint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "reserved_at": {
+            "tipo": "int unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "available_at": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
+    "migrations": {
+        "id": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "migration": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "batch": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
+    "orden_compra_items": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "orden_compra_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "pedido_compra_item_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_automatico_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "inventario_dotacion_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_producto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "producto": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "categoria": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "precio_unitario": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "iva_porcentaje": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "subtotal": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "iva_valor": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "total": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "ordenes_compra": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha_registro": {
+            "tipo": "datetime",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proveedor_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "naturaleza": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "forma_pago_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_entrega": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "observaciones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "valor_transporte": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "subtotal": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "iva_total": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "valor_total": {
+            "tipo": "decimal(15,2)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "creado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "password_reset_tokens": {
+        "email": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "token": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "pedido_automatico_items": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_automatico_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "inventario_dotacion_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "cantidad": {
+            "tipo": "smallint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "cantidad_por_comprar": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "orden_compra_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado_revision": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "observacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "pedido_compra_items": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_compra_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "producto": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "tipo_producto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "estado_revision": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "observacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "seriales": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "orden_compra_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "pedidos_automaticos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "recibido_pedidos": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado_compra": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo": {
+            "tipo": "varchar(10)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "contrato_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_global_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_pedido": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "notas": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "prendas_sin_definir": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        }
+    },
+    "pedidos_compra": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha_registro": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "tipo_responsable": {
+            "tipo": "enum('empleado','aliado')",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "responsable": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "aliado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "clase": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "concepto": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "observacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(50)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_compra": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "registra": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "registrado_por_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "asignado_a_user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "pedidos_globales": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "cliente_proyecto": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "regional_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "total_pedidos": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "notas": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "confirmado": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "confirmado_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entrega_confirmada": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "entrega_confirmada_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "permisos_denegados": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "rol": {
+            "tipo": "enum('th','tic','operaciones','financiera','supervisores','general','tecnico','aliado','tecnico_aliado','tecnico_indirecto')",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "modulo_id": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "submodulo_id": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "archivo_id": {
+            "tipo": "varchar(80)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "accion": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "personal_access_tokens": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tokenable_type": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "tokenable_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "name": {
+            "tipo": "text",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "token": {
+            "tipo": "varchar(64)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "abilities": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "last_used_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "expires_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "proveedores": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nit": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "naturaleza": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "proveedores_work_orders": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "codigo": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "proyecto_sede": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proyecto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "proyectos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "regionales": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "requisiciones": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nro_identificacion_proceso": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "registro_token": {
+            "tipo": "char(36)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nro_identificacion": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cargo_solicitante": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_solicitud": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "fecha_ingreso": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_cierre": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "requeridas": {
+            "tipo": "smallint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "contratadas": {
+            "tipo": "smallint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proyecto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_solicitud": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "responsable": {
+            "tipo": "varchar(200)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "proceso": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "pais": {
+            "tipo": "varchar(80)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "solicitud_confidencial": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "observaciones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cargo_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleador_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "ciudad_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "regional_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "respuestas_ingresos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "documento": {
+            "tipo": "varchar(40)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombres": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "apellidos": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fecha_nacimiento": {
+            "tipo": "date",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "lugar_nacimiento": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "estado_civil": {
+            "tipo": "varchar(50)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "numero_hijos": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "rh": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nivel_escolaridad": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "profesion": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "ciudad": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "barrio": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "direccion": {
+            "tipo": "varchar(250)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "estrato": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "correo": {
+            "tipo": "varchar(180)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "celular": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "emergencia_nombre": {
+            "tipo": "varchar(200)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "emergencia_telefono": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "emergencia_parentesco": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "eps": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "afp": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fondo_cesantias": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "talla_camisa": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "talla_pantalon": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "talla_zapatos": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "fotografia": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "sedes": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(250)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "id_ciudad": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "regional_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "proyecto_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "direccion": {
+            "tipo": "varchar(250)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "telefono": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "id_consultor_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_almacenista_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_secretaria_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_jefe_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_user_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id_torre_mac": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "codigo_distribuidor": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_instalador": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_contrato_inicial": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_contrato_final": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "meta_prepago": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "meta_postpago": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_sede": {
+            "tipo": "varchar(50)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "id_sede_padre": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sub_canal": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "supervisor": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contacto_supervisor": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "lider_regional": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contacto_lider_regional": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "sessions": {
+        "id": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "ip_address": {
+            "tipo": "varchar(45)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "user_agent": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "payload": {
+            "tipo": "longtext",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "last_activity": {
+            "tipo": "int",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
+    "tipos_parametro": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(100)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "grupo": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "tipos_producto": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "categoria": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "tipos_rh": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "traslados_dotacion": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_automatico_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "pedido_automatico_item_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "inventario_dotacion_origen_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_destino_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "prenda": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "genero": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "talla": {
+            "tipo": "varchar(10)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "estado": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "solicitado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "traslados_producto": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pedido_compra_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "pedido_compra_item_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "inventario_producto_origen_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_destino_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "producto": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "cantidad": {
+            "tipo": "int unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "seriales": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "solicitado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "aprobado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "aprobado_en": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "user_preferences": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "preferences": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "users": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cedula": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_expedicion": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "apellidos": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombres": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fotografia": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "sede": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_nacimiento": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "lugar_nacimiento": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "raza": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "genero": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_civil": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nivel_escolaridad": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "profesion": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "direccion_residencia": {
+            "tipo": "varchar(200)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "movil": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estrato": {
+            "tipo": "varchar(5)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "barrio": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_hijos": {
+            "tipo": "tinyint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "ingresos": {
+            "tipo": "decimal(12,2)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "observaciones_medicas": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "alergias": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "talla_camisa": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "talla_pantalon": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "talla_zapatos": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "rh": {
+            "tipo": "varchar(5)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "eps": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "arl": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fondo_pensiones": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "caja_compensacion": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "licencia_carro": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "licencia_carro_vence": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "licencia_moto": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "licencia_moto_vence": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tiene_cert_alturas": {
+            "tipo": "tinyint",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "cert_alturas_vence": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "estado_empleado": {
+            "tipo": "varchar(30)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_directv": {
+            "tipo": "varchar(50)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "empresa_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "empleador": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato_nombre": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jefe_inmediato_correo": {
+            "tipo": "varchar(180)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "comentarios": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cargo": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_funcionario": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_vinculacion": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cuenta_bancaria": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_cuenta": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "banco": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contacto_emergencia_nombre": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contacto_emergencia_telefono": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contacto_emergencia_parentesco": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanzaconoce_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "avanza_sync_estado": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanza_sync_error": {
+            "tipo": "varchar(500)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "avanza_sync_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "name": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "email": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "email_verified_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "rol": {
+            "tipo": "enum('admin','th','tic','operaciones','financiera','supervisores','general','tecnico','aliado')",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "aliado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "activo": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "pendiente_alta": {
+            "tipo": "tinyint",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "ultimo_sso_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "password": {
+            "tipo": "varchar(255)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "remember_token": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "valores_parametro": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo_parametro_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "nombre": {
+            "tipo": "varchar(150)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "vehiculos": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tipo": {
+            "tipo": "enum('carro','moto')",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "placa": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "cc_propietario": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tarjeta_propiedad_frontal": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tarjeta_propiedad_trasera": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_matricula": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_vence_soat": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_vence_tecnomecanica": {
+            "tipo": "date",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tecnico_asignado_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "work_orders": {
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "numero_wo": {
+            "tipo": "varchar(60)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "numero_orden_trabajo": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "id_encabezado_pedido": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_item": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_wo_ibs": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado": {
+            "tipo": "varchar(80)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_descarga": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_orden_trabajo": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_visita": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_visita": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "coordenada_x": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "coordenada_y": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_en_fecha": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_cancelacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "razon_cancelacion": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "observaciones_cancelacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "estado_comercial": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_wo": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tecnico_atendio_flag": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "wo_anterior": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "wo_fisica_ok": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "motivo": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "consumio_material": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "paga_por_directv": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "comision_pagada": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "valor_comision": {
+            "tipo": "varchar(40)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_pago": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "prueba_calidad": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "numero_ticket_aprobacion": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "razon_prueba_calidad_fallida": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "contrato_enviado": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "registrado_por": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_registro_material": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_registro_sin_material": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "modo_atencion": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "auxiliar": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "torre": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "conductor": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_auxilio": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "auxilio": {
+            "tipo": "varchar(40)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "aplica_auxilio": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_estado": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "dias_atraso": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "dias_atraso_sp": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "servicio": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_sl": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "recursos": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "subproducto": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_orden": {
+            "tipo": "varchar(120)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "clase_cliente": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "agendamiento_externo": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tipo_producto": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "se_paga": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "consignada": {
+            "tipo": "varchar(20)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "pago": {
+            "tipo": "varchar(40)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "prioridad": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "proveedor": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cuadrilla_tecnico": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombre_cuadrilla_tecnico": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "apellido_cuadrilla_tecnico": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombre_tecnico": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tecnico_agendado": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cedula_tecnico_agendado": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombre_tecnico_cierre": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cedula_tecnico_cierre": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cedula_tecnico": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "modalidad": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "perimetro": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "perimetro_venta": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "departamento": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "pais": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "codigo_postal": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "agrupacion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "municipio": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "barrio": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "puntos_referencia": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "direccion": {
+            "tipo": "varchar(255)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "cambio_domicilio_entre_calles": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "tel_casa": {
+            "tipo": "varchar(40)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_creacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_vencimiento": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_ultima_reasignacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_finalizacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "fecha_publicacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "tecnologia": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "inicio_agendado": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fin_agendado": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "descripcion": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "aging": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "descarga_materiales_obligatoria": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "descarga_materiales_confirmada": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "region_servicio": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "reiteracion_servicio": {
+            "tipo": "int",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "georreferencia": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "categoria": {
+            "tipo": "varchar(100)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "problema": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "razones": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "nombre_cliente": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "apellido_cliente": {
+            "tipo": "varchar(150)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "no_documento_cliente": {
+            "tipo": "varchar(30)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "telefono_principal": {
+            "tipo": "text",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "jornada": {
+            "tipo": "varchar(60)",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
+        "fecha_programacion": {
+            "tipo": "datetime",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "materiales": {
+            "tipo": "longtext",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        }
+    }
+}

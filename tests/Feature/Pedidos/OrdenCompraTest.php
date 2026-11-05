@@ -41,6 +41,7 @@ class OrdenCompraTest extends TestCase
         ])->json();
         $itemId = $pedido['items'][0]['id'];
         $this->postJson("/api/pedido-compra-items/$itemId/enviar-compras")->assertOk();
+        $this->putJson("/api/pedidos-compra/{$pedido['id']}", ['estado' => 'Enviado a compras', 'estado_compra' => 'Cotizando'])->assertOk();
 
         return $itemId;
     }
@@ -69,6 +70,28 @@ class OrdenCompraTest extends TestCase
 
         $this->assertSame(2, $r['Herramientas']['cantidad_items']);
         $this->assertSame(1, $r['EPP']['cantidad_items']);
+    }
+
+    public function test_un_item_marcado_cuyo_pedido_no_esta_en_compras_no_es_pendiente_ni_se_puede_comprar(): void
+    {
+        $tipo = $this->tipoProducto(null, 'Herramientas');
+        $pedido = $this->postJson('/api/pedidos-compra', [
+            'tipo_responsable' => 'Empleado', 'responsable' => 'A', 'sede' => 'SEDE COMPRAS', 'clase' => 'X', 'concepto' => 'Y',
+            'items' => [['tipo_producto_id' => $tipo, 'cantidad' => 1]],
+        ])->json();
+        $item = $pedido['items'][0]['id'];
+        $this->postJson("/api/pedido-compra-items/$item/enviar-compras")->assertOk();
+
+        $this->assertSame([], $this->getJson('/api/ordenes-compra-pendientes-categoria')->assertOk()->json());
+        $this->assertSame([], $this->getJson('/api/ordenes-compra-items-pendientes')->assertOk()->json());
+        $this->crearOrden([['pedido_compra_item_id' => $item, 'precio_unitario' => 1, 'iva_porcentaje' => 0]])->assertStatus(422);
+
+        // Con el pedido en Compras ya aparece; al regresarlo a Pedidos, deja de aparecer.
+        $this->putJson("/api/pedidos-compra/{$pedido['id']}", ['estado' => 'Enviado a compras', 'estado_compra' => 'Cotizando'])->assertOk();
+        $this->assertSame(1, $this->getJson('/api/ordenes-compra-pendientes-categoria')->json('0.cantidad_items'));
+
+        $this->putJson("/api/pedidos-compra/{$pedido['id']}", ['estado' => 'Pendiente Aprobación', 'estado_compra' => null])->assertOk();
+        $this->assertSame([], $this->getJson('/api/ordenes-compra-pendientes-categoria')->json());
     }
 
     public function test_items_pendientes_se_filtran_por_categoria(): void

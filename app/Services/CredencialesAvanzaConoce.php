@@ -29,7 +29,18 @@ class CredencialesAvanzaConoce
             return ['hash' => $hash, 'mostrar' => self::MISMA_DE_AVANZA, 'de_avanza' => true];
         }
 
-        // Contraseña temporal de 10 caracteres: 2 mayúsculas + 5 minúsculas + 3 dígitos
+        return self::temporal();
+    }
+
+    /**
+     * Contraseña temporal propia del ERP, sin mirar AvanzaConoce (para quien solo entra al
+     * ERP, como el técnico de un aliado empresa). 10 caracteres: 2 mayúsculas + 5 minúsculas
+     * + 3 dígitos.
+     *
+     * @return array{hash: string, mostrar: string, de_avanza: bool}
+     */
+    public static function temporal(): array
+    {
         $plano = strtoupper(Str::random(2)) . strtolower(Str::random(5)) . rand(100, 999);
 
         return ['hash' => Hash::make($plano), 'mostrar' => $plano, 'de_avanza' => false];

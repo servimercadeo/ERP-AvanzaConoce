@@ -279,6 +279,7 @@ class ContratosTest extends TestCase
 
     private function prepararDotacionDirectv(): array
     {
+        $this->formularioIngreso('3001'); // sin formulario de ingreso no hay pedido automático
         $sedeCentral = $this->sede('SYM PEREIRA'); // exigida por el servicio
         $sede = $this->sede('SEDE DTV');
         $mk = fn (string $prenda, string $talla, int $cant) => InventarioDotacion::create([
@@ -304,7 +305,7 @@ class ContratosTest extends TestCase
         $this->assertDatabaseHas('pedidos_automaticos', ['contrato_id' => $r->json('id'), 'empleado_id' => $this->empleado->id]);
     }
 
-    public function test_si_falta_una_talla_en_inventario_el_pedido_se_genera_sin_esa_linea(): void
+    public function test_una_prenda_sin_stock_entra_al_pedido_para_comprarla(): void
     {
         [$polo, $pantalon] = $this->prepararDotacionDirectv();
         $pantalon->update(['cantidad' => 0]); // sin stock de pantalón
@@ -314,14 +315,16 @@ class ContratosTest extends TestCase
         ]))->assertCreated();
 
         $pedido = PedidoAutomatico::where('contrato_id', $r->json('id'))->first();
-        $this->assertSame(2, $pedido->items()->count(), 'Solo polo y carnet: el pantalón no tenía stock.');
+        $this->assertSame(3, $pedido->items()->count());
+        $this->assertSame(1, $pedido->items()->where('inventario_dotacion_id', $pantalon->id)->value('cantidad_por_comprar'));
         $this->assertSame(0, $pantalon->fresh()->cantidad);
-        // Se avisa qué faltó, en la respuesta y en las notas del pedido.
-        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'Pantalon Comercial'));
-        $this->assertStringContainsString('Faltaron: Pantalon Comercial', $pedido->notas);
+        $this->assertSame(8, $polo->fresh()->cantidad);
+        // Se avisa qué falta, en la respuesta y en las notas del pedido.
+        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'Pantalon Comercial') && str_contains($f, 'por comprar 1'));
+        $this->assertStringContainsString('Pendiente: Pantalon Comercial', $pedido->notas);
     }
 
-    public function test_sin_ninguna_prenda_disponible_no_se_crea_el_pedido_y_se_explica(): void
+    public function test_sin_ninguna_prenda_en_stock_el_pedido_se_crea_todo_por_comprar(): void
     {
         foreach ($this->prepararDotacionDirectv() as $item) {
             if ($item instanceof InventarioDotacion) {
@@ -331,23 +334,22 @@ class ContratosTest extends TestCase
 
         $r = $this->postJson('/api/contratos', $this->payload([
             'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'ASESOR COMERCIAL', 'sede' => 'SEDE DTV',
-        ]))->assertCreated()->assertJsonPath('pedido_automatico', null);
+        ]))->assertCreated()->assertJsonPath('pedido_automatico.estado', 'Activo');
 
-        $r->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no se pudo asignar ninguna prenda')
-            && str_contains($m, 'Polo Gris Administrativa') && str_contains($m, 'hay 0'));
-        $this->assertDatabaseCount('pedidos_automaticos', 0);
+        $items = PedidoAutomatico::where('contrato_id', $r->json('id'))->first()->items;
+        $this->assertSame(3, $items->count());
+        $this->assertTrue($items->every(fn ($i) => $i->cantidad === $i->cantidad_por_comprar));
     }
 
-    public function test_un_cargo_sin_dotacion_definida_explica_por_que_no_hay_pedido(): void
+    public function test_cualquier_cargo_de_directv_recibe_la_dotacion_de_un_asesor(): void
     {
-        $this->prepararDotacionDirectv();
+        [$polo] = $this->prepararDotacionDirectv();
 
         $this->postJson('/api/contratos', $this->payload([
             'empresa' => 'SERVIMERCADEO COL', 'cliente_proyecto' => 'DIRECTV', 'cargo' => 'CARGO SIN REGLA', 'sede' => 'SEDE DTV',
-        ]))->assertCreated()->assertJsonPath('pedido_automatico', null)
-            ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no tiene dotación definida'));
+        ]))->assertCreated()->assertJsonPath('pedido_automatico.estado', 'Activo');
 
-        $this->assertDatabaseCount('pedidos_automaticos', 0);
+        $this->assertSame(8, $polo->fresh()->cantidad);
     }
 
     public function test_contrato_no_ingreso_no_genera_pedido(): void

@@ -7,12 +7,20 @@ use App\Models\ProveedorWorkOrder;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
+use App\Services\UsuarioAliadoEmpresa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class WorkOrderController extends Controller
 {
+    /**
+     * Estados de los indicadores (los mismos que cuenta la ficha del aliado). Una WO solo está
+     * Asignada o Finalizada: el estado "Atendido" ya no existe (ver aplicarEstadoPorTecnico).
+     */
+    private const ESTADO_ASIGNADA = 'Asignado';
+    private const ESTADO_FINALIZADA = 'Finalizado';
+
     /**
      * Con ?page= responde por páginas (?per_page=25|50|100, por defecto 50): con miles de
      * WOs, traerlas todas pesaba megas y la tabla tardaba en pintarse. Sin ?page= devuelve
@@ -46,14 +54,14 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Agrega a cada WO los datos del técnico asignado (por `cedula_tecnico_agendado`, o
-     * `cedula_tecnico` si no trae agendado — mismo formato que `users.cedula`): no viven en
+     * Agrega a cada WO los datos de su técnico, por `cedula_tecnico` (la misma cédula con la
+     * que el técnico ve sus WO y se cuentan en su aliado; mismo formato que `users.cedula`): no viven en
      * `work_orders` pero si el técnico ya es empleado del ERP, ahí están. Una sola consulta
      * por lote, no una por fila.
      */
     private function conDatosDelTecnico($workOrders)
     {
-        $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+        $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico;
 
         $cedulas = $workOrders->map($cedulaAsignado)->filter()->unique()->values();
         if ($cedulas->isEmpty()) {
@@ -78,8 +86,8 @@ class WorkOrderController extends Controller
             $wo->subagente_aliado_tecnico = $tecnico ? ($tecnico->aliado?->nombre ?? 'NA') : null;
             $wo->placa_vehiculo_tecnico = $tecnico ? $vehiculosPorTecnico->get($tecnico->id)?->placa : null;
 
-            // "Técnico Atiende" del exporte: un técnico indirecto (aliado) no puede cerrar su
-            // propia WO (ver update()), así que ahí se deja el mismo técnico agendado. Si es
+            // "Técnico Atiende" del exporte: el de un técnico de aliado es siempre el mismo
+            // técnico agendado (por defecto la matriz no les deja cambiar el estado). Si es
             // directo (o no está registrado en el ERP), manda quien la haya cerrado de verdad
             // desde el sistema; si todavía nadie la cerró ahí (la mayoría: llegan ya cerradas
             // en el archivo del proveedor), se usa el "Técnico Atiende" que trajo el import.
@@ -95,19 +103,43 @@ class WorkOrderController extends Controller
         });
     }
 
-    /** Total, conteo por estado y opciones de los filtros sin descargar las WOs. */
+    /**
+     * Total, conteo por estado, indicadores y opciones de los filtros sin descargar las WOs.
+     * Los indicadores (total, asignadas, finalizadas; igual que en la ficha del aliado) cuentan
+     * con los filtros que vengan (búsqueda, fechas, proveedor...); `total`, `por_estado` y las
+     * opciones de los filtros, sobre todas las que el usuario ve.
+     */
     public function resumen(Request $request)
     {
         $distintos = fn (string $columna) => $this->visibles($request)
             ->whereNotNull($columna)->where($columna, '!=', '')
             ->distinct()->orderBy($columna)->pluck($columna);
 
+        $indicadores = $this->filtrar($this->visibles($request), $request)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(estado = ?) as asignadas', [self::ESTADO_ASIGNADA])
+            ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
+            ->first();
+
         return response()->json([
             'total'       => $this->visibles($request)->count(),
             'por_estado'  => $this->visibles($request)->select('estado', DB::raw('COUNT(*) as total'))->groupBy('estado')->pluck('total', 'estado'),
+            'indicadores' => [
+                'total'       => (int) $indicadores->total,
+                'asignadas'   => (int) $indicadores->asignadas,
+                'finalizadas' => (int) $indicadores->finalizadas,
+            ],
             'estados'     => $distintos('estado'),
             'proveedores' => $distintos('proveedor'),
         ]);
+    }
+
+    /** Un técnico o un aliado solo modifica las WO que ve (las demás, como si no existieran). */
+    private function soloLasQueVe(Request $request, WorkOrder $workOrder): void
+    {
+        if (in_array($request->user()?->rol, ['tecnico', 'supervisores', UsuarioAliadoEmpresa::ROL], true)) {
+            abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
+        }
     }
 
     /** Las WOs que este usuario puede ver. */
@@ -115,14 +147,51 @@ class WorkOrderController extends Controller
     {
         $query = WorkOrder::query();
 
-        // El rol "tecnico" solo ve las work orders asignadas a su propia cédula; el resto
-        // de roles con acceso al submódulo (operaciones, admin, etc.) las ve todas. Sin
-        // cédula registrada no ve ninguna (nunca todas por descarte de "IS NULL").
-        if ($request->user()?->rol === 'tecnico') {
-            $query->where('cedula_tecnico', $request->user()->cedula ?? '__sin_cedula__');
+        // El rol "tecnico" (directo o de un aliado) solo ve las asignadas a su propia cédula;
+        // el usuario de un aliado empresa, las de sus técnicos (si la matriz le abre el
+        // módulo); el resto de roles con acceso al submódulo las ve todas. Sin cédula no ve
+        // ninguna (nunca todas por descarte de "IS NULL").
+        $user = $request->user();
+        if ($user?->rol === 'tecnico') {
+            $query->where('cedula_tecnico', $user->cedula ?? '__sin_cedula__');
+        } elseif ($user?->rol === UsuarioAliadoEmpresa::ROL) {
+            $aliadoId = $user->aliadoEmpresa()->value('id');
+            $query->whereIn('cedula_tecnico', User::where('aliado_id', $aliadoId ?? 0)->whereNotNull('cedula')->select('cedula'));
+        } elseif ($user?->rol === 'supervisores') {
+            // El supervisor: solo las de los técnicos a su cargo (no las de otras ciudades).
+            $query->whereIn('cedula_tecnico', self::tecnicosACargoDe($user)->whereNotNull('cedula')->select('cedula'));
         }
 
         return $query;
+    }
+
+    /**
+     * Técnicos a cargo de un supervisor: los que lo tienen de jefe inmediato en su ficha o en
+     * su contrato (por correo, o por nombre en el texto "Nombre - correo" de antes), y los
+     * técnicos de los aliados que él lidera (jefe inmediato del aliado).
+     */
+    public static function tecnicosACargoDe(User $supervisor)
+    {
+        $correo = mb_strtolower(trim((string) $supervisor->email));
+        $nombre = mb_strtoupper(trim((string) $supervisor->name), 'UTF-8');
+
+        $esSuJefe = function ($q) use ($correo, $nombre) {
+            $q->whereRaw('1 = 0');
+            if ($correo !== '') {
+                $q->orWhereRaw('LOWER(TRIM(jefe_inmediato_correo)) = ?', [$correo])
+                    ->orWhereRaw('LOWER(jefe_inmediato) LIKE ?', ['%' . $correo . '%']);
+            }
+            if ($nombre !== '') {
+                $q->orWhereRaw("UPPER(TRIM(SUBSTRING_INDEX(jefe_inmediato, ' - ', 1))) = ?", [$nombre])
+                    ->orWhereRaw('UPPER(TRIM(jefe_inmediato_nombre)) = ?', [$nombre]);
+            }
+        };
+
+        return User::where('rol', 'tecnico')->where(function ($q) use ($esSuJefe, $supervisor) {
+            $q->where($esSuJefe)
+                ->orWhereHas('contratos', $esSuJefe)
+                ->orWhereIn('aliado_id', \App\Models\Aliado::where('jefe_inmediato_id', $supervisor->id)->select('id'));
+        });
     }
 
     private function filtrar($query, Request $request)
@@ -160,35 +229,37 @@ class WorkOrderController extends Controller
     // Misma regla de aplicarEstadoPorTecnico: manda el usuario de la cédula; sin usuario, la MODALIDAD del archivo.
     private function filtrarPorTipoDeTecnico($query, string $tipo): void
     {
-        // wrap(): en SQL crudo Laravel no pone el prefijo de tablas que hay en producción.
-        $columna = fn (string $nombre) => DB::getQueryGrammar()->wrap($nombre);
+        // En SQL crudo Laravel no agrega el prefijo de tablas (`erp_` en producción).
+        $prefijo = DB::getTablePrefix();
+        $wo = "{$prefijo}work_orders";
+
         $usuarioDeLaWo = fn ($q) => $q->selectRaw('1')->from('users')
             ->where('users.cedula', '!=', '')
-            ->whereRaw("{$columna('users.cedula')} = COALESCE(NULLIF({$columna('work_orders.cedula_tecnico_agendado')}, ''), {$columna('work_orders.cedula_tecnico')})");
+            ->whereRaw("{$prefijo}users.cedula = COALESCE(NULLIF({$wo}.cedula_tecnico_agendado, ''), {$wo}.cedula_tecnico)");
 
-        $query->where(function ($w) use ($usuarioDeLaWo, $columna, $tipo) {
+        $query->where(function ($w) use ($usuarioDeLaWo, $tipo, $wo) {
             $w->whereExists(function ($q) use ($usuarioDeLaWo, $tipo) {
                 $usuarioDeLaWo($q);
                 $tipo === 'indirecto' ? $q->whereNotNull('users.aliado_id') : $q->whereNull('users.aliado_id');
-            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $columna, $tipo) {
+            })->orWhere(function ($sinUsuario) use ($usuarioDeLaWo, $tipo, $wo) {
                 $sinUsuario->whereNotExists($usuarioDeLaWo)
-                    ->whereRaw("UPPER(TRIM({$columna('work_orders.modalidad')})) = ?", [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
+                    ->whereRaw("UPPER(TRIM({$wo}.modalidad)) = ?", [$tipo === 'indirecto' ? 'ALIADO' : 'DIRECTO']);
             });
         });
     }
 
-    public function destroy(WorkOrder $workOrder)
+    public function destroy(Request $request, WorkOrder $workOrder)
     {
+        $this->soloLasQueVe($request, $workOrder);
         $workOrder->delete();
 
         return response()->json(null, 204);
     }
 
     /**
-     * Cambia el estado de una WO. El rol "tecnico" solo puede tocar las que ya puede ver
-     * (las de su propia cédula, ver visibles()) y únicamente si es directo: un indirecto
-     * (aliado — tiene `aliado_id`) no puede cambiar el estado de su Work Order, solo verla.
-     * Cuando la cierra un técnico (directo) queda registrado en `*_cierre` para el exporte
+     * Cambia el estado de una WO. Quién puede, lo decide la matriz de Permisos (Editar en
+     * Work Orders, por rol o perfil de aliado); un técnico o un aliado solo toca las que ya
+     * puede ver (ver visibles()). Cuando la cierra un técnico queda registrado en `*_cierre` para el exporte
      * (ver conDatosDelTecnico, columna "Técnico Atiende"); si la cambia otro rol admin/
      * operaciones no se toca, porque ese cambio no es un técnico cerrando su WO. Si el nuevo
      * estado es "Finalizado" también se pone `fecha_finalizacion` (antes solo quedaba la de
@@ -199,10 +270,8 @@ class WorkOrderController extends Controller
         $data = $request->validate(['estado' => 'required|string|max:60']);
         $user = $request->user();
 
+        $this->soloLasQueVe($request, $workOrder);
         if ($user->rol === 'tecnico') {
-            abort_unless($this->visibles($request)->whereKey($workOrder->id)->exists(), 404);
-            abort_if($user->aliado_id, 403, 'Los técnicos aliados (indirectos) no pueden cambiar el estado de la Work Order.');
-
             $workOrder->nombre_tecnico_cierre = $user->name;
             $workOrder->cedula_tecnico_cierre = $user->cedula;
         }
@@ -301,6 +370,12 @@ class WorkOrderController extends Controller
                 }
                 $valores[$campo] = trim((string) $fila[$campo]) !== '' ? trim((string) $fila[$campo]) : null;
             }
+            // La cédula enlaza la WO con su técnico (y su aliado): igual que users.cedula.
+            foreach (['cedula_tecnico', 'cedula_tecnico_agendado'] as $campo) {
+                if (array_key_exists($campo, $valores)) {
+                    $valores[$campo] = WorkOrder::normalizarCedula($valores[$campo]);
+                }
+            }
             foreach ($camposFecha as $campo) {
                 if (!array_key_exists($campo, $fila)) {
                     continue;
@@ -312,6 +387,18 @@ class WorkOrderController extends Controller
                     continue;
                 }
                 $valores[$campo] = is_numeric($fila[$campo]) ? (int) $fila[$campo] : null;
+            }
+            // Materiales del Exporte Macaw ({columna: cantidad}): solo los que traen dato. Si
+            // el archivo no trae esas columnas no se manda la llave y se conservan los de antes.
+            if (array_key_exists('materiales', $fila)) {
+                $materiales = [];
+                foreach ((array) $fila['materiales'] as $nombre => $cantidad) {
+                    $cantidad = is_string($cantidad) ? trim($cantidad) : $cantidad;
+                    if (is_string($nombre) && trim($nombre) !== '' && $cantidad !== null && $cantidad !== '' && (is_scalar($cantidad))) {
+                        $materiales[mb_substr($nombre, 0, 120)] = is_numeric($cantidad) ? $cantidad + 0 : mb_substr((string) $cantidad, 0, 60);
+                    }
+                }
+                $valores['materiales'] = $materiales ?: null;
             }
 
             $llaveStr = $valores['numero_wo'] . '|' . ($tieneItem ? $valores['numero_item'] : '');

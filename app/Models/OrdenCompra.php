@@ -11,6 +11,9 @@ class OrdenCompra extends Model
 
     protected $table = 'ordenes_compra';
 
+    /** La compra ya se hizo: solo las órdenes con prendas de dotación llegan a este estado. */
+    public const COMPLETADA = 'Completada';
+
     public function auditoriaProceso(): string
     {
         return 'Compras';

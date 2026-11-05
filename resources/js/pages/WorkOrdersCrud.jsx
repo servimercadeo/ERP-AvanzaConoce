@@ -190,6 +190,64 @@ const IMPORT_HEADER_MAP = {
  * guarda en ningún lado ("subproducto" en minúscula, el código numérico duplicado — ver
  * nota en IMPORT_HEADER_MAP), así que esa sale "N/D" siempre.
  */
+/**
+ * Columnas de materiales del "Exporte Macaw" (archivo de Operaciones DTV), una por material,
+ * con la cantidad que consumió la WO. Van entre "Contrato enviado" y "Registrado por", con el
+ * nombre exacto del archivo (algunos traen espacios al final). Al importar se guardan en
+ * `work_orders.materiales` (se ven en "Ver todos los datos"); el Exportar NO las incluye.
+ */
+const MATERIALES_MACAW = [
+    "CABLE COAXIAL",
+    "GRAPAS",
+    "AMARRES PLÁSTICOS",
+    "CHAZOS METALICOS",
+    "CONECTORES",
+    "CABLE RG6 BLANCO",
+    "CABLE RG6 NEGRO ",
+    "CABLE UTP NEGRO (INTERNET)",
+    "CONECTORES RG6",
+    "CONECTOR RJ45 (INTERNET)",
+    "GRAPA BLANCA",
+    "GRAPA NEGRA",
+    "AMARRAS BLANCAS",
+    "AMARRAS NEGRAS",
+    "VASELINA",
+    "CINTA NEGRA",
+    "BROCA PARA METAL 1/4 5",
+    "BROCA PARA METAL 3/8  5",
+    "BROCA PARA METAL 5/16",
+    "BROCA PARA MURO 1/4",
+    "BROCA PARA MURO 3/8 - 5\" CORTA",
+    "BROCA PARA MURO 5/16 - 12",
+    "BROCA PARA MURO 5/16 - 5\" CORTA",
+    "BROCA ESPADA PARA MADERA 1/4    CORTA",
+    "BROCA ESPADA PARA MADERA 5/16  5",
+    "CABLE UTP BLANCO (INTERNET)",
+    "BROCA PARA MURO 3/8- 12\" LARGA",
+    "BROCA ESPADA PARA MADERA 5/16  12",
+    "SILICONA EN BARRA",
+    "CINTA AUTOFUNDENTE",
+    "BROCA HSS X 1/4",
+    "BROCA HSS 3/8",
+    "BROCA ESPADA PARA MADERA  3/8 (CORTA)",
+    "BROCA METAL 3/16 - 5\" CORTA",
+    "CLAVOS",
+    "CHAZOS MARIPOSA",
+    "CABLE ENCAUCHETADO",
+    "BROCA ESPADA PARA MADERA 3/4 (CORTA)",
+    "TELEFONO CELULAR SAMSUNG J2",
+    "TELEFONO CELULAR HUAWEI",
+    "MEMORIA MICRO SD 8 GB ADATA",
+    "CANALETA GALVANIZADA 40X25",
+    "CAJAS METÁLICAS 20X20X15 ",
+    "CABLE ELÉCTRICO ENCAUCHETADO 2X14",
+    "BREAKER INDIVIDUAL ",
+    "TOMA ELÉCTRICO DOBLE CON TAPA ",
+    "CAJA METALICA 30X30X15",
+    "SAMSUMG GALAXY J2",
+];
+const MATERIAL_POR_ENCABEZADO = new Map(MATERIALES_MACAW.map((m) => [normalizeHeader(m), m]));
+
 const COLUMNAS_EXPORTE_MACAW = [
     ["Sede", "sede_proveedor"],
     ["Subproducto", ["servicio", "subproducto"]],
@@ -199,14 +257,14 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Consignada", "consignada"],
     ["Pago", "pago"],
     ["Técnico Agendado", ["tecnico_agendado", "nombre_tecnico"]],
-    ["Cédula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
+    ["Cedula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
     ["Técnico Atiende", "nombre_tecnico_atiende"],
-    ["Cédula Técnico", "cedula_tecnico_atiende"],
+    ["Cedula Técnico", "cedula_tecnico_atiende"],
     ["Tipo Vinculación", ["modalidad", "tipo_vinculacion_tecnico"]],
     ["Subagente/Aliado", "subagente_aliado_tecnico"],
     ["workorder", "numero_wo"],
     ["IBS", "numero_wo_ibs"],
-    ["Categoría", "categoria"],
+    ["Categoria", "categoria"],
     ["Problema", "problema"],
     ["Nombre Cliente", "nombre_cliente"],
     ["Apellido Cliente", "apellido_cliente"],
@@ -280,11 +338,14 @@ const CAMPOS_PLANTILLA = [
 ];
 
 /* ─── Modal importar desde Excel ─────────────────────────────────────── */
+const LOTE_IMPORTACION = 1000;
+
 function ImportModal({ onClose, onImported }) {
     const [fileName, setFileName] = useState("");
     const [filas, setFilas] = useState([]);
     const [errores, setErrores] = useState([]);
     const [importing, setImporting] = useState(false);
+    const [progreso, setProgreso] = useState(null);
     const [error, setError] = useState("");
     const [duplicadasInfo, setDuplicadasInfo] = useState(0);
     const [diagnostico, setDiagnostico] = useState(null);
@@ -318,7 +379,16 @@ function ImportModal({ onClose, onImported }) {
             raw.forEach((row, idx) => {
                 const numFila = idx + 2;
                 const mapped = {};
+                const materiales = {};
+                let traeMateriales = false;
                 Object.entries(row).forEach(([k, v]) => {
+                    const material = MATERIAL_POR_ENCABEZADO.get(normalizeHeader(k));
+                    if (material) {
+                        traeMateriales = true;
+                        const cantidad = typeof v === "string" ? v.trim() : v;
+                        if (cantidad !== "" && cantidad !== null && cantidad !== undefined) materiales[material] = cantidad;
+                        return;
+                    }
                     const key = IMPORT_HEADER_MAP[normalizeHeader(k)];
                     // Gana la PRIMERA columna que matchee esa clave, no la última: el Exporte
                     // Macaw trae "Subproducto" (texto) y, mucho más adelante, otra columna
@@ -339,6 +409,7 @@ function ImportModal({ onClose, onImported }) {
                 // fila nueva con ítem "" en vez de actualizar las existentes.
                 const fila = { ...mapped, numero_wo: numeroWo };
                 if ("numero_item" in mapped) fila.numero_item = numeroItem;
+                if (traeMateriales) fila.materiales = materiales;
                 filasPorLlave.set(llave, fila);
             });
 
@@ -373,20 +444,34 @@ function ImportModal({ onClose, onImported }) {
         }
     };
 
+    // Por lotes: un archivo grande en una sola petición puede pasar el límite de tamaño o de
+    // tiempo del servidor. Cada lote se guarda aparte; si uno falla, se avisa cuántas
+    // quedaron cargadas (reimportar el mismo archivo no duplica: actualiza por WO + ítem).
     const handleImport = async () => {
         if (filas.length === 0) return;
         setImporting(true);
         setError("");
+        const total = { creadas: 0, actualizadas: 0 };
+        let enviadas = 0;
         try {
-            const { data } = await api.post("/work-orders/importar", { items: filas });
-            onImported(data);
+            for (let i = 0; i < filas.length; i += LOTE_IMPORTACION) {
+                const lote = filas.slice(i, i + LOTE_IMPORTACION);
+                setProgreso({ hechas: i, total: filas.length });
+                const { data } = await api.post("/work-orders/importar", { items: lote });
+                total.creadas += data.creadas ?? 0;
+                total.actualizadas += data.actualizadas ?? 0;
+                enviadas += lote.length;
+            }
+            onImported(total);
         } catch (err) {
             const listaErrores = err?.response?.data?.errores;
-            setError(
-                Array.isArray(listaErrores) ? listaErrores.join(" · ") : (err?.response?.data?.message ?? "No se pudo importar.")
-            );
+            const motivo = Array.isArray(listaErrores) ? listaErrores.join(" · ") : (err?.response?.data?.message ?? "No se pudo importar.");
+            setError(enviadas > 0
+                ? `Se cargaron ${enviadas} de ${filas.length} filas (${total.creadas} creadas, ${total.actualizadas} actualizadas) y luego falló: ${motivo} Puedes volver a importar el mismo archivo: no duplica.`
+                : motivo);
         } finally {
             setImporting(false);
+            setProgreso(null);
         }
     };
 
@@ -468,7 +553,7 @@ function ImportModal({ onClose, onImported }) {
                 <div style={S.modalFooter}>
                     <button style={S.btnSecondary} onClick={onClose} disabled={importing}>Cancelar</button>
                     <button style={S.btnPrimary} onClick={handleImport} disabled={importing || filas.length === 0}>
-                        {importing ? "Importando…" : `Importar ${filas.length} fila${filas.length !== 1 ? "s" : ""}`}
+                        {importing ? (progreso && progreso.total > LOTE_IMPORTACION ? `Importando ${progreso.hechas.toLocaleString("es-CO")} de ${progreso.total.toLocaleString("es-CO")}…` : "Importando…") : `Importar ${filas.length} fila${filas.length !== 1 ? "s" : ""}`}
                     </button>
                 </div>
             </div>
@@ -693,7 +778,9 @@ function CampoSoloLectura({ label, valor, span }) {
     );
 }
 
-function VerModal({ item, onClose }) {
+/** Todos los datos de una WO. También la usa la ficha del aliado (AliadosCrud). */
+export function VerModal({ item, onClose }) {
+    const materiales = Object.entries(item.materiales ?? {});
     return (
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
@@ -712,6 +799,16 @@ function VerModal({ item, onClose }) {
                             </div>
                         </div>
                     ))}
+                    {materiales.length > 0 && (
+                        <div style={{ marginBottom: 18 }}>
+                            <p className="section-title" style={{ marginBottom: 10 }}>Materiales</p>
+                            <div className="form-grid" style={S.grid4}>
+                                {materiales.map(([nombre, cantidad]) => (
+                                    <CampoSoloLectura key={nombre} label={nombre.trim()} valor={String(cantidad)} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <p className="section-title" style={{ marginBottom: 10 }}>Descripción</p>
                     <div className="form-grid" style={S.grid4}>
                         <CampoSoloLectura label="Descripción de IBS" valor={item.descripcion} span={4} />
@@ -730,9 +827,6 @@ export default function WorkOrdersCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
     const { user } = useAuth();
-    // Un técnico indirecto (aliado, tiene aliado_id) no puede cambiar el estado de su propia
-    // WO — solo verla; el servidor vuelve a validar esto en WorkOrderController::update().
-    const esTecnicoIndirecto = user?.rol === "tecnico" && !!user?.aliado_id;
     const qc = useQueryClient();
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
@@ -778,11 +872,14 @@ export default function WorkOrdersCrud() {
         if (pagina > ultimaPagina) setPagina(ultimaPagina);
     }, [pagina, ultimaPagina]);
 
-    // Total y opciones de los filtros, sin descargar todas las WOs.
+    // Indicadores (con los filtros puestos) y opciones de los filtros, sin descargar todas las WOs.
     const { data: resumen } = useQuery({
-        queryKey: ["work-orders", "resumen"],
-        queryFn: () => api.get("/work-orders/resumen").then((r) => r.data),
+        queryKey: ["work-orders", "resumen", debSearch, estadoFiltro, proveedorFiltro, fechaDesde, fechaHasta],
+        queryFn: () => api.get("/work-orders/resumen", {
+            params: { search: debSearch || undefined, estado: estadoFiltro || undefined, proveedor: proveedorFiltro || undefined, fecha_desde: fechaDesde || undefined, fecha_hasta: fechaHasta || undefined },
+        }).then((r) => r.data),
         staleTime: 60 * 1000,
+        placeholderData: (prev) => prev,
     });
     const estados = ESTADOS_WO;
     const proveedores = resumen?.proveedores ?? [];
@@ -863,17 +960,20 @@ export default function WorkOrdersCrud() {
         <div style={{ width: "100%" }}>
             {toast && <div style={S.toast}>{toast}</div>}
 
+            {/* Indicadores por estado: cuentan con los filtros puestos (búsqueda, fechas...). */}
             <div className="stats-row">
                 <div className="stat-card">
-                    <div className="stat-num">{resumen?.total ?? 0}</div>
+                    <div className="stat-num">{resumen?.indicadores?.total ?? 0}</div>
                     <div className="stat-label">Total Work Orders</div>
                 </div>
-                {ESTADOS_WO.map((e) => (
-                    <div className="stat-card" key={e}>
-                        <div className="stat-num">{resumen?.por_estado?.[e] ?? 0}</div>
-                        <div className="stat-label">{e}</div>
-                    </div>
-                ))}
+                <div className="stat-card">
+                    <div className="stat-num">{resumen?.indicadores?.asignadas ?? 0}</div>
+                    <div className="stat-label">Asignadas</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-num">{resumen?.indicadores?.finalizadas ?? 0}</div>
+                    <div className="stat-label">Finalizadas</div>
+                </div>
             </div>
 
             <div style={S.toolbar}>
@@ -921,7 +1021,7 @@ export default function WorkOrdersCrud() {
                 </div>
                 {puede.exportar && (
                     <button
-                        className="btn-secondary"
+                        className="btn-primary"
                         style={{ display: "inline-flex", alignItems: "center", gap: 6, opacity: exportando ? 0.6 : 1 }}
                         onClick={handleExportar}
                         disabled={exportando}
@@ -985,7 +1085,7 @@ export default function WorkOrdersCrud() {
                                             <button style={S.actionBtn("var(--primary-light)", "var(--primary-dark)")} title="Ver todos los datos" onClick={() => setVerTarget(w)}>
                                                 <IconEye size={14} />
                                             </button>
-                                            {puede.editar && !esTecnicoIndirecto && (
+                                            {puede.editar && (
                                                 <button style={S.actionBtn("#eaf3ff", "#2566af")} title="Cambiar estado" onClick={() => setEstadoTarget(w)}>
                                                     <IconEdit size={14} />
                                                 </button>

@@ -4,12 +4,53 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class InventarioDotacion extends Model
 {
     use HasFactory;
 
     protected $table = 'inventario_dotacion';
+
+    /** Caché del catálogo completo (InventarioDotacionController::index). */
+    public const CACHE_KEY_FLAT = 'inventario-dotacion:flat';
+
+    /**
+     * La misma talla escrita de distintas formas: el formulario de ingreso usa XS...XXXL y el
+     * inventario 2XL/3XL, o "10 (M)" en las prendas femeninas de Tigo.
+     */
+    private const TALLAS_EQUIVALENTES = [
+        ['XS', '6 (XS)'],
+        ['S', '8 (S)'],
+        ['M', '10 (M)'],
+        ['L', '12 (L)'],
+        ['XL', '14 (XL)'],
+        ['2XL', 'XXL', '16 (2XL)'],
+        ['3XL', 'XXXL', '18 (3XL)'],
+        ['4XL', '20 (4XL)'],
+    ];
+
+    /** @return string[] la talla dada primero y luego sus equivalentes. */
+    public static function tallasEquivalentes(string $talla): array
+    {
+        $talla = trim($talla);
+        foreach (self::TALLAS_EQUIVALENTES as $grupo) {
+            if (in_array(mb_strtoupper($talla, 'UTF-8'), $grupo, true)) {
+                return array_values(array_unique([$talla, ...$grupo]));
+            }
+        }
+
+        return [$talla];
+    }
+
+    protected static function booted(): void
+    {
+        // increment/decrement disparan "updated": los pedidos también dejan el catálogo al día.
+        $olvidar = fn () => Cache::store('file')->forget(self::CACHE_KEY_FLAT);
+        static::created($olvidar);
+        static::updated($olvidar);
+        static::deleted($olvidar);
+    }
 
     /**
      * Proyecto de dotación => nombre exacto en la tabla `proyectos`. Fuente única de verdad

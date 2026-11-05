@@ -563,6 +563,24 @@ export const ERP_MODULES = [
         ]
       },
       {
+        id: 'cargos',
+        label: 'Cargos',
+        icon: 'administrativo',
+        desc: 'Catálogo de cargos de Contratos, Empleados y Selección',
+        archivos: [
+          { id: 'cargos_file', label: 'Cargos', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
+      {
+        id: 'anexos_auxilios',
+        label: 'Anexos y Auxilios',
+        icon: 'administrativo',
+        desc: 'Opciones de "Anexo / Auxilio" de los contratos',
+        archivos: [
+          { id: 'anexos_auxilios_file', label: 'Anexos y Auxilios', acciones: ['crear', 'editar', 'eliminar'] },
+        ]
+      },
+      {
         id: 'clases_pedido',
         label: 'Clases de Pedidos',
         icon: 'pedidos',

@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permiso' => \App\Http\Middleware\EnsureUserHasPermission::class,
             // Cierra la sesión de quien quedó inactivo mientras estaba conectado.
             'activo' => \App\Http\Middleware\EnsureUsuarioActivo::class,
+            // El usuario de un aliado empresa solo llega a su ficha y sus Work Orders.
+            'aliado.limitado' => \App\Http\Middleware\SoloAccesoDeAliado::class,
         ]);
         // El contenedor solo es alcanzable a través de Traefik (nunca directo desde
         // internet), así que confiar en cualquier origen es seguro aquí: sin esto, Laravel
@@ -30,6 +32,24 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+        });
+
+        // Un dato que la base rechaza es un problema del dato, no un "Server Error" sin explicación.
+        // El detalle técnico igual queda en el log (Laravel reporta antes de responder).
+        $exceptions->render(function (\Illuminate\Database\QueryException $e, $request) {
+            $mensaje = [
+                1062 => 'Ya existe un registro con esos datos.',
+                1048 => 'Falta un dato obligatorio.',
+                1264 => 'Uno de los valores está fuera del rango permitido.',
+                1366 => 'Uno de los datos tiene caracteres o un formato que no se pueden guardar.',
+                1406 => 'Uno de los datos es demasiado largo.',
+                1451 => 'No se puede eliminar: tiene registros relacionados.',
+                1452 => 'Uno de los datos hace referencia a un registro que no existe.',
+            ][$e->errorInfo[1] ?? null] ?? null;
+
+            if ($mensaje && ($request->is('api/*') || $request->expectsJson())) {
+                return response()->json(['message' => $mensaje], 422);
             }
         });
     })

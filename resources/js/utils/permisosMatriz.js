@@ -8,7 +8,12 @@ export const ROLES = [
     { value: "financiera", label: "Financiera" },
     { value: "supervisores", label: "Supervisores" },
     { value: "general", label: "General" },
-    { value: "tecnico", label: "Técnico" },
+    { value: "tecnico", label: "Técnico directo" },
+    // Perfiles de aliados: no son un rol que se asigne, salen del aliado del usuario
+    // (PermisoDenegado::perfilDe en el servidor).
+    { value: "aliado", label: "Aliado empresa" },
+    { value: "tecnico_aliado", label: "Técnico de aliado empresa" },
+    { value: "tecnico_indirecto", label: "Aliado / técnico indirecto" },
 ];
 
 // Catálogo real de módulos, submódulos y pestañas (los mismos que arman el menú, incluidas

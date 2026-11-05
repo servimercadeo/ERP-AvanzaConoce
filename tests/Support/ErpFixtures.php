@@ -47,6 +47,37 @@ trait ErpFixtures
         ]);
     }
 
+    /**
+     * Fila válida en una tabla con muchas columnas obligatorias (formulario de ingreso,
+     * candidatos): lo que no se indica se rellena según el tipo de la columna.
+     */
+    protected function filaCompleta(string $tabla, array $datos): void
+    {
+        $columnas = DB::select(
+            'select column_name c, data_type t, column_type ct from information_schema.columns
+             where table_schema = database() and table_name = ? and is_nullable = ? and column_default is null and extra not like ?',
+            [DB::getTablePrefix() . $tabla, 'NO', '%auto_increment%'],
+        );
+        foreach ($columnas as $col) {
+            $datos[$col->c] ??= match (true) {
+                str_contains($col->t, 'date') || str_contains($col->t, 'time') => '2000-01-01',
+                str_contains($col->t, 'int') || in_array($col->t, ['decimal', 'double', 'float'], true) => 0,
+                $col->t === 'enum' => explode("'", $col->ct)[1],
+                default => '1',
+            };
+        }
+        DB::table($tabla)->insert($datos);
+    }
+
+    /** Formulario de ingreso diligenciado por esa cédula (de ahí salen las tallas). */
+    protected function formularioIngreso(string $cedula, array $tallas = []): void
+    {
+        $this->filaCompleta('respuestas_ingresos', $tallas + [
+            'documento' => $cedula, 'talla_camisa' => 'M', 'talla_pantalon' => '32', 'talla_zapatos' => '40',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
     protected function tipoProducto(?string $nombre = null, string $categoria = 'Materiales'): int
     {
         return DB::table('tipos_producto')->insertGetId([

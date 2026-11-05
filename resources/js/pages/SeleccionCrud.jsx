@@ -62,6 +62,15 @@ export default function SeleccionCrud() {
   const [saving, setSaving] = useState(false);
 
   const [estadoF, setEstadoF] = useState('Todas');
+  // Más filtros de la lista (sobre las requisiciones ya cargadas): texto, cargo, proyecto,
+  // tipo, ciudad y rango de fecha de solicitud.
+  const [buscarReq, setBuscarReq] = useState('');
+  const [cargoF, setCargoF] = useState('Todos');
+  const [proyectoF, setProyectoF] = useState('Todos');
+  const [tipoF, setTipoF] = useState('Todos');
+  const [ciudadF, setCiudadF] = useState('Todas');
+  const [fechaDesdeF, setFechaDesdeF] = useState('');
+  const [fechaHastaF, setFechaHastaF] = useState('');
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState('create');
   const [form, setForm] = useState({});
@@ -88,7 +97,7 @@ export default function SeleccionCrud() {
     return () => { document.documentElement.style.overflowY = ''; document.body.style.overflowY = ''; };
   }, [modal]);
 
-  useEffect(() => { setPage(1); }, [estadoF]);
+  useEffect(() => { setPage(1); }, [estadoF, buscarReq, cargoF, proyectoF, tipoF, ciudadF, fechaDesdeF, fechaHastaF]);
 
   const ch    = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
   const chVal = k => val => {
@@ -129,12 +138,15 @@ export default function SeleccionCrud() {
   const proyectosOpts    = (catalogs.proyectos || []).map(p => ({ value: String(p.value), label: p.label }));
   const responsablesOpts = (catalogs.responsables || []).map(u => ({ value: u.name, label: u.name }));
   const empresasOpts     = (empresas || []).map(e => ({ value: String(e.id), label: e.nombre }));
-  // Solo los cargos marcados para requisición; si la requisición ya tenía otro cargo, se conserva visible.
-  const cargosOpts       = (() => {
-    const lista = catalogs.cargos_requisicion || [];
-    const actual = (catalogs.cargos || []).find(c => String(c.id) === String(form?.cargo_id));
-    const conActual = actual && !lista.some(c => c.id === actual.id) ? [...lista, actual] : lista;
-    return conActual.map(c => ({ value: String(c.id), label: c.nombre }));
+  // Cargos del catálogo (Parámetros > Cargos): el requerido se guarda por id.
+  const cargosOpts       = (catalogs.cargos || []).map(c => ({ value: String(c.id), label: c.nombre }));
+  // El del solicitante se guarda como texto (viene del empleado elegido): si ese texto no
+  // está en el catálogo, se conserva como opción para no perderlo.
+  const cargosSolicitanteOpts = (() => {
+    const nombres = (catalogs.cargos || []).map(c => c.nombre);
+    const actual = (form?.cargo_solicitante || '').trim();
+    const lista = actual && !nombres.includes(actual) ? [actual, ...nombres] : nombres;
+    return lista.map(n => ({ value: n, label: n }));
   })();
   // Sedes de la ciudad de operación; si la ciudad no tiene sedes registradas, se muestran todas.
   const sedesCiudad      = (catalogs.sedes || []).filter(s => form.ciudad_id && String(s.id_ciudad) === String(form.ciudad_id));
@@ -144,11 +156,15 @@ export default function SeleccionCrud() {
 
   const handleSolicitanteChange = (name) => {
     const user = (catalogs.responsables || []).find(u => u.name === name);
+    // Su cargo con el nombre exacto del catálogo (el del empleado puede venir en otra forma).
+    const cargoUser = user?.cargo
+      ? ((catalogs.cargos || []).find(c => c.nombre.trim().toUpperCase() === user.cargo.trim().toUpperCase())?.nombre ?? user.cargo)
+      : null;
     setForm(p => ({
       ...p,
       nombre_responsable:    name,
       numero_identificacion: user?.cedula ?? p.numero_identificacion ?? '',
-      cargo_solicitante:     user?.cargo  ?? p.cargo_solicitante ?? '',
+      cargo_solicitante:     cargoUser    ?? p.cargo_solicitante ?? '',
     }));
   };
 
@@ -235,9 +251,35 @@ export default function SeleccionCrud() {
   };
 
   /* ── Filters & pagination ─────────────────────────────────────── */
-  const filtered = useMemo(() =>
-    data.filter(r => estadoF === 'Todas' || r.estado === estadoF),
-    [data, estadoF]);
+  // Opciones de cada filtro: lo que de verdad hay en las requisiciones.
+  const opcionesDe = (fn, todos) => [todos, ...[...new Set(data.map(fn).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))];
+  const cargosF     = useMemo(() => opcionesDe(r => r.cargo?.nombre, 'Todos'), [data]);
+  const proyectosF  = useMemo(() => opcionesDe(r => r.proyecto?.nombre, 'Todos'), [data]);
+  const tiposF      = useMemo(() => opcionesDe(r => r.tipo_solicitud, 'Todos'), [data]);
+  const ciudadesF   = useMemo(() => opcionesDe(r => r.ciudad?.nombre, 'Todas'), [data]);
+  const sinTildes   = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const hayFiltros  = estadoF !== 'Todas' || buscarReq || cargoF !== 'Todos' || proyectoF !== 'Todos' || tipoF !== 'Todos'
+                      || ciudadF !== 'Todas' || fechaDesdeF || fechaHastaF;
+  const limpiarFiltros = () => {
+    setEstadoF('Todas'); setBuscarReq(''); setCargoF('Todos'); setProyectoF('Todos'); setTipoF('Todos');
+    setCiudadF('Todas'); setFechaDesdeF(''); setFechaHastaF('');
+  };
+
+  const filtered = useMemo(() => {
+    const texto = sinTildes(buscarReq.trim());
+    return data.filter(r => {
+      const fecha = String(r.fecha_solicitud ?? '').slice(0, 10);
+      return (estadoF === 'Todas' || r.estado === estadoF)
+        && (cargoF === 'Todos' || r.cargo?.nombre === cargoF)
+        && (proyectoF === 'Todos' || r.proyecto?.nombre === proyectoF)
+        && (tipoF === 'Todos' || r.tipo_solicitud === tipoF)
+        && (ciudadF === 'Todas' || r.ciudad?.nombre === ciudadF)
+        && (!fechaDesdeF || (fecha && fecha >= fechaDesdeF))
+        && (!fechaHastaF || (fecha && fecha <= fechaHastaF))
+        && (!texto || [r.nro_identificacion_proceso, r.cargo?.nombre, r.responsable]
+              .some(v => sinTildes(v).includes(texto)));
+    });
+  }, [data, estadoF, buscarReq, cargoF, proyectoF, tipoF, ciudadF, fechaDesdeF, fechaHastaF]);
   const totalP   = Math.max(1, Math.ceil(filtered.length / PER));
   const paged    = filtered.slice((page - 1) * PER, page * PER);
 
@@ -278,12 +320,31 @@ export default function SeleccionCrud() {
       {/* Toolbar */}
       <div style={S.toolbar}>
         <div style={S.filters}>
+          <input
+            style={S.buscarReq}
+            placeholder="Buscar por N° de proceso, cargo o responsable…"
+            value={buscarReq}
+            onChange={e => setBuscarReq(e.target.value)}
+          />
           <FilterDropdown
             label="Estado"
             value={estadoF}
             onChange={setEstadoF}
             options={['Todas', 'Abierta', 'En proceso', 'Completada', 'Cancelada']}
           />
+          <FilterDropdown label="Cargo" value={cargoF} onChange={setCargoF} options={cargosF} />
+          <FilterDropdown label="Proyecto" value={proyectoF} onChange={setProyectoF} options={proyectosF} />
+          <FilterDropdown label="Tipo" value={tipoF} onChange={setTipoF} options={tiposF} />
+          <FilterDropdown label="Ciudad" value={ciudadF} onChange={setCiudadF} options={ciudadesF} />
+          <label style={S.fechaF}>
+            <span>Solicitud desde</span>
+            <input type="date" style={S.fechaInput} value={fechaDesdeF} max={fechaHastaF || undefined} onChange={e => setFechaDesdeF(e.target.value)} />
+          </label>
+          <label style={S.fechaF}>
+            <span>hasta</span>
+            <input type="date" style={S.fechaInput} value={fechaHastaF} min={fechaDesdeF || undefined} onChange={e => setFechaHastaF(e.target.value)} />
+          </label>
+          {hayFiltros && <button style={S.btnLimpiar} onClick={limpiarFiltros}>Quitar filtros</button>}
         </div>
         <div style={S.row}>
           {puede.crear && <button style={S.btnPrimary} onClick={() => openModal('create')}>+ Nueva requisición</button>}
@@ -387,7 +448,7 @@ export default function SeleccionCrud() {
                   />
                 </SField>
                 <F l="N° identificación"     k="numero_identificacion" req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
-                <F l="Cargo del solicitante" k="cargo_solicitante"     req={!isRO(mode)} form={form} ch={ch} dis={isRO(mode)} />
+                <F l="Cargo del solicitante" k="cargo_solicitante"     req={!isRO(mode)} opts={cargosSolicitanteOpts} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="Fecha de solicitud"          k="fecha_solicitud"              req={!isRO(mode)} dis form={form} ch={ch} />
                 <F l="Proceso"                     k="proceso"                      req={!isRO(mode)} opts={OPT.procesos} form={form} ch={ch} dis={isRO(mode)} />
                 <F l="N° identificación del proceso" k="numero_identificacion_proceso" req={!isRO(mode)} dis form={form} ch={ch} />
@@ -523,6 +584,10 @@ const S = {
   page:        { display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' },
   toolbar:     { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
   filters:     { display: 'flex', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' },
+  buscarReq:   { height: 40, minWidth: 260, padding: '0 12px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontFamily: NUN, background: 'var(--white)', color: 'var(--text)', outline: 'none' },
+  fechaF:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: NUN },
+  fechaInput:  { height: 40, padding: '0 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontFamily: NUN, background: 'var(--white)', color: 'var(--text)' },
+  btnLimpiar:  { height: 40, padding: '0 14px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--white)', color: 'var(--text)', fontWeight: 700, fontSize: '0.82rem', fontFamily: NUN, cursor: 'pointer' },
   row:         { display: 'flex', alignItems: 'center', gap: 8 },
   label:       { fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: NUN, whiteSpace: 'nowrap' },
   btnPrimary:  { ..._btn, padding: '0 18px', background: 'var(--primary)', color: '#fff', border: 'none' },

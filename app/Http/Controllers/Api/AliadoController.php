@@ -9,6 +9,8 @@ use App\Models\WorkOrder;
 use App\Services\AltaAliadoEnAvanzaConoce;
 use App\Services\AltaEnAvanzaConoce;
 use App\Services\CredencialesAvanzaConoce;
+use App\Services\EliminacionEmpleado;
+use App\Services\UsuarioAliadoEmpresa;
 use App\Services\IdentidadUnica;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,8 +31,11 @@ use Illuminate\Validation\ValidationException;
  */
 class AliadoController extends Controller
 {
-    /** Estado de la Work Order (columna "Estado" del export) que cuenta en cada contador. */
-    private const ESTADO_ATENDIDA = 'Atendido';
+    /**
+     * Estado de la Work Order (columna "Estado" del export) que cuenta en cada contador. Una WO
+     * solo está Asignada o Finalizada (WorkOrderController::aplicarEstadoPorTecnico).
+     */
+    private const ESTADO_ASIGNADA = 'Asignado';
     private const ESTADO_FINALIZADA = 'Finalizado';
 
     /** Teléfono / celular: números, con + inicial, espacios o guiones opcionales. */
@@ -72,6 +77,8 @@ class AliadoController extends Controller
         'apellidos.regex'       => 'Los apellidos solo pueden tener letras y espacios.',
         'email.unique'          => 'Ese correo ya lo usa otro usuario del ERP.',
         'codigo_pdv.regex'      => 'El código punto de venta (PDV) debe tener solo números, ej. 39582.',
+        'representante_legal_nombre.regex'    => 'El nombre del representante legal solo puede tener letras y espacios.',
+        'representante_legal_documento.regex' => 'El documento del representante legal debe tener solo números, entre 5 y 15 dígitos (sin puntos ni espacios).',
         'modalidad_id_bt.required' => 'Selecciona la modalidad del aliado.',
         'modalidad_id_bt.integer'  => 'Selecciona la modalidad del aliado.',
         'modalidad_id_bt.in'       => 'La modalidad elegida no está en el catálogo de AvanzaConoce. Recarga la página y vuelve a elegirla.',
@@ -84,6 +91,8 @@ class AliadoController extends Controller
         'documento'         => 'Número de documento',
         'nombre'            => 'Razón social o nombre',
         'codigo_pdv'        => 'Código punto de venta (PDV)',
+        'representante_legal_nombre'    => 'Nombre del representante legal',
+        'representante_legal_documento' => 'Documento del representante legal',
         'modalidad_id_bt'   => 'Modalidad',
         'telefono'          => 'Teléfono',
         'correo'            => 'Correo',
@@ -125,6 +134,9 @@ class AliadoController extends Controller
     public function index(Request $request)
     {
         $query = Aliado::query()
+            // El usuario de un aliado empresa solo se ve a sí mismo; el técnico indirecto, a su aliado.
+            ->when($this->esAliado($request), fn ($q) => $q->where('usuario_id', $request->user()->id))
+            ->when($this->tecnicoIndirecto($request), fn ($q, $tecnico) => $q->whereKey($tecnico->aliado_id))
             ->when($request->tipo, fn ($q, $tipo) => $q->where('tipo', $tipo))
             ->when($request->proyecto, fn ($q, $proyecto) => $q->whereHas('proyectos', fn ($p) => $p->where('proyectos.id', $proyecto)))
             ->when($request->search, function ($q, $s) {
@@ -159,9 +171,11 @@ class AliadoController extends Controller
         $aliados->each(fn ($a) => $a->setAttribute('work_orders', $conteos[$a->id] ?? $this->conteoVacio()));
     }
 
-    public function show(Aliado $aliado)
+    public function show(Request $request, Aliado $aliado)
     {
-        $tecnicos = $aliado->tecnicos()
+        $this->soloElSuyo($request, $aliado);
+        // El técnico indirecto solo se ve a sí mismo (no a los demás técnicos de su aliado).
+        $tecnicos = $this->tecnicosVisibles($request, $aliado)
             ->select('id', 'cedula', 'nombres', 'apellidos', 'name', 'email', 'movil', 'activo', 'aliado_id')
             ->orderBy('name')
             ->get();
@@ -171,26 +185,61 @@ class AliadoController extends Controller
 
         $aliado->setRelation('tecnicos', $tecnicos);
         $aliado->load(['proyectos:id,nombre', 'jefeInmediato:id,name']);
-        $aliado->setAttribute('work_orders', $this->conteosWorkOrders('users.aliado_id', [$aliado->id])[$aliado->id] ?? $this->conteoVacio());
+        $aliado->setAttribute('work_orders', $this->tecnicoIndirecto($request)
+            ? ($conteos[$request->user()->id] ?? $this->conteoVacio())
+            : ($this->conteosWorkOrders('users.aliado_id', [$aliado->id])[$aliado->id] ?? $this->conteoVacio()));
 
         return response()->json($aliado);
     }
 
-    /** Work Orders de los técnicos del aliado; ?estado=atendidas|finalizadas filtra. */
+    /**
+     * Work Orders de los técnicos del aliado (por Cédula Técnico), de 25 en 25 con ?page=.
+     * Filtros: ?estado=asignadas|finalizadas, ?cedula_tecnico=, ?search= (N° de WO o ítem) y
+     * ?fecha_desde= / ?fecha_hasta= (fecha de atención, como en Operaciones > Work Orders).
+     * Con ?page= trae además los indicadores (total, asignadas, finalizadas) con esos
+     * mismos filtros menos el estado, que es lo que eligen los indicadores.
+     * Sin ?page= devuelve las 500 más recientes (compatibilidad).
+     */
     public function workOrders(Request $request, Aliado $aliado)
     {
-        $cedulas = $aliado->tecnicos()->whereNotNull('cedula')->pluck('cedula');
+        $this->soloElSuyo($request, $aliado);
+        $cedulas = $this->tecnicosVisibles($request, $aliado)->whereNotNull('cedula')->pluck('cedula');
 
-        $query = WorkOrder::whereIn('cedula_tecnico', $cedulas)
-            ->when($request->estado === 'atendidas', fn ($q) => $q->where('estado', self::ESTADO_ATENDIDA))
+        $base = WorkOrder::whereIn('cedula_tecnico', $cedulas)
+            ->when($request->cedula_tecnico, fn ($q, $c) => $q->where('cedula_tecnico', $c))
+            ->when(trim((string) $request->search), fn ($q, $s) => $q->where(fn ($w) => $w
+                ->where('numero_wo', 'like', "%{$s}%")->orWhere('numero_wo_ibs', 'like', "%{$s}%")))
+            ->when($request->fecha_desde, fn ($q, $f) => $q->whereDate('fecha_estado', '>=', $f))
+            ->when($request->fecha_hasta, fn ($q, $f) => $q->whereDate('fecha_estado', '<=', $f));
+
+        $query = (clone $base)
+            ->when($request->estado === 'asignadas', fn ($q) => $q->where('estado', self::ESTADO_ASIGNADA))
             ->when($request->estado === 'finalizadas', fn ($q) => $q->where('estado', self::ESTADO_FINALIZADA))
-            ->when($request->cedula_tecnico, fn ($q, $c) => $q->where('cedula_tecnico', $c));
+            ->orderByDesc('fecha_finalizacion')->orderByDesc('id');
 
-        return response()->json($query->orderByDesc('fecha_finalizacion')->orderByDesc('id')->limit(500)->get());
+        if ($request->has('page')) {
+            $conteo = (clone $base)
+                ->selectRaw('COUNT(*) as total')
+                ->selectRaw('SUM(estado = ?) as asignadas', [self::ESTADO_ASIGNADA])
+                ->selectRaw('SUM(estado = ?) as finalizadas', [self::ESTADO_FINALIZADA])
+                ->first();
+
+            // Fila completa: la tabla tiene las columnas de Work Orders y el ojo muestra todos sus datos.
+            return response()->json($query->paginate(25)->toArray() + ['indicadores' => [
+                'total'       => (int) $conteo->total,
+                'asignadas'   => (int) $conteo->asignadas,
+                'finalizadas' => (int) $conteo->finalizadas,
+            ]]);
+        }
+
+        return response()->json($query->limit(500)->get());
     }
 
     public function store(Request $request)
     {
+        // Un aliado o técnico de aliado nunca crea aliados nuevos, aunque la matriz le dé "Crear"
+        // (ese "Crear", en su ficha, es agregar técnicos a su empresa).
+        abort_if($this->esAliado($request) || $this->tecnicoIndirecto($request), 403, 'No tienes permiso para crear aliados.');
         $tipo = $this->validar($request, ['tipo' => ['required', Rule::in([Aliado::EMPRESA, Aliado::TECNICO])]])['tipo'];
 
         if ($tipo === Aliado::EMPRESA) {
@@ -204,6 +253,8 @@ class AliadoController extends Controller
             // Ya guardado en el ERP: su usuario en AvanzaConoce (rol Aliado, con PDV, modalidad
             // y su líder como supervisor). Si allá falla, el aliado queda creado igual.
             $credenciales = app(AltaAliadoEnAvanzaConoce::class)->sincronizar($aliado);
+            // Y su usuario del ERP, con la misma contraseña.
+            $credenciales = $this->conUsuarioDelErp($aliado->fresh(), $credenciales);
 
             return response()->json(['aliado' => $aliado->fresh()->load(['proyectos:id,nombre', 'jefeInmediato:id,name']), 'credenciales' => $credenciales], 201);
         }
@@ -256,10 +307,12 @@ class AliadoController extends Controller
 
     public function update(Request $request, Aliado $aliado)
     {
+        $this->soloElSuyo($request, $aliado);
         $reglas = $this->reglasAliado($aliado) + ['activo' => 'sometimes|boolean'];
         // El documento del aliado tipo técnico es la cédula de su usuario: no se cambia aquí.
         if ($aliado->tipo === Aliado::TECNICO) {
-            unset($reglas['tipo_documento'], $reglas['documento'], $reglas['codigo_pdv'], $reglas['modalidad_id_bt']);
+            unset($reglas['tipo_documento'], $reglas['documento'], $reglas['codigo_pdv'], $reglas['modalidad_id_bt'],
+                $reglas['representante_legal_nombre'], $reglas['representante_legal_documento']);
         }
 
         $data = $this->validar($request, $reglas);
@@ -267,6 +320,14 @@ class AliadoController extends Controller
             $aliado->update($data);
             $aliado->proyectos()->sync($data['proyectos']);
         });
+
+        // Su usuario del ERP sigue al aliado (nombre, correo, teléfono, activo). Si no se le
+        // pudo crear (documento o correo de otra persona), se reintenta con los datos nuevos.
+        if ($aliado->tipo === Aliado::EMPRESA) {
+            $aliado->usuario_id
+                ? app(UsuarioAliadoEmpresa::class)->sincronizar($aliado)
+                : app(UsuarioAliadoEmpresa::class)->asegurar($aliado);
+        }
 
         // AvanzaConoce rechazó un dato (correo o teléfono de otra persona...): al corregirlo
         // aquí vuelve a quedar pendiente y el reintento lo crea.
@@ -277,15 +338,25 @@ class AliadoController extends Controller
         return response()->json($aliado->fresh()->load(['proyectos:id,nombre', 'jefeInmediato:id,name']));
     }
 
-    public function destroy(Aliado $aliado)
+    public function destroy(Request $request, Aliado $aliado)
     {
-        if ($aliado->tecnicos()->exists()) {
-            return response()->json([
-                'message' => 'Este aliado tiene técnicos registrados: inactívalo en vez de eliminarlo, así se conserva su historial de Work Orders.',
-            ], 422);
+        $this->soloElSuyo($request, $aliado);
+        $yo = $request->user()->id;
+        if ($aliado->usuario_id === $yo || $aliado->tecnicos()->whereKey($yo)->exists()) {
+            return response()->json(['message' => 'No puedes eliminar el aliado al que pertenece tu propio usuario.'], 422);
         }
 
-        $aliado->delete();
+        // Sus técnicos existían solo por él: se borran por completo. Fuera de la transacción de
+        // abajo porque EliminacionEmpleado borra archivos al confirmar cada uno. Sus Work Orders
+        // no se borran (se enlazan por cédula, sin llave foránea).
+        $aliado->tecnicos()->where('rol', 'tecnico')->get()->each(fn (User $t) => EliminacionEmpleado::eliminar($t));
+
+        DB::transaction(function () use ($aliado) {
+            $usuarioId = $aliado->usuario_id;
+            $aliado->delete();
+            // Su usuario del ERP solo existía para él.
+            User::where('id', $usuarioId)->where('rol', UsuarioAliadoEmpresa::ROL)->delete();
+        });
 
         return response()->json(['message' => 'Aliado eliminado.']);
     }
@@ -293,6 +364,7 @@ class AliadoController extends Controller
     /** Agrega un técnico a un aliado tipo empresa. */
     public function agregarTecnico(Request $request, Aliado $aliado)
     {
+        $this->soloElSuyo($request, $aliado);
         if ($aliado->tipo !== Aliado::EMPRESA) {
             return response()->json(['message' => 'Solo a un aliado empresa se le agregan técnicos: el aliado indirecto es una sola persona.'], 422);
         }
@@ -306,7 +378,10 @@ class AliadoController extends Controller
 
     public function actualizarTecnico(Request $request, Aliado $aliado, User $tecnico)
     {
+        $this->soloElSuyo($request, $aliado);
         abort_unless($tecnico->aliado_id === $aliado->id, 404);
+        // El técnico de un aliado (directo de la empresa o indirecto) solo se edita a sí mismo.
+        abort_if(($yo = $this->tecnicoIndirecto($request)) && $yo->id !== $tecnico->id, 404);
 
         $data = $this->validar($request, [
             'nombres'   => ['required', 'string', 'max:100', 'regex:' . self::REGEX_NOMBRE],
@@ -348,8 +423,12 @@ class AliadoController extends Controller
         }
         $this->validarIdentidad($email, $data['movil'], $cedula);
 
-        // Misma contraseña que en AvanzaConoce si ya existe allá; si no, una temporal.
-        $credenciales = CredencialesAvanzaConoce::paraAlta($cedula);
+        // El técnico de un aliado empresa solo entra al ERP (no tiene AvanzaConoce): contraseña
+        // propia del ERP. El aliado / técnico indirecto sí usa AvanzaConoce: la misma de allá
+        // si ya existe; si no, una temporal (que también se le pone allá al crearlo).
+        $credenciales = $aliado->tipo === Aliado::EMPRESA
+            ? CredencialesAvanzaConoce::temporal()
+            : CredencialesAvanzaConoce::paraAlta($cedula);
 
         $tecnico = new User([
             'cedula'           => $cedula,
@@ -367,6 +446,57 @@ class AliadoController extends Controller
         $tecnico->forceFill(['rol' => 'tecnico', 'aliado_id' => $aliado->id])->save();
 
         return [$tecnico, $credenciales];
+    }
+
+    /**
+     * Crea el usuario del ERP del aliado empresa (misma contraseña que en AvanzaConoce) y
+     * completa las credenciales a mostrar. Con la integración apagada (`$credenciales` null)
+     * se muestran las del ERP solo.
+     */
+    private function conUsuarioDelErp(Aliado $aliado, ?array $credenciales): array
+    {
+        // Si ya existía en AvanzaConoce, su contraseña es la de allá, no la generada aquí.
+        $hash = ($credenciales['de_avanza'] ?? false)
+            ? (CredencialesAvanzaConoce::passwordEnAvanza(AltaAliadoEnAvanzaConoce::nit($aliado)) ?? $aliado->avanza_password)
+            : $aliado->avanza_password;
+        $erp = app(UsuarioAliadoEmpresa::class)->asegurar($aliado, $hash);
+
+        $credenciales ??= [
+            'nombre'    => $aliado->nombre,
+            'email'     => mb_strtolower(trim((string) $aliado->correo)),
+            'password'  => $erp['password'],
+            'de_avanza' => false,
+        ];
+
+        return array_merge($credenciales, [
+            'solo_avanza' => false,
+            'erp'         => ['estado' => $erp['estado'], 'mensaje' => $erp['mensaje']],
+        ]);
+    }
+
+    private function esAliado(Request $request): bool
+    {
+        return $request->user()?->rol === UsuarioAliadoEmpresa::ROL;
+    }
+
+    /** El técnico indirecto (técnico con `aliado_id`) en sesión, si lo es. */
+    private function tecnicoIndirecto(Request $request): ?User
+    {
+        $user = $request->user();
+        return $user && !$this->esAliado($request) && $user->aliado_id ? $user : null;
+    }
+
+    /** El usuario de un aliado empresa y el técnico indirecto solo abren su propio aliado. */
+    private function soloElSuyo(Request $request, Aliado $aliado): void
+    {
+        abort_if($this->esAliado($request) && $aliado->usuario_id !== $request->user()->id, 404);
+        abort_if(($tecnico = $this->tecnicoIndirecto($request)) && $aliado->id !== $tecnico->aliado_id, 404);
+    }
+
+    /** Técnicos del aliado que este usuario ve: todos, o solo él si es un técnico indirecto. */
+    private function tecnicosVisibles(Request $request, Aliado $aliado)
+    {
+        return $aliado->tecnicos()->when($this->tecnicoIndirecto($request), fn ($q, $tecnico) => $q->whereKey($tecnico->id));
     }
 
     private function credencialesParaMostrar(User $tecnico, array $credenciales): array
@@ -402,6 +532,8 @@ class AliadoController extends Controller
             'tipo_documento'  => ['required', Rule::in(Aliado::TIPOS_DOCUMENTO)],
             'documento'       => ['required', 'string', 'max:20', 'regex:/^[0-9]{5,15}(-[0-9])?$/', Rule::unique('aliados', 'documento')->ignore($aliado?->id)],
             'nombre'          => 'required|string|max:150',
+            'representante_legal_nombre'    => ['required', 'string', 'max:150', 'regex:' . self::REGEX_NOMBRE],
+            'representante_legal_documento' => ['required', 'string', 'regex:/^[0-9]{5,15}$/'],
             'codigo_pdv'      => ['required', 'string', 'regex:/^[0-9]{1,20}$/'],
             'modalidad_id_bt' => ['required', 'integer', Rule::in(Aliado::modalidadesDisponibles()->pluck('id_bt')->all())],
             'telefono'        => ['required', 'string', 'max:20', 'regex:' . self::REGEX_TELEFONO],
@@ -447,9 +579,9 @@ class AliadoController extends Controller
 
     /**
      * Work Orders por $columna (users.aliado_id o users.id), contando cada WO una vez
-     * aunque traiga varias filas (una por ítem). Asignadas = todas las de sus técnicos.
+     * aunque traiga varias filas (una por ítem). Total = todas las de sus técnicos.
      *
-     * @return array<int, array{asignadas: int, atendidas: int, finalizadas: int}>
+     * @return array<int, array{total: int, asignadas: int, finalizadas: int}>
      */
     private function conteosWorkOrders(string $columna, array $ids): array
     {
@@ -465,13 +597,13 @@ class AliadoController extends Controller
             ->whereIn($columna, $ids)
             ->groupBy($columna)
             ->selectRaw("{$prefijo}{$columna} as llave")
-            ->selectRaw("COUNT(DISTINCT {$wo}.numero_wo) as asignadas")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as atendidas", [self::ESTADO_ATENDIDA])
+            ->selectRaw("COUNT(DISTINCT {$wo}.numero_wo) as total")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as asignadas", [self::ESTADO_ASIGNADA])
             ->selectRaw("COUNT(DISTINCT CASE WHEN {$wo}.estado = ? THEN {$wo}.numero_wo END) as finalizadas", [self::ESTADO_FINALIZADA])
             ->get()
             ->mapWithKeys(fn ($f) => [(int) $f->llave => [
+                'total'       => (int) $f->total,
                 'asignadas'   => (int) $f->asignadas,
-                'atendidas'   => (int) $f->atendidas,
                 'finalizadas' => (int) $f->finalizadas,
             ]])
             ->all();
@@ -479,6 +611,6 @@ class AliadoController extends Controller
 
     private function conteoVacio(): array
     {
-        return ['asignadas' => 0, 'atendidas' => 0, 'finalizadas' => 0];
+        return ['total' => 0, 'asignadas' => 0, 'finalizadas' => 0];
     }
 }

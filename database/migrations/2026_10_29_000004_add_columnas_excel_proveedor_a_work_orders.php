@@ -11,38 +11,53 @@ return new class extends Migration
      * Macaw) trae columnas que hasta ahora se descartaban al importar. El usuario pegó la
      * fila 1 de ese archivo real y pidió agregar todo lo que faltara.
      */
+    /**
+     * Textos como TEXT (no VARCHAR): con las columnas de Macaw (000003) la fila de
+     * `work_orders` supera el límite de InnoDB ("Row size too large", 8126 bytes) en modo
+     * estricto; TEXT se guarda fuera de la fila. Idempotente: salta las que ya existan.
+     */
+    private const COLUMNAS = [
+        'dias_atraso' => ['integer', 'fecha_estado'],
+        'dias_atraso_sp' => ['integer', 'dias_atraso'],
+        'estado_descarga' => ['text', 'estado'],
+        'estado_orden_trabajo' => ['text', 'estado_descarga'],
+        'estado_visita' => ['text', 'estado_orden_trabajo'],
+        'estado_en_fecha' => ['dateTime', 'estado_visita'],
+        'georreferencia' => ['text', 'region_servicio'],
+        'nombre_cuadrilla_tecnico' => ['text', 'cuadrilla_tecnico'],
+        'apellido_cuadrilla_tecnico' => ['text', 'nombre_cuadrilla_tecnico'],
+        'cambio_domicilio_entre_calles' => ['text', 'direccion'],
+        'pais' => ['text', 'departamento'],
+        'puntos_referencia' => ['text', 'barrio'],
+        'codigo_postal' => ['text', 'pais'],
+        'agrupacion' => ['text', 'codigo_postal'],
+        'telefono_principal' => ['text', 'no_documento_cliente'],
+        'recursos' => ['text', 'servicio'],
+        'fecha_ultima_reasignacion' => ['dateTime', 'fecha_vencimiento'],
+        'reiteracion_servicio' => ['integer', 'region_servicio'],
+        'numero_visita' => ['text', 'estado_visita'],
+        'coordenada_x' => ['text', 'numero_visita'],
+        'coordenada_y' => ['text', 'coordenada_x'],
+        'razones' => ['text', 'problema'],
+        'numero_orden_trabajo' => ['text', 'numero_wo'],
+        'codigo_sl' => ['text', 'servicio'],
+        'clase_cliente' => ['text', 'tipo_orden'],
+        'agendamiento_externo' => ['text', 'clase_cliente'],
+        'descarga_materiales_obligatoria' => ['text', 'aging'],
+        'descarga_materiales_confirmada' => ['text', 'descarga_materiales_obligatoria'],
+        'id_encabezado_pedido' => ['text', 'numero_orden_trabajo'],
+    ];
+
     public function up(): void
     {
-        Schema::table('work_orders', function (Blueprint $table) {
-            $table->integer('dias_atraso')->nullable()->after('fecha_estado');
-            $table->integer('dias_atraso_sp')->nullable()->after('dias_atraso');
-            $table->string('estado_descarga', 60)->nullable()->after('estado');
-            $table->string('estado_orden_trabajo', 80)->nullable()->after('estado_descarga');
-            $table->string('estado_visita', 60)->nullable()->after('estado_orden_trabajo');
-            $table->dateTime('estado_en_fecha')->nullable()->after('estado_visita');
-            $table->string('georreferencia', 60)->nullable()->after('region_servicio');
-            $table->string('nombre_cuadrilla_tecnico', 100)->nullable()->after('cuadrilla_tecnico');
-            $table->string('apellido_cuadrilla_tecnico', 100)->nullable()->after('nombre_cuadrilla_tecnico');
-            $table->string('cambio_domicilio_entre_calles', 255)->nullable()->after('direccion');
-            $table->string('pais', 60)->nullable()->after('departamento');
-            $table->string('puntos_referencia', 150)->nullable()->after('barrio');
-            $table->string('codigo_postal', 30)->nullable()->after('pais');
-            $table->string('agrupacion', 60)->nullable()->after('codigo_postal');
-            $table->string('telefono_principal', 40)->nullable()->after('no_documento_cliente');
-            $table->string('recursos', 150)->nullable()->after('servicio');
-            $table->dateTime('fecha_ultima_reasignacion')->nullable()->after('fecha_vencimiento');
-            $table->integer('reiteracion_servicio')->nullable()->after('region_servicio');
-            $table->string('numero_visita', 60)->nullable()->after('estado_visita');
-            $table->string('coordenada_x', 30)->nullable()->after('numero_visita');
-            $table->string('coordenada_y', 30)->nullable()->after('coordenada_x');
-            $table->string('razones', 255)->nullable()->after('problema');
-            $table->string('numero_orden_trabajo', 60)->nullable()->after('numero_wo');
-            $table->string('codigo_sl', 30)->nullable()->after('servicio');
-            $table->string('clase_cliente', 60)->nullable()->after('tipo_orden');
-            $table->string('agendamiento_externo', 20)->nullable()->after('clase_cliente');
-            $table->string('descarga_materiales_obligatoria', 20)->nullable()->after('aging');
-            $table->string('descarga_materiales_confirmada', 20)->nullable()->after('descarga_materiales_obligatoria');
-            $table->string('id_encabezado_pedido', 60)->nullable()->after('numero_orden_trabajo');
+        $faltan = array_filter(self::COLUMNAS, fn ($c, $nombre) => !Schema::hasColumn('work_orders', $nombre), ARRAY_FILTER_USE_BOTH);
+        if (!$faltan) {
+            return;
+        }
+        Schema::table('work_orders', function (Blueprint $table) use ($faltan) {
+            foreach ($faltan as $nombre => [$tipo, $despues]) {
+                $table->{$tipo}($nombre)->nullable()->after($despues);
+            }
         });
     }
 

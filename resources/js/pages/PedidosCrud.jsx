@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/axios";
 import { useAcciones } from "../hooks/useAcciones";
+import { useAuth } from "../context/AuthContext";
 import {
     IconSearch,
     IconEmptySearch,
@@ -18,12 +19,22 @@ import SelectBuscable from "../components/SelectBuscable";
 
 // --- Valores estáticos para los filtros ---
 const ESTADOS_PEDIDO = ["Pendiente Aprobación", "Aprobado", "Enviado a compras", "Completado", "Rechazado"];
-const ALIADOS_MOCK = ["Aliado Norte S.A.S.", "Aliado Sur Limitada", "Distribuciones Avanza", "Punto de Venta Centro", "Aliado Alianza Oriente"];
 
 export default function PedidosCrud() {
     // Acciones que la matriz de Permisos le deja hacer a este rol aquí (el servidor las vuelve a validar).
     const puede = useAcciones();
     const qc = useQueryClient();
+    // Un aliado (usuario de un aliado empresa o técnico de un aliado) pide siempre a nombre de
+    // su aliado y solo ve sus pedidos (el servidor lo vuelve a imponer).
+    const { user } = useAuth();
+    const esAliado = user?.rol === "aliado" || !!user?.aliado_id;
+
+    // Aliados reales para "Responsable" de tipo Aliado (a un aliado solo le llega el suyo).
+    const { data: aliadosData = [] } = useQuery({
+        queryKey: ["pedidos-compra-aliados"],
+        queryFn: () => api.get("/pedidos-compra/aliados").then((r) => r.data),
+    });
+    const ALIADOS = useMemo(() => aliadosData.map((a) => a.nombre), [aliadosData]);
 
     // --- Cargar datos dinámicos del backend si existen ---
     const { data: catalogos = {} } = useQuery({
@@ -61,36 +72,22 @@ export default function PedidosCrud() {
         .filter(t => t.categoria === categoria)
         .map(t => ({ id: t.id, nombre: t.nombre }));
 
-    // --- Pedidos de Dotación enviados a Compras (datos reales del backend) ---
-    const { data: pedidosDotacion = [] } = useQuery({
-        queryKey: ["pedidos-automaticos"],
-        queryFn: () => api.get("/pedidos-automaticos").then((r) => r.data),
-    });
-
-    const pedidosDotacionCompras = useMemo(
-        () => pedidosDotacion.filter(p => p.estado === "Enviar a compras"),
-        [pedidosDotacion]
-    );
-
-    const [dotacionDetalle, setDotacionDetalle] = useState(null);
-
-    // --- Revisión manual de stock/traslado (pedidos "Enviar a compras", de Dotación o de oficina) ---
-    // revisionPedido: { id, codigo, origen: "dotacion" | "local" }
+    // --- Revisión manual de stock/traslado de los pedidos de oficina (la dotación va directo a
+    // Compras desde Pedidos globales) ---
+    // revisionPedido: { id, codigo }
     const [revisionPedido, setRevisionPedido] = useState(null);
 
-    const endpointItemBase = (itemId) => revisionPedido.origen === "dotacion"
-        ? `/pedido-automatico-items/${itemId}`
-        : `/pedido-compra-items/${itemId}`;
+    const endpointItemBase = (itemId) => `/pedido-compra-items/${itemId}`;
 
     const normalizarItemRevision = (raw) => ({
         item_id: raw.item_id,
-        titulo: raw.prenda ? `${raw.prenda} · ${raw.genero} · T:${raw.talla}` : raw.producto,
+        titulo: raw.producto,
         cantidad: raw.cantidad,
         estado_revision: raw.estado_revision,
         observacion: raw.observacion,
         sede_pedido: raw.sede_pedido,
         opciones: (raw.sedes_cercanas ?? raw.sedes_disponibles ?? []).map(o => ({
-            inventario_id: o.inventario_dotacion_id ?? o.inventario_producto_id,
+            inventario_id: o.inventario_producto_id,
             sede_id: o.sede_id,
             sede_nombre: o.sede_nombre,
             cantidad: o.cantidad,
@@ -98,18 +95,13 @@ export default function PedidosCrud() {
     });
 
     const { data: revisionItems = [], isLoading: loadingRevision } = useQuery({
-        queryKey: ["stock-revision", revisionPedido?.origen, revisionPedido?.id],
-        queryFn: () => {
-            const url = revisionPedido.origen === "dotacion"
-                ? `/pedidos-automaticos/${revisionPedido.id}/stock-revision`
-                : `/pedidos-compra/${revisionPedido.id}/stock-revision`;
-            return api.get(url).then(r => r.data.map(normalizarItemRevision));
-        },
+        queryKey: ["stock-revision", revisionPedido?.id],
+        queryFn: () => api.get(`/pedidos-compra/${revisionPedido.id}/stock-revision`).then(r => r.data.map(normalizarItemRevision)),
         enabled: !!revisionPedido,
     });
     const invalidateRevision = () => {
-        qc.invalidateQueries({ queryKey: ["stock-revision", revisionPedido?.origen, revisionPedido?.id] });
-        qc.invalidateQueries({ queryKey: revisionPedido.origen === "dotacion" ? ["pedidos-automaticos"] : ["pedidos-compra"] });
+        qc.invalidateQueries({ queryKey: ["stock-revision", revisionPedido?.id] });
+        qc.invalidateQueries({ queryKey: ["pedidos-compra"] });
     };
     const [accionandoItemId, setAccionandoItemId] = useState(null);
 
@@ -135,7 +127,6 @@ export default function PedidosCrud() {
     // Entrega tampoco se envía desde aquí: se dispara sola, consolidada por pedido, al
     // asignar el pedido a alguien en Asignación de Pedidos.
     const enviarActaTraslado = async (itemId) => {
-        if (revisionPedido.origen === "dotacion") return;
         try {
             const { data } = await api.post(`/pedido-compra-items/${itemId}/acta-traslado`);
             if (data.enviada) {
@@ -173,20 +164,12 @@ export default function PedidosCrud() {
         if (!window.confirm(`¿Solicitar el traslado de ${cantidad} unidad(es) hacia la sede pedida?`)) return;
         setAccionandoItemId(itemId);
         try {
-            const campoOrigen = revisionPedido.origen === "dotacion"
-                ? "inventario_dotacion_origen_id"
-                : "inventario_producto_origen_id";
             await api.post(`${endpointItemBase(itemId)}/traslado`, {
-                [campoOrigen]: inventarioOrigenId,
+                inventario_producto_origen_id: inventarioOrigenId,
                 cantidad,
             });
             invalidateRevision();
-            showToast(
-                revisionPedido.origen === "dotacion"
-                    ? "Traslado solicitado y stock movido. Enviando el acta de traslado por correo…"
-                    : "Traslado solicitado. Queda pendiente de aprobación en Inventario General antes de mover el stock y enviar el acta."
-            );
-            if (revisionPedido.origen === "dotacion") enviarActaTraslado(itemId);
+            showToast("Traslado solicitado. Queda pendiente de aprobación en Inventario General antes de mover el stock y enviar el acta.");
         } catch (err) {
             showToast(err?.response?.data?.message ?? "No se pudo solicitar el traslado.", "error");
         } finally {
@@ -222,55 +205,17 @@ export default function PedidosCrud() {
         }
     };
 
-    // --- Adapta los pedidos reales de Dotación a la misma forma que usa la tabla ---
-    const pedidosDotacionAdaptados = useMemo(
-        () => pedidosDotacionCompras.map(p => ({
-            id: `dot-${p.id}`,
-            origen: "dotacion",
-            codigo: p.codigo,
-            fecha_registro: (p.fecha_pedido || "").slice(0, 10),
-            tipo_responsable: "Empleado",
-            responsable: p.empleado ? `${p.empleado.nombres} ${p.empleado.apellidos}` : "—",
-            sede: p.contrato?.sede ?? "—",
-            clase: "Pedido Interno",
-            concepto: "REPOSICION",
-            estado: "Enviado a compras",
-            recibido_pedidos: !!p.recibido_pedidos,
-            // El check solo se puede activar cuando la revisión de al menos una prenda
-            // concluyó que NO hay stock en ninguna sede ("Enviado a Compras"). Si todo se
-            // resolvió con stock propio o traslado, o aún falta revisar, se queda bloqueado
-            // (el backend además lo valida server-side, así que esto es solo la UI).
-            puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
-            registra: "Módulo Dotación",
-            items: (p.items ?? []).map(it => ({
-                producto: `${it.inventario?.prenda ?? "Prenda"} · ${it.inventario?.genero ?? ""} · T:${it.inventario?.talla ?? ""}`,
-                cantidad: it.cantidad
-            })),
-            _dotacionRaw: p
-        })),
-        [pedidosDotacionCompras]
-    );
-
     // --- Listas de catálogos ---
     const sedesOptions = catalogos.sedes || [];
 
-    const responsablesOptions = useMemo(() => {
-        if (selCatalogos.responsables && selCatalogos.responsables.length > 0) {
-            return selCatalogos.responsables.map(r => r.name);
-        }
-        return [
-            "Juan Pérez",
-            "María Gómez",
-            "Carlos Rodríguez",
-            "Laura Martínez",
-            "Sofía Gallego",
-            "Andrés Mendoza"
-        ];
-    }, [selCatalogos]);
+    const responsablesOptions = useMemo(
+        () => (selCatalogos.responsables ?? []).map(r => r.name),
+        [selCatalogos]
+    );
 
     const todosResponsablesOptions = useMemo(
-        () => [...new Set([...responsablesOptions, ...ALIADOS_MOCK])],
-        [responsablesOptions]
+        () => [...new Set([...responsablesOptions, ...ALIADOS])],
+        [responsablesOptions, ALIADOS]
     );
 
     // --- Pedidos de insumos de oficina (datos reales del backend) ---
@@ -282,14 +227,12 @@ export default function PedidosCrud() {
 
     const [selectedIds, setSelectedIds] = useState([]);
 
-    // --- Listado combinado: pedidos locales + pedidos reales de Dotación enviados a compras ---
     const pedidosLocalAdaptados = useMemo(
         () => pedidos.map(p => {
             const categorias = [...new Set((p.items ?? []).map(it => it.tipo_producto?.categoria).filter(Boolean))];
             return {
                 ...p,
-                // Mismo criterio que en Dotación: el check "Enviar a Compras" solo se
-                // habilita cuando la revisión de al menos un producto concluyó que no
+                // El check "Enviar a Compras" solo se habilita cuando la revisión de al menos un producto concluyó que no
                 // hay stock en ninguna sede (el backend también lo valida).
                 puede_enviar_compras: (p.items ?? []).some(it => it.estado_revision === "Enviado a Compras"),
                 // Categoría de los productos del pedido, para mostrarla bajo el código
@@ -300,11 +243,6 @@ export default function PedidosCrud() {
         [pedidos]
     );
 
-    const pedidosCombinados = useMemo(
-        () => [...pedidosDotacionAdaptados, ...pedidosLocalAdaptados],
-        [pedidosDotacionAdaptados, pedidosLocalAdaptados]
-    );
-    
     // --- Búsqueda y filtros ---
     const [search, setSearch] = useState("");
     const [filterOpen, setFilterOpen] = useState(false);
@@ -364,19 +302,19 @@ export default function PedidosCrud() {
     // --- Resumen para las tarjetas de estadísticas ---
     const stats = useMemo(
         () => ({
-            total: pedidosCombinados.length,
-            pendientes: pedidosCombinados.filter(p => p.estado === "Pendiente Aprobación").length,
-            aprobados: pedidosCombinados.filter(p => p.estado === "Aprobado").length,
-            enviados: pedidosCombinados.filter(p => p.estado === "Enviado a compras").length,
-            completados: pedidosCombinados.filter(p => p.estado === "Completado").length,
+            total: pedidosLocalAdaptados.length,
+            pendientes: pedidosLocalAdaptados.filter(p => p.estado === "Pendiente Aprobación").length,
+            aprobados: pedidosLocalAdaptados.filter(p => p.estado === "Aprobado").length,
+            enviados: pedidosLocalAdaptados.filter(p => p.estado === "Enviado a compras").length,
+            completados: pedidosLocalAdaptados.filter(p => p.estado === "Completado").length,
         }),
-        [pedidosCombinados]
+        [pedidosLocalAdaptados]
     );
 
     // --- Lógica de filtrado local (instantánea) ---
     const filteredPedidos = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return pedidosCombinados.filter(p => {
+        return pedidosLocalAdaptados.filter(p => {
             if (q && !p.codigo.toLowerCase().includes(q) && !p.responsable.toLowerCase().includes(q)) return false;
 
             if (filtroEstado !== "Todos" && p.estado !== filtroEstado) return false;
@@ -390,7 +328,7 @@ export default function PedidosCrud() {
 
             return true;
         });
-    }, [pedidosCombinados, search, filtroEstado, filtroSede, filtroClase, filtroConcepto, filtroResponsable, filtroFechaInicio, filtroFechaFin]);
+    }, [pedidosLocalAdaptados, search, filtroEstado, filtroSede, filtroClase, filtroConcepto, filtroResponsable, filtroFechaInicio, filtroFechaFin]);
 
     // --- Limpiar Filtros ---
     const clearFilters = () => {
@@ -403,11 +341,8 @@ export default function PedidosCrud() {
         setFiltroFechaFin("");
     };
 
-    // --- Seleccionar / Deseleccionar Filas (los de Dotación son de solo lectura) ---
-    const seleccionablesFiltered = useMemo(
-        () => filteredPedidos.filter(p => p.origen !== "dotacion"),
-        [filteredPedidos]
-    );
+    // --- Seleccionar / Deseleccionar Filas ---
+    const seleccionablesFiltered = filteredPedidos;
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
@@ -496,26 +431,6 @@ export default function PedidosCrud() {
         }
     };
 
-    // --- Marcar/Desmarcar recepción manual de un pedido de Dotación en Pedidos ---
-    const [recibiendoDotacionId, setRecibiendoDotacionId] = useState(null);
-
-    const handleToggleRecibidoDotacion = async (pedidoDotacion, marcar) => {
-        setRecibiendoDotacionId(pedidoDotacion.id);
-        try {
-            await api.put(`/pedidos-automaticos/${pedidoDotacion.id}/recibido-pedidos`, { recibido: marcar });
-            qc.invalidateQueries({ queryKey: ["pedidos-automaticos"] });
-            showToast(
-                marcar
-                    ? `Pedido ${pedidoDotacion.codigo} recibido en Pedidos.`
-                    : `Pedido ${pedidoDotacion.codigo} marcado como no recibido.`
-            );
-        } catch (err) {
-            showToast(err?.response?.data?.message ?? "No se pudo actualizar el pedido.", "error");
-        } finally {
-            setRecibiendoDotacionId(null);
-        }
-    };
-
     // --- Exportar a Excel (Simulación) ---
     const handleExportar = () => {
         setExporting(true);
@@ -527,8 +442,8 @@ export default function PedidosCrud() {
 
     // --- Trazabilidad de Pedidos ---
     const selectedPedidoForTrazabilidad = useMemo(() => {
-        return pedidosCombinados.find(p => p.id === activeTrazabilidadId) || null;
-    }, [pedidosCombinados, activeTrazabilidadId]);
+        return pedidosLocalAdaptados.find(p => p.id === activeTrazabilidadId) || null;
+    }, [pedidosLocalAdaptados, activeTrazabilidadId]);
 
     const handleTrazabilidad = () => {
         if (selectedIds.length === 0) {
@@ -550,8 +465,8 @@ export default function PedidosCrud() {
         setModalMode("new");
         setModalData({
             id: null,
-            tipo_responsable: "Empleado",
-            responsable: responsablesOptions[0] || "",
+            tipo_responsable: esAliado ? "Aliado" : "Empleado",
+            responsable: esAliado ? (ALIADOS[0] || "") : (responsablesOptions[0] || ""),
             sede: sedesOptions[0] || "",
             clase: CLASES_PEDIDO[0] || "",
             concepto: CONCEPTOS_PEDIDO[0] || "",
@@ -581,7 +496,7 @@ export default function PedidosCrud() {
         setModalData(prev => ({
             ...prev,
             tipo_responsable: tipo,
-            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (ALIADOS_MOCK[0] || "")
+            responsable: tipo === "Empleado" ? (responsablesOptions[0] || "") : (ALIADOS[0] || "")
         }));
     };
 
@@ -820,22 +735,16 @@ export default function PedidosCrud() {
                                         transition: "background 0.2s"
                                     }}>
                                         <td style={{ textAlign: 'center' }}>
-                                            {p.origen !== "dotacion" && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={() => handleSelectRow(p.id)}
-                                                    style={S.checkbox}
-                                                />
-                                            )}
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => handleSelectRow(p.id)}
+                                                style={S.checkbox}
+                                            />
                                         </td>
                                         <td style={{ fontWeight: 800, fontFamily: "monospace" }}>
                                             {p.codigo}
-                                            {p.origen === "dotacion" ? (
-                                                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#6b21a8", letterSpacing: "0.04em", marginTop: 2 }}>
-                                                    DOTACIÓN
-                                                </div>
-                                            ) : p.categoria && (
+                                            {p.categoria && (
                                                 <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#0f766e", letterSpacing: "0.04em", marginTop: 2 }}>
                                                     {p.categoria.toUpperCase()}
                                                 </div>
@@ -874,25 +783,14 @@ export default function PedidosCrud() {
                                             </span>
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                                            {p.origen === "dotacion" ? (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={p.recibido_pedidos}
-                                                    disabled={!p.puede_enviar_compras || recibiendoDotacionId === p._dotacionRaw.id}
-                                                    onChange={(e) => handleToggleRecibidoDotacion(p._dotacionRaw, e.target.checked)}
-                                                    style={S.checkbox}
-                                                    title={p.puede_enviar_compras ? "Marca para enviar este pedido a Compras" : "Primero revisa el stock (botón ⇄): el check solo se activa si alguna prenda no tiene stock en ninguna sede"}
-                                                />
-                                            ) : (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={p.estado === "Enviado a compras"}
-                                                    disabled={p.estado === "Completado" || enviandoCompraId === p.id || (!p.puede_enviar_compras && p.estado !== "Enviado a compras")}
-                                                    onChange={(e) => handleEnviarCompras(p, e.target.checked)}
-                                                    style={S.checkbox}
-                                                    title={p.puede_enviar_compras || p.estado === "Enviado a compras" ? "Enviar este pedido al módulo de Compras" : "Primero revisa el stock (botón ⇄): el check solo se activa si algún producto no tiene stock en ninguna sede"}
-                                                />
-                                            )}
+                                            <input
+                                                type="checkbox"
+                                                checked={p.estado === "Enviado a compras"}
+                                                disabled={p.estado === "Completado" || enviandoCompraId === p.id || (!p.puede_enviar_compras && p.estado !== "Enviado a compras")}
+                                                onChange={(e) => handleEnviarCompras(p, e.target.checked)}
+                                                style={S.checkbox}
+                                                title={p.puede_enviar_compras || p.estado === "Enviado a compras" ? "Enviar este pedido al módulo de Compras" : "Primero revisa el stock (botón ⇄): el check solo se activa si algún producto no tiene stock en ninguna sede"}
+                                            />
                                         </td>
                                         <td>{p.registra}</td>
                                         <td style={{ textAlign: 'center' }}>
@@ -900,11 +798,11 @@ export default function PedidosCrud() {
                                                 <button
                                                     style={S.actionIconBtn("#e8f0ff", "#1a4fa8")}
                                                     title="Ver Detalles"
-                                                    onClick={() => p.origen === "dotacion" ? setDotacionDetalle(p._dotacionRaw) : handleAbrirEditar(p, "view")}
+                                                    onClick={() => handleAbrirEditar(p, "view")}
                                                 >
                                                     <IconEye size={14} />
                                                 </button>
-                                                {puede.editar && (p.origen === "dotacion" || p.estado !== "Completado") && (
+                                                {puede.editar && p.estado !== "Completado" && (
                                                     <button
                                                         style={{
                                                             ...S.actionIconBtn("#fef3c7", "#92400e"),
@@ -912,25 +810,17 @@ export default function PedidosCrud() {
                                                             fontSize: "0.9rem",
                                                         }}
                                                         title="Revisar Stock / Traslado"
-                                                        onClick={() => setRevisionPedido(
-                                                            p.origen === "dotacion"
-                                                                ? { id: p._dotacionRaw.id, codigo: p.codigo, origen: "dotacion" }
-                                                                : { id: p.id, codigo: p.codigo, origen: "local" }
-                                                        )}
+                                                        onClick={() => setRevisionPedido({ id: p.id, codigo: p.codigo })}
                                                     >
                                                         ⇄
                                                     </button>
                                                 )}
-                                                {p.origen !== "dotacion" && (
-                                                    <>
-                                                        {puede.editar && <button style={S.actionIconBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => handleAbrirEditar(p, "edit")}>
-                                                            <IconEdit size={14} />
-                                                        </button>}
-                                                        {puede.eliminar && <button style={S.actionIconBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => handleEliminarUno(p)}>
-                                                            <IconTrash size={14} />
-                                                        </button>}
-                                                    </>
-                                                )}
+                                                {puede.editar && <button style={S.actionIconBtn("#e8f8f5", "var(--primary-dark)")} title="Editar" onClick={() => handleAbrirEditar(p, "edit")}>
+                                                    <IconEdit size={14} />
+                                                </button>}
+                                                {puede.eliminar && <button style={S.actionIconBtn("#fce8e8", "#a33")} title="Eliminar" onClick={() => handleEliminarUno(p)}>
+                                                    <IconTrash size={14} />
+                                                </button>}
                                             </div>
                                         </td>
                                     </tr>
@@ -1054,82 +944,7 @@ export default function PedidosCrud() {
                 </div>
             )}
 
-            {/* --- Modal Detalle de Pedido de Dotación (solo lectura) --- */}
-            {dotacionDetalle && (
-                <div style={S.overlay}>
-                    <div style={S.modal} onClick={e => e.stopPropagation()}>
-                        <div style={S.modalHeader}>
-                            <span style={S.modalTitle}>
-                                Pedido de Dotación {dotacionDetalle.codigo}
-                            </span>
-                            <button style={S.closeBtn} onClick={() => setDotacionDetalle(null)}>
-                                <IconClose size={16} />
-                            </button>
-                        </div>
-                        <div style={S.modalBody}>
-                            <div className="form-grid" style={S.grid2}>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Empleado</label>
-                                    <div style={{ fontWeight: 700 }}>
-                                        {dotacionDetalle.empleado
-                                            ? `${dotacionDetalle.empleado.nombres} ${dotacionDetalle.empleado.apellidos}`
-                                            : "—"}
-                                    </div>
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Cédula</label>
-                                    <div style={{ fontWeight: 700 }}>{dotacionDetalle.empleado?.cedula ?? "—"}</div>
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Sede</label>
-                                    <div style={{ fontWeight: 700 }}>{dotacionDetalle.contrato?.sede ?? "—"}</div>
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Proyecto</label>
-                                    <div style={{ fontWeight: 700 }}>{dotacionDetalle.contrato?.cliente_proyecto ?? "—"}</div>
-                                </div>
-                                <div style={S.formGroup}>
-                                    <label style={S.label}>Fecha Pedido</label>
-                                    <div style={{ fontWeight: 700 }}>{dotacionDetalle.fecha_pedido}</div>
-                                </div>
-                            </div>
-
-                            <hr style={{ border: 'none', borderBottom: '1.5px solid var(--border)', margin: '20px 0' }} />
-
-                            <h3 style={{ fontFamily: "'Poppins', sans-serif", fontSize: '0.98rem', fontWeight: 700, color: 'var(--primary)', marginBottom: 12 }}>
-                                Prendas a comprar
-                            </h3>
-                            <div style={{ border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                    <thead>
-                                        <tr style={{ background: 'var(--bg)', borderBottom: '1.5px solid var(--border)' }}>
-                                            <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800 }}>Prenda</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800 }}>Talla</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800 }}>Género</th>
-                                            <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, width: 80 }}>Cantidad</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(dotacionDetalle.items ?? []).map((it, idx) => (
-                                            <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                <td style={{ padding: '8px 12px', fontWeight: 600 }}>{it.inventario?.prenda ?? "—"}</td>
-                                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>{it.inventario?.talla ?? "—"}</td>
-                                                <td style={{ padding: '8px 12px', textAlign: 'center' }}>{it.inventario?.genero ?? "—"}</td>
-                                                <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800 }}>{it.cantidad}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div style={S.modalFooter}>
-                            <button style={S.btnSecondary} onClick={() => setDotacionDetalle(null)}>Cerrar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- Modal Revisión de Stock / Traslado (pedidos de Dotación) --- */}
+            {/* --- Modal Revisión de Stock / Traslado --- */}
             {revisionPedido && (
                 <div style={S.overlay}>
                     <div style={{ ...S.modal, maxWidth: "min(1100px, 94vw)" }} onClick={e => e.stopPropagation()}>
@@ -1180,13 +995,13 @@ export default function PedidosCrud() {
                                                             Observación: {it.observacion}
                                                         </div>
                                                     )}
-                                                    {revisionPedido.origen !== "dotacion" && it.estado_revision === "Traslado Solicitado" && (
+                                                    {it.estado_revision === "Traslado Solicitado" && (
                                                         <div style={{ fontSize: '0.8rem', color: '#92400e', marginBottom: 10 }}>
                                                             Falta que lo aprueben en Inventario General &gt; Aprobación de Traslado: ahí se mueve el stock y se manda el acta.
                                                         </div>
                                                     )}
                                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                                        {revisionPedido.origen !== "dotacion" && it.estado_revision === "Traslado Aprobado" && (
+                                                        {it.estado_revision === "Traslado Aprobado" && (
                                                             <button
                                                                 style={{ ...S.btnSecondary, fontSize: '0.8rem', padding: '5px 12px' }}
                                                                 onClick={() => enviarActaTraslado(it.item_id)}
@@ -1482,7 +1297,7 @@ export default function PedidosCrud() {
                                                     name="tipo_resp"
                                                     checked={modalData.tipo_responsable === "Empleado"}
                                                     onChange={() => handleTipoResponsableChange("Empleado")}
-                                                    disabled={modalMode === "view"}
+                                                    disabled={modalMode === "view" || esAliado}
                                                 />
                                                 Empleado
                                             </label>
@@ -1492,7 +1307,7 @@ export default function PedidosCrud() {
                                                     name="tipo_resp"
                                                     checked={modalData.tipo_responsable === "Aliado"}
                                                     onChange={() => handleTipoResponsableChange("Aliado")}
-                                                    disabled={modalMode === "view"}
+                                                    disabled={modalMode === "view" || esAliado}
                                                 />
                                                 Aliado
                                             </label>
@@ -1516,10 +1331,12 @@ export default function PedidosCrud() {
                                                 style={S.select} 
                                                 value={modalData.responsable} 
                                                 onChange={e => setModalData(prev => ({ ...prev, responsable: e.target.value }))}
-                                                disabled={modalMode === "view"}
+                                                disabled={modalMode === "view" || esAliado}
                                                 required
                                             >
-                                                {ALIADOS_MOCK.map(s => <option key={s} value={s}>{s}</option>)}
+                                                {/* Un pedido viejo con un aliado que ya no está activo lo conserva. */}
+                                                {(modalData.responsable && !ALIADOS.includes(modalData.responsable) ? [modalData.responsable, ...ALIADOS] : ALIADOS)
+                                                    .map(s => <option key={s} value={s}>{s}</option>)}
                                             </SelectBuscable>
                                         )}
                                     </div>

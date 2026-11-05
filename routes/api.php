@@ -52,14 +52,24 @@ Route::get('/registro/catalogos', function (Request $request) {
         }
     }
 
+    // Listas de nombres en una sola consulta (ver ListasDeNombres): es el formulario público.
+    $nombres = \App\Support\ListasDeNombres::traer([
+        'proyectos'        => ['tabla' => 'proyectos', 'filtro' => fn ($q) => $q->where('activo', true)],
+        'eps'              => ['tabla' => 'eps'],
+        'fondos_pensiones' => ['tabla' => 'fondos_pensiones'],
+        'fondos_cesantias' => ['tabla' => 'fondos_cesantias'],
+        'estados_civil'    => ['tabla' => 'estados_civil'],
+        'tipos_rh'         => ['tabla' => 'tipos_rh'],
+    ]);
+
     return response()->json([
         'ciudades'        => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),
-        'proyectos'       => DB::table('proyectos')->where('activo', true)->orderBy('nombre')->pluck('nombre'),
-        'eps'             => DB::table('eps')->orderBy('nombre')->pluck('nombre'),
-        'fondos_pensiones'=> DB::table('fondos_pensiones')->orderBy('nombre')->pluck('nombre'),
-        'fondos_cesantias'=> DB::table('fondos_cesantias')->orderBy('nombre')->pluck('nombre'),
-        'estados_civil'   => DB::table('estados_civil')->orderBy('nombre')->pluck('nombre'),
-        'tipos_rh'        => DB::table('tipos_rh')->orderBy('nombre')->pluck('nombre'),
+        'proyectos'       => $nombres['proyectos'],
+        'eps'             => $nombres['eps'],
+        'fondos_pensiones'=> $nombres['fondos_pensiones'],
+        'fondos_cesantias'=> $nombres['fondos_cesantias'],
+        'estados_civil'   => $nombres['estados_civil'],
+        'tipos_rh'        => $nombres['tipos_rh'],
         'negocio'         => $negocio,
         'estado'          => $estado,
         // Empresa de la requisición: la que se muestra en el formulario (S&M o Servimercadeo).
@@ -181,31 +191,44 @@ Route::get('/catalogos', function () {
 
     $merge = fn($base, $extra) => $base->merge($extra)->filter(fn($v) => $v && $v !== '')->unique()->sort()->values();
 
+    // Las listas de nombres en una sola consulta (ver ListasDeNombres). area_empresa no
+    // lleva DISTINCT, como antes.
+    $hayAreas = \Illuminate\Support\Facades\Schema::hasTable('area_empresa');
+    $listas = collect(['cargos' => 'cargos', 'eps' => 'eps', 'arls' => 'arls', 'cajas' => 'cajas_compensacion',
+        'pensiones' => 'fondos_pensiones', 'cesantias' => 'fondos_cesantias', 'bancos' => 'bancos',
+        'tipos_rh' => 'tipos_rh', 'sedes' => 'sedes', 'anexos_auxilios' => 'anexos_auxilios'])->map(fn ($tabla) => ['tabla' => $tabla, 'distinct' => true])->all();
+    if ($hayAreas) {
+        $listas['areas_empresa'] = ['tabla' => 'area_empresa'];
+    }
+    $nombres = \App\Support\ListasDeNombres::traer($listas);
+    // Tipos de funcionario/vinculación: distintos exactos (como el unique() de PHP) en una
+    // sola consulta; el filtro y el orden finales siguen en PHP ($merge), como antes.
+    $tipos = DB::table('users')->selectRaw("? as k, CONVERT(tipo_funcionario USING utf8mb4) COLLATE utf8mb4_bin as v", ['tipos_funcionario'])
+        ->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->distinct()
+        ->unionAll(DB::table('base_ingresos')->selectRaw("? as k, CONVERT(tipo_vinculacion USING utf8mb4) COLLATE utf8mb4_bin as v", ['tipos_vinculacion'])
+            ->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->distinct())
+        ->get()->groupBy('k')->map(fn ($g) => $g->pluck('v'));
+    $lista = fn (string $clave) => $nombres->get($clave, collect());
+
     return response()->json([
-        'cargos'            => DB::table('cargos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'eps'               => DB::table('eps')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'arls'              => DB::table('arls')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'cajas'             => DB::table('cajas_compensacion')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'pensiones'         => DB::table('fondos_pensiones')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'cesantias'         => DB::table('fondos_cesantias')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'bancos'            => DB::table('bancos')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'tipos_rh'          => DB::table('tipos_rh')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'sedes'             => DB::table('sedes')->select('nombre')->distinct()->orderBy('nombre')->pluck('nombre'),
-        'areas_empresa'     => \Illuminate\Support\Facades\Schema::hasTable('area_empresa')
-                                    ? DB::table('area_empresa')->orderBy('nombre')->pluck('nombre')
-                                    : [],
+        'cargos'            => $lista('cargos'),
+        'eps'               => $lista('eps'),
+        'arls'              => $lista('arls'),
+        'cajas'             => $lista('cajas'),
+        'pensiones'         => $lista('pensiones'),
+        'cesantias'         => $lista('cesantias'),
+        'bancos'            => $lista('bancos'),
+        'tipos_rh'          => $lista('tipos_rh'),
+        'sedes'             => $lista('sedes'),
+        // Opciones de "Anexo / Auxilio" del contrato (Parámetros > Anexos y Auxilios).
+        'anexos_auxilios'   => $lista('anexos_auxilios'),
+        'areas_empresa'     => $hayAreas ? $lista('areas_empresa') : [],
         'regionales'        => DB::table('regionales')->select('id', 'nombre')->orderBy('nombre')->get(),
         'empleadores'       => DB::table('empleadores')->select('id', 'nombre', 'tipo')->orderBy('nombre')->get(),
         'ciudades'          => $ciudades,
         'sedes_por_ciudad'  => $sedesPorCiudad,
-        'tipos_funcionario' => $merge(
-                                    DB::table('users')->whereNotNull('tipo_funcionario')->where('tipo_funcionario', '!=', '')->pluck('tipo_funcionario'),
-                                    collect([])
-                               ),
-        'tipos_vinculacion' => $merge(
-                                    DB::table('base_ingresos')->whereNotNull('tipo_vinculacion')->where('tipo_vinculacion', '!=', '')->pluck('tipo_vinculacion'),
-                                    collect([])
-                               ),
+        'tipos_funcionario' => $merge($tipos->get('tipos_funcionario', collect()), collect([])),
+        'tipos_vinculacion' => $merge($tipos->get('tipos_vinculacion', collect()), collect([])),
     ]);
 });
 
@@ -227,7 +250,7 @@ Route::post('/users/desde-avanzaconoce', [UserController::class, 'recibirDeAvanz
 Route::post('/sso/token', [SsoController::class, 'generarToken']);
 
 // ── Protegido (Sanctum) ───────────────────────────────────────────────────────
-Route::middleware(['auth:sanctum', 'activo'])->group(function () {
+Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function () {
     // Actualizar configuración global (tema de color)
     Route::post('/settings', [AppSettingController::class, 'update']);
 
@@ -240,6 +263,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         return response()->json(
             App\Models\User::where('activo', true)
                 ->whereNotNull('name')->where('name', '!=', '')
+                // El usuario de un aliado empresa no es una persona de la empresa.
+                ->where(fn ($q) => $q->whereNull('rol')->orWhere('rol', '!=', 'aliado'))
                 ->orderBy('name')
                 ->get(['id', 'name', 'cargo'])
         );
@@ -404,6 +429,24 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.regionales.regionales_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.regionales.regionales_file'));
 
+    // Parámetros > Anexos y Auxilios: las opciones de "Anexo / Auxilio" del contrato.
+    Route::apiResource('anexos-auxilios', App\Http\Controllers\Api\AnexoAuxilioController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['anexos-auxilios' => 'anexoAuxilio'])
+        ->middleware('permiso:parametros.anexos_auxilios')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.anexos_auxilios.anexos_auxilios_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.anexos_auxilios.anexos_auxilios_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.anexos_auxilios.anexos_auxilios_file'));
+
+    // Catálogo de cargos (Parametros > Cargos): los selects de Contratos, Empleados y Selección.
+    Route::apiResource('cargos', App\Http\Controllers\Api\CargoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['cargos' => 'cargo'])
+        ->middleware('permiso:parametros.cargos')
+        ->middlewareFor('store', PermisoDenegado::middleware('crear', 'parametros.cargos.cargos_file'))
+        ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.cargos.cargos_file'))
+        ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.cargos.cargos_file'));
+
     // Catálogo de proyectos (Parametros > Proyectos)
     Route::apiResource('proyectos', App\Http\Controllers\Api\ProyectoController::class)
         ->parameters(['proyectos' => 'proyecto'])
@@ -468,7 +511,7 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
-    // Parametros > Operaciones > Asignación de Vehículo
+    // Parametros > Operativos > Asignación de Vehículo
     Route::get('vehiculos/tecnicos', [App\Http\Controllers\Api\VehiculoController::class, 'tecnicos']);
     Route::get('vehiculos/{vehiculo}/archivo/{cara}', [App\Http\Controllers\Api\VehiculoController::class, 'descargarArchivo']);
     Route::apiResource('vehiculos', App\Http\Controllers\Api\VehiculoController::class)
@@ -481,6 +524,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);
     Route::get('ordenes-compra/{ordenCompra}/pdf', [App\Http\Controllers\Api\OrdenCompraController::class, 'pdf']);
+    Route::get('ordenes-compra/{ordenCompra}/excel-dotacion', [App\Http\Controllers\Api\OrdenCompraController::class, 'excelDotacion']);
+    Route::put('ordenes-compra/{ordenCompra}/completar', [App\Http\Controllers\Api\OrdenCompraController::class, 'completar'])
+        ->middleware(PermisoDenegado::middleware('crear', 'pedidos_compras.compras.ver_crear_orden_compra'));
     Route::apiResource('ordenes-compra', App\Http\Controllers\Api\OrdenCompraController::class)
         ->parameters(['ordenes-compra' => 'ordenCompra'])
         ->only(['index', 'show', 'store', 'destroy'])
@@ -507,12 +553,16 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
 
     // Work Orders (Operaciones > Work Orders): visor de órdenes de trabajo técnicas,
     // cargadas por importación masiva desde el Excel de origen del proveedor.
-    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen']);
+    // Ver: técnico directo (solo las suyas, ver WorkOrderController::visibles) y roles superiores
+    // con el submódulo; ningún aliado (PermisoDenegado::SOLO_PERSONAL_DIRECTO).
+    Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen'])
+        ->middleware('permiso:operaciones.work_orders');
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
         ->middleware(PermisoDenegado::middleware('importar', 'operaciones.work_orders.work_orders_file'));
     Route::apiResource('work-orders', App\Http\Controllers\Api\WorkOrderController::class)
         ->only(['index', 'update', 'destroy'])
         ->parameters(['work-orders' => 'workOrder'])
+        ->middleware('permiso:operaciones.work_orders')
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.work_orders.work_orders_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.work_orders.work_orders_file'));
 
@@ -521,12 +571,14 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::get('aliados/proyectos', [App\Http\Controllers\Api\AliadoController::class, 'proyectos']);
     Route::get('aliados/jefes', [App\Http\Controllers\Api\AliadoController::class, 'jefes']);
     Route::get('aliados/modalidades', [App\Http\Controllers\Api\AliadoController::class, 'modalidades']);
-    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders']);
+    Route::get('aliados/{aliado}/work-orders', [App\Http\Controllers\Api\AliadoController::class, 'workOrders'])
+        ->middleware('permiso:operaciones.aliados');
     Route::post('aliados/{aliado}/tecnicos', [App\Http\Controllers\Api\AliadoController::class, 'agregarTecnico'])
         ->middleware(PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'));
     Route::put('aliados/{aliado}/tecnicos/{tecnico}', [App\Http\Controllers\Api\AliadoController::class, 'actualizarTecnico'])
         ->middleware(PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'));
     Route::apiResource('aliados', App\Http\Controllers\Api\AliadoController::class)
+        ->middlewareFor(['index', 'show'], 'permiso:operaciones.aliados')
         ->middlewareFor('store', PermisoDenegado::middleware('crear', 'operaciones.aliados.aliados_file'))
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'operaciones.aliados.aliados_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'operaciones.aliados.aliados_file'));
@@ -561,7 +613,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('auditoria/procesos', [App\Http\Controllers\Api\AuditoriaController::class, 'procesos']);
     });
 
-    // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos)
+    // Pedidos de insumos de oficina (Pedidos y Compras > Pedidos > Ver y Crear Pedidos). Un
+    // aliado solo ve y toca los suyos (PedidoCompra::visiblesPara).
+    // Antes del apiResource: si no, "aliados" se tomaría como el id de un pedido.
+    Route::get('pedidos-compra/aliados', [App\Http\Controllers\Api\PedidoCompraController::class, 'aliados']);
     Route::apiResource('pedidos-compra', App\Http\Controllers\Api\PedidoCompraController::class)
         ->parameters(['pedidos-compra' => 'pedidoCompra'])
         ->middlewareFor('store', PermisoDenegado::middleware('crear', 'pedidos_compras.pedidos.ver_crear_pedidos'))
@@ -836,14 +891,13 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::get('/seleccion/catalogos', function () {
         return response()->json([
             'cargos'       => DB::table('cargos')->select('id', 'nombre')->orderBy('nombre')->get(),
-            // Subconjunto ofrecido en "Cargo requerido" de las requisiciones
-            'cargos_requisicion' => DB::table('cargos')->where('en_requisicion', true)->select('id', 'nombre')->orderBy('nombre')->get(),
             'proyectos'    => DB::table('proyectos')->where('activo', true)->orderBy('nombre')
                                ->get(['id', 'nombre'])
                                ->map(fn($p) => ['value' => $p->id, 'label' => $p->nombre])
                                ->values(),
             'responsables' => DB::table('users')
                                ->whereNotNull('name')->where('name', '!=', '')
+                               ->where(fn ($q) => $q->whereNull('rol')->orWhere('rol', '!=', 'aliado'))
                                ->orderBy('name')
                                ->get(['name', 'cedula', 'cargo']),
             'ciudades'     => DB::table('ciudades')->select('id', 'nombre')->orderBy('nombre')->get(),

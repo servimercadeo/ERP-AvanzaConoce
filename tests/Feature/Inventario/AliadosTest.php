@@ -44,6 +44,7 @@ class AliadosTest extends TestCase
             'nombre' => 'TECNOMARIN S.A.S', 'telefono' => '3001112233', 'ciudad' => 'MEDELLIN',
             'correo' => 'contacto@tecnomarin.co', 'direccion' => 'Calle 10 # 20-30',
             'codigo_pdv' => '39582', 'modalidad_id_bt' => 26359,
+            'representante_legal_nombre' => 'María Pérez Gómez', 'representante_legal_documento' => '43123456',
             'proyectos' => [$this->proyecto['DIRECTV'], $this->proyecto['HUGHES COL']],
             'jefe_inmediato_id' => $this->jefe,
         ], $extra);
@@ -64,16 +65,19 @@ class AliadosTest extends TestCase
         return collect($respuesta->json($ruta))->pluck('nombre')->sort()->values()->all();
     }
 
-    public function test_aliado_tipo_empresa_crea_solo_el_aliado(): void
+    public function test_aliado_tipo_empresa_crea_el_aliado_y_su_usuario_del_erp(): void
     {
         $this->actuarComo('admin');
 
-        $this->postJson('/api/aliados', $this->empresa())
-            ->assertCreated()->assertJsonPath('credenciales', null);
+        $r = $this->postJson('/api/aliados', $this->empresa())
+            ->assertCreated()->assertJsonPath('credenciales.erp.estado', 'ok');
 
         $aliado = Aliado::firstOrFail();
         $this->assertSame('empresa', $aliado->tipo);
-        $this->assertSame(0, $aliado->tecnicos()->count());
+        $this->assertSame(0, $aliado->tecnicos()->count(), 'Su usuario no es uno de sus técnicos.');
+        $usuario = User::findOrFail($aliado->usuario_id);
+        $this->assertSame(['aliado', '9001234567', 'contacto@tecnomarin.co', null], [$usuario->rol, $usuario->cedula, $usuario->email, $usuario->aliado_id]);
+        $this->assertTrue(Hash::check($r->json('credenciales.password'), $usuario->password));
     }
 
     public function test_aliado_empresa_se_crea_completo_y_correcto(): void
@@ -85,8 +89,9 @@ class AliadosTest extends TestCase
             'nombre' => '  Satelital Carvajal Acevedo S.A.S ', 'correo' => 'Gerencia@SATELITAL.co', 'observaciones' => 'Opera en el Eje Cafetero',
         ]))->assertCreated();
 
-        // Respuesta (integración con AvanzaConoce apagada): sin credenciales y con sus relaciones.
-        $r->assertJsonPath('credenciales', null)
+        // Respuesta (integración con AvanzaConoce apagada): credenciales solo del ERP y sus relaciones.
+        $r->assertJsonPath('credenciales.avanza', null)
+            ->assertJsonPath('credenciales.erp.estado', 'ok')
             ->assertJsonPath('aliado.jefe_inmediato.name', 'COORDINADOR OPERACIONES');
         $this->assertSame(['DIRECTV', 'HUGHES COL'], $this->nombresProyectos($r));
 
@@ -104,7 +109,7 @@ class AliadosTest extends TestCase
         ])->all());
         $this->assertArrayNotHasKey('contacto_nombre', $aliado->getAttributes());
 
-        // Solo se crea el aliado: ningún usuario técnico ni del ERP; con la integración apagada nada se envía.
+        // El aliado y su usuario del ERP, ningún técnico; con la integración apagada nada se envía.
         $this->assertSame(0, $aliado->tecnicos()->count());
         $this->assertSame(0, User::where('rol', 'tecnico')->count());
         Http::assertNothingSent();
@@ -333,16 +338,20 @@ class AliadosTest extends TestCase
             'proyectos' => [$this->proyecto['HUGHES COL'], $this->proyecto['DIRECTV']],
         ]))->assertCreated();
 
-        // Credenciales de AvanzaConoce (no del ERP) y resultado del envío.
+        // Las mismas credenciales sirven en AvanzaConoce y en el ERP; resultado de ambos.
         $r->assertJsonPath('credenciales.email', 'gladiscarvajalace@gmail.com')
-            ->assertJsonPath('credenciales.solo_avanza', true)
-            ->assertJsonPath('credenciales.avanza.estado', 'ok');
+            ->assertJsonPath('credenciales.solo_avanza', false)
+            ->assertJsonPath('credenciales.avanza.estado', 'ok')
+            ->assertJsonPath('credenciales.erp.estado', 'ok');
         $aliado = Aliado::firstOrFail();
         $this->assertTrue(Hash::check($r->json('credenciales.password'), $aliado->avanza_password));
         $this->assertSame(['ok', 1196], [$aliado->avanza_sync_estado, (int) $aliado->avanzaconoce_id]);
         $this->assertArrayNotHasKey('avanza_password', $r->json('aliado'));
-        // La empresa no es usuario del ERP.
-        $this->assertSame(0, User::where('cedula', '9015381039')->count());
+        // Su usuario del ERP: el NIT sin guion como cédula (como en AvanzaConoce, para el SSO
+        // y la copia de contraseñas) y el mismo hash que se mandó allá.
+        $usuario = User::where('cedula', '9015381039')->firstOrFail();
+        $this->assertSame(['aliado', $aliado->id], [$usuario->rol, $usuario->aliadoEmpresa?->id]);
+        $this->assertSame($aliado->avanza_password, $usuario->password);
 
         Http::assertSentCount(1);
         Http::assertSent(function (Peticion $req) use ($aliado, $jefe, $r) {
@@ -480,6 +489,8 @@ class AliadosTest extends TestCase
             'tipo_documento'    => 'Completa el campo «Tipo de documento».',
             'documento'         => 'Completa el campo «Número de documento».',
             'nombre'            => 'Completa el campo «Razón social o nombre».',
+            'representante_legal_nombre'    => 'Completa el campo «Nombre del representante legal».',
+            'representante_legal_documento' => 'Completa el campo «Documento del representante legal».',
             'codigo_pdv'        => 'Completa el campo «Código punto de venta (PDV)».',
             'modalidad_id_bt'   => 'Selecciona la modalidad del aliado.',
             'telefono'          => 'Completa el campo «Teléfono».',
@@ -539,6 +550,10 @@ class AliadosTest extends TestCase
 
         $error = fn (array $extra, string $campo) => $this->postJson('/api/aliados', $this->empresa(['documento' => '800111222'] + $extra))->assertStatus(422)->json("errors.{$campo}.0");
         $this->assertSame('El código punto de venta (PDV) debe tener solo números, ej. 39582.', $error(['codigo_pdv' => 'PDV-12'], 'codigo_pdv'));
+        $this->assertSame('El nombre del representante legal solo puede tener letras y espacios.', $error(['representante_legal_nombre' => 'Ana 123'], 'representante_legal_nombre'));
+        $this->assertStringContainsString('solo números', $error(['representante_legal_documento' => '43.123.456'], 'representante_legal_documento'));
+        $this->postJson('/api/aliados', $this->empresa(['documento' => '800111223', 'representante_legal_nombre' => 'José Ñúñez']))->assertCreated()
+            ->assertJsonPath('aliado.representante_legal_nombre', 'José Ñúñez')->assertJsonPath('aliado.representante_legal_documento', '43123456');
         $this->assertStringContainsString('no está en el catálogo', $error(['modalidad_id_bt' => 99999], 'modalidad_id_bt'));
         $this->putJson("/api/aliados/{$id}", $this->empresa(['codigo_pdv' => '', 'modalidad_id_bt' => '']))
             ->assertJsonValidationErrors(['codigo_pdv', 'modalidad_id_bt']);
@@ -617,18 +632,18 @@ class AliadosTest extends TestCase
         // WO1 trae dos ítems: cuenta una vez.
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '1', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '2', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
-        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'estado' => 'Atendido', 'cedula_tecnico' => '1020304050']);
+        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'estado' => 'Asignado', 'cedula_tecnico' => '1020304050']);
         WorkOrder::create(['numero_wo' => 'WO3', 'numero_item' => '', 'estado' => 'Finalizado', 'cedula_tecnico' => '4444444']);
 
         $this->getJson('/api/aliados')->assertOk()
-            ->assertJsonPath('0.work_orders', ['asignadas' => 2, 'atendidas' => 1, 'finalizadas' => 1])
+            ->assertJsonPath('0.work_orders', ['total' => 2, 'asignadas' => 1, 'finalizadas' => 1])
             ->assertJsonPath('0.tecnicos_count', 1);
 
         $this->getJson("/api/aliados/{$empresa->id}")->assertOk()
-            ->assertJsonPath('tecnicos.0.work_orders.asignadas', 2);
+            ->assertJsonPath('tecnicos.0.work_orders.total', 2);
 
         $this->assertCount(3, $this->getJson("/api/aliados/{$empresa->id}/work-orders")->json());
-        $this->assertSame(['WO2'], collect($this->getJson("/api/aliados/{$empresa->id}/work-orders?estado=atendidas")->json())->pluck('numero_wo')->all());
+        $this->assertSame(['WO2'], collect($this->getJson("/api/aliados/{$empresa->id}/work-orders?estado=asignadas")->json())->pluck('numero_wo')->all());
     }
 
     public function test_los_tecnicos_de_aliados_no_aparecen_en_empleados(): void
@@ -643,14 +658,60 @@ class AliadosTest extends TestCase
         $this->assertNotContains('1020304050', $cedulas);
     }
 
-    public function test_un_aliado_con_tecnicos_no_se_elimina(): void
+    public function test_eliminar_un_aliado_borra_sus_tecnicos_pero_no_sus_work_orders(): void
     {
         $this->actuarComo('admin');
         $this->postJson('/api/aliados', ['tipo' => 'tecnico'] + $this->persona())->assertCreated();
+        $indirecto = Aliado::where('tipo', 'tecnico')->firstOrFail();
+        WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'estado' => 'Finalizado', 'cedula_tecnico' => '1020304050']);
         $vacio = Aliado::create($this->empresa());
 
-        $this->deleteJson('/api/aliados/' . Aliado::where('tipo', 'tecnico')->value('id'))->assertStatus(422);
+        $this->deleteJson("/api/aliados/{$indirecto->id}")->assertOk();
         $this->deleteJson("/api/aliados/{$vacio->id}")->assertOk();
+
+        $this->assertNull(Aliado::find($indirecto->id));
+        $this->assertNull(User::where('cedula', '1020304050')->first());
+        $this->assertSame(1, WorkOrder::where('numero_wo', 'WO1')->count());
+    }
+
+    public function test_no_se_elimina_el_aliado_de_tu_propio_usuario(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        $yo = $this->actuarComo('admin', ['aliado_id' => $aliado->id]);
+
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertStatus(422);
+        $this->assertNotNull($yo->fresh());
+        $this->assertNotNull(Aliado::find($aliado->id));
+    }
+
+    public function test_de_entrada_solo_el_admin_elimina_y_solo_admin_y_operaciones_editan(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        // `activo` es el cambio de estado: se guarda con el resto de la edición.
+        $inactivo = $this->empresa(['activo' => false]);
+
+        $this->actuarComo('operaciones');
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertForbidden();
+        $this->putJson("/api/aliados/{$aliado->id}", $inactivo)->assertOk()->assertJsonPath('activo', false);
+
+        foreach (['th', 'tic', 'financiera', 'supervisores', 'general'] as $rol) {
+            $this->actuarComo($rol);
+            $this->deleteJson("/api/aliados/{$aliado->id}")->assertForbidden();
+            $this->putJson("/api/aliados/{$aliado->id}", $inactivo)->assertForbidden();
+        }
+
+        $this->assertNotNull(Aliado::find($aliado->id));
+    }
+
+    public function test_a_otro_rol_se_le_habilita_eliminar_y_editar_desde_la_matriz(): void
+    {
+        $aliado = Aliado::create($this->empresa());
+        \App\Models\PermisoDenegado::where(['rol' => 'th', 'modulo_id' => 'operaciones', 'submodulo_id' => 'aliados'])
+            ->whereIn('accion', ['editar', 'eliminar'])->delete();
+
+        $this->actuarComo('th');
+        $this->putJson("/api/aliados/{$aliado->id}", $this->empresa(['activo' => false]))->assertOk();
+        $this->deleteJson("/api/aliados/{$aliado->id}")->assertOk();
     }
 
     public function test_el_rol_tecnico_no_administra_aliados(): void
