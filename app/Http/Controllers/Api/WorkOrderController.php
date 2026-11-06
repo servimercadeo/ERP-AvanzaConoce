@@ -4,13 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProveedorWorkOrder;
+use App\Models\Supervisor;
+use App\Models\Torre;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
+use App\Services\AuxilioProductividad;
 use App\Services\UsuarioAliadoEmpresa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class WorkOrderController extends Controller
 {
@@ -20,6 +25,10 @@ class WorkOrderController extends Controller
      */
     private const ESTADO_ASIGNADA = 'Asignado';
     private const ESTADO_FINALIZADA = 'Finalizado';
+
+    // Cómo atendió un directo al finalizar la WO (columna "Modo Atención" del exporte).
+    private const SOLO = 'SOLO';
+    private const ACOMPANADO = 'ACOMPAÑADO';
 
     /**
      * Con ?page= responde por páginas (?per_page=25|50|100, por defecto 50): con miles de
@@ -33,7 +42,11 @@ class WorkOrderController extends Controller
 
         if ($request->has('page')) {
             $porPagina = (int) $request->per_page;
-            return response()->json($query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50));
+            $pagina = $query->paginate(in_array($porPagina, [25, 50, 100], true) ? $porPagina : 50);
+            // "Cambiar estado" pregunta SOLO/ACOMPAÑADO únicamente en las WO de directos.
+            $tecnicos = $this->tecnicosDe($pagina->getCollection());
+            $pagina->getCollection()->each(fn (WorkOrder $wo) => $wo->tipo_tecnico = $this->tipoDeTecnico($wo, $tecnicos));
+            return response()->json($pagina);
         }
 
         // Sin ?page=: lo usa el Exportar Excel, así que de una vez se completa con la sede del
@@ -45,11 +58,16 @@ class WorkOrderController extends Controller
     // Sin asociación queda vacía: así se nota qué proveedor falta asociar en Sedes.
     private function conSedeDelProveedor($workOrders)
     {
-        $sedes = ProveedorWorkOrder::with('sede:id,nombre')->get()
-            ->mapWithKeys(fn (ProveedorWorkOrder $p) => [$p->codigo => $p->sede->nombre]);
+        $proveedores = ProveedorWorkOrder::with('sede:id,nombre')->get()->keyBy('codigo');
+        // Columna "Torre": la persona asignada a esa sede en Parámetros > Operativos > Torres.
+        $torres = Torre::with('user:id,name', 'items')->get()
+            ->flatMap(fn (Torre $t) => $t->items->map(fn ($sede) => [$sede->id, $t->user?->name]))
+            ->mapWithKeys(fn ($par) => [$par[0] => $par[1]]);
 
-        return $workOrders->each(function (WorkOrder $wo) use ($sedes) {
-            $wo->sede_proveedor = $wo->proveedor ? $sedes->get(ProveedorWorkOrder::codigoDe($wo->proveedor)) : null;
+        return $workOrders->each(function (WorkOrder $wo) use ($proveedores, $torres) {
+            $proveedor = $wo->proveedor ? $proveedores->get(ProveedorWorkOrder::codigoDe($wo->proveedor)) : null;
+            $wo->sede_proveedor = $proveedor?->sede?->nombre;
+            $wo->torre_sede = $proveedor ? $torres->get($proveedor->sede_id) : null;
         });
     }
 
@@ -64,9 +82,6 @@ class WorkOrderController extends Controller
         $cedulaAsignado = fn (WorkOrder $wo) => $wo->cedula_tecnico;
 
         $cedulas = $workOrders->map($cedulaAsignado)->filter()->unique()->values();
-        if ($cedulas->isEmpty()) {
-            return $workOrders;
-        }
 
         $tecnicos = User::whereIn('cedula', $cedulas)
             ->with('aliado:id,nombre')
@@ -74,24 +89,37 @@ class WorkOrderController extends Controller
             ->keyBy('cedula');
 
         $vehiculosPorTecnico = Vehiculo::whereIn('tecnico_asignado_id', $tecnicos->pluck('id')->filter())
-            ->get(['placa', 'tecnico_asignado_id'])
+            ->get(['placa', 'tipo', 'tecnico_asignado_id'])
             ->keyBy('tecnico_asignado_id');
 
-        return $workOrders->map(function (WorkOrder $wo) use ($tecnicos, $vehiculosPorTecnico, $cedulaAsignado) {
+        $valorAuxilioPorMes = $this->valorDeAuxilioPorMes($workOrders);
+
+        // Columna "Supervisor": el de Parámetros > Operativos > Supervisores; si no tiene, su jefe inmediato.
+        $supervisorPorTecnico = Supervisor::with(['user:id,name', 'items' => fn ($q) => $q->whereKey($tecnicos->pluck('id'))])
+            ->get()
+            ->flatMap(fn (Supervisor $s) => $s->items->map(fn ($t) => [$t->id, $s->user?->name]))
+            ->mapWithKeys(fn ($par) => [$par[0] => $par[1]]);
+
+        return $workOrders->map(function (WorkOrder $wo) use ($tecnicos, $vehiculosPorTecnico, $supervisorPorTecnico, $valorAuxilioPorMes, $cedulaAsignado) {
             $tecnico = $tecnicos->get($cedulaAsignado($wo));
             $wo->tipo_vinculacion_tecnico = $tecnico?->tipo_vinculacion;
-            $wo->supervisor_tecnico = $tecnico?->jefe_inmediato;
+            $wo->supervisor_tecnico = ($tecnico ? $supervisorPorTecnico->get($tecnico->id) : null) ?? $tecnico?->jefe_inmediato;
             // "NA" (no "N/D"): si el técnico existe, SÍ sabemos si tiene aliado o no; "N/D"
             // es solo para lo que el sistema no puede saber en absoluto.
             $wo->subagente_aliado_tecnico = $tecnico ? ($tecnico->aliado?->nombre ?? 'NA') : null;
-            $wo->placa_vehiculo_tecnico = $tecnico ? $vehiculosPorTecnico->get($tecnico->id)?->placa : null;
+            $vehiculo = $tecnico ? $vehiculosPorTecnico->get($tecnico->id) : null;
+            $wo->placa_vehiculo_tecnico = $vehiculo?->placa;
 
             // "Técnico Atiende" del exporte: el de un técnico de aliado es siempre el mismo
             // técnico agendado (por defecto la matriz no les deja cambiar el estado). Si es
             // directo (o no está registrado en el ERP), manda quien la haya cerrado de verdad
             // desde el sistema; si todavía nadie la cerró ahí (la mayoría: llegan ya cerradas
             // en el archivo del proveedor), se usa el "Técnico Atiende" que trajo el import.
-            if ($tecnico && $tecnico->aliado_id) {
+            // Sin usuario en el ERP decide la MODALIDAD del archivo, como en aplicarEstadoPorTecnico.
+            $esAliado = $tecnico
+                ? (bool) $tecnico->aliado_id
+                : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8') === 'ALIADO';
+            if ($esAliado) {
                 $wo->nombre_tecnico_atiende = $wo->tecnico_agendado ?: $wo->nombre_tecnico;
                 $wo->cedula_tecnico_atiende = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
             } else {
@@ -99,8 +127,46 @@ class WorkOrderController extends Controller
                 $wo->cedula_tecnico_atiende = $wo->cedula_tecnico_cierre ?: $wo->cedula_tecnico;
             }
 
+            // "Fecha registro material", "Modo Atención" y "Auxiliar" del exporte: solo de directos.
+            $wo->fecha_cierre_tecnico = !$esAliado && $wo->estado === 'Finalizado'
+                ? $wo->fecha_finalizacion?->format('Y-m-d H:i')
+                : null;
+            $wo->modo_atencion_directo = $esAliado ? null : $wo->modo_atencion;
+            $wo->auxiliar_directo = $esAliado ? null : $wo->auxiliar;
+
+            // "Conductor": el mismo técnico que atendió el servicio.
+            $wo->conductor_tecnico = $wo->nombre_tecnico_atiende;
+            // "Tipo Auxilio": el vehículo del directo (Carro/Moto); el de un aliado no lo pone la empresa.
+            $wo->tipo_auxilio_vehiculo = $esAliado ? 'N/A' : $vehiculo?->tipo;
+            // "Auxilio": lo que se le paga a ESTA orden según el tramo del mes (ver AuxilioProductividad).
+            $mes = $wo->fecha_finalizacion?->format('Y-m');
+            $wo->auxilio_calculado = $mes
+                ? $valorAuxilioPorMes->get($mes)?->get(AuxilioProductividad::cedulaDe($wo))
+                : null;
+
             return $wo;
         });
+    }
+
+    /**
+     * Valor del auxilio por orden, como mes => (cédula => valor). El total del mes se cuenta
+     * sobre TODAS las WO de ese técnico, no solo las que trae el exporte: al pasar de tramo se
+     * recalculan todas sus órdenes del mes. Una consulta por cada mes que aparezca.
+     */
+    private function valorDeAuxilioPorMes($workOrders)
+    {
+        $usuarios = AuxilioProductividad::usuariosPorCedula();
+
+        return $workOrders
+            ->filter(fn (WorkOrder $wo) => $wo->estado === self::ESTADO_FINALIZADA
+                && $wo->fecha_finalizacion
+                && AuxilioProductividad::esDirecto($wo, $usuarios))
+            ->groupBy(fn (WorkOrder $wo) => $wo->fecha_finalizacion->format('Y-m'))
+            ->map(fn ($delMes, $mes) => AuxilioProductividad::valorPorOrdenDelMes(
+                $mes,
+                $usuarios,
+                $delMes->map(fn (WorkOrder $wo) => AuxilioProductividad::cedulaDe($wo))->unique()->values()->all(),
+            ));
     }
 
     /**
@@ -267,10 +333,32 @@ class WorkOrderController extends Controller
      */
     public function update(Request $request, WorkOrder $workOrder)
     {
-        $data = $request->validate(['estado' => 'required|string|max:60']);
+        $data = $request->validate([
+            'estado'        => 'required|string|max:60',
+            'modo_atencion' => 'nullable|in:' . self::SOLO . ',' . self::ACOMPANADO,
+            'auxiliar_id'   => 'nullable|integer',
+        ]);
         $user = $request->user();
 
         $this->soloLasQueVe($request, $workOrder);
+
+        // Al finalizar la WO de un directo se registra si atendió solo o con qué auxiliar técnico.
+        $esDirecto = $this->tipoDeTecnico($workOrder, $this->tecnicosDe(collect([$workOrder]))) === 'DIRECTO';
+        if ($data['estado'] === 'Finalizado' && $esDirecto) {
+            $modo = $data['modo_atencion'] ?? null;
+            if (!$modo) {
+                throw ValidationException::withMessages(['modo_atencion' => 'Indica si el técnico atendió SOLO o ACOMPAÑADO.']);
+            }
+            $auxiliar = $modo === self::ACOMPANADO
+                ? $this->auxiliaresTecnicos()->firstWhere('id', (int) ($data['auxiliar_id'] ?? 0))
+                : null;
+            if ($modo === self::ACOMPANADO && !$auxiliar) {
+                throw ValidationException::withMessages(['auxiliar_id' => 'Selecciona el auxiliar técnico que lo acompañó.']);
+            }
+            $workOrder->modo_atencion = $modo;
+            $workOrder->auxiliar = $auxiliar['nombre'] ?? null;
+        }
+
         if ($user->rol === 'tecnico') {
             $workOrder->nombre_tecnico_cierre = $user->name;
             $workOrder->cedula_tecnico_cierre = $user->cedula;
@@ -284,6 +372,23 @@ class WorkOrderController extends Controller
         $workOrder->save();
 
         return response()->json($workOrder);
+    }
+
+    /** Auxiliares técnicos que pueden acompañar a un directo (empleados activos con ese cargo). */
+    public function auxiliares()
+    {
+        return response()->json($this->auxiliaresTecnicos());
+    }
+
+    private function auxiliaresTecnicos()
+    {
+        return User::where('activo', true)->whereNotNull('cargo')->orderBy('name')->get(['id', 'name', 'cargo'])
+            ->filter(function (User $u) {
+                $cargo = mb_strtoupper(Str::ascii((string) $u->cargo), 'UTF-8');
+                return str_contains($cargo, 'AUXILIAR TECNICO') || str_contains($cargo, 'TECNICO AUXILIAR') || str_contains($cargo, '(AUX)');
+            })
+            ->map(fn (User $u) => ['id' => $u->id, 'nombre' => $u->name])
+            ->values();
     }
 
     /**
@@ -457,22 +562,40 @@ class WorkOrderController extends Controller
     // Un aliado no puede cambiar el estado: queda Finalizado. Un directo sí: queda Asignado, sin reabrir lo que ya avanzó.
     private function aplicarEstadoPorTecnico(WorkOrder $wo, $tecnicos): void
     {
-        $cedula = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
-        // Cédula sin usuario en el ERP: decide la MODALIDAD que trae el archivo.
-        $tipo = $cedula && $tecnicos->has($cedula)
-            ? ($tecnicos->get($cedula) ? 'ALIADO' : 'DIRECTO')
-            : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8');
+        $tipo = $this->tipoDeTecnico($wo, $tecnicos);
 
         if ($tipo === 'ALIADO') {
             $wo->estado = 'Finalizado';
         } elseif ($tipo === 'DIRECTO') {
             $anterior = $wo->getOriginal('estado');
             $wo->estado = $anterior === 'Finalizado' ? $anterior : 'Asignado';
-            // Reimportar no le cambia el mes del auxilio a lo que ya se finalizó.
-            if ($anterior === 'Finalizado' && $wo->getOriginal('fecha_finalizacion')) {
-                $wo->fecha_finalizacion = $wo->getOriginal('fecha_finalizacion');
+            // Reimportar no pisa lo que se registró al cerrarla (mes del auxilio, solo/acompañado).
+            if ($anterior === 'Finalizado') {
+                foreach (['fecha_finalizacion', 'modo_atencion', 'auxiliar'] as $campo) {
+                    if ($wo->getOriginal($campo)) {
+                        $wo->{$campo} = $wo->getOriginal($campo);
+                    }
+                }
             }
         }
+    }
+
+    // 'ALIADO', 'DIRECTO' o la MODALIDAD del archivo si la cédula no tiene usuario en el ERP.
+    private function tipoDeTecnico(WorkOrder $wo, $tecnicos): string
+    {
+        $cedula = $wo->cedula_tecnico_agendado ?: $wo->cedula_tecnico;
+
+        return $cedula && $tecnicos->has($cedula)
+            ? ($tecnicos->get($cedula) ? 'ALIADO' : 'DIRECTO')
+            : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8');
+    }
+
+    // aliado_id por cédula de los técnicos de esas WO, como lo espera tipoDeTecnico().
+    private function tecnicosDe($workOrders)
+    {
+        $cedulas = $workOrders->flatMap(fn (WorkOrder $wo) => [$wo->cedula_tecnico_agendado, $wo->cedula_tecnico])->filter()->unique()->values();
+
+        return User::whereIn('cedula', $cedulas)->where('cedula', '!=', '')->pluck('aliado_id', 'cedula');
     }
 
     private function parsearFecha($valor): ?string

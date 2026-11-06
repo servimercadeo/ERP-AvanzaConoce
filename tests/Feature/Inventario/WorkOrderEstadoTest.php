@@ -180,13 +180,170 @@ class WorkOrderEstadoTest extends TestCase
             ->assertJsonPath('data.0.numero_wo', 'D2');
     }
 
+    public function test_exporte_fecha_de_cierre_solo_para_directos_finalizados(): void
+    {
+        $this->tecnicoAliado('777');
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $crear = fn (string $wo, array $datos) => WorkOrder::create($datos + ['numero_wo' => $wo, 'numero_item' => '', 'fecha_finalizacion' => '2026-11-02 10:15:00']);
+        $crear('DIRECTO-CERRADA', ['cedula_tecnico' => '555', 'estado' => 'Finalizado']);
+        $crear('DIRECTO-ABIERTA', ['cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        $crear('ALIADO-USUARIO', ['cedula_tecnico' => '777', 'estado' => 'Finalizado']);
+        $crear('ALIADO-MODALIDAD', ['cedula_tecnico' => '999', 'modalidad' => 'ALIADO', 'estado' => 'Finalizado']);
+        $crear('DIRECTO-MODALIDAD', ['cedula_tecnico' => '999', 'modalidad' => 'DIRECTO', 'estado' => 'Finalizado']);
+        $this->actingAs($this->usuario('admin'));
+
+        $fechas = collect($this->getJson('/api/work-orders')->assertOk()->json())->pluck('fecha_cierre_tecnico', 'numero_wo')->sortKeys()->all();
+
+        $this->assertSame([
+            'ALIADO-MODALIDAD' => null, 'ALIADO-USUARIO' => null, 'DIRECTO-ABIERTA' => null,
+            'DIRECTO-CERRADA' => '2026-11-02 10:15', 'DIRECTO-MODALIDAD' => '2026-11-02 10:15',
+        ], $fechas);
+    }
+
+    public function test_exporte_el_tecnico_de_un_aliado_sin_usuario_es_el_agendado(): void
+    {
+        WorkOrder::create([
+            'numero_wo' => 'WO8', 'numero_item' => '', 'cedula_tecnico' => '999', 'modalidad' => 'ALIADO',
+            'tecnico_agendado' => 'Pedro Aliado', 'nombre_tecnico' => 'Nombre TH', 'cedula_tecnico_agendado' => '888',
+        ]);
+        WorkOrder::create(['numero_wo' => 'WO9', 'numero_item' => '', 'nombre_tecnico' => 'Sin Cedula']);
+        $this->actingAs($this->usuario('admin'));
+
+        $wos = collect($this->getJson('/api/work-orders')->assertOk()->json())->keyBy('numero_wo');
+
+        $this->assertSame('Pedro Aliado', $wos['WO8']['nombre_tecnico_atiende']);
+        $this->assertSame('Sin Cedula', $wos['WO9']['nombre_tecnico_atiende']);
+    }
+
+    private function auxiliar(string $nombre, string $cargo = 'AUXILIAR TECNICO', bool $activo = true)
+    {
+        return $this->usuario('general', ['name' => $nombre, 'cargo' => $cargo, 'activo' => $activo]);
+    }
+
+    public function test_el_directo_debe_indicar_como_atendio_al_finalizar(): void
+    {
+        $tecnico = $this->usuario('tecnico', ['cedula' => '555']);
+        $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        $this->actingAs($tecnico);
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado'])
+            ->assertUnprocessable()->assertJsonPath('errors.modo_atencion.0', 'Indica si el técnico atendió SOLO o ACOMPAÑADO.');
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'CON OTRO'])->assertUnprocessable();
+        $this->assertSame('Asignado', $wo->fresh()->estado);
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
+
+        $wo->refresh();
+        $this->assertSame(['Finalizado', 'SOLO', null], [$wo->estado, $wo->modo_atencion, $wo->auxiliar]);
+    }
+
+    public function test_acompanado_exige_un_auxiliar_tecnico_valido(): void
+    {
+        $tecnico = $this->usuario('tecnico', ['cedula' => '555']);
+        $auxiliar = $this->auxiliar('Laura Auxiliar');
+        $otro = $this->usuario('general', ['name' => 'No Es Auxiliar', 'cargo' => 'ANALISTA ADMINISTRATIVO']);
+        $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        $this->actingAs($tecnico);
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO'])
+            ->assertUnprocessable()->assertJsonPath('errors.auxiliar_id.0', 'Selecciona el auxiliar técnico que lo acompañó.');
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => $otro->id])
+            ->assertUnprocessable();
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => $auxiliar->id])->assertOk();
+
+        $wo->refresh();
+        $this->assertSame(['ACOMPAÑADO', 'Laura Auxiliar'], [$wo->modo_atencion, $wo->auxiliar]);
+    }
+
+    public function test_finalizar_la_wo_de_un_aliado_no_pide_ni_guarda_como_atendio(): void
+    {
+        $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '999', 'modalidad' => 'ALIADO', 'estado' => 'Asignado']);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
+
+        $this->assertNull($wo->fresh()->modo_atencion);
+    }
+
+    public function test_pasar_a_asignado_no_pide_como_atendio(): void
+    {
+        $tecnico = $this->usuario('tecnico', ['cedula' => '555']);
+        $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Finalizado']);
+        $this->actingAs($tecnico);
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Asignado'])->assertOk();
+    }
+
+    public function test_la_lista_de_auxiliares_trae_solo_auxiliares_tecnicos_activos(): void
+    {
+        $this->auxiliar('Ana Auxiliar');
+        $this->auxiliar('Beto En Alturas', 'AUXILIAR TÉCNICO EN ALTURAS');
+        $this->auxiliar('Carla En Campo', 'TECNICO AUXILIAR EN CAMPO');
+        $this->auxiliar('Dario Instalaciones', 'TECNICO DE INSTALACIONES (AUX)');
+        $this->auxiliar('Inactivo', 'AUXILIAR TECNICO', false);
+        $this->auxiliar('Sistemas', 'AUXILIAR DE SISTEMAS');
+        $this->auxiliar('Tecnico Normal', 'TÉCNICO DE INSTALACIONES');
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+
+        $nombres = collect($this->getJson('/api/work-orders/auxiliares')->assertOk()->json())->pluck('nombre')->all();
+
+        $this->assertSame(['Ana Auxiliar', 'Beto En Alturas', 'Carla En Campo', 'Dario Instalaciones'], $nombres);
+    }
+
+    public function test_la_pagina_dice_si_la_wo_es_de_directo_o_aliado(): void
+    {
+        $this->tecnicoAliado('777');
+        $this->usuario('tecnico', ['cedula' => '555']);
+        WorkOrder::create(['numero_wo' => 'WO-D', 'numero_item' => '', 'cedula_tecnico' => '555']);
+        WorkOrder::create(['numero_wo' => 'WO-A', 'numero_item' => '', 'cedula_tecnico' => '777']);
+        WorkOrder::create(['numero_wo' => 'WO-M', 'numero_item' => '', 'cedula_tecnico' => '999', 'modalidad' => 'directo']);
+        $this->actingAs($this->usuario('admin'));
+
+        $tipos = collect($this->getJson('/api/work-orders?page=1')->assertOk()->json('data'))->pluck('tipo_tecnico', 'numero_wo')->sortKeys()->all();
+
+        $this->assertSame(['WO-A' => 'ALIADO', 'WO-D' => 'DIRECTO', 'WO-M' => 'DIRECTO'], $tipos);
+    }
+
+    public function test_exporte_modo_y_auxiliar_solo_de_directos_y_reimportar_no_los_pisa(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '1', 'cedula_tecnico' => '555', 'estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar' => 'Laura Auxiliar']);
+        WorkOrder::create(['numero_wo' => 'WO2', 'numero_item' => '', 'cedula_tecnico' => '999', 'modalidad' => 'ALIADO', 'estado' => 'Finalizado', 'modo_atencion' => 'SOLO', 'auxiliar' => 'Del Archivo']);
+        $this->importar(['numero_item' => '1', 'cedula_tecnico' => '555', 'modo_atencion' => 'SOLO', 'auxiliar' => '']);
+
+        $wos = collect($this->getJson('/api/work-orders')->assertOk()->json())->keyBy('numero_wo');
+
+        $this->assertSame(['ACOMPAÑADO', 'Laura Auxiliar'], [$wos['WO1']['modo_atencion_directo'], $wos['WO1']['auxiliar_directo']]);
+        $this->assertSame([null, null], [$wos['WO2']['modo_atencion_directo'], $wos['WO2']['auxiliar_directo']]);
+    }
+
+    public function test_exporte_conductor_es_el_tecnico_que_atendio_y_tipo_auxilio_su_vehiculo(): void
+    {
+        $this->tecnicoAliado('777');
+        $directo = $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Ruiz']);
+        $sinVehiculo = $this->usuario('tecnico', ['cedula' => '444', 'name' => 'Ana Sin Carro']);
+        \App\Models\Vehiculo::create(['tipo' => 'Moto', 'placa' => 'ABC123', 'tecnico_asignado_id' => $directo->id]);
+        $crear = fn (string $wo, array $datos) => WorkOrder::create($datos + ['numero_wo' => $wo, 'numero_item' => '']);
+        $crear('DIRECTO', ['cedula_tecnico' => '555', 'estado' => 'Finalizado', 'nombre_tecnico_cierre' => 'Carlos Ruiz']);
+        $crear('SIN-VEHICULO', ['cedula_tecnico' => '444', 'nombre_tecnico' => 'Ana Sin Carro']);
+        $crear('ALIADO', ['cedula_tecnico' => '777', 'tecnico_agendado' => 'Pedro Aliado']);
+        $this->actingAs($this->usuario('admin'));
+
+        $wos = collect($this->getJson('/api/work-orders')->assertOk()->json())->keyBy('numero_wo');
+
+        $this->assertSame(['Carlos Ruiz', 'Moto'], [$wos['DIRECTO']['conductor_tecnico'], $wos['DIRECTO']['tipo_auxilio_vehiculo']]);
+        $this->assertSame(['Ana Sin Carro', null], [$wos['SIN-VEHICULO']['conductor_tecnico'], $wos['SIN-VEHICULO']['tipo_auxilio_vehiculo']]);
+        $this->assertSame(['Pedro Aliado', 'N/A'], [$wos['ALIADO']['conductor_tecnico'], $wos['ALIADO']['tipo_auxilio_vehiculo']]);
+    }
+
     public function test_tecnico_directo_puede_cambiar_el_estado_de_su_propia_wo(): void
     {
         $tecnico = $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Ruiz']);
         $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Abierta']);
         $this->actingAs($tecnico);
 
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
 
         $wo->refresh();
         $this->assertSame('Finalizado', $wo->estado);

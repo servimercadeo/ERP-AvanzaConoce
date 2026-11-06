@@ -128,7 +128,7 @@ class FallosDeBaseDeDatosTest extends TestCase
         $ruta = base_path(RevisorEsquema::ARCHIVO);
 
         if (getenv('ACTUALIZAR_ESQUEMA')) {
-            $this->assertSame('', \Illuminate\Support\Facades\DB::getTablePrefix());
+            // leerActual() quita el prefijo: sirve igual con el DB_PREFIX=erp_ de phpunit.xml.
             $this->assertStringEndsWith('_test', \Illuminate\Support\Facades\DB::getDatabaseName());
             file_put_contents($ruta, json_encode($actual, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL);
         }

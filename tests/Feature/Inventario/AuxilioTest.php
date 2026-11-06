@@ -116,7 +116,7 @@ class AuxilioTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($tecnico);
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($admin);
@@ -188,6 +188,61 @@ class AuxilioTest extends TestCase
 
         $this->assertCount(1, $r);
         $this->assertSame('555', $r[0]['cedula']);
+    }
+
+    private function columnaAuxilio(): array
+    {
+        return collect($this->getJson('/api/work-orders')->assertOk()->json())
+            ->pluck('auxilio_calculado', 'numero_wo')->all();
+    }
+
+    public function test_el_exporte_trae_el_valor_que_se_le_paga_a_cada_orden(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearFinalizadas('555', 3);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->assertSame([4000, 4000, 4000], array_values($this->columnaAuxilio()));
+    }
+
+    public function test_al_pasar_de_tramo_el_exporte_recalcula_todas_las_ordenes_del_mes(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearFinalizadas('555', 100);
+        $this->actingAs($this->usuario('admin'));
+        $this->assertSame([4000], array_values(array_unique($this->columnaAuxilio())));
+
+        // La número 101 sube a todas al tramo 101-105, no solo a ella.
+        $this->crearFinalizadas('555', 1, '2026-10-15', null, 'EXTRA-');
+
+        $valores = $this->columnaAuxilio();
+        $this->assertSame([4300], array_values(array_unique($valores)));
+        $this->assertCount(101, $valores);
+    }
+
+    public function test_el_exporte_no_paga_auxilio_a_aliados_ni_a_lo_que_no_esta_finalizado(): void
+    {
+        $aliado = Aliado::create(['tipo' => 'empresa', 'tipo_documento' => 'NIT', 'documento' => '900555668-1', 'nombre' => 'ALIADO SAS']);
+        $this->usuario('tecnico', ['cedula' => '777', 'aliado_id' => $aliado->id]);
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearFinalizadas('777', 2, '2026-10-15', null, 'ALI-');
+        WorkOrder::create(['numero_wo' => 'ABIERTA', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado', 'fecha_finalizacion' => '2026-10-15']);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->assertSame([null], array_values(array_unique($this->columnaAuxilio())));
+    }
+
+    public function test_cada_mes_se_paga_con_su_propio_tramo(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearFinalizadas('555', 101, '2026-10-15', null, 'OCT-');
+        $this->crearFinalizadas('555', 2, '2026-11-15', null, 'NOV-');
+        $this->actingAs($this->usuario('admin'));
+
+        $valores = collect($this->columnaAuxilio());
+
+        $this->assertSame([4300], $valores->filter(fn ($v, $wo) => str_contains($wo, 'OCT-'))->unique()->values()->all());
+        $this->assertSame([4000], $valores->filter(fn ($v, $wo) => str_contains($wo, 'NOV-'))->unique()->values()->all());
     }
 
     public function test_el_tecnico_solo_ve_su_propio_auxilio(): void

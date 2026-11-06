@@ -70,6 +70,8 @@ export function useErpModules() {
                     // Si se renombra el grupo, este id cambia también en Submodule.jsx y routes/api.php.
                     if (id === "paramgrupo_operativos") {
                         archivos.push({ id: "asignacion_vehiculo_file", label: "Asignación de Vehículo", acciones: ["crear", "editar", "eliminar"] });
+                        archivos.push({ id: "supervisores_file", label: "Supervisores", acciones: ["crear", "editar", "eliminar"] });
+                        archivos.push({ id: "torres_file", label: "Torres", acciones: ["crear", "editar", "eliminar"] });
                     }
                     return {
                         id,

@@ -252,10 +252,6 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Sede", "sede_proveedor"],
     ["Subproducto", ["servicio", "subproducto"]],
     ["Tipo Servicio", "codigo_sl"],
-    ["Tipo Producto", "tipo_producto"],
-    ["Se Paga", "se_paga"],
-    ["Consignada", "consignada"],
-    ["Pago", "pago"],
     ["Técnico Agendado", ["tecnico_agendado", "nombre_tecnico"]],
     ["Cedula Técnico Agendado", ["cedula_tecnico_agendado", "cedula_tecnico"]],
     ["Técnico Atiende", "nombre_tecnico_atiende"],
@@ -264,62 +260,40 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Subagente/Aliado", "subagente_aliado_tecnico"],
     ["workorder", "numero_wo"],
     ["IBS", "numero_wo_ibs"],
-    ["Categoria", "categoria"],
-    ["Problema", "problema"],
+    ["Problema", ["problema", "descripcion"]],
     ["Nombre Cliente", "nombre_cliente"],
     ["Apellido Cliente", "apellido_cliente"],
-    ["No Documento", "no_documento_cliente"],
     ["Dirección", "direccion"],
     ["Barrio", "barrio"],
     ["Ciudad", "municipio"],
     ["Departamento", "departamento"],
-    ["Tel. Casa", "tel_casa"],
+    ["Tel. Casa", ["tel_casa", "telefono_principal"]],
     ["Perímetro de la Zona", "perimetro"],
-    ["Perímetro de la Venta", "perimetro_venta"],
     ["Nom Tipo Cliente", "tipo_orden"],
-    ["Jornada", "jornada"],
-    ["Fecha Programación", "fecha_programacion"],
+    ["Fecha Programación", ["fecha_programacion", "inicio_agendado"]],
     ["Fecha Atención", "fecha_estado"],
     ["Fecha Finalización", "fecha_finalizacion"],
-    ["Fecha Publicación", "fecha_publicacion"],
+    ["Fecha Publicación", ["fecha_publicacion", "fecha_estado"]],
     ["Fecha Creación", "fecha_creacion"],
     ["Proveedor", "proveedor"],
-    ["Tecnología", "tecnologia"],
+    ["Tecnología", ["tecnologia", "recursos"]],
     ["Estado", "estado"],
-    ["Fecha Cancelación", "fecha_cancelacion"],
-    ["Razón Cancelación", "razon_cancelacion"],
-    ["Observaciones Cancelación", "observaciones_cancelacion"],
-    ["Estado Comercial", "estado_comercial"],
-    ["tipo", "tipo_wo"],
-    ["Tecnico atendio", "tecnico_atendio_flag"],
-    ["WO Aterior", "wo_anterior"],
-    ["WO Fisica OK", "wo_fisica_ok"],
-    ["Motivo", "motivo"],
     // La columna "subproducto" en minúscula del archivo real: un código numérico sin
     // relación con "Subproducto" (texto), que ya ocupó ese dato arriba — ver la nota en
     // IMPORT_HEADER_MAP. No se guarda nada de esta, así que siempre sale "N/D".
     ["subproducto", null],
     ["Consumio Material", "consumio_material"],
-    ["Paga por Directv", "paga_por_directv"],
-    ["Comision pagada", "comision_pagada"],
-    ["Valor comision", "valor_comision"],
-    ["Fecha Pago", "fecha_pago"],
-    ["Prueba de Calidad", "prueba_calidad"],
-    ["Numero de ticket de aprobación", "numero_ticket_aprobacion"],
-    ["Razón de Prueba de Calidad Fallida", "razon_prueba_calidad_fallida"],
-    ["Contrato enviado", "contrato_enviado"],
-    ["Registrado por", "registrado_por"],
-    ["Fecha registro material", "fecha_registro_material"],
+    ["Registrado por", ["nombre_tecnico_atiende", "nombre_tecnico"]],
+    ["Fecha registro material", "fecha_cierre_tecnico"],
     ["Fecha Registro sin material", "fecha_registro_sin_material"],
-    ["Modo Atención", "modo_atencion"],
-    ["Auxiliar", "auxiliar"],
+    ["Modo Atención", "modo_atencion_directo"],
+    ["Auxiliar", "auxiliar_directo"],
     ["Supervisor", "supervisor_tecnico"],
-    ["Torre", "torre"],
+    ["Torre", ["torre_sede", "torre"]],
     ["Placa vehiculo", "placa_vehiculo_tecnico"],
-    ["Conductor", "conductor"],
-    ["Tipo Auxilio", "tipo_auxilio"],
-    ["Auxilio", "auxilio"],
-    ["Aplica Auxilio", "aplica_auxilio"],
+    ["Conductor", ["conductor_tecnico", "conductor"]],
+    ["Tipo Auxilio", ["tipo_auxilio_vehiculo", "tipo_auxilio"]],
+    ["Auxilio", ["auxilio_calculado", "auxilio"]],
 ];
 
 // Lista fija (no se calcula de los valores que ya existan en la BD): así el filtro y
@@ -587,6 +561,19 @@ function DeleteModal({ item, onClose, onConfirm, deleting }) {
 /* ─── Modal para cambiar el estado de una Work Order ───────────────────── */
 function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
     const [estado, setEstado] = useState(item.estado || "");
+    const [modo, setModo] = useState("");
+    const [auxiliarId, setAuxiliarId] = useState("");
+    // Solo la WO de un directo registra al finalizar si atendió solo o acompañado (exporte, columnas AI/AJ).
+    const pideAtencion = item.tipo_tecnico === "DIRECTO" && estado === "Finalizado";
+    const { data: auxiliares = [] } = useQuery({
+        queryKey: ["work-orders", "auxiliares"],
+        queryFn: () => api.get("/work-orders/auxiliares").then((r) => r.data),
+        enabled: pideAtencion && modo === "ACOMPAÑADO",
+    });
+    const completo = estado && (!pideAtencion || modo === "SOLO" || (modo === "ACOMPAÑADO" && auxiliarId));
+    const confirmar = () => onConfirm(pideAtencion
+        ? { estado, modo_atencion: modo, auxiliar_id: modo === "ACOMPAÑADO" ? Number(auxiliarId) : null }
+        : { estado });
     return (
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
@@ -602,11 +589,30 @@ function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
                             {estados.map((e) => <option key={e} value={e}>{e}</option>)}
                         </SelectBuscable>
                     </div>
+                    {pideAtencion && (
+                        <div style={{ ...S.formGroup, marginTop: 14 }}>
+                            <label style={S.label}>¿Cómo atendió el servicio?</label>
+                            <SelectBuscable style={S.input} value={modo} onChange={(e) => { setModo(e.target.value); setAuxiliarId(""); }}>
+                                <option value="">Seleccione…</option>
+                                <option value="SOLO">SOLO</option>
+                                <option value="ACOMPAÑADO">ACOMPAÑADO</option>
+                            </SelectBuscable>
+                        </div>
+                    )}
+                    {pideAtencion && modo === "ACOMPAÑADO" && (
+                        <div style={{ ...S.formGroup, marginTop: 14 }}>
+                            <label style={S.label}>Auxiliar técnico que lo acompañó</label>
+                            <SelectBuscable style={S.input} value={auxiliarId} onChange={(e) => setAuxiliarId(e.target.value)}>
+                                <option value="">Seleccione…</option>
+                                {auxiliares.map((a) => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+                            </SelectBuscable>
+                        </div>
+                    )}
                     {error && <p style={S.errorMsg}>{error}</p>}
                 </div>
                 <div style={S.modalFooter}>
                     <button style={S.btnSecondary} onClick={onClose} disabled={saving}>Cancelar</button>
-                    <button style={S.btnPrimary} onClick={() => onConfirm(estado)} disabled={saving || !estado}>
+                    <button style={S.btnPrimary} onClick={confirmar} disabled={saving || !completo}>
                         {saving ? "Guardando…" : "Guardar"}
                     </button>
                 </div>
@@ -908,6 +914,10 @@ export default function WorkOrdersCrud() {
                     // la ficha del técnico).
                     const candidatos = Array.isArray(campo) ? campo : [campo];
                     const valor = candidatos.map((c) => w[c]).find((v) => v !== null && v !== undefined && v !== "");
+                    // "Inicio agendado" se guarda como texto ISO: mismo formato que las demás fechas.
+                    if (typeof valor === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(valor)) {
+                        return [label, valor.slice(0, 16).replace("T", " ")];
+                    }
                     return [label, valor ?? ""];
                 }),
             ));
@@ -925,12 +935,12 @@ export default function WorkOrdersCrud() {
         }
     };
 
-    const handleCambiarEstado = async (estado) => {
+    const handleCambiarEstado = async (cambio) => {
         if (!estadoTarget) return;
         setGuardandoEstado(true);
         setErrorEstado(null);
         try {
-            await api.put(`/work-orders/${estadoTarget.id}`, { estado });
+            await api.put(`/work-orders/${estadoTarget.id}`, cambio);
             invalidate();
             setEstadoTarget(null);
             showToast("Estado actualizado.");

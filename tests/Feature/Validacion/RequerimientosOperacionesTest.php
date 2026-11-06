@@ -173,7 +173,7 @@ class RequerimientosOperacionesTest extends TestCase
         $this->assertSame(['1001'], $wos->pluck('cedula_tecnico')->unique()->values()->all());
 
         $asignada = WorkOrder::where('cedula_tecnico', '1001')->where('estado', 'Asignado')->firstOrFail();
-        $this->putJson("/api/work-orders/{$asignada->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->putJson("/api/work-orders/{$asignada->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
         $this->assertSame(['Finalizado', '1001'], [$asignada->fresh()->estado, $asignada->fresh()->cedula_tecnico_cierre]);
         $this->getJson('/api/work-orders/resumen')->assertJsonPath('indicadores', ['total' => 4, 'asignadas' => 1, 'finalizadas' => 3]);
     }

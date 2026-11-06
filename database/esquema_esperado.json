@@ -3975,6 +3975,64 @@
             "charset": null
         }
     },
+    "supervisor_tecnico": {
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "supervisor_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "tecnico_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "supervisores": {
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
     "tipos_parametro": {
         "id": {
             "tipo": "bigint unsigned",
@@ -4068,6 +4126,64 @@
             "tipo": "timestamp",
             "nulo": true,
             "por_defecto": true,
+            "charset": null
+        }
+    },
+    "torre_sede": {
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "torre_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        }
+    },
+    "torres": {
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
             "charset": null
         }
     },

@@ -89,7 +89,7 @@ class WorkOrderEnlaceTecnicoTest extends TestCase
         $this->assertTrue(collect($r->json('data'))->every(fn ($wo) => $wo['cedula_tecnico'] === '1085293826'));
         $this->assertSame($esperado['1085293826']['total'], $this->getJson('/api/work-orders/resumen')->assertOk()->json('total'));
         $suya = WorkOrder::where('cedula_tecnico', '1085293826')->where('estado', 'Asignado')->firstOrFail();
-        $this->putJson("/api/work-orders/{$suya->id}", ['estado' => 'Finalizado'])->assertOk();
+        $this->putJson("/api/work-orders/{$suya->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'SOLO'])->assertOk();
         $this->assertSame(['Finalizado', '1085293826'], [$suya->fresh()->estado, $suya->fresh()->cedula_tecnico_cierre]);
         $ajena = WorkOrder::where('cedula_tecnico', '72243190')->firstOrFail();
         $this->putJson("/api/work-orders/{$ajena->id}", ['estado' => 'Finalizado'])->assertNotFound();

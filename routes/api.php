@@ -520,6 +520,19 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros.paramgrupo_operativos.asignacion_vehiculo_file'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros.paramgrupo_operativos.asignacion_vehiculo_file'));
 
+    // Parametros > Operativos > Supervisores y Torres (solo para el exporte de Work Orders).
+    foreach (['supervisores', 'torres'] as $tipo) {
+        $pestana = "parametros.paramgrupo_operativos.{$tipo}_file";
+        $c = App\Http\Controllers\Api\AsignacionOperativaController::class;
+        Route::middleware("permiso:{$pestana}")->group(function () use ($tipo, $pestana, $c) {
+            Route::get("{$tipo}/opciones", [$c, 'opciones'])->defaults('tipo', $tipo);
+            Route::get($tipo, [$c, 'index'])->defaults('tipo', $tipo);
+            Route::post($tipo, [$c, 'store'])->defaults('tipo', $tipo)->middleware(PermisoDenegado::middleware('crear', $pestana));
+            Route::put("{$tipo}/{id}", [$c, 'update'])->defaults('tipo', $tipo)->whereNumber('id')->middleware(PermisoDenegado::middleware('editar', $pestana));
+            Route::delete("{$tipo}/{id}", [$c, 'destroy'])->defaults('tipo', $tipo)->whereNumber('id')->middleware(PermisoDenegado::middleware('eliminar', $pestana));
+        });
+    }
+
     // Órdenes de Compra (Pedidos y Compras > Compras > Ver y Crear Orden de Compra)
     Route::get('ordenes-compra-pendientes-categoria', [App\Http\Controllers\Api\OrdenCompraController::class, 'pendientesPorCategoria']);
     Route::get('ordenes-compra-items-pendientes', [App\Http\Controllers\Api\OrdenCompraController::class, 'itemsPendientes']);
@@ -556,6 +569,8 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
     // Ver: técnico directo (solo las suyas, ver WorkOrderController::visibles) y roles superiores
     // con el submódulo; ningún aliado (PermisoDenegado::SOLO_PERSONAL_DIRECTO).
     Route::get('work-orders/resumen', [App\Http\Controllers\Api\WorkOrderController::class, 'resumen'])
+        ->middleware('permiso:operaciones.work_orders');
+    Route::get('work-orders/auxiliares', [App\Http\Controllers\Api\WorkOrderController::class, 'auxiliares'])
         ->middleware('permiso:operaciones.work_orders');
     Route::post('work-orders/importar', [App\Http\Controllers\Api\WorkOrderController::class, 'importar'])
         ->middleware(PermisoDenegado::middleware('importar', 'operaciones.work_orders.work_orders_file'));

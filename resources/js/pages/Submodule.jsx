@@ -55,6 +55,8 @@ const AprobacionTrasladoCrud = lazy(() => import('./AprobacionTrasladoCrud'));
 const CategoriaProductoCrud = lazy(() => import('./CategoriaProductoCrud'));
 const ProveedoresCrud = lazy(() => import('./ProveedoresCrud'));
 const VehiculosCrud = lazy(() => import('./VehiculosCrud'));
+const SupervisoresCrud = lazy(() => import('./AsignacionesOperativasCrud').then((m) => ({ default: m.SupervisoresCrud })));
+const TorresCrud = lazy(() => import('./AsignacionesOperativasCrud').then((m) => ({ default: m.TorresCrud })));
 
 // import SubagentesCrud      from './SubagentesCrud';
 // import FacturasCrud        from './FacturasCrud';
@@ -389,6 +391,8 @@ function resolveSubCrud(moduleId, submoduleId, archivoId, sub) {
           return null;
         case 'paramgrupo_operativos':
           if (archivoId === 'asignacion_vehiculo_file') return VehiculosCrud;
+          if (archivoId === 'supervisores_file') return SupervisoresCrud;
+          if (archivoId === 'torres_file') return TorresCrud;
         // eslint-disable-next-line no-fallthrough
         default:
           // Tipo de parámetro creado por el usuario (ver useErpModules.js), suelto o
