@@ -569,6 +569,8 @@ function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
         queryKey: ["work-orders", "auxiliares"],
         queryFn: () => api.get("/work-orders/auxiliares").then((r) => r.data),
         enabled: pideAtencion && modo === "ACOMPAÑADO",
+        // Sin caché: un auxiliar recién creado en Parámetros debe aparecer de una.
+        staleTime: 0,
     });
     const completo = estado && (!pideAtencion || modo === "SOLO" || (modo === "ACOMPAÑADO" && auxiliarId));
     const confirmar = () => onConfirm(pideAtencion

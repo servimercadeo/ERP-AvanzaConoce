@@ -229,7 +229,11 @@ class AuxilioTest extends TestCase
         WorkOrder::create(['numero_wo' => 'ABIERTA', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado', 'fecha_finalizacion' => '2026-10-15']);
         $this->actingAs($this->usuario('admin'));
 
-        $this->assertSame([null], array_values(array_unique($this->columnaAuxilio())));
+        $valores = $this->columnaAuxilio();
+
+        // El aliado nunca cobra auxilio; la del directo aún no está finalizada, así que no se paga todavía.
+        $this->assertSame(['N/A'], collect($valores)->filter(fn ($v, $wo) => str_contains($wo, 'ALI-'))->unique()->values()->all());
+        $this->assertNull($valores['ABIERTA']);
     }
 
     public function test_cada_mes_se_paga_con_su_propio_tramo(): void
