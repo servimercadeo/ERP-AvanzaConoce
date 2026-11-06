@@ -69,7 +69,8 @@ class ContratosTest extends TestCase
         $body = $this->payload(['empleado_id' => null, 'documento' => '7770001', 'nombres' => 'Nuevo', 'apellidos' => 'Empleado', 'correo' => 'nuevo.emp@test.co']);
 
         $a = $this->postJson('/api/contratos', $body)->assertCreated()->json('empleado_id');
-        $b = $this->postJson('/api/contratos', $body)->assertCreated()->json('empleado_id');
+        // El segundo, histórico: con uno activo no se crea otro activo.
+        $b = $this->postJson('/api/contratos', ['estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Voluntario'] + $body)->assertCreated()->json('empleado_id');
 
         $this->assertSame($a, $b);
         $this->assertSame(1, User::where('cedula', '7770001')->count());

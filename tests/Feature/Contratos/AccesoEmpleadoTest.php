@@ -90,7 +90,8 @@ class AccesoEmpleadoTest extends TestCase
     {
         $empleado = $this->empleado(['cedula' => '7102']);
         $viejo = $this->contrato($empleado, ['fecha_ingreso' => '2024-01-01']);
-        $this->contrato($empleado, ['fecha_ingreso' => '2026-01-01', 'estado_contrato' => 'Traslado']);
+        // Datos de antes de la regla de un solo contrato activo: se crea directo en la base.
+        \App\Models\Contrato::create($this->payload($empleado, ['fecha_ingreso' => '2026-01-01', 'estado_contrato' => 'Traslado', 'completado' => true]));
 
         $this->putJson("/api/contratos/$viejo", $this->payload($empleado, ['fecha_ingreso' => '2024-01-01', 'estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Terminación']))->assertOk();
 

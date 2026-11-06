@@ -121,6 +121,14 @@ class CircuitoDotacionTest extends TestCase
         return $this->postJson('/api/contratos', $this->datosContrato($empleado, $extra))->assertCreated();
     }
 
+    /** Como en la vida real: el contrato anterior se finaliza antes del reingreso. */
+    private function finalizar(User $empleado, $respuesta): void
+    {
+        $this->putJson('/api/contratos/' . $respuesta->json('id'), $this->datosContrato($empleado, [
+            'estado_contrato' => 'Finalizado', 'motivo_finalizacion' => 'Voluntario', 'fecha_retiro' => '2026-11-15',
+        ]))->assertOk();
+    }
+
     private function pedidoDe($respuesta): PedidoAutomatico
     {
         $id = $respuesta->json('pedido_automatico.id');
@@ -172,9 +180,11 @@ class CircuitoDotacionTest extends TestCase
     public function test_un_segundo_contrato_no_da_otro_kit(): void
     {
         $empleado = $this->empleado();
-        $this->pedidoDe($this->contrato($empleado));
+        $primero = $this->contrato($empleado);
+        $this->pedidoDe($primero);
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
         $this->assertSame(8, $polo->fresh()->cantidad);
+        $this->finalizar($empleado, $primero);
 
         $this->contrato($empleado)->assertJsonPath('pedido_automatico', null)
             ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'ya tuvo otro contrato') && str_contains($m, 'manualmente'));
@@ -186,7 +196,7 @@ class CircuitoDotacionTest extends TestCase
     public function test_con_un_segundo_contrato_el_kit_se_puede_crear_manualmente(): void
     {
         $empleado = $this->empleado();
-        $this->contrato($empleado);
+        $this->finalizar($empleado, $this->contrato($empleado));
         $this->contrato($empleado);
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
@@ -490,7 +500,9 @@ class CircuitoDotacionTest extends TestCase
     public function test_un_contrato_de_traslado_posterior_no_da_otro_kit(): void
     {
         $empleado = $this->empleado();
-        $this->pedidoDe($this->contrato($empleado));
+        $primero = $this->contrato($empleado);
+        $this->pedidoDe($primero);
+        $this->finalizar($empleado, $primero);
 
         $this->contrato($empleado, ['estado_contrato' => 'Traslado'])->assertJsonPath('pedido_automatico', null);
 
@@ -2186,7 +2198,9 @@ class CircuitoDotacionTest extends TestCase
     {
         $empleado = $this->empleado();
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
-        $pedido = $this->pedidoDe($this->contrato($empleado));
+        $primero = $this->contrato($empleado);
+        $pedido = $this->pedidoDe($primero);
+        $this->finalizar($empleado, $primero);
         $segundo = $this->contrato($empleado)->json('id');
 
         $this->deleteJson("/api/contratos/{$segundo}")->assertNoContent();
@@ -2491,7 +2505,8 @@ class CircuitoDotacionTest extends TestCase
             $empleado = $this->empleado(conFormulario: $caso !== 1); // 1: sin formulario
             $r = $this->contrato($empleado, ['estado_contrato' => $caso === 2 ? 'Finalizado' : 'Vigente']); // 2: histórico
             if ($caso === 3) {
-                $this->contrato($empleado)->assertJsonPath('pedido_automatico', null); // 3: segundo contrato
+                $this->finalizar($empleado, $r);
+                $this->contrato($empleado)->assertJsonPath('pedido_automatico', null); // 3: segundo contrato (reingreso)
             }
             if (in_array($caso, [0, 3], true)) {
                 $conKit[$r->json('id')] = $empleado->id;

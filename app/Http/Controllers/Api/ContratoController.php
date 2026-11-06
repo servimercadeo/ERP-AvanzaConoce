@@ -20,6 +20,9 @@ use Illuminate\Validation\ValidationException;
 
 class ContratoController extends Controller
 {
+    /** Estados de un contrato activo: una persona solo puede tener uno ("Activo" es el nombre viejo de Vigente). */
+    private const ESTADOS_ACTIVOS = ['Vigente', 'Activo', 'Traslado'];
+
     private const MESES_ES = [
         'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
@@ -446,6 +449,20 @@ class ContratoController extends Controller
         // generar el pedido automático.
         $data['estado_contrato'] = ($data['estado_contrato'] ?? null) ?: 'Vigente';
 
+        // Una persona puede tener varios contratos (reingreso), pero solo uno activo a la vez.
+        if (in_array($data['estado_contrato'], self::ESTADOS_ACTIVOS, true)) {
+            $activo = Contrato::where('empleado_id', $data['empleado_id'])
+                ->where('completado', true)
+                ->whereIn('estado_contrato', self::ESTADOS_ACTIVOS)
+                ->first();
+            if ($activo) {
+                throw ValidationException::withMessages([
+                    'empleado_id' => "Esta persona ya tiene un contrato vigente ({$activo->cargo}, desde "
+                        . ($activo->fecha_ingreso?->format('Y-m-d') ?? 'sin fecha') . '). Finalízalo antes de crear el nuevo.',
+                ]);
+            }
+        }
+
         return DB::transaction(function() use ($data) {
             $data['completado'] = true;
 
@@ -487,6 +504,16 @@ class ContratoController extends Controller
         // Contrato finalizado sin otro vigente: la persona queda Inactiva (ERP y AvanzaConoce).
         app(\App\Services\AccesoEmpleado::class)->alGuardarContrato($contrato);
 
+        // Reingreso: la misma persona con un contrato nuevo. Quedó inactiva al terminar el anterior,
+        // así que vuelve a tener acceso; quien aún no recibe el alta lo obtiene allá.
+        $reingreso = Contrato::where('empleado_id', $contrato->empleado_id)->whereKeyNot($contrato->id)
+            ->where('completado', true)->exists();
+        $empleado = $contrato->empleado()->first();
+        if ($reingreso && $empleado && !$empleado->pendiente_alta && !$empleado->activo
+            && in_array($contrato->estado_contrato, self::ESTADOS_ACTIVOS, true)) {
+            app(\App\Services\AccesoEmpleado::class)->activar($empleado);
+        }
+
         $pedidoAutomatico = null;
         $motivoSinPedido = null;
         $faltantes = [];
@@ -509,6 +536,7 @@ class ContratoController extends Controller
         // Para el mensaje al crear: por qué no hubo pedido, o qué prendas faltaron.
         $contratoData['pedido_automatico_motivo'] = $motivoSinPedido;
         $contratoData['pedido_automatico_faltantes'] = $faltantes;
+        $contratoData['reingreso'] = $reingreso;
 
         return response()->json($contratoData, 201);
     }

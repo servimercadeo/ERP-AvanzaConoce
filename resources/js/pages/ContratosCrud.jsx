@@ -23,6 +23,7 @@ import { buildContratoPayloadFromExcelRows, filaParaCompletarContrato } from "..
 import { exportarContratosExcel, descargarPlantillaContratos } from "../utils/contratosExport";
 import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
+import { opcionesDeReingreso } from "../utils/reingreso";
 import SelectBuscable from "../components/SelectBuscable";
 
 const POR_PAGINA = 5;
@@ -58,6 +59,9 @@ const TIPOS_CONTRATO = [
 ];
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
+
+// Minúsculas y sin tildes, para buscar sin importar cómo se escribió.
+const sinTildes = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // Normaliza un valor para que coincida con las opciones del <select> (ignora mayúsculas, tildes y espacios)
 const matchOpt = (val, opts) => {
@@ -387,7 +391,7 @@ function SearchableSelect({
     );
 }
 
-function CandidatoSelector({ candidatos, empleados, onSelect }) {
+function CandidatoSelector({ candidatos, reingresos = [], empleados, onSelect }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState(null);
@@ -400,15 +404,16 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
             .toLowerCase()
             .split(/\s+/)
             .filter(Boolean);
+        // Sin búsqueda solo los candidatos con aval; quien ya tuvo contrato (reingreso) se busca.
         if (!words.length) return candidatos.slice(0, 80);
-        return candidatos
+        return [...candidatos, ...reingresos]
             .filter((c) => {
                 const text =
                     `${c.nombres} ${c.apellidos} ${c.documento}`.toLowerCase();
                 return words.every((w) => text.includes(w));
             })
             .slice(0, 80);
-    }, [debouncedQ, candidatos]);
+    }, [debouncedQ, candidatos, reingresos]);
 
     useEffect(() => {
         const h = (e) => {
@@ -421,6 +426,8 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
     }, []);
 
     const handlePick = (c) => {
+        // Solo un contrato activo por persona: el vigente se finaliza antes del reingreso.
+        if (c.reingreso && c.vigente) return;
         setSelected(c);
         setQuery("");
         setOpen(false);
@@ -430,7 +437,7 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
         );
         onSelect({
             ...c,
-            empleado_id: emp?.id ?? "",
+            empleado_id: c.empleado_id ?? emp?.id ?? "",
             documento: c.documento,
             nombres: c.nombres,
             apellidos: c.apellidos,
@@ -508,6 +515,11 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                         >
                             Doc: {selected.documento}
                         </div>
+                        {selected.reingreso && (
+                            <div style={{ fontSize: "0.78rem", color: "var(--primary-dark)", fontWeight: 700, marginTop: 2 }}>
+                                Reingreso · datos tomados de su último contrato ({selected.ultimo?.cargo || "sin cargo"}). Revísalos y escribe la fecha de ingreso.
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={() => {
@@ -575,11 +587,13 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                             ) : (
                                 filtered.map((c) => (
                                     <div
-                                        key={c.documento}
+                                        key={`${c.reingreso ? "r" : "c"}-${c.documento}`}
                                         onMouseDown={() => handlePick(c)}
+                                        title={c.reingreso && c.vigente ? "Tiene un contrato vigente: finalízalo antes de crear el reingreso." : undefined}
                                         style={{
                                             padding: "10px 16px",
-                                            cursor: "pointer",
+                                            cursor: c.reingreso && c.vigente ? "not-allowed" : "pointer",
+                                            opacity: c.reingreso && c.vigente ? 0.6 : 1,
                                             borderBottom:
                                                 "1px solid var(--border)",
                                             display: "flex",
@@ -650,6 +664,13 @@ function CandidatoSelector({ candidatos, empleados, onSelect }) {
                                             >
                                                 {c.documento}
                                             </div>
+                                            {c.reingreso && (
+                                                <div style={{ fontSize: "0.74rem", fontWeight: 700, color: c.vigente ? "#a33" : "var(--primary-dark)" }}>
+                                                    {c.vigente
+                                                        ? `Contrato vigente (${c.vigente.cargo || "sin cargo"}): finalízalo antes del reingreso`
+                                                        : `Reingreso · último contrato: ${c.ultimo?.cargo || "sin cargo"} (${c.ultimo?.estado || "—"})`}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -671,6 +692,7 @@ function Modal({
     empleados,
     catalogs,
     candidatosContrato = [],
+    contratos = [],
     proyectoOpts = [],
     empleadorOpts = [],
     empresasOpts = [],
@@ -683,6 +705,11 @@ function Modal({
     // Contratos aparte): oculta salario, seguridad social, costos/anexos y datos
     // médicos para roles sin acceso a esa información.
     const ocultarSensible = readOnly && restringirVistaSensible;
+    // Quien ya tuvo contrato se puede volver a contratar sin pasar por Selección (reingreso).
+    const reingresos = useMemo(
+        () => opcionesDeReingreso(contratos, candidatosContrato),
+        [contratos, candidatosContrato],
+    );
     const [form, setForm] = useState(initial);
     const [errors, setErrors] = useState({});
     const [activeTab, setActive] = useState("principal");
@@ -875,6 +902,16 @@ function Modal({
             fondo_cesantias: pick(c.fondo_cesantias, catalogs.cesantias, f.fondo_cesantias),
             arl: pick(c.arl, catalogs.arls, f.arl),
             caja_compensacion: pick(c.caja_compensacion, catalogs.cajas, f.caja_compensacion),
+            // Del contrato anterior, solo en un reingreso (un candidato no los trae).
+            ...(c.reingreso ? {
+                tipo_contrato: pick(c.tipo_contrato, TIPOS_CONTRATO, f.tipo_contrato),
+                banco: pick(c.banco, catalogs.bancos, f.banco),
+                tipo_cuenta: pick(c.tipo_cuenta, TIPOS_CUENTA, f.tipo_cuenta),
+                cuenta_bancaria: c.cuenta_bancaria || f.cuenta_bancaria,
+                jefe_inmediato_correo: c.jefe_inmediato_correo || f.jefe_inmediato_correo,
+                centros_costos: c.centros_costos?.length ? c.centros_costos : f.centros_costos,
+                fecha_ingreso: "",
+            } : {}),
         }));
         setErrors({});
     };
@@ -1165,6 +1202,7 @@ function Modal({
                         <div style={{ paddingBottom: 20 }}>
                             <CandidatoSelector
                                 candidatos={candidatosContrato}
+                                reingresos={reingresos}
                                 empleados={empleados}
                                 onSelect={handleCandidatoSelect}
                             />
@@ -2701,13 +2739,15 @@ export default function ContratosCrud() {
     const filtered = useMemo(
         () =>
             contratos.filter((c) => {
-                const q = debouncedSearch.toLowerCase();
-                const empName =
-                    `${c.empleado?.apellidos ?? ""} ${c.empleado?.nombres ?? ""}`.toLowerCase();
-                const matchQ =
-                    empName.includes(q) ||
-                    (c.empleado?.cedula ?? "").includes(q) ||
-                    (c.cargo ?? "").toLowerCase().includes(q);
+                // Cada palabra por separado y en cualquier orden: el nombre se ve "nombres
+                // apellidos" pero se puede escribir al revés, con o sin tildes.
+                const texto = sinTildes(
+                    `${c.empleado?.nombres ?? ""} ${c.empleado?.apellidos ?? ""} ${c.empleado?.name ?? ""} ${c.empleado?.cedula ?? ""} ${c.cargo ?? ""}`,
+                );
+                const matchQ = sinTildes(debouncedSearch)
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .every((palabra) => texto.includes(palabra));
                 const matchE =
                     filtroEstado === "Todos"
                         ? c.estado_contrato !== "No ingreso"
@@ -2827,13 +2867,14 @@ export default function ContratosCrud() {
                 qc.invalidateQueries({ queryKey: ["candidatos-contrato"] });
                 // El aval con contrato ya no muestra "Anular aval".
                 qc.invalidateQueries({ queryKey: ["base-ingresos"] });
+                const creado = data.reingreso ? "Reingreso creado." : "Contrato creado.";
                 showToast(
                     data.pedido_automatico
-                        ? `Contrato creado. Pedido automático ${data.pedido_automatico.codigo} generado.` +
+                        ? `${creado} Pedido automático ${data.pedido_automatico.codigo} generado.` +
                           (data.pedido_automatico_faltantes?.length
                               ? ` Pendiente: ${data.pedido_automatico_faltantes.join("; ")}.`
                               : "")
-                        : `Contrato creado. ${data.pedido_automatico_motivo ?? "No se generó el pedido automático de dotación."}`,
+                        : `${creado} ${data.pedido_automatico_motivo ?? "No se generó el pedido automático de dotación."}`,
                     data.pedido_automatico && !data.pedido_automatico_faltantes?.length ? 4000 : 10000,
                 );
             }
@@ -3669,6 +3710,7 @@ export default function ContratosCrud() {
                 empleados={empleados}
                 catalogs={catalogs}
                 candidatosContrato={candidatosContrato}
+                contratos={editTarget ? [] : contratos}
                 proyectoOpts={proyectoOpts}
                 empleadorOpts={empleadorOpts}
                 empresasOpts={empresasOpts}
