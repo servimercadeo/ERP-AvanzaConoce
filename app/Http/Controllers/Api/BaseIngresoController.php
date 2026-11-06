@@ -22,14 +22,16 @@ class BaseIngresoController extends Controller
 
         $req = $c->requisicion;
 
-        $ingreso->nombre_completo  = $c->nombres;
-        $ingreso->telefono         = $c->celular;
-        $ingreso->correo           = $c->correo;
+        // Lo del candidato y la requisición manda; si allá está vacío se ve lo del propio aval
+        // (antes quedaba en blanco aunque el aval lo tuviera).
+        $ingreso->nombre_completo  = $c->nombres ?: $ingreso->nombre_completo;
+        $ingreso->telefono         = $c->celular ?: $ingreso->telefono;
+        $ingreso->correo           = $c->correo ?: $ingreso->correo;
         $ingreso->tipo_vinculacion = $c->tipo_vinculacion ?? $ingreso->tipo_vinculacion;
-        $ingreso->cargo            = $req?->cargo?->nombre;
-        $ingreso->empresa          = $req?->empresa?->nombre;
-        $ingreso->proyecto         = $req?->proyecto?->nombre;
-        $ingreso->lider_inmediato  = $req?->responsable;
+        $ingreso->cargo            = $req?->cargo?->nombre ?: $ingreso->cargo;
+        $ingreso->empresa          = $req?->empresa?->nombre ?: $ingreso->empresa;
+        $ingreso->proyecto         = $req?->proyecto?->nombre ?: $ingreso->proyecto;
+        $ingreso->lider_inmediato  = $req?->responsable ?: $ingreso->lider_inmediato;
         // El empleador lo eligió quien dio el aval (Candidatos); las requisiciones antiguas lo traían.
         $ingreso->empleador        = $c->empleadorNombre() ?: $ingreso->empleador;
 
@@ -199,6 +201,20 @@ class BaseIngresoController extends Controller
             $baseIngreso->candidato->update([
                 'empleador_id' => $data['empleador'] ? \App\Models\Empleador::where('nombre', $data['empleador'])->value('id') : null,
             ]);
+        }
+
+        // Igual con los datos de la persona: la lista y las demás pantallas los leen del candidato,
+        // así que editarlos solo en el aval no se veía en ninguna parte.
+        if ($baseIngreso->candidato) {
+            $delCandidato = array_filter([
+                'nombres'          => $data['nombre_completo'] ?? null,
+                'celular'          => $data['telefono'] ?? null,
+                'correo'           => $data['correo'] ?? null,
+                'tipo_vinculacion' => $data['tipo_vinculacion'] ?? null,
+            ], fn ($v) => $v !== null && $v !== '');
+            if ($delCandidato) {
+                $baseIngreso->candidato->update($delCandidato);
+            }
         }
 
         $baseIngreso->load([

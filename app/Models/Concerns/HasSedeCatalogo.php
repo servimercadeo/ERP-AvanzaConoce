@@ -25,10 +25,14 @@ trait HasSedeCatalogo
                 return;
             }
 
-            $nombre = trim((string) $model->sede);
+            // El texto que se acaba de escribir, no `$model->sede`: ese accesor devuelve el nombre
+            // de la sede del id ANTERIOR, y al editar se volvía a encontrar la misma sede.
+            $nombre = trim((string) ($model->getAttributes()['sede'] ?? ''));
             $model->sede_id = $nombre !== ''
                 ? Sede::whereRaw('UPPER(nombre) = ?', [mb_strtoupper($nombre, 'UTF-8')])->value('id')
                 : null;
+            // Sin esto, la respuesta mostraría el nombre de la sede anterior ya cargada.
+            $model->unsetRelation('sedeCatalogo');
         });
     }
 

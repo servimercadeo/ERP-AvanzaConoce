@@ -250,6 +250,17 @@ export default function BaseIngresoCrud() {
     };
   }, [isModalOpen]);
 
+  // Cargo, empresa, proyecto y líder son de la requisición, que comparten varios candidatos:
+  // si la requisición los tiene, aquí no se editan (no se verían; se cambian en Requisiciones).
+  const reqDelAval = candidates.find((x) => String(x.id) === String(form.candidato_id))?.requisicion ?? null;
+  const deRequisicion = {
+    cargo: Boolean(reqDelAval?.cargo?.nombre),
+    empresa: Boolean(reqDelAval?.empresa?.nombre),
+    proyecto: Boolean(reqDelAval?.proyecto?.nombre),
+    lider_inmediato: Boolean(reqDelAval?.responsable),
+  };
+  const etiquetaReq = (texto, campo) => (deRequisicion[campo] ? `${texto} (de la requisición)` : texto);
+
   const handleCandidatoSelect = (candidatoId) => {
     const c = candidates.find(x => String(x.id) === String(candidatoId));
     if (!c) {
@@ -551,10 +562,10 @@ export default function BaseIngresoCrud() {
 
               <label style={S.sectionLabel}>Datos laborales</label>
               <div className="form-grid" style={{ ...S.grid3, marginBottom: 18 }}>
-                <Field label="Cargo" k="cargo" opts={form.cargo && !cargosCatalogo.includes(form.cargo) ? [form.cargo, ...cargosCatalogo] : cargosCatalogo} form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label={etiquetaReq("Cargo", "cargo")} k="cargo" opts={form.cargo && !cargosCatalogo.includes(form.cargo) ? [form.cargo, ...cargosCatalogo] : cargosCatalogo} form={form} onChange={set} disabled={modalMode === 'view' || deRequisicion.cargo} />
                 <Field label="Ciudad" k="ciudad" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Empresa" k="empresa" form={form} onChange={set} disabled={modalMode === 'view'} />
-                <Field label="Proyecto" k="proyecto" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label={etiquetaReq("Empresa", "empresa")} k="empresa" form={form} onChange={set} disabled={modalMode === 'view' || deRequisicion.empresa} />
+                <Field label={etiquetaReq("Proyecto", "proyecto")} k="proyecto" form={form} onChange={set} disabled={modalMode === 'view' || deRequisicion.proyecto} />
                 <Field label="Teléfono" k="telefono" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Correo electrónico" k="correo" type="email" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Tipo de vinculación" k="tipo_vinculacion" opts={tiposVinculacion} form={form} onChange={set} disabled={modalMode === 'view'} />
@@ -569,7 +580,7 @@ export default function BaseIngresoCrud() {
                     disabled={modalMode === 'view'}
                   />
                 </div>
-                <Field label="Líder inmediato" k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view'} />
+                <Field label={etiquetaReq("Líder inmediato", "lider_inmediato")} k="lider_inmediato" form={form} onChange={set} disabled={modalMode === 'view' || deRequisicion.lider_inmediato} />
                 <Field label="Empleador" k="empleador" opts={empleadorOpts} form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha de aval" k="fecha_aval" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
                 <Field label="Fecha programación ingreso" k="fecha_programacion_ingreso" type="date" form={form} onChange={set} disabled={modalMode === 'view'} />
