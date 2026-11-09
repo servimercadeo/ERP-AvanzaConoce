@@ -74,10 +74,34 @@ class SupervisoresTorresTest extends TestCase
             ->assertJsonPath('errors.item_ids.0', 'La sede SERVIMERCADEO CALI ya está con Torre Uno. Quítalo de allá primero.');
     }
 
+    public function test_las_opciones_solo_traen_empleados_de_directv(): void
+    {
+        $this->empleadoDe('Zzz De Directv', 'DIRECTV COL');
+        $this->empleadoDe('Aaa De Directv', 'DIRECTV');
+        $this->empleadoDe('Mmm De Tigo', 'TIGO EXPRESS');
+        $this->usuario('general', ['name' => 'Bbb Sin Contrato']);
+        $this->empleadoDe('Inactivo De Directv', 'DIRECTV')->update(['activo' => false]);
+
+        $empleados = collect($this->getJson('/api/supervisores/opciones')->assertOk()->json('empleados'));
+
+        // "DIRECTV COL" es el nombre viejo del mismo proyecto, así que también cuenta.
+        $this->assertSame(['Aaa De Directv', 'Zzz De Directv'], $empleados->pluck('nombre')->all());
+        $this->assertSame(['DIRECTV', 'DIRECTV'], $empleados->pluck('proyecto')->all());
+    }
+
+    /** Un empleado activo con contrato de ese proyecto. */
+    private function empleadoDe(string $nombre, string $proyecto): \App\Models\User
+    {
+        $user = $this->usuario('general', ['name' => $nombre]);
+        \App\Models\Contrato::create(['empleado_id' => $user->id, 'cliente_proyecto' => $proyecto]);
+
+        return $user;
+    }
+
     public function test_las_opciones_traen_empleados_activos_y_tecnicos_o_sedes(): void
     {
-        $this->usuario('general', ['name' => 'Activo']);
-        $this->usuario('general', ['name' => 'Inactivo', 'activo' => false]);
+        $this->empleadoDe('Activo', 'DIRECTV');
+        $this->empleadoDe('Inactivo', 'DIRECTV')->update(['activo' => false]);
         $this->usuario('tecnico', ['name' => 'Carlos Tecnico', 'cedula' => '555']);
         Sede::create(['nombre' => 'SEDE A']);
 

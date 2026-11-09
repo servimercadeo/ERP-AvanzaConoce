@@ -25,7 +25,7 @@ import { compressImage, mensajeErrorFoto } from "../utils/imageCompress";
 import { propagarFotoEmpleado } from "../utils/fotoEmpleado";
 import SelectBuscable from "../components/SelectBuscable";
 
-const POR_PAGINA = 5;
+const POR_PAGINA = 20;
 
 // Nombre de columna (como en "Exportar Excel") de los campos que reporta la importación.
 const CAMPOS_IMPORT_LABEL = {
@@ -2546,6 +2546,8 @@ export default function ContratosCrud() {
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebounce(search, 300);
     const [filtroEstado, setFiltroEstado] = useState("Todos");
+    // Por fecha de ingreso (la columna "Ingreso"); si falta, por cuándo se registró.
+    const [orden, setOrden] = useState("recientes");
     const [filtroSede, setFiltroSede] = useState("Todas");
     const [filtroTipoContrato, setFiltroTipoContrato] = useState("Todos");
     const [filtroVinc, setFiltroVinc] = useState("Todos");
@@ -2662,6 +2664,7 @@ export default function ContratosCrud() {
     useEffect(() => {
         setPagina(1);
     }, [
+        orden,
         search,
         filtroEstado,
         filtroSede,
@@ -2758,11 +2761,20 @@ export default function ContratosCrud() {
         ],
     );
 
+    const ordenados = useMemo(() => {
+        const fecha = (c) => c.fecha_ingreso || c.created_at || "";
+        // Desempata por id: dos contratos del mismo día no se barajan al repintar.
+        return [...filtered].sort((a, b) => {
+            const dif = fecha(a) < fecha(b) ? -1 : fecha(a) > fecha(b) ? 1 : (a.id ?? 0) - (b.id ?? 0);
+            return orden === "recientes" ? -dif : dif;
+        });
+    }, [filtered, orden]);
+
     const paginated = useMemo(
-        () => filtered.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
-        [filtered, pagina],
+        () => ordenados.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA),
+        [ordenados, pagina],
     );
-    const totalPaginas = Math.ceil(filtered.length / POR_PAGINA);
+    const totalPaginas = Math.ceil(ordenados.length / POR_PAGINA);
 
     const stats = useMemo(
         () => ({
@@ -2873,7 +2885,7 @@ export default function ContratosCrud() {
         if (!filtered.length) return;
         setExporting(true);
         try {
-            await exportarContratosExcel(filtered, { incluirSensible: puedeVerInfoSensible });
+            await exportarContratosExcel(ordenados, { incluirSensible: puedeVerInfoSensible });
             showToast(`Excel exportado (${filtered.length} contrato${filtered.length === 1 ? "" : "s"}).`);
         } catch {
             showToast("No se pudo generar el Excel.");
@@ -3416,8 +3428,8 @@ export default function ContratosCrud() {
                 <div style={S.paginationBar}>
                     <span style={S.paginationInfo}>
                         Mostrando {(pagina - 1) * POR_PAGINA + 1}–
-                        {Math.min(pagina * POR_PAGINA, filtered.length)} de{" "}
-                        {filtered.length} contratos
+                        {Math.min(pagina * POR_PAGINA, ordenados.length)} de{" "}
+                        {ordenados.length} contratos
                     </span>
                     <div style={S.paginationBtns}>
                         <button
@@ -3512,6 +3524,18 @@ export default function ContratosCrud() {
                                     gap: "16px 24px",
                                 }}
                             >
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Orden</label>
+                                    <FilterSelect
+                                        value={orden}
+                                        onChange={setOrden}
+                                        defaultValue="recientes"
+                                        options={[
+                                            { label: "Más nuevo a más antiguo", value: "recientes" },
+                                            { label: "Más antiguo a más nuevo", value: "antiguos" },
+                                        ]}
+                                    />
+                                </div>
                                 <div style={S.formGroup}>
                                     <label style={S.label}>Estado</label>
                                     <FilterSelect

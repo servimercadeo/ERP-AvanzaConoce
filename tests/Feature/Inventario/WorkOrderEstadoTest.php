@@ -215,6 +215,15 @@ class WorkOrderEstadoTest extends TestCase
         $this->assertSame('Sin Cedula', $wos['WO9']['nombre_tecnico_atiende']);
     }
 
+    /** Un empleado activo con contrato de ese proyecto (de ahí sale "DIRECTV"). */
+    private function empleadoDe(string $nombre, string $proyecto): \App\Models\User
+    {
+        $user = $this->usuario('general', ['name' => $nombre]);
+        \App\Models\Contrato::create(['empleado_id' => $user->id, 'cliente_proyecto' => $proyecto]);
+
+        return $user;
+    }
+
     /** Un valor del parámetro Parametros > Operativos > Auxiliar. */
     private function auxiliar(string $nombre): \App\Models\ValorParametro
     {
@@ -253,10 +262,10 @@ class WorkOrderEstadoTest extends TestCase
 
         $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO'])
             ->assertUnprocessable()->assertJsonPath('errors.auxiliar_id.0', 'Selecciona el auxiliar técnico que lo acompañó.');
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => $otro->id])
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => "p-{$otro->id}"])
             ->assertUnprocessable();
 
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => $auxiliar->id])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => "p-{$auxiliar->id}"])->assertOk();
 
         $wo->refresh();
         $this->assertSame(['ACOMPAÑADO', 'Laura Auxiliar'], [$wo->modo_atencion, $wo->auxiliar]);
@@ -281,21 +290,36 @@ class WorkOrderEstadoTest extends TestCase
         $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Asignado'])->assertOk();
     }
 
-    public function test_la_lista_de_auxiliares_sale_del_parametro_y_no_de_los_cargos(): void
+    public function test_la_lista_de_auxiliares_trae_los_de_directv_y_el_parametro_y_nadie_mas(): void
     {
-        $this->auxiliar('Carla Auxiliar');
-        $this->auxiliar('Ana Auxiliar');
-        // Un empleado con cargo de auxiliar ya NO entra solo por su cargo.
-        $this->usuario('general', ['name' => 'Beto Por Cargo', 'cargo' => 'AUXILIAR TECNICO']);
+        $this->empleadoDe('Zulma De Directv', 'DIRECTV');
+        $this->empleadoDe('Ana De Directv', 'DIRECTV');
+        $this->empleadoDe('Nelly De Tigo', 'TIGO EXPRESS');
+        $this->usuario('general', ['name' => 'Beto Sin Contrato']);
+        $this->empleadoDe('Inactiva De Directv', 'DIRECTV')->update(['activo' => false]);
+        $this->auxiliar('Carla Del Parametro');
         \App\Models\ValorParametro::create([
             'tipo_parametro_id' => \App\Models\TipoParametro::create(['nombre' => 'Otro catálogo', 'grupo' => 'Operativos'])->id,
             'nombre' => 'De Otro Catalogo',
         ]);
-        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555', 'name' => 'Aaa Tecnico']));
 
         $nombres = collect($this->getJson('/api/work-orders/auxiliares')->assertOk()->json())->pluck('nombre')->all();
 
-        $this->assertSame(['Ana Auxiliar', 'Carla Auxiliar'], $nombres);
+        // Solo los de DIRECTV, por nombre, y al final lo que se agregó en el parámetro.
+        $this->assertSame(['Ana De Directv', 'Zulma De Directv', 'Carla Del Parametro'], $nombres);
+    }
+
+    public function test_un_empleado_de_directv_se_puede_elegir_como_auxiliar(): void
+    {
+        $tecnico = $this->usuario('tecnico', ['cedula' => '555']);
+        $auxiliar = $this->empleadoDe('Zulma De Directv', 'DIRECTV');
+        $wo = WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Asignado']);
+        $this->actingAs($tecnico);
+
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => "u-{$auxiliar->id}"])->assertOk();
+
+        $this->assertSame('Zulma De Directv', $wo->fresh()->auxiliar);
     }
 
     public function test_un_auxiliar_nuevo_del_parametro_queda_disponible_de_una(): void
@@ -310,7 +334,7 @@ class WorkOrderEstadoTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($tecnico);
-        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => $id])->assertOk();
+        $this->putJson("/api/work-orders/{$wo->id}", ['estado' => 'Finalizado', 'modo_atencion' => 'ACOMPAÑADO', 'auxiliar_id' => "p-{$id}"])->assertOk();
 
         $this->assertSame('Nuevo Auxiliar', $wo->fresh()->auxiliar);
     }

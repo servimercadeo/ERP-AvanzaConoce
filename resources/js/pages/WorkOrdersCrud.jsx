@@ -574,7 +574,7 @@ function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
     });
     const completo = estado && (!pideAtencion || modo === "SOLO" || (modo === "ACOMPAÑADO" && auxiliarId));
     const confirmar = () => onConfirm(pideAtencion
-        ? { estado, modo_atencion: modo, auxiliar_id: modo === "ACOMPAÑADO" ? Number(auxiliarId) : null }
+        ? { estado, modo_atencion: modo, auxiliar_id: modo === "ACOMPAÑADO" ? auxiliarId : null }
         : { estado });
     return (
         <div style={S.overlay}>
@@ -606,7 +606,11 @@ function EstadoModal({ item, estados, onClose, onConfirm, saving, error }) {
                             <label style={S.label}>Auxiliar técnico que lo acompañó</label>
                             <SelectBuscable style={S.input} value={auxiliarId} onChange={(e) => setAuxiliarId(e.target.value)}>
                                 <option value="">Seleccione…</option>
-                                {auxiliares.map((a) => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+                                {auxiliares.map((a) => (
+                                    <option key={a.id} value={a.id}>
+                                        {a.proyecto ? `${a.nombre} — ${a.proyecto}` : a.nombre}
+                                    </option>
+                                ))}
                             </SelectBuscable>
                         </div>
                     )}

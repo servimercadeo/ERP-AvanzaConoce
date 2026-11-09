@@ -27,7 +27,11 @@ function FormModal({ tipo, editTarget, asignaciones, opciones, onClose, onSave }
         const usados = new Set(asignaciones.map((a) => a.user_id));
         return opciones.empleados
             .filter((e) => !usados.has(e.id))
-            .map((e) => ({ value: String(e.id), label: e.cargo ? `${e.nombre} — ${e.cargo}` : e.nombre }));
+            // Vienen ordenados con los de DIRECTV primero (ver ProyectoDeEmpleado); el proyecto va en la etiqueta para no confundirlos.
+            .map((e) => ({
+                value: String(e.id),
+                label: [e.nombre, e.cargo, e.proyecto].filter(Boolean).join(" — "),
+            }));
     }, [asignaciones, opciones.empleados]);
 
     // Un técnico tiene un solo supervisor y una sede una sola torre: los de otro salen en gris.

@@ -11,6 +11,7 @@ use App\Models\ValorParametro;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
 use App\Services\AuxilioProductividad;
+use App\Services\ProyectoDeEmpleado;
 use App\Services\UsuarioAliadoEmpresa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -342,7 +343,7 @@ class WorkOrderController extends Controller
         $data = $request->validate([
             'estado'        => 'required|string|max:60',
             'modo_atencion' => 'nullable|in:' . self::SOLO . ',' . self::ACOMPANADO,
-            'auxiliar_id'   => 'nullable|integer',
+            'auxiliar_id'   => 'nullable|string|max:30',
         ]);
         $user = $request->user();
 
@@ -356,7 +357,7 @@ class WorkOrderController extends Controller
                 throw ValidationException::withMessages(['modo_atencion' => 'Indica si el técnico atendió SOLO o ACOMPAÑADO.']);
             }
             $auxiliar = $modo === self::ACOMPANADO
-                ? $this->auxiliaresTecnicos()->firstWhere('id', (int) ($data['auxiliar_id'] ?? 0))
+                ? $this->auxiliaresTecnicos()->firstWhere('id', (string) ($data['auxiliar_id'] ?? ''))
                 : null;
             if ($modo === self::ACOMPANADO && !$auxiliar) {
                 throw ValidationException::withMessages(['auxiliar_id' => 'Selecciona el auxiliar técnico que lo acompañó.']);
@@ -386,13 +387,27 @@ class WorkOrderController extends Controller
         return response()->json($this->auxiliaresTecnicos());
     }
 
+    /**
+     * Los empleados de DIRECTV y además los valores del parámetro Auxiliar, para un auxiliar
+     * que no sea empleado del ERP. El id lleva de dónde sale cada uno ("u-12", "p-3") porque
+     * las dos listas numeran por su lado.
+     */
     private function auxiliaresTecnicos()
     {
-        return ValorParametro::whereHas('tipoParametro', fn ($q) => $q->where('nombre', self::PARAMETRO_AUXILIAR))
+        $proyectos = ProyectoDeEmpleado::porUsuario();
+        $personas = User::where('activo', true)->get(['id', 'name'])
+            ->map(fn (User $u) => [
+                'id'       => "u-{$u->id}",
+                'nombre'   => $u->name,
+                'proyecto' => $proyectos->get($u->id),
+            ]);
+
+        $delParametro = ValorParametro::whereHas('tipoParametro', fn ($q) => $q->where('nombre', self::PARAMETRO_AUXILIAR))
             ->orderBy('nombre')
             ->get(['id', 'nombre'])
-            ->map(fn (ValorParametro $v) => ['id' => $v->id, 'nombre' => $v->nombre])
-            ->values();
+            ->map(fn (ValorParametro $v) => ['id' => "p-{$v->id}", 'nombre' => $v->nombre, 'proyecto' => null]);
+
+        return ProyectoDeEmpleado::soloDirectv($personas)->concat($delParametro)->values();
     }
 
     /**
