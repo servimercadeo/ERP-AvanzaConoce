@@ -13,7 +13,11 @@ import { IconSearch, IconEmptySearch, IconLoading, IconClose, IconTrash, IconPlu
  * las 110 se pagan al valor del tramo 106–120, no solo las que pasan de 105).
  */
 const pesos = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
-const mesActual = () => new Date().toISOString().slice(0, 7);
+// Mes local (no toISOString, que es UTC: el último día del mes desde las 7 p. m. daría el siguiente).
+const mesActual = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 export default function AuxiliosCrud() {
     const puede = useAcciones();

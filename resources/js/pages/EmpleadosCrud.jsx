@@ -149,6 +149,20 @@ const BANCOS = [
 // La API devuelve fechas como "1995-06-14T00:00:00.000000Z"; el <input type="date"> necesita "yyyy-MM-dd"
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+/** ¿La fecha (yyyy-mm-dd) cae entre desde y hasta, ambos incluidos? Sin fecha no entra. */
+const enRangoFechas = (fecha, desde, hasta) =>
+    Boolean(fecha) && (!desde || fecha >= desde) && (!hasta || fecha <= hasta);
+
+/** Ingreso del contrato actual: el activo más reciente; si no hay, el último. */
+const fechaIngresoActual = (emp) => {
+    const contratos = emp.contratos ?? [];
+    const actual =
+        contratos.find((c) =>
+            ["Vigente", "Activo", "Traslado"].includes(c.estado_contrato),
+        ) ?? contratos[0];
+    return dateOnly(actual?.fecha_ingreso);
+};
+
 // Normaliza un valor para que coincida con las opciones del <select> (ignora mayúsculas, tildes y sufijo /a)
 const matchOpt = (val, opts) => {
     if (!val || !opts?.length) return null;
@@ -1538,6 +1552,11 @@ export default function EmpleadosCrud() {
     const [filtroPensiones, setFiltroPensiones] = useState("Todas");
     const [filtroRH, setFiltroRH] = useState("Todos");
     const [filtroCiudad, setFiltroCiudad] = useState("Todas");
+    // Rangos de fecha (yyyy-mm-dd): ingreso del contrato actual y vencimiento de documentos.
+    const [ingresoDesde, setIngresoDesde] = useState("");
+    const [ingresoHasta, setIngresoHasta] = useState("");
+    const [vencDesde, setVencDesde] = useState("");
+    const [vencHasta, setVencHasta] = useState("");
     const [catalogs, setCatalogs] = useState({
         sedes: SEDES,
         // Del catálogo (Parámetros > Cargos), al cargar /catalogos.
@@ -1669,7 +1688,23 @@ export default function EmpleadosCrud() {
                         e.sede,
                     ) ??
                         false);
+                const ingreso = fechaIngresoActual(e);
+                const matchIng =
+                    (!ingresoDesde && !ingresoHasta) ||
+                    enRangoFechas(ingreso, ingresoDesde, ingresoHasta);
+                // Basta con que uno de sus documentos venza dentro del rango.
+                const matchVenc =
+                    (!vencDesde && !vencHasta) ||
+                    [
+                        e.licencia_carro_vence,
+                        e.licencia_moto_vence,
+                        e.cert_alturas_vence,
+                    ].some((f) =>
+                        enRangoFechas(dateOnly(f), vencDesde, vencHasta),
+                    );
                 return (
+                    matchIng &&
+                    matchVenc &&
                     matchQ &&
                     matchE &&
                     matchS &&
@@ -1698,6 +1733,10 @@ export default function EmpleadosCrud() {
             filtroPensiones,
             filtroRH,
             filtroCiudad,
+            ingresoDesde,
+            ingresoHasta,
+            vencDesde,
+            vencHasta,
             catalogs.sedes_por_ciudad,
         ],
     );
@@ -1718,6 +1757,10 @@ export default function EmpleadosCrud() {
         filtroPensiones,
         filtroRH,
         filtroCiudad,
+        ingresoDesde,
+        ingresoHasta,
+        vencDesde,
+        vencHasta,
     ]);
 
     const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
@@ -1810,6 +1853,10 @@ export default function EmpleadosCrud() {
         setFiltroPensiones("Todas");
         setFiltroRH("Todos");
         setFiltroCiudad("Todas");
+        setIngresoDesde("");
+        setIngresoHasta("");
+        setVencDesde("");
+        setVencHasta("");
     };
 
     /* CRUD */
@@ -2517,7 +2564,9 @@ export default function EmpleadosCrud() {
                                     <input
                                         style={S.input}
                                         type="date"
-                                        disabled
+                                        value={ingresoDesde}
+                                        max={ingresoHasta || undefined}
+                                        onChange={(ev) => setIngresoDesde(ev.target.value)}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2527,7 +2576,9 @@ export default function EmpleadosCrud() {
                                     <input
                                         style={S.input}
                                         type="date"
-                                        disabled
+                                        value={ingresoHasta}
+                                        min={ingresoDesde || undefined}
+                                        onChange={(ev) => setIngresoHasta(ev.target.value)}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2537,7 +2588,9 @@ export default function EmpleadosCrud() {
                                     <input
                                         style={S.input}
                                         type="date"
-                                        disabled
+                                        value={vencDesde}
+                                        max={vencHasta || undefined}
+                                        onChange={(ev) => setVencDesde(ev.target.value)}
                                     />
                                 </div>
                                 <div style={S.formGroup}>
@@ -2547,7 +2600,9 @@ export default function EmpleadosCrud() {
                                     <input
                                         style={S.input}
                                         type="date"
-                                        disabled
+                                        value={vencHasta}
+                                        min={vencDesde || undefined}
+                                        onChange={(ev) => setVencHasta(ev.target.value)}
                                     />
                                 </div>
                             </div>

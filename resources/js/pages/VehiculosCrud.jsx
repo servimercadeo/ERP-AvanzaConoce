@@ -263,8 +263,10 @@ export default function VehiculosCrud() {
     }, [vehiculos, debSearch, vencDesde, vencHasta]);
 
     const proximosAVencer = () => {
-        const hoy = new Date().toISOString().slice(0, 10);
-        const en30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+        // Fecha local, no toISOString (UTC): desde las 7 p. m. daría el día siguiente.
+        const local = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const hoy = local(new Date());
+        const en30 = local(new Date(Date.now() + 30 * 86400000));
         setVencDesde(hoy);
         setVencHasta(en30);
     };

@@ -65,7 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Hora de Colombia: las fechas que llegan de Excel (WO, contratos) ya vienen en hora local, y
+    // las que pone el sistema (now(): cambio de estado de una WO, auditoría, fecha de un pedido)
+    // deben coincidir con ellas. En UTC quedaban 5 horas adelante: desde las 7 p. m. caían en el
+    // día siguiente y los filtros por fecha no las encontraban donde se esperaba.
+    'timezone' => env('APP_TIMEZONE', 'America/Bogota'),
 
     /*
     |--------------------------------------------------------------------------
