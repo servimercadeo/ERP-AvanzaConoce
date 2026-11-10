@@ -7,14 +7,15 @@ use App\Models\ProveedorWorkOrder;
 use App\Models\Supervisor;
 use App\Models\Torre;
 use App\Models\User;
+use App\Models\ValorParametro;
 use App\Models\Vehiculo;
 use App\Models\WorkOrder;
 use App\Services\AuxilioProductividad;
+use App\Services\ProyectoDeEmpleado;
 use App\Services\UsuarioAliadoEmpresa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class WorkOrderController extends Controller
@@ -29,6 +30,9 @@ class WorkOrderController extends Controller
     // Cómo atendió un directo al finalizar la WO (columna "Modo Atención" del exporte).
     private const SOLO = 'SOLO';
     private const ACOMPANADO = 'ACOMPAÑADO';
+
+    /** Tipo de parámetro del que sale la lista de auxiliares (Parametros > Operativos). */
+    private const PARAMETRO_AUXILIAR = 'Auxiliar';
 
     /**
      * Con ?page= responde por páginas (?per_page=25|50|100, por defecto 50): con miles de
@@ -136,13 +140,16 @@ class WorkOrderController extends Controller
 
             // "Conductor": el mismo técnico que atendió el servicio.
             $wo->conductor_tecnico = $wo->nombre_tecnico_atiende;
-            // "Tipo Auxilio": el vehículo del directo (Carro/Moto); el de un aliado no lo pone la empresa.
-            $wo->tipo_auxilio_vehiculo = $esAliado ? 'N/A' : $vehiculo?->tipo;
-            // "Auxilio": lo que se le paga a ESTA orden según el tramo del mes (ver AuxilioProductividad).
+            // "Tipo Auxilio": el vehículo del directo (Carro/Moto). "N/A" si es aliado (la
+            // empresa no se lo pone) o si el directo todavía no tiene vehículo asignado.
+            $wo->tipo_auxilio_vehiculo = $esAliado ? 'N/A' : ($vehiculo?->tipo ?: 'N/A');
+            // "Auxilio": lo que se le paga a ESTA orden según el tramo del mes (ver
+            // AuxilioProductividad). "N/A" para un aliado, que nunca cobra auxilio; vacío
+            // mientras la orden de un directo no esté finalizada, porque aún no se paga.
             $mes = $wo->fecha_finalizacion?->format('Y-m');
-            $wo->auxilio_calculado = $mes
-                ? $valorAuxilioPorMes->get($mes)?->get(AuxilioProductividad::cedulaDe($wo))
-                : null;
+            $wo->auxilio_calculado = $esAliado
+                ? 'N/A'
+                : ($mes ? $valorAuxilioPorMes->get($mes)?->get(AuxilioProductividad::cedulaDe($wo)) : null);
 
             return $wo;
         });
@@ -336,7 +343,7 @@ class WorkOrderController extends Controller
         $data = $request->validate([
             'estado'        => 'required|string|max:60',
             'modo_atencion' => 'nullable|in:' . self::SOLO . ',' . self::ACOMPANADO,
-            'auxiliar_id'   => 'nullable|integer',
+            'auxiliar_id'   => 'nullable|string|max:30',
         ]);
         $user = $request->user();
 
@@ -350,7 +357,7 @@ class WorkOrderController extends Controller
                 throw ValidationException::withMessages(['modo_atencion' => 'Indica si el técnico atendió SOLO o ACOMPAÑADO.']);
             }
             $auxiliar = $modo === self::ACOMPANADO
-                ? $this->auxiliaresTecnicos()->firstWhere('id', (int) ($data['auxiliar_id'] ?? 0))
+                ? $this->auxiliaresTecnicos()->firstWhere('id', (string) ($data['auxiliar_id'] ?? ''))
                 : null;
             if ($modo === self::ACOMPANADO && !$auxiliar) {
                 throw ValidationException::withMessages(['auxiliar_id' => 'Selecciona el auxiliar técnico que lo acompañó.']);
@@ -374,21 +381,33 @@ class WorkOrderController extends Controller
         return response()->json($workOrder);
     }
 
-    /** Auxiliares técnicos que pueden acompañar a un directo (empleados activos con ese cargo). */
+    /** Auxiliares que pueden acompañar a un directo: los valores de Parametros > Operativos > Auxiliar. */
     public function auxiliares()
     {
         return response()->json($this->auxiliaresTecnicos());
     }
 
+    /**
+     * Los empleados de DIRECTV y además los valores del parámetro Auxiliar, para un auxiliar
+     * que no sea empleado del ERP. El id lleva de dónde sale cada uno ("u-12", "p-3") porque
+     * las dos listas numeran por su lado.
+     */
     private function auxiliaresTecnicos()
     {
-        return User::where('activo', true)->whereNotNull('cargo')->orderBy('name')->get(['id', 'name', 'cargo'])
-            ->filter(function (User $u) {
-                $cargo = mb_strtoupper(Str::ascii((string) $u->cargo), 'UTF-8');
-                return str_contains($cargo, 'AUXILIAR TECNICO') || str_contains($cargo, 'TECNICO AUXILIAR') || str_contains($cargo, '(AUX)');
-            })
-            ->map(fn (User $u) => ['id' => $u->id, 'nombre' => $u->name])
-            ->values();
+        $proyectos = ProyectoDeEmpleado::porUsuario();
+        $personas = User::where('activo', true)->get(['id', 'name'])
+            ->map(fn (User $u) => [
+                'id'       => "u-{$u->id}",
+                'nombre'   => $u->name,
+                'proyecto' => $proyectos->get($u->id),
+            ]);
+
+        $delParametro = ValorParametro::whereHas('tipoParametro', fn ($q) => $q->where('nombre', self::PARAMETRO_AUXILIAR))
+            ->orderBy('nombre')
+            ->get(['id', 'nombre'])
+            ->map(fn (ValorParametro $v) => ['id' => "p-{$v->id}", 'nombre' => $v->nombre, 'proyecto' => null]);
+
+        return ProyectoDeEmpleado::soloDirectv($personas)->concat($delParametro)->values();
     }
 
     /**
