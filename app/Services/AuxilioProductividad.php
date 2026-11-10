@@ -87,13 +87,17 @@ class AuxilioProductividad
     public static function acompanamientosDelMes(string $mes): Collection
     {
         $inicio = Carbon::createFromFormat('Y-m', $mes)->startOfMonth();
+        $usuarios = self::usuariosPorCedula();
 
         return WorkOrder::query()
             ->where('estado', self::FINALIZADO)
             ->whereBetween('fecha_finalizacion', [$inicio, $inicio->copy()->endOfMonth()])
             ->whereNotNull('auxiliar')
             ->where('auxiliar', '!=', '')
-            ->get(['numero_wo', 'auxiliar', 'auxiliar_user_id'])
+            ->get([...self::COLUMNAS, 'auxiliar', 'auxiliar_user_id'])
+            // Solo quien acompañó a un directo: el Excel también trae "Auxiliar" en WO de
+            // aliados, y esas no pagan auxilio.
+            ->filter(fn (WorkOrder $wo) => self::esDirecto($wo, $usuarios))
             ->groupBy(fn (WorkOrder $wo) => $wo->auxiliar_user_id ? "u-{$wo->auxiliar_user_id}" : "n-{$wo->auxiliar}");
     }
 

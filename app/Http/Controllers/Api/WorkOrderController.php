@@ -406,6 +406,15 @@ class WorkOrderController extends Controller
             ->get(['id', 'nombre'])
             ->map(fn (ValorParametro $v) => ['id' => "p-{$v->id}", 'nombre' => $v->nombre, 'proyecto' => null]);
 
+        // Si el valor del parámetro es alguien que ya está como empleado, se ofrece solo el
+        // empleado ("u-"): con los dos, según cuál eligieran, sus acompañamientos se contaban
+        // por separado (por id y por nombre) y su auxilio caía en una escala más baja.
+        $normalizar = fn ($nombre) => mb_strtoupper(preg_replace('/\s+/', ' ', trim(
+            \Illuminate\Support\Str::ascii((string) $nombre)
+        )), 'UTF-8');
+        $yaEstan = $personas->map(fn (array $p) => $normalizar($p['nombre']))->flip();
+        $delParametro = $delParametro->reject(fn (array $v) => $yaEstan->has($normalizar($v['nombre'])));
+
         return $personas->concat($delParametro)->values();
     }
 

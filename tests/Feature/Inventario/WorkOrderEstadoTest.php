@@ -322,6 +322,22 @@ class WorkOrderEstadoTest extends TestCase
         $this->assertSame('Zulma De Directv', $wo->fresh()->auxiliar);
     }
 
+    public function test_quien_esta_en_el_parametro_y_es_empleado_sale_una_sola_vez(): void
+    {
+        $zulma = $this->empleadoDe('Zulma De Directv', 'DIRECTV');
+        $tipo = \App\Models\TipoParametro::firstOrCreate(['nombre' => 'Auxiliar'], ['grupo' => 'Operativos']);
+        // Escrito con otras mayúsculas, tildes y espacios: es la misma persona.
+        \App\Models\ValorParametro::create(['tipo_parametro_id' => $tipo->id, 'nombre' => '  zulma de  DÍRECTV ']);
+        \App\Models\ValorParametro::create(['tipo_parametro_id' => $tipo->id, 'nombre' => 'Carla Externa']);
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+
+        $auxiliares = collect($this->getJson('/api/work-orders/auxiliares')->assertOk()->json());
+
+        // Queda el empleado (con id, para que su auxilio se cuente junto) y no el valor repetido.
+        $this->assertSame(["u-{$zulma->id}"], $auxiliares->where('nombre', 'Zulma De Directv')->pluck('id')->values()->all());
+        $this->assertSame(['Zulma De Directv', 'Carla Externa'], $auxiliares->pluck('nombre')->all());
+    }
+
     public function test_un_auxiliar_nuevo_del_parametro_queda_disponible_de_una(): void
     {
         $tecnico = $this->usuario('tecnico', ['cedula' => '555']);

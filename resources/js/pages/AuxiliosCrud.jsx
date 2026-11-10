@@ -120,7 +120,7 @@ export default function AuxiliosCrud() {
                         </thead>
                         <tbody>
                             {resultados.map((r) => (
-                                <tr key={r.cedula}>
+                                <tr key={r.cedula || `n-${r.nombre}`}>
                                     <td style={{ color: "var(--text-muted)" }}>{r.cedula || "—"}</td>
                                     <td style={{ fontWeight: 700 }}>{r.nombre}</td>
                                     <td>{r.total_wo}</td>

@@ -316,6 +316,26 @@ class AuxilioTest extends TestCase
         $this->assertSame([41, 4500, 184500], [$r[0]['total_wo'], $r[0]['tramo']['valor_por_orden'], $r[0]['total_auxilio']]);
     }
 
+    public function test_el_auxiliar_que_trae_el_excel_en_una_wo_de_aliado_no_cobra(): void
+    {
+        $aliado = Aliado::create(['tipo' => 'empresa', 'tipo_documento' => 'NIT', 'documento' => '900555666-1', 'nombre' => 'ALIADO SAS']);
+        $this->usuario('tecnico', ['cedula' => '777', 'aliado_id' => $aliado->id]);
+        $this->usuario('tecnico', ['cedula' => '555']);
+        // Importadas: la columna "Auxiliar" llega en WO del aliado y en una del directo.
+        foreach (range(1, 30) as $i) {
+            WorkOrder::create(['numero_wo' => "AL-{$i}", 'numero_item' => '', 'cedula_tecnico' => '777', 'estado' => 'Finalizado',
+                'fecha_finalizacion' => '2026-10-15', 'auxiliar' => 'Pedro Del Excel']);
+        }
+        WorkOrder::create(['numero_wo' => 'DI-1', 'numero_item' => '', 'cedula_tecnico' => '555', 'estado' => 'Finalizado',
+            'fecha_finalizacion' => '2026-10-15', 'auxiliar' => 'Pedro Del Excel']);
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados');
+
+        // Solo cuenta la que acompañó al directo.
+        $this->assertSame([['Pedro Del Excel', 1]], array_map(fn ($f) => [$f['nombre'], $f['total_wo']], $r));
+    }
+
     public function test_un_auxiliar_que_no_es_empleado_sale_por_su_nombre(): void
     {
         $this->usuario('tecnico', ['cedula' => '555']);
