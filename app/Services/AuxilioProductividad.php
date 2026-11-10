@@ -17,6 +17,8 @@ use Illuminate\Support\Collection;
 class AuxilioProductividad
 {
     /** Columnas que necesitan cedulaDe(), esDirecto() y el conteo por orden. */
+    public const FINALIZADO = 'Finalizado';
+
     public const COLUMNAS = [
         'numero_wo', 'modalidad', 'cedula_tecnico_cierre', 'cedula_tecnico_agendado', 'cedula_tecnico',
         'nombre_tecnico_cierre', 'tecnico_agendado', 'nombre_tecnico',
@@ -48,9 +50,9 @@ class AuxilioProductividad
             : mb_strtoupper(trim((string) $wo->modalidad), 'UTF-8') === 'DIRECTO';
     }
 
-    public static function tramos(): Collection
+    public static function tramos(string $tipo = AuxilioTramo::TECNICO): Collection
     {
-        return AuxilioTramo::orderBy('desde')->get();
+        return AuxilioTramo::deTipo($tipo)->orderBy('desde')->get();
     }
 
     public static function tramoDe(int $total, Collection $tramos): ?AuxilioTramo
@@ -64,7 +66,7 @@ class AuxilioProductividad
         $inicio = Carbon::createFromFormat('Y-m', $mes)->startOfMonth();
 
         return WorkOrder::query()
-            ->where('estado', 'Finalizado')
+            ->where('estado', self::FINALIZADO)
             ->whereBetween('fecha_finalizacion', [$inicio, $inicio->copy()->endOfMonth()])
             ->get(self::COLUMNAS)
             ->filter(fn (WorkOrder $wo) => self::esDirecto($wo, $usuarios)
@@ -76,6 +78,23 @@ class AuxilioProductividad
     public static function ordenesPagadas(Collection $ordenes): int
     {
         return $ordenes->unique('numero_wo')->count();
+    }
+
+    /**
+     * Lo que acompañó cada auxiliar en el mes: user_id (o el nombre, si no es del ERP) => las
+     * WO donde quedó como ACOMPAÑANTE de un directo. Su escala es otra, la de tipo auxiliar.
+     */
+    public static function acompanamientosDelMes(string $mes): Collection
+    {
+        $inicio = Carbon::createFromFormat('Y-m', $mes)->startOfMonth();
+
+        return WorkOrder::query()
+            ->where('estado', self::FINALIZADO)
+            ->whereBetween('fecha_finalizacion', [$inicio, $inicio->copy()->endOfMonth()])
+            ->whereNotNull('auxiliar')
+            ->where('auxiliar', '!=', '')
+            ->get(['numero_wo', 'auxiliar', 'auxiliar_user_id'])
+            ->groupBy(fn (WorkOrder $wo) => $wo->auxiliar_user_id ? "u-{$wo->auxiliar_user_id}" : "n-{$wo->auxiliar}");
     }
 
     /** Valor que se le paga a cada orden de ese técnico en el mes, por cédula. */

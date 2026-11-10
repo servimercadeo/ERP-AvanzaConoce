@@ -424,6 +424,12 @@
             "por_defecto": true,
             "charset": null
         },
+        "tipo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": "utf8mb4"
+        },
         "desde": {
             "tipo": "int unsigned",
             "nulo": false,
@@ -5141,6 +5147,12 @@
             "nulo": true,
             "por_defecto": true,
             "charset": "utf8mb4"
+        },
+        "auxiliar_user_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
         },
         "torre": {
             "tipo": "varchar(150)",

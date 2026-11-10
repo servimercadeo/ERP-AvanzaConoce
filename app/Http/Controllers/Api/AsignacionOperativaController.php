@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Sede;
 use App\Models\Supervisor;
 use App\Models\Torre;
-use App\Models\User;
 use App\Services\ProyectoDeEmpleado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,23 +37,15 @@ class AsignacionOperativaController extends Controller
 
     public function opciones(Request $request)
     {
+        // Las dos listas son de gente de DIRECTV: ni el cargo ni el rol deciden quién se puede asignar.
+        $personas = ProyectoDeEmpleado::personasDirectv();
+
         $items = $request->route('tipo') === 'supervisores'
-            ? User::where('rol', 'tecnico')->orderBy('name')->get(['id', 'name', 'cedula'])
-                ->map(fn (User $u) => ['id' => $u->id, 'nombre' => $u->cedula ? "{$u->name} ({$u->cedula})" : $u->name])
+            ? $personas->map(fn (array $p) => ['id' => $p['id'], 'nombre' => $p['cedula'] ? "{$p['nombre']} ({$p['cedula']})" : $p['nombre']])
             : Sede::orderBy('nombre')->get(['id', 'nombre'])->map(fn (Sede $s) => ['id' => $s->id, 'nombre' => $s->nombre]);
 
-        // Solo la gente de DIRECTV: es a quien se asigna, y la lista queda corta de buscar.
-        $proyectos = ProyectoDeEmpleado::porUsuario();
-        $empleados = User::where('activo', true)->get(['id', 'name', 'cargo'])
-            ->map(fn (User $u) => [
-                'id'       => $u->id,
-                'nombre'   => $u->name,
-                'cargo'    => $u->cargo,
-                'proyecto' => $proyectos->get($u->id),
-            ]);
-
         return response()->json([
-            'empleados' => ProyectoDeEmpleado::soloDirectv($empleados),
+            'empleados' => $personas,
             'items' => $items->values(),
         ]);
     }

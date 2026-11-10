@@ -3252,6 +3252,7 @@ export default function ContratosCrud() {
                         <thead>
                             <tr>
                                 <th>Empleado</th>
+                                <th>Empleador</th>
                                 <th>Cargo</th>
                                 <th>Sede</th>
                                 <th>Tipo</th>
@@ -3303,6 +3304,7 @@ export default function ContratosCrud() {
                                             </span>
                                         </div>
                                     </td>
+                                    <td>{c.empleador}</td>
                                     <td>{c.cargo}</td>
                                     <td>
                                         <span

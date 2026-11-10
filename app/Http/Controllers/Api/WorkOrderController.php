@@ -364,6 +364,10 @@ class WorkOrderController extends Controller
             }
             $workOrder->modo_atencion = $modo;
             $workOrder->auxiliar = $auxiliar['nombre'] ?? null;
+            // El id solo existe si el auxiliar es una persona del ERP ("u-12"), no un valor del parámetro.
+            $workOrder->auxiliar_user_id = str_starts_with((string) ($auxiliar['id'] ?? ''), 'u-')
+                ? (int) substr($auxiliar['id'], 2)
+                : null;
         }
 
         if ($user->rol === 'tecnico') {
@@ -394,20 +398,15 @@ class WorkOrderController extends Controller
      */
     private function auxiliaresTecnicos()
     {
-        $proyectos = ProyectoDeEmpleado::porUsuario();
-        $personas = User::where('activo', true)->get(['id', 'name'])
-            ->map(fn (User $u) => [
-                'id'       => "u-{$u->id}",
-                'nombre'   => $u->name,
-                'proyecto' => $proyectos->get($u->id),
-            ]);
+        $personas = ProyectoDeEmpleado::personasDirectv()
+            ->map(fn (array $p) => ['id' => "u-{$p['id']}", 'nombre' => $p['nombre'], 'proyecto' => $p['proyecto']]);
 
         $delParametro = ValorParametro::whereHas('tipoParametro', fn ($q) => $q->where('nombre', self::PARAMETRO_AUXILIAR))
             ->orderBy('nombre')
             ->get(['id', 'nombre'])
             ->map(fn (ValorParametro $v) => ['id' => "p-{$v->id}", 'nombre' => $v->nombre, 'proyecto' => null]);
 
-        return ProyectoDeEmpleado::soloDirectv($personas)->concat($delParametro)->values();
+        return $personas->concat($delParametro)->values();
     }
 
     /**
