@@ -249,6 +249,113 @@ class AuxilioTest extends TestCase
         $this->assertSame([4000], $valores->filter(fn ($v, $wo) => str_contains($wo, 'NOV-'))->unique()->values()->all());
     }
 
+    /** WO finalizadas en el mes donde esa persona quedó como acompañante del técnico. */
+    private function crearAcompanadas(int $cantidad, ?\App\Models\User $auxiliar, string $nombre = '', string $fecha = '2026-10-15'): void
+    {
+        foreach (range(1, $cantidad) as $i) {
+            WorkOrder::create([
+                'numero_wo' => 'ACOMP-' . ($auxiliar->id ?? $nombre) . "-{$i}", 'numero_item' => '',
+                'cedula_tecnico' => '555', 'estado' => 'Finalizado', 'fecha_finalizacion' => $fecha,
+                'modo_atencion' => 'ACOMPAÑADO', 'auxiliar' => $auxiliar->name ?? $nombre,
+                'auxiliar_user_id' => $auxiliar?->id,
+            ]);
+        }
+    }
+
+    public function test_las_dos_escalas_vienen_sembradas_y_son_distintas(): void
+    {
+        $this->actingAs($this->usuario('admin'));
+
+        $tecnico = collect($this->getJson('/api/auxilios/tramos')->assertOk()->json());
+        $auxiliar = collect($this->getJson('/api/auxilios/tramos?tipo=auxiliar')->assertOk()->json());
+
+        $this->assertSame([[0, 100, 4000], [101, 105, 4300], [106, 120, 4400], [121, null, 5000]],
+            $tecnico->map(fn ($t) => [$t['desde'], $t['hasta'], $t['valor_por_orden']])->all());
+        $this->assertSame([[0, 20, 0], [21, 30, 3500], [31, 40, 4000], [41, null, 4500]],
+            $auxiliar->map(fn ($t) => [$t['desde'], $t['hasta'], $t['valor_por_orden']])->all());
+    }
+
+    public function test_el_auxiliar_cobra_por_las_wo_que_acompano_con_su_propia_escala(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $auxiliar = $this->usuario('general', ['name' => 'Laura Auxiliar', 'cedula' => '777']);
+        $this->crearAcompanadas(25, $auxiliar);
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json();
+
+        $this->assertSame('auxiliar', $r['tipo']);
+        $this->assertCount(1, $r['resultados']);
+        $this->assertSame(['Laura Auxiliar', '777', 25, 3500, 87500], [
+            $r['resultados'][0]['nombre'], $r['resultados'][0]['cedula'], $r['resultados'][0]['total_wo'],
+            $r['resultados'][0]['tramo']['valor_por_orden'], $r['resultados'][0]['total_auxilio'],
+        ]);
+    }
+
+    public function test_hasta_20_acompanamientos_el_auxiliar_no_cobra(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $auxiliar = $this->usuario('general', ['name' => 'Laura Auxiliar']);
+        $this->crearAcompanadas(20, $auxiliar);
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados');
+
+        $this->assertSame([20, 0, 0], [$r[0]['total_wo'], $r[0]['tramo']['valor_por_orden'], $r[0]['total_auxilio']]);
+    }
+
+    public function test_al_pasar_de_tramo_el_auxiliar_recalcula_todas_sus_ordenes(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $auxiliar = $this->usuario('general', ['name' => 'Laura Auxiliar']);
+        $this->crearAcompanadas(41, $auxiliar);
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados');
+
+        $this->assertSame([41, 4500, 184500], [$r[0]['total_wo'], $r[0]['tramo']['valor_por_orden'], $r[0]['total_auxilio']]);
+    }
+
+    public function test_un_auxiliar_que_no_es_empleado_sale_por_su_nombre(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearAcompanadas(3, null, 'Pedro Del Parametro');
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados');
+
+        $this->assertSame(['Pedro Del Parametro', '', 3], [$r[0]['nombre'], $r[0]['cedula'], $r[0]['total_wo']]);
+    }
+
+    public function test_las_dos_escalas_no_se_mezclan_en_el_reporte(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Tecnico']);
+        $auxiliar = $this->usuario('general', ['name' => 'Laura Auxiliar']);
+        $this->crearFinalizadas('555', 3);
+        $this->crearAcompanadas(25, $auxiliar);
+        $this->actingAs($this->usuario('admin'));
+
+        $tecnicos = collect($this->getJson('/api/auxilios/reporte?mes=2026-10')->assertOk()->json('resultados'));
+        $auxiliares = collect($this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados'));
+
+        // Las 25 acompañadas también las finalizó el técnico 555, así que a él le cuentan 28.
+        $this->assertSame(['Carlos Tecnico'], $tecnicos->pluck('nombre')->all());
+        $this->assertSame(28, $tecnicos[0]['total_wo']);
+        $this->assertSame(['Laura Auxiliar'], $auxiliares->pluck('nombre')->all());
+    }
+
+    public function test_cada_escala_se_configura_por_su_lado(): void
+    {
+        $this->actingAs($this->usuario('admin'));
+
+        $id = $this->postJson('/api/auxilios/tramos?tipo=auxiliar', ['desde' => 200, 'hasta' => null, 'valor_por_orden' => 9000])
+            ->assertCreated()->json('id');
+
+        $this->assertSame('auxiliar', \App\Models\AuxilioTramo::find($id)->tipo);
+        $this->assertContains(9000, array_column($this->getJson('/api/auxilios/tramos?tipo=auxiliar')->json(), 'valor_por_orden'));
+        $this->assertNotContains(9000, array_column($this->getJson('/api/auxilios/tramos')->json(), 'valor_por_orden'));
+    }
+
     public function test_el_tecnico_solo_ve_su_propio_auxilio(): void
     {
         $tecnico = $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Ruiz']);
@@ -319,10 +426,13 @@ class AuxilioTest extends TestCase
         $this->assertDatabaseMissing('auxilio_tramos', ['id' => $id]);
     }
 
-    public function test_los_4_tramos_por_defecto_quedan_sembrados_por_la_migracion(): void
+    public function test_los_tramos_por_defecto_de_cada_escala_quedan_sembrados_por_la_migracion(): void
     {
-        $this->assertSame(4, AuxilioTramo::count());
-        $this->assertDatabaseHas('auxilio_tramos', ['desde' => 0, 'hasta' => 100, 'valor_por_orden' => 4000]);
-        $this->assertDatabaseHas('auxilio_tramos', ['desde' => 121, 'hasta' => null, 'valor_por_orden' => 5000]);
+        $this->assertSame(4, AuxilioTramo::deTipo(AuxilioTramo::TECNICO)->count());
+        $this->assertSame(4, AuxilioTramo::deTipo(AuxilioTramo::AUXILIAR)->count());
+        $this->assertDatabaseHas('auxilio_tramos', ['tipo' => 'tecnico', 'desde' => 0, 'hasta' => 100, 'valor_por_orden' => 4000]);
+        $this->assertDatabaseHas('auxilio_tramos', ['tipo' => 'tecnico', 'desde' => 121, 'hasta' => null, 'valor_por_orden' => 5000]);
+        $this->assertDatabaseHas('auxilio_tramos', ['tipo' => 'auxiliar', 'desde' => 0, 'hasta' => 20, 'valor_por_orden' => 0]);
+        $this->assertDatabaseHas('auxilio_tramos', ['tipo' => 'auxiliar', 'desde' => 41, 'hasta' => null, 'valor_por_orden' => 4500]);
     }
 }

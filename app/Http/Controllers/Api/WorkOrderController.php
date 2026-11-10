@@ -364,6 +364,10 @@ class WorkOrderController extends Controller
             }
             $workOrder->modo_atencion = $modo;
             $workOrder->auxiliar = $auxiliar['nombre'] ?? null;
+            // El id solo existe si el auxiliar es una persona del ERP ("u-12"), no un valor del parámetro.
+            $workOrder->auxiliar_user_id = str_starts_with((string) ($auxiliar['id'] ?? ''), 'u-')
+                ? (int) substr($auxiliar['id'], 2)
+                : null;
         }
 
         if ($user->rol === 'tecnico') {

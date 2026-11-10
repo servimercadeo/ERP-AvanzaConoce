@@ -100,6 +100,7 @@ class WorkOrder extends Model
         'fecha_registro_sin_material',
         'modo_atencion',
         'auxiliar',
+        'auxiliar_user_id',
         'torre',
         'conductor',
         'tipo_auxilio',

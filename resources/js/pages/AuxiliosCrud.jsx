@@ -21,6 +21,9 @@ export default function AuxiliosCrud() {
     const esTecnico = user?.rol === "tecnico";
     const qc = useQueryClient();
     const [mes, setMes] = useState(mesActual());
+    // Dos escalas: la del técnico que finaliza la WO y la del auxiliar que lo acompañó.
+    const [tipo, setTipo] = useState("tecnico");
+    const esAuxiliar = tipo === "auxiliar";
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
     const [tramosOpen, setTramosOpen] = useState(false);
@@ -32,9 +35,9 @@ export default function AuxiliosCrud() {
     };
 
     const { data: resultado, isLoading } = useQuery({
-        queryKey: ["auxilios-reporte", mes, debSearch],
+        queryKey: ["auxilios-reporte", tipo, mes, debSearch],
         queryFn: () =>
-            api.get("/auxilios/reporte", { params: { mes, search: debSearch || undefined } }).then((r) => r.data),
+            api.get("/auxilios/reporte", { params: { tipo, mes, search: debSearch || undefined } }).then((r) => r.data),
         placeholderData: (prev) => prev,
         // Sin caché: una WO recién finalizada debe verse al entrar aquí.
         staleTime: 0,
@@ -49,7 +52,7 @@ export default function AuxiliosCrud() {
                 <div className="stats-row">
                     <div className="stat-card">
                         <div className="stat-num">{resultados.length}</div>
-                        <div className="stat-label">Técnicos con auxilio este mes</div>
+                        <div className="stat-label">{esAuxiliar ? "Auxiliares" : "Técnicos"} con auxilio este mes</div>
                     </div>
                 </div>
             )}
@@ -60,11 +63,17 @@ export default function AuxiliosCrud() {
                         <span style={S.searchIcon}><IconSearch size={15} /></span>
                         <input
                             style={S.searchInput}
-                            placeholder="Buscar por técnico o cédula…"
+                            placeholder={`Buscar por ${esAuxiliar ? "auxiliar" : "técnico"} o cédula…`}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                )}
+                {!esTecnico && (
+                    <select style={S.filtroSelect} value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                        <option value="tecnico">Auxilio de técnicos</option>
+                        <option value="auxiliar">Auxilio de auxiliares</option>
+                    </select>
                 )}
                 <input
                     type="month"
@@ -87,8 +96,10 @@ export default function AuxiliosCrud() {
                         <IconEmptySearch size={44} />
                         <p>
                             {esTecnico
-                                ? "No tienes Work Orders finalizadas que den auxilio en este mes."
-                                : "Ningún técnico directo cumple un tramo de auxilio en este mes."}
+                                ? "No tienes Work Orders que den auxilio en este mes."
+                                : esAuxiliar
+                                    ? "Ningún auxiliar acompañó Work Orders en este mes."
+                                    : "Ningún técnico directo cumple un tramo de auxilio en este mes."}
                         </p>
                     </div>
                 ) : (
@@ -96,8 +107,8 @@ export default function AuxiliosCrud() {
                         <thead>
                             <tr>
                                 <th>Cédula</th>
-                                <th>Técnico</th>
-                                <th>WO Finalizadas</th>
+                                <th>{esAuxiliar ? "Auxiliar" : "Técnico"}</th>
+                                <th>{esAuxiliar ? "WO Acompañadas" : "WO Finalizadas"}</th>
                                 <th>Escala</th>
                                 <th>Valor por Orden</th>
                                 <th>Total Auxilio</th>
@@ -106,7 +117,7 @@ export default function AuxiliosCrud() {
                         <tbody>
                             {resultados.map((r) => (
                                 <tr key={r.cedula}>
-                                    <td style={{ color: "var(--text-muted)" }}>{r.cedula}</td>
+                                    <td style={{ color: "var(--text-muted)" }}>{r.cedula || "—"}</td>
                                     <td style={{ fontWeight: 700 }}>{r.nombre}</td>
                                     <td>{r.total_wo}</td>
                                     <td>{r.tramo ? `${r.tramo.desde} – ${r.tramo.hasta ?? "en adelante"}` : "—"}</td>
@@ -121,6 +132,7 @@ export default function AuxiliosCrud() {
 
             {tramosOpen && (
                 <TramosModal
+                    tipo={tipo}
                     onClose={() => setTramosOpen(false)}
                     onChanged={() => qc.invalidateQueries({ queryKey: ["auxilios-reporte"] })}
                     showToast={showToast}
@@ -131,11 +143,11 @@ export default function AuxiliosCrud() {
 }
 
 /* ─── Modal para configurar las escalas (tramos) del auxilio ────────────── */
-function TramosModal({ onClose, onChanged, showToast }) {
+function TramosModal({ tipo, onClose, onChanged, showToast }) {
     const qc = useQueryClient();
     const { data: tramos = [], isLoading } = useQuery({
-        queryKey: ["auxilios-tramos"],
-        queryFn: () => api.get("/auxilios/tramos").then((r) => r.data),
+        queryKey: ["auxilios-tramos", tipo],
+        queryFn: () => api.get("/auxilios/tramos", { params: { tipo } }).then((r) => r.data),
     });
 
     const refrescar = () => {
@@ -145,7 +157,7 @@ function TramosModal({ onClose, onChanged, showToast }) {
 
     const agregarTramo = async () => {
         try {
-            await api.post("/auxilios/tramos", { desde: 0, hasta: null, valor_por_orden: 0 });
+            await api.post("/auxilios/tramos", { desde: 0, hasta: null, valor_por_orden: 0 }, { params: { tipo } });
             refrescar();
         } catch {
             showToast("No se pudo agregar la escala.");
@@ -156,14 +168,17 @@ function TramosModal({ onClose, onChanged, showToast }) {
         <div style={S.overlay}>
             <div style={{ ...S.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
                 <div style={S.modalHeader}>
-                    <span style={{ fontWeight: 800 }}>Configurar escalas de auxilio</span>
+                    <span style={{ fontWeight: 800 }}>
+                        Escalas del auxilio de {tipo === "auxiliar" ? "auxiliares" : "técnicos"}
+                    </span>
                     <button style={S.btnIcon} onClick={onClose}><IconClose size={16} /></button>
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: 0 }}>
-                        Según el total de Work Orders que un técnico directo finalice en el mes, se le paga
-                        cada una al valor de la escala que alcanzó. Deja "Hasta" vacío para la última escala
-                        (sin límite superior).
+                        {tipo === "auxiliar"
+                            ? "Según cuántas Work Orders acompañó un auxiliar directo en el mes, se le paga cada una al valor de la escala que alcanzó."
+                            : "Según el total de Work Orders que un técnico directo finalice en el mes, se le paga cada una al valor de la escala que alcanzó."}
+                        {" "}Deja "Hasta" vacío para la última escala (sin límite superior).
                     </p>
                     {isLoading ? (
                         <div style={S.empty}><IconLoading size={28} /></div>
