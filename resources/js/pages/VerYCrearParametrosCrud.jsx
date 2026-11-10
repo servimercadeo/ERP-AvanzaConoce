@@ -5,6 +5,7 @@ import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useErpModules } from '../hooks/useErpModules';
 import { canAccessSubmodule, canAccessArchivo } from '../data/erpModules';
+import { SearchableSelect } from '../components/SearchableSelect';
 import {
   MODULE_ICONS,
   IconFolder,
@@ -158,6 +159,15 @@ export function ValoresParametroPanel({ tipo }) {
     queryFn: () => api.get('/valores-parametro', { params: { tipo_parametro_id: tipo.id } }).then((r) => r.data),
   });
 
+  // "Auxiliar" no es un catálogo escrito a mano: son personas de DIRECTV (sin mirar su cargo).
+  const esDePersonas = tipo.nombre === 'Auxiliar';
+  const { data: personas = [] } = useQuery({
+    queryKey: ['personas-directv'],
+    queryFn: () => api.get('/personas-directv').then((r) => r.data),
+    enabled: esDePersonas,
+    staleTime: 0,
+  });
+
   const abrirCrear = () => {
     setEditTarget(null);
     setNombre('');
@@ -272,7 +282,23 @@ export function ValoresParametroPanel({ tipo }) {
             <div style={S.modalBody}>
               <div style={S.formGroup}>
                 <label style={S.label}>Nombre *</label>
-                <input style={S.input} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                {esDePersonas ? (
+                  <>
+                    <SearchableSelect
+                      value={nombre}
+                      defaultValue=""
+                      freeText
+                      options={personas.map((p) => ({
+                        value: p.nombre,
+                        label: p.cargo ? `${p.nombre} — ${p.cargo}` : p.nombre,
+                      }))}
+                      onChange={setNombre}
+                    />
+                    <span style={S.hint}>Gente de DIRECTV. Si alguien no está en la lista, escribe su nombre.</span>
+                  </>
+                ) : (
+                  <input style={S.input} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+                )}
               </div>
               <div style={S.formGroup}>
                 <label style={S.label}>Descripción</label>
@@ -556,4 +582,5 @@ const S = {
   label: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' },
   input: { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'Nunito,sans-serif', color: 'var(--text)', background: 'var(--white)', outline: 'none' },
   err: { color: '#e74c3c', fontSize: '0.75rem', marginTop: 2 },
+  hint: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 },
 };

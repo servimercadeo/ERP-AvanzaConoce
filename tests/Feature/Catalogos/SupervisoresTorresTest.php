@@ -98,19 +98,31 @@ class SupervisoresTorresTest extends TestCase
         return $user;
     }
 
-    public function test_las_opciones_traen_empleados_activos_y_tecnicos_o_sedes(): void
+    public function test_a_un_supervisor_se_le_asigna_cualquier_persona_de_directv_no_solo_tecnicos(): void
     {
-        $this->empleadoDe('Activo', 'DIRECTV');
+        $this->empleadoDe('Activo', 'DIRECTV')->update(['cedula' => '111']);
         $this->empleadoDe('Inactivo', 'DIRECTV')->update(['activo' => false]);
-        $this->usuario('tecnico', ['name' => 'Carlos Tecnico', 'cedula' => '555']);
+        // Un técnico que no es de DIRECTV ya no se ofrece; el rol dejó de decidir.
+        $this->usuario('tecnico', ['name' => 'Carlos Tecnico De Tigo', 'cedula' => '555']);
         Sede::create(['nombre' => 'SEDE A']);
 
         $sup = $this->getJson('/api/supervisores/opciones')->assertOk()->json();
-        $this->assertContains('Activo', array_column($sup['empleados'], 'nombre'));
-        $this->assertNotContains('Inactivo', array_column($sup['empleados'], 'nombre'));
-        $this->assertSame(['Carlos Tecnico (555)'], array_column($sup['items'], 'nombre'));
+        $this->assertSame(['Activo'], array_column($sup['empleados'], 'nombre'));
+        $this->assertSame(['Activo (111)'], array_column($sup['items'], 'nombre'));
 
         $this->assertSame(['SEDE A'], array_column($this->getJson('/api/torres/opciones')->assertOk()->json('items'), 'nombre'));
+    }
+
+    public function test_el_listado_de_personas_de_directv_sirve_para_el_parametro_auxiliar(): void
+    {
+        $this->empleadoDe('Zoe De Directv', 'DIRECTV')->update(['cargo' => 'ASESOR COMERCIAL']);
+        $this->empleadoDe('Ana De Tigo', 'TIGO EXPRESS');
+        $this->usuario('general', ['name' => 'Sin Contrato']);
+
+        $personas = $this->getJson('/api/personas-directv')->assertOk()->json();
+
+        $this->assertSame(['Zoe De Directv'], array_column($personas, 'nombre'));
+        $this->assertSame('ASESOR COMERCIAL', $personas[0]['cargo']);
     }
 
     public function test_el_exporte_saca_supervisor_por_tecnico_y_torre_por_sede(): void

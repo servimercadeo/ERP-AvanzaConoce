@@ -503,6 +503,11 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
         ->middlewareFor('update', PermisoDenegado::middleware('editar', 'parametros._modulo.ver_y_crear_parametros'))
         ->middlewareFor('destroy', PermisoDenegado::middleware('eliminar', 'parametros._modulo.ver_y_crear_parametros'));
 
+    // Personas de DIRECTV: las que ofrecen los selectores de Parametros (ej. el valor del
+    // parámetro Auxiliar) sin mirar cargo ni rol.
+    Route::get('personas-directv', fn () => response()->json(App\Services\ProyectoDeEmpleado::personasDirectv()))
+        ->middleware('permiso:parametros');
+
     // Valores dentro de cada Tipo de Parámetro genérico.
     Route::apiResource('valores-parametro', App\Http\Controllers\Api\ValorParametroController::class)
         ->only(['index', 'store', 'update', 'destroy'])

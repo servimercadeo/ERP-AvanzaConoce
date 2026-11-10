@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +32,23 @@ class ProyectoDeEmpleado
                 return $proyectos->contains(self::PRINCIPAL) ? self::PRINCIPAL : $proyectos->first();
             })
             ->filter();
+    }
+
+    /** Empleados activos de DIRECTV, por nombre: lo que ofrecen todos los selectores de personas. */
+    public static function personasDirectv(): Collection
+    {
+        $proyectos = self::porUsuario();
+
+        return self::soloDirectv(
+            User::where('activo', true)->get(['id', 'name', 'cargo', 'cedula'])
+                ->map(fn (User $u) => [
+                    'id'       => $u->id,
+                    'nombre'   => $u->name,
+                    'cargo'    => $u->cargo,
+                    'cedula'   => $u->cedula,
+                    'proyecto' => $proyectos->get($u->id),
+                ])
+        );
     }
 
     /**
