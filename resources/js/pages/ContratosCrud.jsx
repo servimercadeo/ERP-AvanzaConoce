@@ -60,6 +60,11 @@ const TIPOS_CONTRATO = [
 
 const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 
+/** Sin desde ni hasta, todo pasa; con alguno, solo las fechas dentro (extremos incluidos). */
+const enRangoFechas = (fecha, desde, hasta) =>
+    (!desde && !hasta) ||
+    (Boolean(fecha) && (!desde || fecha >= desde) && (!hasta || fecha <= hasta));
+
 // Minúsculas y sin tildes, para buscar sin importar cómo se escribió.
 const sinTildes = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -2594,6 +2599,11 @@ export default function ContratosCrud() {
     const [filtroCaja, setFiltroCaja] = useState("Todas");
     const [filtroEmpresa, setFiltroEmpresa] = useState("Todas");
     const [filtroFondoPensiones, setFiltroFondoPensiones] = useState("Todos");
+    // Rangos de fecha (yyyy-mm-dd), con los dos extremos incluidos.
+    const [ingresoDesde, setIngresoDesde] = useState("");
+    const [ingresoHasta, setIngresoHasta] = useState("");
+    const [retiroDesde, setRetiroDesde] = useState("");
+    const [retiroHasta, setRetiroHasta] = useState("");
     const [catalogs, setCatalogs] = useState({
         cargos: [],
         sedes: [],
@@ -2713,6 +2723,10 @@ export default function ContratosCrud() {
         filtroCaja,
         filtroEmpresa,
         filtroFondoPensiones,
+        ingresoDesde,
+        ingresoHasta,
+        retiroDesde,
+        retiroHasta,
     ]);
 
     useEffect(() => {
@@ -2773,7 +2787,11 @@ export default function ContratosCrud() {
                 const matchFP =
                     filtroFondoPensiones === "Todos" ||
                     c.fondo_pensiones === filtroFondoPensiones;
+                const matchIng = enRangoFechas(dateOnly(c.fecha_ingreso), ingresoDesde, ingresoHasta);
+                const matchRet = enRangoFechas(dateOnly(c.fecha_retiro), retiroDesde, retiroHasta);
                 return (
+                    matchIng &&
+                    matchRet &&
                     matchQ &&
                     matchE &&
                     matchS &&
@@ -2798,6 +2816,10 @@ export default function ContratosCrud() {
             filtroCaja,
             filtroEmpresa,
             filtroFondoPensiones,
+            ingresoDesde,
+            ingresoHasta,
+            retiroDesde,
+            retiroHasta,
         ],
     );
 
@@ -2918,6 +2940,10 @@ export default function ContratosCrud() {
         setFiltroCaja("Todas");
         setFiltroEmpresa("Todas");
         setFiltroFondoPensiones("Todos");
+        setIngresoDesde("");
+        setIngresoHasta("");
+        setRetiroDesde("");
+        setRetiroHasta("");
     };
 
     // Exporta exactamente lo que se ve en la tabla (búsqueda + filtros activos), no solo
@@ -3690,6 +3716,46 @@ export default function ContratosCrud() {
                                             label: s,
                                             value: s,
                                         }))}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Fecha ingreso desde</label>
+                                    <input
+                                        type="date"
+                                        style={S.input}
+                                        value={ingresoDesde}
+                                        max={ingresoHasta || undefined}
+                                        onChange={(e) => setIngresoDesde(e.target.value)}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Fecha ingreso hasta</label>
+                                    <input
+                                        type="date"
+                                        style={S.input}
+                                        value={ingresoHasta}
+                                        min={ingresoDesde || undefined}
+                                        onChange={(e) => setIngresoHasta(e.target.value)}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Fecha retiro desde</label>
+                                    <input
+                                        type="date"
+                                        style={S.input}
+                                        value={retiroDesde}
+                                        max={retiroHasta || undefined}
+                                        onChange={(e) => setRetiroDesde(e.target.value)}
+                                    />
+                                </div>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>Fecha retiro hasta</label>
+                                    <input
+                                        type="date"
+                                        style={S.input}
+                                        value={retiroHasta}
+                                        min={retiroDesde || undefined}
+                                        onChange={(e) => setRetiroHasta(e.target.value)}
                                     />
                                 </div>
                             </div>
