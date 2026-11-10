@@ -89,6 +89,32 @@ class SupervisoresTorresTest extends TestCase
         $this->assertSame(['DIRECTV', 'DIRECTV'], $empleados->pluck('proyecto')->all());
     }
 
+    public function test_el_proyecto_sale_del_contrato_actual_y_no_de_uno_viejo(): void
+    {
+        $contrato = fn ($user, $proyecto, $estado, $ingreso) => \App\Models\Contrato::create([
+            'empleado_id' => $user->id, 'cliente_proyecto' => $proyecto, 'estado_contrato' => $estado, 'fecha_ingreso' => $ingreso,
+        ]);
+
+        // Fue de DIRECTV y reingresó a TIGO: ya no se ofrece.
+        $aTigo = $this->usuario('general', ['name' => 'Paso A Tigo']);
+        $contrato($aTigo, 'DIRECTV', 'Finalizado', '2025-01-10');
+        $contrato($aTigo, 'TIGO EXPRESS', 'Vigente', '2026-06-01');
+
+        // Al revés: fue de TIGO y hoy es de DIRECTV.
+        $aDirectv = $this->usuario('general', ['name' => 'Paso A Directv']);
+        $contrato($aDirectv, 'TIGO EXPRESS', 'Finalizado', '2025-01-10');
+        $contrato($aDirectv, 'DIRECTV', 'Vigente', '2026-06-01');
+
+        // El vigente manda aunque haya uno finalizado con fecha más nueva.
+        $vigenteViejo = $this->usuario('general', ['name' => 'Vigente Viejo']);
+        $contrato($vigenteViejo, 'DIRECTV', 'Vigente', '2024-03-01');
+        $contrato($vigenteViejo, 'TIGO EXPRESS', 'Finalizado', '2026-02-01');
+
+        $empleados = collect($this->getJson('/api/supervisores/opciones')->assertOk()->json('empleados'));
+
+        $this->assertSame(['Paso A Directv', 'Vigente Viejo'], $empleados->pluck('nombre')->all());
+    }
+
     /** Un empleado activo con contrato de ese proyecto. */
     private function empleadoDe(string $nombre, string $proyecto): \App\Models\User
     {

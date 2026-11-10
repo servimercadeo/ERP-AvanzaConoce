@@ -8,27 +8,33 @@ use Illuminate\Support\Facades\DB;
 /**
  * Proyecto de cada empleado (DIRECTV, TIGO HOME...), sacado del contrato: `users` no lo
  * guarda. Lo usan los selectores de personas de Parametros > Operativos (Supervisores,
- * Torres) y el de auxiliares de Work Orders para mostrar primero a los de DIRECTV.
+ * Torres) y el de auxiliares de Work Orders para ofrecer solo a los de DIRECTV.
  */
 class ProyectoDeEmpleado
 {
     public const PRINCIPAL = 'DIRECTV';
 
-    /** user_id => nombre del proyecto. Si tiene varios contratos, DIRECTV manda. */
+    /** Estados en que el contrato está corriendo (los mismos que ContratoController). */
+    private const ESTADOS_ACTIVOS = ['Vigente', 'Activo', 'Traslado'];
+
+    /**
+     * user_id => proyecto de su contrato actual: el activo más reciente; si no tiene ninguno
+     * activo, el último que tuvo. Un contrato viejo de otro proyecto no cuenta (p. ej. quien
+     * pasó de DIRECTV a TIGO por reingreso ya es de TIGO).
+     */
     public static function porUsuario(): Collection
     {
         return DB::table('contratos')
             ->whereNotNull('empleado_id')
             ->orderByDesc('fecha_ingreso')
-            ->get(['empleado_id', 'cliente_proyecto'])
+            ->orderByDesc('id')
+            ->get(['empleado_id', 'cliente_proyecto', 'estado_contrato'])
             ->groupBy('empleado_id')
             ->map(function (Collection $contratos) {
-                $proyectos = $contratos
-                    ->map(fn ($c) => EmpresaProyectoRules::nombreActual($c->cliente_proyecto))
-                    ->filter()
-                    ->values();
+                $actual = $contratos->first(fn ($c) => in_array($c->estado_contrato, self::ESTADOS_ACTIVOS, true))
+                    ?? $contratos->first();
 
-                return $proyectos->contains(self::PRINCIPAL) ? self::PRINCIPAL : $proyectos->first();
+                return EmpresaProyectoRules::nombreActual($actual->cliente_proyecto);
             })
             ->filter();
     }
