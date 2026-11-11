@@ -114,18 +114,43 @@ class AuxilioController extends Controller
             ->filter(fn ($llave) => str_starts_with($llave, 'u-'))
             ->map(fn ($llave) => (int) substr($llave, 2));
         $personas = User::whereIn('id', $ids)->get(['id', 'name', 'cedula'])->keyBy('id');
+        $porNombre = $this->empleadosPorNombre();
 
-        return $acompanamientos->map(function ($ordenes, $llave) use ($personas, $tramos) {
-            // Un auxiliar que no es empleado del ERP (valor del parámetro) solo tiene nombre.
-            $persona = str_starts_with($llave, 'u-') ? $personas->get((int) substr($llave, 2)) : null;
+        return $acompanamientos->map(function ($ordenes, $llave) use ($personas, $porNombre, $tramos) {
+            $nombre = str_starts_with($llave, 'u-')
+                ? ($personas->get((int) substr($llave, 2))?->name ?: $ordenes->first()->auxiliar)
+                : $ordenes->first()->auxiliar;
+            // Si el auxiliar se eligió del parámetro no hay id, pero casi siempre es un
+            // empleado: se busca su cédula por el nombre antes de dejarla vacía.
+            $cedula = str_starts_with($llave, 'u-')
+                ? $personas->get((int) substr($llave, 2))?->cedula
+                : $porNombre->get($this->clave($nombre))?->cedula;
 
             return $this->fila(
-                (string) ($persona?->cedula ?? ''),
-                $persona?->name ?: $ordenes->first()->auxiliar,
+                (string) ($cedula ?? ''),
+                $nombre,
                 AuxilioProductividad::ordenesPagadas($ordenes),
                 $tramos,
             );
         });
+    }
+
+    /** Empleados activos con cédula, indexados por su nombre normalizado. */
+    private function empleadosPorNombre()
+    {
+        return User::where('activo', true)
+            ->whereNotNull('cedula')
+            ->where('cedula', '!=', '')
+            ->get(['id', 'name', 'cedula'])
+            ->keyBy(fn (User $u) => $this->clave($u->name));
+    }
+
+    /** Nombre sin tildes, sin espacios de sobra y en minúscula, para poder comparar. */
+    private function clave(?string $nombre): string
+    {
+        $limpio = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $nombre) ?: (string) $nombre;
+
+        return mb_strtolower(trim(preg_replace('/\s+/', ' ', $limpio)), 'UTF-8');
     }
 
     private function fila(string $cedula, string $nombre, int $total, $tramos): array

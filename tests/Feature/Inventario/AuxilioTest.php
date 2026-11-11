@@ -316,6 +316,19 @@ class AuxilioTest extends TestCase
         $this->assertSame([41, 4500, 184500], [$r[0]['total_wo'], $r[0]['tramo']['valor_por_orden'], $r[0]['total_auxilio']]);
     }
 
+    public function test_el_auxiliar_elegido_del_parametro_trae_la_cedula_del_empleado(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->usuario('general', ['name' => 'Michel Jaramillo Cardona', 'cedula' => '1098765']);
+        // Guardado por nombre (valor del parámetro), sin auxiliar_user_id.
+        $this->crearAcompanadas(2, null, 'MICHEL  JARAMILLO CARDONA');
+        $this->actingAs($this->usuario('admin'));
+
+        $r = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->assertOk()->json('resultados');
+
+        $this->assertSame('1098765', $r[0]['cedula']);
+    }
+
     public function test_un_auxiliar_que_no_es_empleado_sale_por_su_nombre(): void
     {
         $this->usuario('tecnico', ['cedula' => '555']);
