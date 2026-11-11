@@ -3257,6 +3257,7 @@ export default function ContratosCrud() {
                                 <th>Sede</th>
                                 <th>Tipo</th>
                                 <th>Ingreso</th>
+                                <th>Retiro</th>
                                 <th>Estado</th>
                                 <th style={{ textAlign: "center" }}>
                                     Acciones
@@ -3318,6 +3319,7 @@ export default function ContratosCrud() {
                                     </td>
                                     <td>{c.tipo_contrato}</td>
                                     <td>{dateOnly(c.fecha_ingreso)}</td>
+                                    <td>{dateOnly(c.fecha_retiro) || "—"}</td>
                                     <td>
                                         <span
                                             style={S.badge(

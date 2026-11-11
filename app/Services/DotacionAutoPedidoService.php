@@ -34,6 +34,33 @@ class DotacionAutoPedidoService
         'AUXILIAR TECNICO',
     ];
 
+    /** Bodega de dotación de cada proyecto (ver bodegaDe). */
+    private const BODEGAS = [
+        'DIRECTV'            => 'SERVIMERCADEO PEREIRA',
+        'SYM TIGO EXPRESS'   => 'TIGO EXPRESS PEREIRA',
+        'SYM TIGO HOME'      => 'TIGO HOME PEREIRA',
+        'SYM ADMINISTRATIVO' => self::SEDE_CENTRAL_ADMINISTRATIVA,
+    ];
+
+    /**
+     * Otros nombres con que está cargada cada prenda del kit (la clave ya normalizada: ver
+     * esLaPrenda). Son los de producción, con sus errores de escritura tal cual: si allá se
+     * corrige o se cambia un nombre, se agrega aquí.
+     */
+    private const NOMBRES_EN_INVENTARIO = [
+        'POLO GRIS ADMINISTRATIVA'        => ['CAMISA COMERCIAL HOMBRE', 'CAMISA COMERCIAL DAMA'],
+        'PANTALON COMERCIAL'              => ['PANTALON COMERCIAL HOMBRE', 'PANTALON COMERCIAL DAMA'],
+        'POLO INSTALADOR AZUL OSCURO M/C' => ['POLO INSTALADOR MC'],
+        'POLO INSTALADOR AZUL OSCURO M/L' => ['POLO INSTALADOR ML'],
+        'PANTALON DE DRIL TECNICOS'       => ['PANTALON INSTALADOR', 'PANTALON INSTLADOR'],
+        'BOTAS INSTALADOR'                => ['BOTAS TECNICO INSTALADOR', 'BOTAS TECNICO ISNTALADOR'],
+        'REATA AZUL OSCURO'               => ['RIATAS INSTALADOR', 'RIATA INSTALADOR'],
+        'GORRA'                           => ['GORRAS DIRECTV', 'GORRA DIRECTV'],
+    ];
+
+    /** @var array<string, int|null> bodega ya resuelta por proyecto */
+    private array $bodegas = [];
+
     /** En estos proyectos todos los cargos reciben el kit de técnico. */
     private const PROYECTOS_CON_KIT_TECNICO = ['HUGHES COL', 'HUGHES ECU', 'FT&H'];
 
@@ -103,6 +130,8 @@ class DotacionAutoPedidoService
                 'empleado_id'  => $contrato->empleado_id,
                 'estado'       => 'Activo',
                 'fecha_pedido' => now()->toDateString(),
+                // La bodega de la que sale el kit (la de su primera prenda).
+                'sede_id'      => $asignables[0][0]->sede_id,
                 'notas'        => PedidoAutomatico::NOTA_AUTOMATICO . ' al crear el contrato.' . $this->notaFaltantes(),
                 'prendas_sin_definir' => $this->sinDefinir ?: null,
             ]);
@@ -187,6 +216,7 @@ class DotacionAutoPedidoService
 
             $this->agregarPrendas($pedido, $asignables, $descuenta);
             $pedido->update([
+                'sede_id' => $asignables[0][0]->sede_id,
                 'notas' => PedidoAutomatico::NOTA_AUTOMATICO . ' y actualizado al cambiar el proyecto del contrato.' . $this->notaFaltantes(),
                 'prendas_sin_definir' => $this->sinDefinir ?: null,
             ]);
@@ -224,37 +254,17 @@ class DotacionAutoPedidoService
             return [];
         }
 
-        $sedeCentral = Sede::where('nombre', self::SEDE_CENTRAL_ADMINISTRATIVA)->value('id');
-        if (!$sedeCentral) {
-            Log::error('DotacionAutoPedidoService: no se encontró la sede central administrativa "' . self::SEDE_CENTRAL_ADMINISTRATIVA . '"; no se genera pedido automático para el contrato ' . $contrato->id . '.');
-            $this->sinPedido('no existe la sede central ' . self::SEDE_CENTRAL_ADMINISTRATIVA . ' en el inventario.');
-            return [];
-        }
-
         $sedeContrato = $contrato->sede_id ?: ($contrato->sede ? Sede::where('nombre', $contrato->sede)->value('id') : null);
 
-        if (!$sedeContrato) {
-            Log::info("DotacionAutoPedidoService: no se pudo resolver la sede \"{$contrato->sede}\" del contrato {$contrato->id}.");
-            if (!collect($reglas)->contains(fn ($r) => $r[0] === 'SYM ADMINISTRATIVO')) {
-                $this->sinPedido("no se encontró la sede \"{$contrato->sede}\" del contrato en el inventario de dotación.");
-                return [];
-            }
-        }
-
         $asignables = [];
-        foreach ($reglas as [$proyectoPrenda, $prenda, $generoPrenda, $talla, $cantidad]) {
-            if ($solo !== null && !in_array($prenda, $solo, true)) {
+        foreach ($reglas as $regla) {
+            [$proyectosPrenda, $prenda, $generoPrenda, $talla, $cantidad] = $regla;
+            $opcional = $regla[5] ?? false;
+            if ($solo !== null && !collect($solo)->contains(fn ($s) => self::esLaPrenda($prenda, $s))) {
                 continue;
             }
 
-            $sedeId = $proyectoPrenda === 'SYM ADMINISTRATIVO' ? $sedeCentral : $sedeContrato;
-            if (!$sedeId) {
-                $this->faltantes[] = "{$prenda} (sin sede en el inventario)";
-                $this->sinDefinir[] = $prenda;
-                continue;
-            }
-
-            $inv = $this->buscarItem($proyectoPrenda, $sedeId, $prenda, $generoPrenda, $talla, $cantidad);
+            $inv = $this->buscarItem((array) $proyectosPrenda, $sedeContrato, $prenda, $generoPrenda, $talla, $cantidad, $opcional);
             if ($inv) {
                 $asignables[] = [$inv, $cantidad, max(0, $cantidad - $inv->cantidad)];
             }
@@ -308,13 +318,18 @@ class DotacionAutoPedidoService
     }
 
     /**
-     * La fila de inventario de la prenda en esa sede. Si no alcanza el stock, o la prenda nunca
-     * se ha manejado ahí (se crea en 0), igual entra al pedido: lo que falta queda por comprar
-     * y se reporta. Solo sin género o sin talla no se sabe qué prenda es, y no se asigna.
+     * La fila de inventario de la prenda en la bodega de su proyecto (ver bodegaDe). Si no
+     * alcanza el stock, igual entra al pedido: lo que falta queda por comprar y se reporta.
+     * Si la bodega no tiene la fila pero la prenda existe en el catálogo, se crea en 0 para
+     * comprarla. Lo que no existe en el catálogo no se inventa: queda pendiente (o se omite,
+     * si es opcional). Sin género o sin talla no se sabe qué prenda es, y no se asigna.
+     *
+     * @param string[] $proyectos en orden de preferencia (p. ej. el carnet de Tigo sale de su
+     *                            propio inventario y, si no lo tiene, del administrativo)
      */
-    private function buscarItem(string $proyecto, int $sedeId, string $prenda, ?string $genero, ?string $talla, int $cantidad): ?InventarioDotacion
+    private function buscarItem(array $proyectos, ?int $sedeContrato, string $prenda, ?string $genero, ?string $talla, int $cantidad, bool $opcional = false): ?InventarioDotacion
     {
-        $descripcion = "{$prenda} ({$proyecto}, {$genero}, sede_id {$sedeId})";
+        $descripcion = "{$prenda} (" . implode('/', $proyectos) . ", {$genero})";
 
         if (!$genero) {
             Log::info("DotacionAutoPedidoService: género no registrado para el empleado, no se asigna {$descripcion}.");
@@ -330,46 +345,130 @@ class DotacionAutoPedidoService
             return null;
         }
 
-        // La misma talla puede estar escrita distinto en el inventario: "M" es "10 (M)" en las
-        // prendas femeninas de Tigo y "XXL" es "2XL" en varios polos.
+        // La misma talla puede estar escrita distinto en el inventario: "M" es "10 (M)" o "10"
+        // en las prendas de mujer y "XXL" es "2XL" en varios polos.
         $tallas = InventarioDotacion::tallasEquivalentes($talla);
-        $filas = InventarioDotacion::where('proyecto', $proyecto)
-            ->where('sede_id', $sedeId)
-            ->where('prenda', $prenda)
-            ->whereIn('talla', $tallas)
-            ->where('genero', $genero)
-            ->lockForUpdate()
-            ->get()
-            ->sortBy(fn ($f) => array_search(mb_strtoupper($f->talla, 'UTF-8'), array_map(fn ($t) => mb_strtoupper($t, 'UTF-8'), $tallas), true));
+        // Prendas sin talla (carnet, gorra): sirve la de cualquier género, primero la suya.
+        $generos = mb_strtoupper($talla, 'UTF-8') === 'N/A'
+            ? [$genero, $genero === 'Masculino' ? 'Femenino' : 'Masculino']
+            : [$genero];
+        $real = fn ($q) => $q->where(fn ($w) => $w->where('cantidad', '>', 0)->orWhere('stock_minimo', '>', 0)->orWhere('precio', '>', 0));
 
-        if ($filas->isEmpty()) {
-            Log::info("DotacionAutoPedidoService: no se encontró en inventario {$descripcion}, talla {$talla}: se crea en 0 para comprarla.");
-            $this->faltantes[] = "{$prenda} talla {$talla} (por comprar {$cantidad}: no existe en el inventario de la sede)";
-            return $this->crearFilaEnCero($proyecto, $sedeId, $prenda, $genero, $tallas);
+        foreach ($proyectos as $proyecto) {
+            $sedeId = $this->bodegaDe($proyecto) ?? $sedeContrato;
+            if (!$sedeId) {
+                continue;
+            }
+
+            $filas = $this->filasDeLaPrenda($proyecto, $prenda, $generos, $tallas, fn ($q) => $q->where('sede_id', $sedeId)->lockForUpdate());
+            if ($filas->isNotEmpty()) {
+                // La primera que alcance y, si ninguna alcanza, la que más tenga.
+                $inv = $filas->first(fn ($f) => $f->cantidad >= $cantidad) ?? $filas->sortByDesc('cantidad')->first();
+                if ($inv->cantidad < $cantidad) {
+                    $falta = $cantidad - $inv->cantidad;
+                    Log::info("DotacionAutoPedidoService: stock insuficiente para {$descripcion}, talla {$inv->talla} (disponible {$inv->cantidad}, solicitado {$cantidad}).");
+                    $this->faltantes[] = "{$prenda} talla {$inv->talla} (por comprar {$falta}: hay {$inv->cantidad}, se necesitan {$cantidad})";
+                }
+
+                return $inv;
+            }
+
+            // La bodega no la tiene, pero la prenda existe en el catálogo (con existencias, stock
+            // mínimo o precio en otra sede): se crea en 0 con ese nombre, talla y precio para
+            // comprarla. Una fila en 0 sin precio no cuenta: pudo inventarla una versión anterior.
+            $modelo = $this->filasDeLaPrenda($proyecto, $prenda, $generos, $tallas, $real)->first();
+            if ($modelo) {
+                Log::info("DotacionAutoPedidoService: {$descripcion} talla {$talla} no está en la sede {$sedeId}: se crea en 0 para comprarla.");
+                $this->faltantes[] = "{$prenda} talla {$modelo->talla} (por comprar {$cantidad}: no está en el inventario de la sede)";
+
+                return InventarioDotacion::create([
+                    'proyecto' => $proyecto, 'sede_id' => $sedeId, 'prenda' => $modelo->prenda, 'genero' => $modelo->genero,
+                    'talla' => $modelo->talla, 'precio' => $modelo->precio, 'cantidad' => 0, 'stock_minimo' => 0,
+                ]);
+            }
         }
 
-        // La primera que alcance y, si ninguna alcanza, la que más tenga.
-        $inv = $filas->first(fn ($f) => $f->cantidad >= $cantidad) ?? $filas->sortByDesc('cantidad')->first();
-        if ($inv->cantidad < $cantidad) {
-            $falta = $cantidad - $inv->cantidad;
-            Log::info("DotacionAutoPedidoService: stock insuficiente para {$descripcion}, talla {$inv->talla} (disponible {$inv->cantidad}, solicitado {$cantidad}).");
-            $this->faltantes[] = "{$prenda} talla {$inv->talla} (por comprar {$falta}: hay {$inv->cantidad}, se necesitan {$cantidad})";
+        if ($opcional) {
+            Log::info("DotacionAutoPedidoService: {$descripcion} no existe en el inventario y es opcional: se omite.");
+            return null;
         }
 
-        return $inv;
+        // Solo se pide a Compras una prenda que existe: si el catálogo no la maneja en esa talla
+        // (p. ej. pantalón de mujer talla 32, cuando las de mujer van de 4 a 24) no se inventa la
+        // fila: queda pendiente y se completa sola al corregir la talla del empleado.
+        Log::info("DotacionAutoPedidoService: {$descripcion} no se maneja en talla {$talla}: no se asigna.");
+        $this->faltantes[] = "{$prenda} ({$genero}) no se maneja en talla {$talla}: revisa la talla del empleado o el inventario";
+        $this->sinDefinir[] = $prenda;
+
+        return null;
     }
 
-    /** Con la talla y el precio que esa prenda ya usa en otras sedes, si los hay. */
-    private function crearFilaEnCero(string $proyecto, int $sedeId, string $prenda, string $genero, array $tallas): InventarioDotacion
+    /**
+     * Filas del proyecto que son esta prenda (con cualquiera de los nombres con que se escribe,
+     * ver esLaPrenda), en esos géneros y tallas, ordenadas por el género y la talla preferidos.
+     */
+    private function filasDeLaPrenda(string $proyecto, string $prenda, array $generos, array $tallas, callable $filtro)
     {
-        $otraSede = InventarioDotacion::where(['proyecto' => $proyecto, 'prenda' => $prenda, 'genero' => $genero])
-            ->whereIn('talla', $tallas)
-            ->first();
+        $posicion = fn (array $lista, $valor) => array_search(
+            mb_strtoupper((string) $valor, 'UTF-8'),
+            array_map(fn ($t) => mb_strtoupper((string) $t, 'UTF-8'), $lista),
+            true,
+        );
 
-        return InventarioDotacion::create([
-            'proyecto' => $proyecto, 'sede_id' => $sedeId, 'prenda' => $prenda, 'genero' => $genero,
-            'talla' => $otraSede->talla ?? $tallas[0], 'precio' => $otraSede->precio ?? 0, 'cantidad' => 0, 'stock_minimo' => 0,
-        ]);
+        return InventarioDotacion::where('proyecto', $proyecto)
+            ->whereIn('genero', $generos)
+            ->whereIn('talla', $tallas)
+            ->tap($filtro)
+            ->get()
+            ->filter(fn ($f) => self::esLaPrenda($prenda, $f->prenda))
+            ->sortBy(fn ($f) => $posicion($generos, $f->genero) * 100 + $posicion($tallas, $f->talla))
+            ->values();
+    }
+
+    /**
+     * Sede de donde sale la dotación de cada proyecto: su bodega. En producción cada proyecto
+     * tiene todo su inventario en una sola sede de Pereira (ver BODEGAS); si esa sede no tiene
+     * nada del proyecto, la que más existencias tenga. Null si el proyecto no tiene inventario
+     * (entonces se usa la sede del contrato).
+     */
+    private function bodegaDe(string $proyecto): ?int
+    {
+        if (array_key_exists($proyecto, $this->bodegas)) {
+            return $this->bodegas[$proyecto];
+        }
+
+        $conInventario = fn ($q) => $q->where('proyecto', $proyecto)
+            ->where(fn ($w) => $w->where('cantidad', '>', 0)->orWhere('stock_minimo', '>', 0)->orWhere('precio', '>', 0));
+
+        $nombrada = Sede::where('nombre', self::BODEGAS[$proyecto] ?? '')->value('id');
+        if ($nombrada && InventarioDotacion::where('sede_id', $nombrada)->tap($conInventario)->exists()) {
+            return $this->bodegas[$proyecto] = $nombrada;
+        }
+
+        return $this->bodegas[$proyecto] = InventarioDotacion::query()->tap($conInventario)
+            ->selectRaw('sede_id, SUM(cantidad) as total')
+            ->groupBy('sede_id')
+            ->orderByDesc('total')
+            ->value('sede_id')
+            ?? ($proyecto === 'SYM ADMINISTRATIVO' ? $nombrada : null);
+    }
+
+    /**
+     * ¿La fila del inventario llamada $nombreInventario es la prenda $prenda del kit? Ignora
+     * mayúsculas, tildes, espacios dobles, el prefijo "SYM " y la talla que algunas prendas de
+     * mujer llevan en el nombre ("SYM POLO MC AZUL TIGO EXPRESS (10)"), y acepta los nombres
+     * con que cada inventario la tiene cargada (ver NOMBRES_EN_INVENTARIO).
+     */
+    public static function esLaPrenda(string $prenda, string $nombreInventario): bool
+    {
+        $norm = fn (string $n) => preg_replace(
+            ['/^SYM\s+/', '/\s*\(\d+\)$/'],
+            '',
+            preg_replace('/\s+/', ' ', trim(mb_strtoupper(Str::ascii($n), 'UTF-8'))),
+        );
+        $buscada = $norm($prenda);
+
+        return in_array($norm($nombreInventario), [$buscada, ...array_map($norm, self::NOMBRES_EN_INVENTARIO[$buscada] ?? [])], true);
     }
 
     /**
@@ -388,21 +487,25 @@ class DotacionAutoPedidoService
             $reglas = array_merge($reglas, $this->kitAdministrativoSym($genero, $empleado));
 
         } elseif (in_array($proyecto, ['SYM TIGO EXPRESS', 'SYM TIGO HOME'], true)) {
+            // Carnet y gorra: del inventario del propio proyecto (en producción cada Tigo tiene el
+            // suyo) y, si no los tiene, del administrativo. No tienen talla: sirve el de cualquier género.
+            $carnetTigo = [$proyecto, 'SYM ADMINISTRATIVO'];
+            $generoNA = $genero ?? 'Masculino';
             if ($esSupervisorComercial && $proyecto === 'SYM TIGO HOME') {
                 $reglas[] = ['SYM TIGO HOME', 'Polo Ml Azul Home', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = [$carnetTigo, 'Carnet', $generoNA, 'N/A', 1];
             } elseif ($esSupervisorComercial) {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = [$carnetTigo, 'Carnet', $generoNA, 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO EXPRESS') {
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', $genero, $empleado->talla_camisa, 1];
                 $reglas[] = ['SYM TIGO EXPRESS', 'Polo Mc Blanca Tigo Express', $genero, $empleado->talla_camisa, 1];
-                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = [$carnetTigo, 'Carnet', $generoNA, 'N/A', 1];
             } elseif ($esAsesor && $proyecto === 'SYM TIGO HOME') {
                 $reglas[] = ['SYM TIGO HOME', 'Polo Ml Azul Home', $genero, $empleado->talla_camisa, 2];
-                $reglas[] = ['SYM ADMINISTRATIVO', 'Gorra Tigo', 'Masculino', 'N/A', 1];
-                $reglas[] = ['SYM ADMINISTRATIVO', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = [$carnetTigo, 'Gorra Tigo', $generoNA, 'N/A', 1];
+                $reglas[] = [$carnetTigo, 'Carnet', $generoNA, 'N/A', 1];
             } else {
                 // Cargo no comercial (ej. Analista, Coordinador) en un proyecto Tigo: recibe el
                 // mismo kit que "personal administrativo" (proyecto Solo Ausentismos).
@@ -416,12 +519,12 @@ class DotacionAutoPedidoService
                 $reglas[] = ['DIRECTV', 'Polo Gris Administrativa', $genero, $empleado->talla_camisa, 2];
                 $reglas[] = ['DIRECTV', 'Pantalon Comercial', $genero, $empleado->talla_pantalon, 1];
                 $reglas[] = ['DIRECTV', 'Botas Instalador', 'Masculino', $empleado->talla_zapatos, 1];
-                $reglas[] = ['DIRECTV', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['DIRECTV', 'Carnet', $genero ?? 'Masculino', 'N/A', 1, true];
             } else {
                 // Todos los demás cargos de DIRECTV reciben la dotación de un asesor.
                 $reglas[] = ['DIRECTV', 'Polo Gris Administrativa', $genero, $empleado->talla_camisa, 2];
                 $reglas[] = ['DIRECTV', 'Pantalon Comercial', $genero, $empleado->talla_pantalon, 1];
-                $reglas[] = ['DIRECTV', 'Carnet', 'Masculino', 'N/A', 1];
+                $reglas[] = ['DIRECTV', 'Carnet', $genero ?? 'Masculino', 'N/A', 1, true];
             }
         } else {
             return [];
@@ -440,7 +543,8 @@ class DotacionAutoPedidoService
             ['DIRECTV', 'Botas Instalador', 'Masculino', $empleado->talla_zapatos, 1],
             ['DIRECTV', 'Reata Azul Oscuro', 'Masculino', 'N/A', 1],
             ['DIRECTV', 'Gorra', 'Masculino', 'N/A', 1],
-            ['DIRECTV', 'Carnet', 'Masculino', 'N/A', 1],
+            // El inventario de DIRECTV de producción no maneja carnet: si no está, se omite.
+            ['DIRECTV', 'Carnet', 'Masculino', 'N/A', 1, true],
         ];
     }
 

@@ -20,6 +20,21 @@ trait ErpFixtures
         return $prefijo . '-' . uniqid() . '-' . (++$this->seq);
     }
 
+    /**
+     * Datos de un pedido de dotación manual con su sede (obligatoria): la de su primera prenda,
+     * como la elegiría quien lo crea. Sin prendas, cualquier sede.
+     */
+    protected function conSede(array $datos): array
+    {
+        if (array_key_exists('sede_id', $datos)) {
+            return $datos;
+        }
+        $primera = $datos['items'][0]['inventario_dotacion_id'] ?? null;
+        $sede = $primera ? DB::table('inventario_dotacion')->where('id', $primera)->value('sede_id') : null;
+
+        return $datos + ['sede_id' => $sede ?? DB::table('sedes')->value('id') ?? $this->sede()];
+    }
+
     protected function usuario(string $rol = 'general', array $atributos = []): User
     {
         $user = User::factory()->create(array_merge(['activo' => true], $atributos));

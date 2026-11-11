@@ -43,9 +43,9 @@ class StockPorEstadoDelPedidoTest extends TestCase
 
     private function crear(string $estado): int
     {
-        return $this->postJson('/api/pedidos-automaticos', [
+        return $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $this->empleado->id, 'estado' => $estado, 'items' => $this->items(),
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
     }
 
     private function cambiar(int $id, string $estado, ?array $items = null)

@@ -14,7 +14,7 @@ class PedidoAutomaticoController extends Controller
     {
         // sedeCatalogo: el nombre de la sede de empleado y contrato sale del catálogo
         // (HasSedeCatalogo); precargado, no es una consulta por pedido.
-        $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario.sede:id,nombre'])
+        $query = PedidoAutomatico::with(['empleado.sedeCatalogo', 'contrato.sedeCatalogo', 'items.inventario.sede:id,nombre', 'sede:id,nombre'])
             ->whereNotNull('codigo')
             // Un aliado (o técnico de aliado) no ve la dotación de la empresa: solo la suya.
             ->when(\App\Models\PedidoCompra::aliadoDe($request->user()), fn ($q) => $q->where('empleado_id', $request->user()->id));
@@ -47,6 +47,7 @@ class PedidoAutomaticoController extends Controller
             'fecha_pedido' => 'nullable|date',
             'notas'        => 'nullable|string',
             'codigo'       => 'nullable|string|max:10|unique:pedidos_automaticos,codigo',
+            'sede_id'      => 'required|exists:sedes,id',
             'items'        => 'nullable|array',
             'items.*.inventario_dotacion_id' => 'required|exists:inventario_dotacion,id',
             'items.*.cantidad'               => 'required|integer|min:1',
@@ -60,6 +61,9 @@ class PedidoAutomaticoController extends Controller
         $contrato = $this->contratoDelPedido($data);
         if ($msg = PedidoAutomatico::prendasDeOtroProyecto($contrato, $data['items'] ?? [])) {
             return response()->json(['message' => $msg], 422);
+        }
+        if ($msg = $this->prendasDeOtraSede((int) $data['sede_id'], $data['items'] ?? [])) {
+            return response()->json(['message' => $msg, 'errors' => ['sede_id' => [$msg]]], 422);
         }
         // Sin contrato ligado el pedido no se puede revisar en Compras (la sede pedida sale de
         // ahí) ni agrupar en un pedido global.
@@ -81,7 +85,7 @@ class PedidoAutomaticoController extends Controller
                 }
 
                 return response()->json(
-                    $pedido->load(['empleado', 'contrato', 'items.inventario']),
+                    $pedido->load(['empleado', 'contrato', 'items.inventario', 'sede:id,nombre']),
                     201
                 );
             });
@@ -93,7 +97,7 @@ class PedidoAutomaticoController extends Controller
     public function show(PedidoAutomatico $pedidoAutomatico)
     {
         return response()->json(
-            $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
+            $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario', 'sede:id,nombre'])
         );
     }
 
@@ -105,6 +109,7 @@ class PedidoAutomaticoController extends Controller
             'estado'       => ['nullable', 'string', \Illuminate\Validation\Rule::in(PedidoAutomatico::ESTADOS)],
             'fecha_pedido' => 'nullable|date',
             'notas'        => 'nullable|string',
+            'sede_id'      => 'sometimes|nullable|exists:sedes,id',
             'items'        => 'nullable|array',
             'items.*.inventario_dotacion_id' => 'required|exists:inventario_dotacion,id',
             'items.*.cantidad'               => 'required|integer|min:1',
@@ -115,6 +120,14 @@ class PedidoAutomaticoController extends Controller
         }
         if ($msg = PedidoAutomatico::prendasDeOtroProyecto($this->contratoDelPedido($data), $data['items'] ?? [])) {
             return response()->json(['message' => $msg], 422);
+        }
+        // Las prendas que se agregan salen de la sede del pedido; las que ya tenía se respetan
+        // (un pedido automático puede traer el carnet del inventario administrativo).
+        $sedeId = array_key_exists('sede_id', $data) ? $data['sede_id'] : $pedidoAutomatico->sede_id;
+        $yaTenia = $pedidoAutomatico->items()->pluck('inventario_dotacion_id')->all();
+        $nuevas = array_filter($data['items'] ?? [], fn ($i) => !in_array($i['inventario_dotacion_id'], $yaTenia));
+        if ($sedeId && ($msg = $this->prendasDeOtraSede((int) $sedeId, $nuevas))) {
+            return response()->json(['message' => $msg, 'errors' => ['sede_id' => [$msg]]], 422);
         }
 
         try {
@@ -129,7 +142,7 @@ class PedidoAutomaticoController extends Controller
                 $pedidoAutomatico->update($data);
 
                 return response()->json(
-                    $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario'])
+                    $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario', 'sede:id,nombre'])
                 );
             });
         } catch (InvalidArgumentException $e) {
@@ -177,7 +190,7 @@ class PedidoAutomaticoController extends Controller
             $this->restaurarInventario($pedidoAutomatico);
             $pedidoAutomatico->update(['estado' => 'Devolución']);
 
-            $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario']);
+            $pedidoAutomatico->load(['empleado', 'contrato', 'items.inventario', 'sede:id,nombre']);
 
             \App\Models\User::completarFotografias([$pedidoAutomatico->empleado]);
 
@@ -227,6 +240,24 @@ class PedidoAutomaticoController extends Controller
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /** Mensaje si alguna prenda no es del inventario de esa sede, o null si todas lo son. */
+    private function prendasDeOtraSede(int $sedeId, array $items): ?string
+    {
+        $ajenas = \App\Models\InventarioDotacion::with('sede:id,nombre')
+            ->whereIn('id', array_column($items, 'inventario_dotacion_id'))
+            ->where('sede_id', '!=', $sedeId)
+            // La dotación administrativa (carnet de oficina) sale siempre de la sede central.
+            ->where('proyecto', '!=', 'SYM ADMINISTRATIVO')
+            ->get();
+        if ($ajenas->isEmpty()) {
+            return null;
+        }
+        $sede = \App\Models\Sede::whereKey($sedeId)->value('nombre');
+
+        return "Las prendas salen del inventario de la sede {$sede}. No son de esa sede: "
+            . $ajenas->map(fn ($i) => "{$i->prenda} {$i->talla} ({$i->sede?->nombre})")->implode(', ') . '.';
+    }
 
     private function contratoDelPedido(array $data): ?\App\Models\Contrato
     {

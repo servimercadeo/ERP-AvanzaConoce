@@ -315,6 +315,8 @@ class PedidoGlobalController extends Controller
                     'codigo'           => !empty($p['codigo']) ? $p['codigo'] : PedidoAutomatico::generarCodigo(),
                     'empleado_id'      => $p['empleado_id'],
                     'contrato_id'      => $contrato->id,
+                    // La sede de la que salen sus prendas (la de la primera).
+                    'sede_id'          => \App\Models\InventarioDotacion::whereKey($p['items'][0]['inventario_dotacion_id'] ?? null)->value('sede_id'),
                     'estado'           => 'Completado',
                     'fecha_pedido'     => $p['fecha_pedido'] ?? now()->toDateString(),
                     'notas'            => $p['notas'] ?? null,

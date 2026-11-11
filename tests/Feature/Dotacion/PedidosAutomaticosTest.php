@@ -46,13 +46,13 @@ class PedidosAutomaticosTest extends TestCase
 
     private function crear(array $extra = [])
     {
-        return $this->postJson('/api/pedidos-automaticos', array_merge([
+        return $this->postJson('/api/pedidos-automaticos', $this->conSede(array_merge([
             'empleado_id' => $this->empleado->id,
             'items' => [
                 ['inventario_dotacion_id' => $this->camisa->id, 'cantidad' => 2],
                 ['inventario_dotacion_id' => $this->pantalon->id, 'cantidad' => 1],
             ],
-        ], $extra));
+        ], $extra)));
     }
 
     public function test_pedido_activo_descuenta_el_inventario_y_genera_codigo(): void
@@ -292,14 +292,14 @@ class PedidosAutomaticosTest extends TestCase
         ]);
 
         // La camisa del setUp es de SYM TIGO HOME: no le corresponde.
-        $this->postJson('/api/pedidos-automaticos', [
+        $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $dtv->id, 'items' => [['inventario_dotacion_id' => $this->camisa->id, 'cantidad' => 1]],
-        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'solo se le puede asignar dotación de DIRECTV'));
+        ]))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'solo se le puede asignar dotación de DIRECTV'));
         $this->assertSame(10, $this->camisa->fresh()->cantidad);
 
-        $id = $this->postJson('/api/pedidos-automaticos', [
+        $id = $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $dtv->id, 'items' => [['inventario_dotacion_id' => $poloDtv->id, 'cantidad' => 1]],
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
         $this->assertSame(4, $poloDtv->fresh()->cantidad);
 
         // Tampoco al editar.

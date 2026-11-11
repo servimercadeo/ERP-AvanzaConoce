@@ -2928,6 +2928,12 @@
             "por_defecto": true,
             "charset": null
         },
+        "sede_id": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
         "fecha_pedido": {
             "tipo": "date",
             "nulo": true,
@@ -3982,12 +3988,6 @@
         }
     },
     "supervisor_tecnico": {
-        "created_at": {
-            "tipo": "timestamp",
-            "nulo": true,
-            "por_defecto": true,
-            "charset": null
-        },
         "id": {
             "tipo": "bigint unsigned",
             "nulo": false,
@@ -4006,6 +4006,12 @@
             "por_defecto": false,
             "charset": null
         },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
         "updated_at": {
             "tipo": "timestamp",
             "nulo": true,
@@ -4014,21 +4020,9 @@
         }
     },
     "supervisores": {
-        "created_at": {
-            "tipo": "timestamp",
-            "nulo": true,
-            "por_defecto": true,
-            "charset": null
-        },
         "id": {
             "tipo": "bigint unsigned",
             "nulo": false,
-            "por_defecto": true,
-            "charset": null
-        },
-        "updated_at": {
-            "tipo": "timestamp",
-            "nulo": true,
             "por_defecto": true,
             "charset": null
         },
@@ -4036,6 +4030,18 @@
             "tipo": "bigint unsigned",
             "nulo": false,
             "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
             "charset": null
         }
     },
@@ -4136,16 +4142,16 @@
         }
     },
     "torre_sede": {
-        "created_at": {
-            "tipo": "timestamp",
-            "nulo": true,
-            "por_defecto": true,
-            "charset": null
-        },
         "id": {
             "tipo": "bigint unsigned",
             "nulo": false,
             "por_defecto": true,
+            "charset": null
+        },
+        "torre_id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": false,
             "charset": null
         },
         "sede_id": {
@@ -4154,10 +4160,10 @@
             "por_defecto": false,
             "charset": null
         },
-        "torre_id": {
-            "tipo": "bigint unsigned",
-            "nulo": false,
-            "por_defecto": false,
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
             "charset": null
         },
         "updated_at": {
@@ -4168,21 +4174,9 @@
         }
     },
     "torres": {
-        "created_at": {
-            "tipo": "timestamp",
-            "nulo": true,
-            "por_defecto": true,
-            "charset": null
-        },
         "id": {
             "tipo": "bigint unsigned",
             "nulo": false,
-            "por_defecto": true,
-            "charset": null
-        },
-        "updated_at": {
-            "tipo": "timestamp",
-            "nulo": true,
             "por_defecto": true,
             "charset": null
         },
@@ -4190,6 +4184,18 @@
             "tipo": "bigint unsigned",
             "nulo": false,
             "por_defecto": false,
+            "charset": null
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
+            "charset": null
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": true,
             "charset": null
         }
     },

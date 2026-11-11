@@ -15,6 +15,7 @@ class PedidoAutomatico extends Model
         'contrato_id',
         'pedido_global_id',
         'empleado_id',
+        'sede_id',
         'estado',
         'recibido_pedidos',
         'estado_compra',
@@ -37,6 +38,12 @@ class PedidoAutomatico extends Model
     public function contrato()
     {
         return $this->belongsTo(Contrato::class, 'contrato_id');
+    }
+
+    /** Sede de la que sale el pedido (de su inventario se descuentan las prendas). */
+    public function sede()
+    {
+        return $this->belongsTo(Sede::class, 'sede_id');
     }
 
     public function items()
@@ -212,7 +219,11 @@ class PedidoAutomatico extends Model
         // Lo que se agregó a mano ya no está sin definir.
         if ($items !== null && $this->prendas_sin_definir) {
             $agregadas = InventarioDotacion::whereIn('id', array_column($items, 'inventario_dotacion_id'))->pluck('prenda')->all();
-            $cambios['prendas_sin_definir'] = array_values(array_diff($this->prendas_sin_definir, $agregadas)) ?: null;
+            // Por nombre del kit: en el inventario puede estar como "CAMISA COMERCIAL DAMA".
+            $cambios['prendas_sin_definir'] = array_values(array_filter(
+                $this->prendas_sin_definir,
+                fn ($prenda) => !collect($agregadas)->contains(fn ($a) => \App\Services\DotacionAutoPedidoService::esLaPrenda($prenda, $a)),
+            )) ?: null;
         }
         if ($nuevo === 'Cancelado') {
             $cambios['pedido_global_id'] = null;

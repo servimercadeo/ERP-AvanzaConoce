@@ -19,15 +19,17 @@ class InventarioDotacion extends Model
      * La misma talla escrita de distintas formas: el formulario de ingreso usa XS...XXXL y el
      * inventario 2XL/3XL, o "10 (M)" en las prendas femeninas de Tigo.
      */
+    // El número solo va al final: en producción las camisas de mujer de DIRECTV vienen por
+    // número ("CAMISA COMERCIAL DAMA" talla 10). Al final para que primero se busque la letra.
     private const TALLAS_EQUIVALENTES = [
-        ['XS', '6 (XS)'],
-        ['S', '8 (S)'],
-        ['M', '10 (M)'],
-        ['L', '12 (L)'],
-        ['XL', '14 (XL)'],
-        ['2XL', 'XXL', '16 (2XL)'],
-        ['3XL', 'XXXL', '18 (3XL)'],
-        ['4XL', '20 (4XL)'],
+        ['XS', '6 (XS)', '6'],
+        ['S', '8 (S)', '8'],
+        ['M', '10 (M)', '10'],
+        ['L', '12 (L)', '12'],
+        ['XL', '14 (XL)', '14'],
+        ['2XL', 'XXL', '16 (2XL)', '16'],
+        ['3XL', 'XXXL', '18 (3XL)', '18'],
+        ['4XL', '20 (4XL)', '20'],
     ];
 
     /** @return string[] la talla dada primero y luego sus equivalentes. */

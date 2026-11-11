@@ -54,6 +54,8 @@ const dateOnly = (v) => (v ? String(v).split("T")[0] : "");
 const EMPTY_FORM = {
     empleado_id: "",
     contrato_id: "",
+    // Sede de la que salen las prendas: obligatoria al crear el pedido a mano.
+    sede_id: "",
     estado: "Activo",
     fecha_pedido: new Date().toISOString().split("T")[0],
     notas: "",
@@ -259,6 +261,7 @@ function InventarioItemSelect({
     tallasEmpleado,
     proyecto,
     sedeId,
+    soloSede = null,
 }) {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
@@ -274,6 +277,10 @@ function InventarioItemSelect({
         if (!proyecto) return [];
         const permitidos = inventariosPermitidos(proyecto);
         let base = inventarioFlat.filter((i) => i.cantidad > 0 && permitidos.includes(i.proyecto));
+        // Solo la sede del pedido (la dotación administrativa sale siempre de la sede central).
+        if (soloSede) {
+            base = base.filter((i) => i.proyecto === "SYM ADMINISTRATIVO" || String(i.sede_id) === String(soloSede));
+        }
 
         // Género del empleado ("Otro" o sin registrar: ambos).
         if (generoEmpleado && ["masculino", "femenino"].includes(generoEmpleado.toLowerCase())) {
@@ -301,7 +308,7 @@ function InventarioItemSelect({
                 return words.every((w) => txt.includes(w));
             })
             .slice(0, 80);
-    }, [query, inventarioFlat, generoEmpleado, tallasEmpleado, proyecto, sedeId]);
+    }, [query, inventarioFlat, generoEmpleado, tallasEmpleado, proyecto, sedeId, soloSede]);
 
     useEffect(() => {
         const h = (e) => {
@@ -557,6 +564,14 @@ function Modal({
         const e = {};
         if (!form.empleado_id) e.empleado_id = "Requerido";
         if (!form.fecha_pedido) e.fecha_pedido = "Requerido";
+        if (isNuevo && !form.sede_id) e.sede_id = "Requerido";
+        form.items.forEach((it, idx) => {
+            const inv = inventarioFlat.find((i) => String(i.id) === String(it.inventario_dotacion_id)) ?? it._inv;
+            const nueva = !(initial.items ?? []).some(
+                (o) => String(o.inventario_dotacion_id ?? o.inventario?.id) === String(it.inventario_dotacion_id),
+            );
+            if (nueva && !esDeLaSede(inv)) e[`item_${idx}_inv`] = "Esta prenda no es de la sede del pedido";
+        });
         if (form.estado === "Activo") {
             form.items.forEach((it, idx) => {
                 if (!it.inventario_dotacion_id)
@@ -618,6 +633,56 @@ function Modal({
     const proyectoEmpleado = contratoPedido?.cliente_proyecto ?? null;
     const proyectoInventarioEmpleado = proyectoInventarioDe(proyectoEmpleado);
     const sedeContratoId = contratoPedido?.sede_id ?? null;
+
+    // Sedes del proyecto del empleado (las de su inventario de dotación).
+    const { data: sedesProyecto = [], isLoading: cargandoSedes } = useQuery({
+        queryKey: ["dotacion-sedes", proyectoInventarioEmpleado],
+        queryFn: () =>
+            api
+                .get("/inventario-dotacion/sedes", { params: { proyecto: proyectoInventarioEmpleado } })
+                .then((r) => r.data),
+        enabled: open && !!proyectoInventarioEmpleado,
+        staleTime: 5 * 60 * 1000,
+    });
+    // Existencias de cada sede para este proyecto, para mostrarlas y proponer una.
+    // (Lo administrativo de un empleado de otro proyecto sale de la sede central: no cuenta.)
+    const { stockPorSede, sedesConInventario } = useMemo(() => {
+        const permitidos = inventariosPermitidos(proyectoInventarioEmpleado);
+        const m = {};
+        const sedes = new Map();
+        inventarioFlat.forEach((i) => {
+            const cuenta = i.proyecto === proyectoInventarioEmpleado || (permitidos.includes(i.proyecto) && i.proyecto !== "SYM ADMINISTRATIVO");
+            if (cuenta && i.sede_id) {
+                m[i.sede_id] = (m[i.sede_id] ?? 0) + (i.cantidad > 0 ? i.cantidad : 0);
+                sedes.set(String(i.sede_id), { id: i.sede_id, nombre: i.sede_nombre ?? `Sede ${i.sede_id}` });
+            }
+        });
+        return { stockPorSede: m, sedesConInventario: [...sedes.values()] };
+    }, [inventarioFlat, proyectoInventarioEmpleado]);
+    const opcionesSede = useMemo(() => {
+        // Las sedes del proyecto y, además, las que tienen su inventario aunque no estén ligadas
+        // al proyecto en Parámetros: sin estas no se podría elegir la bodega.
+        const lista = [...sedesProyecto];
+        sedesConInventario.forEach((x) => {
+            if (!lista.some((y) => String(y.id) === String(x.id))) lista.push(x);
+        });
+        // Un pedido viejo puede tener una sede que ya no está ligada al proyecto: se muestra igual.
+        if (form.sede_id && !lista.some((x) => String(x.id) === String(form.sede_id)) && form.sede) {
+            lista.push(form.sede);
+        }
+        return lista;
+    }, [sedesProyecto, form.sede_id, form.sede]);
+    // Al crear: la sede del contrato si tiene dotación; si no, la que más tenga (la bodega).
+    useEffect(() => {
+        if (!open || !isNuevo || form.sede_id || !opcionesSede.length) return;
+        const conStock = opcionesSede.filter((x) => (stockPorSede[x.id] ?? 0) > 0);
+        const propuesta =
+            conStock.find((x) => String(x.id) === String(sedeContratoId)) ??
+            [...conStock].sort((a, b) => (stockPorSede[b.id] ?? 0) - (stockPorSede[a.id] ?? 0))[0];
+        if (propuesta) setForm((f) => ({ ...f, sede_id: String(propuesta.id) }));
+    }, [open, isNuevo, form.sede_id, opcionesSede, stockPorSede, sedeContratoId]);
+    const esDeLaSede = (inv) =>
+        !form.sede_id || !inv || inv.proyecto === "SYM ADMINISTRATIVO" || String(inv.sede_id) === String(form.sede_id);
 
     const generoEmpleado = useMemo(() => {
         const emp = empleados.find(
@@ -715,6 +780,7 @@ function Modal({
                                                 ...f,
                                                 empleado_id: v,
                                                 contrato_id: contrato?.id ?? "",
+                                                sede_id: "",
                                                 items: [],
                                             }));
                                             // Sincronizar tallas con el nuevo empleado
@@ -930,6 +996,43 @@ function Modal({
                             )}
 
                             <div className="form-grid" style={{ ...S.grid2, marginTop: 16 }}>
+                                <div style={S.formGroup}>
+                                    <label style={S.label}>
+                                        Sede {isNuevo && "*"}
+                                    </label>
+                                    <SelectBuscable
+                                        style={{
+                                            ...S.input,
+                                            ...(errors.sede_id ? S.inputErr : {}),
+                                            ...(readOnly ? S.inputDisabled : {}),
+                                        }}
+                                        value={form.sede_id ?? ""}
+                                        onChange={(e) => {
+                                            setForm((f) => ({ ...f, sede_id: e.target.value }));
+                                            setErrors((er) => ({ ...er, sede_id: undefined }));
+                                        }}
+                                        disabled={readOnly || !proyectoInventarioEmpleado}
+                                    >
+                                        <option value="">
+                                            {!form.empleado_id
+                                                ? "Primero elige el empleado"
+                                                : cargandoSedes
+                                                  ? "Cargando sedes…"
+                                                  : "Selecciona la sede"}
+                                        </option>
+                                        {opcionesSede.map((x) => (
+                                            <option key={x.id} value={String(x.id)}>
+                                                {x.nombre}
+                                                {stockPorSede[x.id] !== undefined ? ` (${stockPorSede[x.id]} prendas)` : " (sin inventario)"}
+                                            </option>
+                                        ))}
+                                    </SelectBuscable>
+                                    {errors.sede_id && <span style={S.err}>{errors.sede_id}</span>}
+                                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                                        Las prendas se descuentan del inventario de esta sede.
+                                    </span>
+                                </div>
+                                <div />
                                 <div style={S.formGroup}>
                                     <label style={S.label}>
                                         Fecha pedido *
@@ -1338,7 +1441,8 @@ function Modal({
                                                         tallasEmpleado
                                                     }
                                                     proyecto={proyectoInventarioEmpleado}
-                                                    sedeId={sedeContratoId}
+                                                    sedeId={form.sede_id || sedeContratoId}
+                                                    soloSede={form.sede_id || null}
                                                 />
                                             )}
                                             <div
@@ -1571,6 +1675,11 @@ function ImportPedidosModal({ onClose, onImported, empleados, contratos, inventa
                 await api.post("/pedidos-automaticos", {
                     empleado_id: g.empleado.id,
                     contrato_id: g.contrato_id,
+                    // La sede (obligatoria) es la de sus prendas: la que eligió la importación.
+                    sede_id:
+                        (g.items.map((it) => inventarioFlat.find((i) => i.id === it.inventario_dotacion_id))
+                            .find((i) => i && i.proyecto !== "SYM ADMINISTRATIVO") ??
+                            inventarioFlat.find((i) => i.id === g.items[0]?.inventario_dotacion_id))?.sede_id ?? null,
                     estado: g.estado,
                     fecha_pedido: g.fecha_pedido,
                     notas: g.notas,
@@ -2085,6 +2194,8 @@ export default function PedidosAutomaticosCrud() {
     const buildEditForm = (pedido) => ({
         empleado_id: pedido.empleado_id ?? "",
         contrato_id: pedido.contrato_id ?? "",
+        sede_id: pedido.sede_id ?? "",
+        sede: pedido.sede ?? null,
         estado: pedido.estado ?? "Pendiente",
         fecha_pedido: dateOnly(pedido.fecha_pedido),
         notas: pedido.notas ?? "",

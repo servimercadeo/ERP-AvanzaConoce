@@ -54,10 +54,10 @@ class PedidosGlobalesYCronogramaTest extends TestCase
                 ['precio' => 1000, 'cantidad' => 20, 'stock_minimo' => 0],
             );
 
-        $id = $this->postJson('/api/pedidos-automaticos', [
+        $id = $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $emp->id, 'contrato_id' => $contratoId,
             'items' => [['inventario_dotacion_id' => $prenda->id, 'cantidad' => 1]],
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         return PedidoAutomatico::find($id);
     }

@@ -200,9 +200,9 @@ class CircuitoDotacionTest extends TestCase
         $this->contrato($empleado);
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
-        $this->postJson('/api/pedidos-automaticos', [
+        $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]],
-        ])->assertCreated();
+        ]))->assertCreated();
 
         $this->assertSame(7, $polo->fresh()->cantidad);
         $this->assertSame(2, PedidoAutomatico::where('empleado_id', $empleado->id)->count());
@@ -289,27 +289,38 @@ class CircuitoDotacionTest extends TestCase
         $this->putJson("/api/pedidos-automaticos/{$pedido->id}", ['empleado_id' => $empleado->id, 'estado' => 'Completado', 'items' => $this->itemsDe($pedido)])->assertOk();
     }
 
-    public function test_una_sede_sin_inventario_del_proyecto_recibe_el_pedido_todo_por_comprar(): void
+    public function test_el_kit_sale_de_la_bodega_del_proyecto_aunque_la_sede_del_contrato_no_tenga_inventario(): void
     {
+        // Como en producción: todo el inventario del proyecto está en una sola sede.
         $sede = $this->sede('SEDE SIN STOCK');
+        $botas = $this->fila('DIRECTV', 'Botas Instalador', 'Masculino', '40');
 
         $r = $this->contrato($this->empleado(), ['cliente_proyecto' => 'HUGHES COL', 'sede' => 'SEDE SIN STOCK']);
 
         $pedido = $this->pedidoDe($r);
         $this->assertSame(self::KIT_TECNICO, $this->nombresDePrendas($pedido));
-        $this->assertSame(0, (int) $pedido->items()->get()->sum(fn ($i) => $i->cantidadEnStock()));
-        // Quedan las filas en 0, con la talla y el precio que la prenda ya usa en otra sede.
-        $botas = $this->fila('DIRECTV', 'Botas Instalador', 'Masculino', '40', $sede);
-        $this->assertSame(0, $botas->cantidad);
-        $this->assertSame(1000, $botas->precio);
+        $this->assertSame(0, (int) $pedido->items()->sum('cantidad_por_comprar'), 'Hay stock en la bodega: nada por comprar.');
+        $this->assertSame(9, $botas->fresh()->cantidad);
+        $this->assertFalse(InventarioDotacion::where('sede_id', $sede)->exists(), 'No crea filas en la sede del contrato.');
     }
 
-    public function test_una_sede_inexistente_solo_asigna_lo_de_la_sede_central(): void
+    public function test_con_una_sede_inexistente_igual_sale_el_kit_de_la_bodega(): void
     {
         $r = $this->contrato($this->empleado(), ['cliente_proyecto' => 'TIGO EXPRESS', 'sede' => 'NO EXISTE']);
 
-        $this->assertSame(['Carnet'], $this->nombresDePrendas($this->pedidoDe($r)));
-        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'sin sede'));
+        $this->assertSame(self::KIT_EXPRESS, $this->nombresDePrendas($this->pedidoDe($r)));
+    }
+
+    public function test_la_bodega_nombrada_del_proyecto_manda_sobre_otras_sedes_con_stock(): void
+    {
+        // En producción DIRECTV está en SERVIMERCADEO PEREIRA, aunque otra sede tuviera más.
+        $pereira = $this->sede('SERVIMERCADEO PEREIRA');
+        $polo = $this->prenda('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M', $pereira, 3);
+
+        $this->pedidoDe($this->contrato($this->empleado()));
+
+        $this->assertSame(1, $polo->fresh()->cantidad);
+        $this->assertSame(10, $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M')->cantidad);
     }
 
     // ── Tallas y género ──────────────────────────────────────────────────────
@@ -347,24 +358,69 @@ class CircuitoDotacionTest extends TestCase
         $this->assertSame('XXL', $tallas['Polo Instalador Azul Oscuro M/C']);
     }
 
-    public function test_una_talla_que_no_existe_entra_por_comprar(): void
+    public function test_una_talla_que_no_existe_no_se_inventa_y_queda_pendiente(): void
     {
         // XS de hombre: no existe en los polos de Tigo, ni con otro nombre.
-        $r = $this->contrato($this->empleado(tallasFormulario: ['talla_camisa' => 'XS']), ['cliente_proyecto' => 'TIGO EXPRESS']);
+        $empleado = $this->empleado(tallasFormulario: ['talla_camisa' => 'XS']);
+        $r = $this->contrato($empleado, ['cliente_proyecto' => 'TIGO EXPRESS']);
 
         $pedido = $this->pedidoDe($r);
-        $this->assertSame(self::KIT_EXPRESS, $this->nombresDePrendas($pedido));
-        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'talla XS') && str_contains($f, 'por comprar 1'));
-        $this->assertSame(0, $this->fila('SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', 'Masculino', 'XS')->cantidad);
+        $this->assertSame(['Carnet'], $this->nombresDePrendas($pedido));
+        $r->assertJsonPath('pedido_automatico_faltantes.0', fn ($f) => str_contains($f, 'no se maneja en talla XS'));
+        $this->assertFalse(InventarioDotacion::where(['prenda' => 'Polo Mc Azul Tigo Express', 'talla' => 'XS'])->exists(), 'No debe crear la talla en el inventario.');
+
+        // Al corregir la talla del empleado, el pedido se completa con la que sí existe.
+        $empleado->refresh()->update(['talla_camisa' => 'M']);
+        $this->assertSame(self::KIT_EXPRESS, $this->nombresDePrendas($pedido->fresh()));
     }
 
-    public function test_la_mujer_con_talla_sin_fila_en_su_sede_usa_el_nombre_de_talla_del_inventario(): void
+    public function test_una_prenda_que_no_esta_en_el_catalogo_del_proyecto_no_se_inventa(): void
     {
-        $sede = $this->sede('SEDE NUEVA TIGO');
+        // Como en producción: el kit administrativo no está cargado en SYM ADMINISTRATIVO.
+        InventarioDotacion::where('proyecto', 'SYM ADMINISTRATIVO')->whereIn('prenda', ['Polo Gris Manga Corta', 'Jean Azul'])->delete();
+        $antes = InventarioDotacion::count();
 
-        $this->pedidoDe($this->contrato($this->empleado(['genero' => 'Femenino']), ['cliente_proyecto' => 'TIGO EXPRESS', 'sede' => 'SEDE NUEVA TIGO']));
+        $r = $this->contrato($this->empleado(), ['cliente_proyecto' => 'TIGO EXPRESS', 'cargo' => 'ANALISTA']);
 
-        $this->assertSame(0, $this->fila('SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', 'Femenino', '10 (M)', $sede)->cantidad);
+        $this->assertSame(['Carnet'], $this->nombresDePrendas($this->pedidoDe($r)));
+        $this->assertSame($antes, InventarioDotacion::count(), 'No debe crear filas de prendas que no existen.');
+        $this->assertCount(2, $r->json('pedido_automatico_faltantes'));
+    }
+
+    public function test_la_talla_que_existe_en_otra_sede_entra_por_comprar_en_la_bodega(): void
+    {
+        // La talla L solo está cargada en otra sede (con precio): la bodega la compra.
+        $this->prenda('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'L', $this->otraSedeId, 0);
+
+        $r = $this->contrato($this->empleado(tallasFormulario: ['talla_camisa' => 'L']));
+
+        $this->assertSame(self::KIT_ASESOR_DTV, $this->nombresDePrendas($this->pedidoDe($r)));
+        $nueva = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'L');
+        $this->assertSame([0, 1000], [$nueva->cantidad, $nueva->precio]);
+    }
+
+    public function test_el_pedido_descuenta_del_inventario_lo_que_hay_y_solo_compra_lo_que_falta(): void
+    {
+        $this->prenda('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M', cantidad: 1);
+        $pantalon = $this->fila('DIRECTV', 'Pantalon Comercial', 'Masculino', '32');
+
+        $pedido = $this->pedidoDe($this->contrato($this->empleado(tallasFormulario: ['talla_camisa' => 'M', 'talla_pantalon' => '32'])));
+
+        // 2 polos pedidos, 1 en stock: se descuenta 1 y 1 queda por comprar.
+        $polo = $pedido->items()->with('inventario')->get()->firstWhere('inventario.prenda', 'Polo Gris Administrativa');
+        $this->assertSame([2, 1], [$polo->cantidad, $polo->cantidad_por_comprar]);
+        $this->assertSame(0, $polo->inventario->fresh()->cantidad);
+        $this->assertSame(9, $pantalon->fresh()->cantidad);
+    }
+
+    public function test_la_mujer_con_talla_sin_fila_en_la_bodega_usa_el_nombre_de_talla_del_inventario(): void
+    {
+        InventarioDotacion::where(['prenda' => 'Polo Mc Azul Tigo Express', 'genero' => 'Femenino', 'talla' => '10 (M)'])->delete();
+        $this->prenda('SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', 'Femenino', '10 (M)', $this->otraSedeId, 0);
+
+        $this->pedidoDe($this->contrato($this->empleado(['genero' => 'Femenino']), ['cliente_proyecto' => 'TIGO EXPRESS']));
+
+        $this->assertSame(0, $this->fila('SYM TIGO EXPRESS', 'Polo Mc Azul Tigo Express', 'Femenino', '10 (M)')->cantidad);
     }
 
     public function test_sin_stock_en_la_talla_equivalente_se_reporta_cuanto_hay(): void
@@ -420,7 +476,7 @@ class CircuitoDotacionTest extends TestCase
         $vigente = $this->contrato($empleado)->json('id');
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
-        $id = $this->postJson('/api/pedidos-automaticos', ['empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]]])
+        $id = $this->postJson('/api/pedidos-automaticos', $this->conSede(['empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]]]))
             ->assertCreated()->assertJsonPath('contrato_id', $vigente)->json('id');
 
         $this->assertSame($vigente, PedidoAutomatico::find($id)->contrato_id);
@@ -479,9 +535,9 @@ class CircuitoDotacionTest extends TestCase
         $this->assertSame(8, $home->fresh()->cantidad);
         $this->assertSame(10, $express->fresh()->cantidad);
         // Tampoco se le pueden asignar a mano.
-        $this->postJson('/api/pedidos-automaticos', [
+        $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $express->id, 'cantidad' => 1]],
-        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'No corresponden'));
+        ]))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'No corresponden'));
     }
 
     public function test_cambiar_la_sede_o_el_cargo_del_contrato_no_modifica_el_pedido(): void
@@ -515,9 +571,9 @@ class CircuitoDotacionTest extends TestCase
         $this->contrato($empleado, ['cliente_proyecto' => 'TIGO EXPRESS']);
         $poloDtv = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
-        $this->postJson('/api/pedidos-automaticos', [
+        $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $poloDtv->id, 'cantidad' => 1]],
-        ])->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'No corresponden'));
+        ]))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'No corresponden'));
 
         $this->assertSame(10, $poloDtv->fresh()->cantidad);
     }
@@ -593,9 +649,9 @@ class CircuitoDotacionTest extends TestCase
         $r = $this->contrato($empleado, ['estado_contrato' => 'Vigente']);
         $this->pedidoDe($r)->cambiarEstado('Cancelado');
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
-        $manual = $this->postJson('/api/pedidos-automaticos', [
+        $manual = $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'contrato_id' => $r->json('id'), 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 3]],
-        ])->assertCreated()->json('id');
+        ]))->assertCreated()->json('id');
 
         $this->cambiarContrato($empleado, $r->json('id'), ['cliente_proyecto' => 'TIGO EXPRESS']);
 
@@ -625,7 +681,8 @@ class CircuitoDotacionTest extends TestCase
         $empleado = $this->empleado();
         $r = $this->contrato($empleado);
         $pedido = $this->pedidoDe($r);
-        DB::table('sedes')->where('id', $this->centralId)->update(['nombre' => 'SEDE RENOMBRADA']);
+        // El proyecto nuevo no tiene nada cargado.
+        InventarioDotacion::whereIn('proyecto', ['SYM TIGO EXPRESS', 'SYM ADMINISTRATIVO'])->delete();
 
         $this->cambiarContrato($empleado, $r->json('id'), ['cliente_proyecto' => 'TIGO EXPRESS'])
             ->assertJsonPath('pedido_automatico_aviso', fn ($a) => str_contains($a, 'se eliminó'));
@@ -769,6 +826,9 @@ class CircuitoDotacionTest extends TestCase
         }
         $this->postJson('/api/inventario-dotacion/import', ['items' => $filas])->assertOk()->assertJson(['creados' => 3]);
 
+        // Sin lo de la sede original, la importada queda como bodega de DIRECTV.
+        InventarioDotacion::where('proyecto', 'DIRECTV')->where('sede_id', '!=', $sede)->delete();
+
         $r = $this->contrato($this->empleado(), ['sede' => 'SEDE NUEVA']);
 
         $this->assertSame(self::KIT_ASESOR_DTV, $this->nombresDePrendas($this->pedidoDe($r)));
@@ -828,9 +888,9 @@ class CircuitoDotacionTest extends TestCase
         $this->contrato($empleado, ['estado_contrato' => 'Finalizado']);
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
-        $r = $this->postJson('/api/pedidos-automaticos', [
+        $r = $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]],
-        ])->assertCreated()->assertJsonCount(1, 'items')->assertJsonPath('estado', 'Activo');
+        ]))->assertCreated()->assertJsonCount(1, 'items')->assertJsonPath('estado', 'Activo');
 
         $this->assertMatchesRegularExpression('/^\d{5}$/', $r->json('codigo'));
         $this->assertSame(9, $polo->fresh()->cantidad);
@@ -841,7 +901,7 @@ class CircuitoDotacionTest extends TestCase
         $a = $this->pedidoDe($this->contrato($this->empleado()))->codigo;
         $empleado = $this->empleado();
         $this->contrato($empleado, ['estado_contrato' => 'Finalizado']);
-        $b = $this->postJson('/api/pedidos-automaticos', ['empleado_id' => $empleado->id, 'items' => []])->assertCreated()->json('codigo');
+        $b = $this->postJson('/api/pedidos-automaticos', $this->conSede(['empleado_id' => $empleado->id, 'items' => []]))->assertCreated()->json('codigo');
         $c = $this->pedidoDe($this->contrato($this->empleado()))->codigo;
 
         $this->assertSame((int) $a + 1, (int) $b);
@@ -863,7 +923,7 @@ class CircuitoDotacionTest extends TestCase
     /** Pedido manual que ya está en Compras (como los que quedaron de antes, sin pedido global). */
     private function manualEnCompras(User $empleado, InventarioDotacion $prenda, int $cantidad): PedidoAutomatico
     {
-        $pedido = PedidoAutomatico::find($this->postJson('/api/pedidos-automaticos', ['empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $prenda->id, 'cantidad' => $cantidad]]])->assertCreated()->json('id'));
+        $pedido = PedidoAutomatico::find($this->postJson('/api/pedidos-automaticos', $this->conSede(['empleado_id' => $empleado->id, 'items' => [['inventario_dotacion_id' => $prenda->id, 'cantidad' => $cantidad]]]))->assertCreated()->json('id'));
         $pedido->cambiarEstado('Enviar a compras');
 
         return $pedido->fresh();
@@ -1157,7 +1217,7 @@ class CircuitoDotacionTest extends TestCase
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
         $datos = ['empleado_id' => $empleado->id, 'estado' => 'Enviar a compras', 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]]];
 
-        $this->postJson('/api/pedidos-automaticos', $datos)->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Pedidos globales'));
+        $this->postJson('/api/pedidos-automaticos', $this->conSede($datos))->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Pedidos globales'));
         $this->putJson("/api/pedidos-automaticos/{$pedido->id}", $datos)->assertStatus(422)->assertJsonPath('message', fn ($m) => str_contains($m, 'Pedidos globales'));
 
         $this->assertSame('Activo', $pedido->fresh()->estado);
@@ -1920,8 +1980,10 @@ class CircuitoDotacionTest extends TestCase
 
     public function test_importar_a_una_sede_fuera_del_proyecto_funciona_si_la_fila_es_de_una_compra(): void
     {
-        // HUGHES en una sede que no es de DIRECTV: el pedido creó las filas en 0.
+        // El inventario de DIRECTV quedó (sin stock) en una sede que no es del proyecto: el
+        // pedido sale de ahí todo por comprar, y la compra se recibe en esa sede.
         $sede = $this->sede('SEDE HUGHES');
+        InventarioDotacion::where('proyecto', 'DIRECTV')->update(['sede_id' => $sede, 'cantidad' => 0]);
         $pedido = $this->pedidoDe($this->contrato($this->empleado(), ['cliente_proyecto' => 'HUGHES COL', 'sede' => 'SEDE HUGHES', 'regional_id' => $this->regional()]));
         $this->postJson('/api/pedidos-globales', ['proyecto' => 'HUGHES COL'])->assertCreated();
         $this->putJson('/api/pedidos-automaticos/bulk-estado', ['ids' => [$pedido->id], 'estado' => 'Enviar a compras'])->assertOk();
@@ -2119,12 +2181,15 @@ class CircuitoDotacionTest extends TestCase
             ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'error inesperado'));
     }
 
-    public function test_sin_la_sede_central_no_se_genera_y_se_explica(): void
+    public function test_sin_inventario_administrativo_no_se_genera_y_se_explica(): void
     {
-        DB::table('sedes')->where('id', $this->centralId)->update(['nombre' => 'SYM PEREIRA VIEJA']);
+        // Como en producción: SYM ADMINISTRATIVO no tiene nada cargado.
+        InventarioDotacion::where('proyecto', 'SYM ADMINISTRATIVO')->delete();
 
-        $this->contrato($this->empleado())->assertJsonPath('pedido_automatico', null)
-            ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'SYM PEREIRA'));
+        $this->contrato($this->empleado(), ['cliente_proyecto' => 'ADMINISTRATIVO', 'cargo' => 'ANALISTA'])
+            ->assertJsonPath('pedido_automatico', null)
+            ->assertJsonPath('pedido_automatico_motivo', fn ($m) => str_contains($m, 'no se maneja'));
+        $this->assertSame(0, InventarioDotacion::where('proyecto', 'SYM ADMINISTRATIVO')->count(), 'No inventa el kit.');
     }
 
     public function test_el_formulario_que_llega_despues_del_contrato_no_crea_el_pedido_solo(): void
@@ -2239,9 +2304,13 @@ class CircuitoDotacionTest extends TestCase
         $this->postJson('/api/empleados/importar-datos-personales', ['filas' => [['cedula' => '66002', 'genero' => 'Femenino']]])->assertOk();
 
         $fresco = $pedido->fresh();
-        $this->assertSame(self::KIT_ASESOR_DTV, $this->nombresDePrendas($fresco));
-        $this->assertNull($fresco->prendas_sin_definir);
+        // El formulario trae pantalón 32, que no es talla de mujer (van de 4 a 24): no se
+        // inventa esa talla; el pantalón queda pendiente hasta corregirla.
+        $this->assertSame(['Carnet', 'Polo Gris Administrativa'], $this->nombresDePrendas($fresco));
+        $this->assertSame(['Pantalon Comercial'], $fresco->prendas_sin_definir);
+        $this->assertStringContainsString('no se maneja en talla 32', $fresco->notas);
         $this->assertStringNotContainsString('no tiene género', $fresco->notas);
+        $this->assertFalse(InventarioDotacion::where(['prenda' => 'Pantalon Comercial', 'genero' => 'Femenino', 'talla' => '32'])->exists());
         $this->assertSame(8, $polo->fresh()->cantidad, 'Las 2 polos salen del inventario una sola vez.');
     }
 
@@ -2417,7 +2486,7 @@ class CircuitoDotacionTest extends TestCase
         foreach (range(1, 150) as $i) {
             [$empleado, $vigente] = $this->empleadoConDosContratos($i);
             $items = [['inventario_dotacion_id' => $polo->id, 'cantidad' => 2], ['inventario_dotacion_id' => $carnet->id, 'cantidad' => 1]];
-            $id = $this->postJson('/api/pedidos-automaticos', ['empleado_id' => $empleado->id, 'items' => $items])->assertCreated()->json('id');
+            $id = $this->postJson('/api/pedidos-automaticos', $this->conSede(['empleado_id' => $empleado->id, 'items' => $items]))->assertCreated()->json('id');
             $esperado[$id] = [$empleado->id, $vigente];
         }
 
@@ -2439,9 +2508,9 @@ class CircuitoDotacionTest extends TestCase
         [, $ajeno] = $this->empleadoConDosContratos(2);
         $polo = $this->fila('DIRECTV', 'Polo Gris Administrativa', 'Masculino', 'M');
 
-        $this->postJson('/api/pedidos-automaticos', [
+        $this->postJson('/api/pedidos-automaticos', $this->conSede([
             'empleado_id' => $empleado->id, 'contrato_id' => $ajeno, 'items' => [['inventario_dotacion_id' => $polo->id, 'cantidad' => 1]],
-        ])->assertCreated()->assertJsonPath('contrato_id', $vigente);
+        ]))->assertCreated()->assertJsonPath('contrato_id', $vigente);
     }
 
     public function test_importar_masivamente_un_global_liga_cada_pedido_a_su_contrato_vigente(): void

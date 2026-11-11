@@ -127,7 +127,7 @@ const TIPOS_VINC = [
     "Temporal",
     "Otro",
 ];
-const POR_PAGINA = 10;
+const POR_PAGINA = 20; // Igual que Contratos.
 const BANCOS = [
     "Bancolombia",
     "Davivienda",
