@@ -33,13 +33,13 @@ const normalizeHeader = (s) =>
  * tildes/mayúsculas, así que aquí las claves van sin tildes.
  */
 const IMPORT_HEADER_MAP = {
-    // "Nº de cliente" en el archivo de origen viene mal nombrada: en realidad es donde
-    // vive el número real de la orden de trabajo (confirmado por el usuario contra su
-    // archivo real, columna AI). "Número de orden de trabajo" (columna AM) es otro campo
-    // distinto, no el que se usa como llave.
-    "n de cliente": "numero_wo",
+    // En el archivo de origen el número real de la orden de trabajo viene en "N° de WO de
+    // IBS", y "Nº de cliente" es el número de IBS (iban al revés y los datos quedaban
+    // trocados, tanto en la pantalla como en el exporte). "Número de orden de trabajo"
+    // (columna AM) es otro campo distinto, no el que se usa como llave.
+    "n de wo de ibs": "numero_wo",
     "numero de wo": "numero_wo", // alias por si otro export usa este nombre más corto
-    "n de wo de ibs": "numero_wo_ibs",
+    "n de cliente": "numero_wo_ibs",
     "n de item": "numero_item",
     "estado": "estado",
     "fecha de estado de orden de trabajo": "fecha_estado",
@@ -269,7 +269,9 @@ const COLUMNAS_EXPORTE_MACAW = [
     ["Departamento", "departamento"],
     ["Tel. Casa", ["tel_casa", "telefono_principal"]],
     ["Perímetro de la Zona", "perimetro"],
-    ["Nom Tipo Cliente", "tipo_orden"],
+    // Es la "Clase de cliente" del archivo (Pospago/Prepago), no el "Tipo de cliente"
+    // ("Normal Casa", "Normal Edificio"), que es otra columna.
+    ["Nom Tipo Cliente", "clase_cliente"],
     ["Fecha Programación", ["fecha_programacion", "inicio_agendado"]],
     ["Fecha Atención", "fecha_estado"],
     ["Fecha Finalización", "fecha_finalizacion"],
@@ -468,9 +470,9 @@ function ImportModal({ onClose, onImported }) {
                 </div>
                 <div style={S.modalBody}>
                     <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: 0 }}>
-                        Se leen las columnas más relevantes del archivo de origen (el resto se ignora): <strong>Nº de cliente</strong> (obligatorio — es donde
-                        realmente está el número de WO en este archivo, aunque el título de la columna diga "cliente"),
-                        <strong> N° de item</strong> (identifica cada material/línea del mismo WO), <strong>N° de WO de IBS</strong> (otro número de referencia, se guarda aparte),
+                        Se leen las columnas más relevantes del archivo de origen (el resto se ignora): <strong>N° de WO de IBS</strong> (obligatorio — es donde
+                        realmente está el número de la Work Order en este archivo),
+                        <strong> N° de item</strong> (identifica cada material/línea del mismo WO), <strong>Nº de cliente</strong> (el número de IBS, se guarda aparte),
                         Estado, Fechas, Servicio, Proveedor, Cuadrilla/Técnico Responsable, CEDULA, NOMBRE TH, MODALIDAD, perímetro, ubicación, Aging y Descripción de IBS.
                         {" "}Un mismo WO puede traer varias filas (una por ítem) — todas se guardan. Si una fila con el mismo WO + ítem ya existe, se actualiza; si no, se crea.
                     </p>
@@ -966,6 +968,8 @@ export default function WorkOrdersCrud() {
             setDeleteTarget(null);
             showToast("Work Order eliminada.");
         } catch (err) {
+            // Si falló por datos viejos en pantalla, al recargar la lista se ve lo real.
+            invalidate();
             showToast(err?.response?.data?.message ?? "No se pudo eliminar.");
         } finally {
             setDeleting(false);

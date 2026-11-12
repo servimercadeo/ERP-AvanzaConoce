@@ -111,6 +111,18 @@ class WorkOrderImportTest extends TestCase
         $this->assertFalse(WorkOrder::where('numero_wo', 'X1')->exists());
     }
 
+    public function test_borrar_una_work_order_que_ya_no_existe_no_es_un_error(): void
+    {
+        $wo = WorkOrder::create(['numero_wo' => 'WO-BORRADA', 'numero_item' => '']);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->deleteJson("/api/work-orders/{$wo->id}")->assertNoContent();
+        // Segundo intento: la lista del navegador quedó vieja, no debe salir un error feo.
+        $this->deleteJson("/api/work-orders/{$wo->id}")->assertNoContent();
+
+        $this->assertFalse(WorkOrder::whereKey($wo->id)->exists());
+    }
+
     public function test_el_tecnico_solo_ve_las_work_orders_de_su_cedula(): void
     {
         WorkOrder::create(['numero_wo' => 'WO1', 'numero_item' => '', 'cedula_tecnico' => '555']);
