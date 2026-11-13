@@ -461,6 +461,56 @@
             "charset": null
         }
     },
+    "auxilios_anulados": {
+        "anulado_por": {
+            "tipo": "bigint unsigned",
+            "nulo": true,
+            "por_defecto": false,
+            "charset": null
+        },
+        "clave": {
+            "tipo": "varchar(190)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "created_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": false,
+            "charset": null
+        },
+        "id": {
+            "tipo": "bigint unsigned",
+            "nulo": false,
+            "por_defecto": true,
+            "charset": null
+        },
+        "mes": {
+            "tipo": "varchar(7)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "nombre": {
+            "tipo": "varchar(190)",
+            "nulo": true,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "tipo": {
+            "tipo": "varchar(20)",
+            "nulo": false,
+            "por_defecto": false,
+            "charset": "utf8mb4"
+        },
+        "updated_at": {
+            "tipo": "timestamp",
+            "nulo": true,
+            "por_defecto": false,
+            "charset": null
+        }
+    },
     "bancos": {
         "id": {
             "tipo": "bigint unsigned",

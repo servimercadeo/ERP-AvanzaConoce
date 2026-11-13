@@ -262,6 +262,72 @@ class AuxilioTest extends TestCase
         }
     }
 
+    public function test_eliminar_un_auxilio_lo_saca_del_reporte_sin_tocar_las_work_orders(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Tecnico']);
+        $this->crearFinalizadas('555', 3);
+        $this->actingAs($this->usuario('admin'));
+
+        $this->postJson('/api/auxilios/anulados', ['clave' => '555', 'nombre' => 'Carlos Tecnico', 'mes' => '2026-10'])
+            ->assertNoContent();
+
+        $this->assertSame([], $this->getJson('/api/auxilios/reporte?mes=2026-10')->assertOk()->json('resultados'));
+        // Las Work Orders siguen ahí: solo se anuló el pago de ese mes.
+        $this->assertSame(3, WorkOrder::where('cedula_tecnico', '555')->count());
+    }
+
+    public function test_el_auxilio_eliminado_se_puede_ver_y_restaurar(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Tecnico']);
+        $this->crearFinalizadas('555', 3);
+        $this->actingAs($this->usuario('admin'));
+        $this->postJson('/api/auxilios/anulados', ['clave' => '555', 'mes' => '2026-10'])->assertNoContent();
+
+        $eliminados = $this->getJson('/api/auxilios/reporte?mes=2026-10&anulados=1')->assertOk()->json('resultados');
+        $this->assertSame(['Carlos Tecnico', true], [$eliminados[0]['nombre'], $eliminados[0]['anulado']]);
+
+        $this->deleteJson('/api/auxilios/anulados', ['clave' => '555', 'mes' => '2026-10'])->assertNoContent();
+
+        $r = $this->getJson('/api/auxilios/reporte?mes=2026-10')->assertOk()->json('resultados');
+        $this->assertSame(['Carlos Tecnico'], array_column($r, 'nombre'));
+    }
+
+    public function test_el_auxilio_se_elimina_solo_en_ese_mes_y_en_esa_escala(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555', 'name' => 'Carlos Tecnico']);
+        $this->crearFinalizadas('555', 3);
+        $this->crearFinalizadas('555', 2, '2026-11-10', null, 'N');
+        $this->actingAs($this->usuario('admin'));
+
+        $this->postJson('/api/auxilios/anulados', ['clave' => '555', 'mes' => '2026-10'])->assertNoContent();
+
+        $this->assertSame([], $this->getJson('/api/auxilios/reporte?mes=2026-10')->json('resultados'));
+        $this->assertCount(1, $this->getJson('/api/auxilios/reporte?mes=2026-11')->json('resultados'));
+    }
+
+    public function test_el_auxiliar_sin_cedula_tambien_se_puede_eliminar(): void
+    {
+        $this->usuario('tecnico', ['cedula' => '555']);
+        $this->crearAcompanadas(3, null, 'Pedro Del Parametro');
+        $this->actingAs($this->usuario('admin'));
+
+        $fila = $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->json('resultados.0');
+        $this->postJson('/api/auxilios/anulados?tipo=auxiliar', ['clave' => $fila['clave'], 'mes' => '2026-10'])
+            ->assertNoContent();
+
+        $this->assertSame([], $this->getJson('/api/auxilios/reporte?tipo=auxiliar&mes=2026-10')->json('resultados'));
+        // La escala de técnicos no se tocó: el técnico 555 sigue cobrando sus 3.
+        $this->assertCount(1, $this->getJson('/api/auxilios/reporte?mes=2026-10')->json('resultados'));
+    }
+
+    public function test_el_tecnico_no_puede_eliminar_auxilios(): void
+    {
+        $this->actingAs($this->usuario('tecnico', ['cedula' => '555']));
+
+        $this->postJson('/api/auxilios/anulados', ['clave' => '555', 'mes' => '2026-10'])->assertForbidden();
+        $this->deleteJson('/api/auxilios/anulados', ['clave' => '555', 'mes' => '2026-10'])->assertForbidden();
+    }
+
     public function test_las_dos_escalas_vienen_sembradas_y_son_distintas(): void
     {
         $this->actingAs($this->usuario('admin'));

@@ -616,6 +616,11 @@ Route::middleware(['auth:sanctum', 'activo', 'aliado.limitado'])->group(function
         Route::delete('auxilios/tramos/{tramo}', [App\Http\Controllers\Api\AuxilioController::class, 'destroyTramo'])
             ->middleware(PermisoDenegado::middleware('editar', 'operaciones.auxilios.auxilios_file'));
         Route::get('auxilios/reporte', [App\Http\Controllers\Api\AuxilioController::class, 'reporte']);
+        // "Eliminar" un auxilio es anularlo para esa persona y ese mes; se puede restaurar.
+        Route::post('auxilios/anulados', [App\Http\Controllers\Api\AuxilioController::class, 'anular'])
+            ->middleware(PermisoDenegado::middleware('eliminar', 'operaciones.auxilios.auxilios_file'));
+        Route::delete('auxilios/anulados', [App\Http\Controllers\Api\AuxilioController::class, 'restaurar'])
+            ->middleware(PermisoDenegado::middleware('eliminar', 'operaciones.auxilios.auxilios_file'));
     });
 
     // Módulo Permisos: qué rol ve qué módulo/submódulo. Admin siempre; los demás roles solo
