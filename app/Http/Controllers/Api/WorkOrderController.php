@@ -321,10 +321,20 @@ class WorkOrderController extends Controller
         });
     }
 
-    public function destroy(Request $request, WorkOrder $workOrder)
+    /**
+     * El id llega como texto a propósito: si la fila ya no existe (la lista del navegador
+     * quedó vieja y se borró desde otra pantalla) no tiene sentido reventar con "No query
+     * results"; el resultado que el usuario pidió ya está dado, así que se responde 204 y la
+     * pantalla se refresca sola.
+     */
+    public function destroy(Request $request, string $workOrder)
     {
-        $this->soloLasQueVe($request, $workOrder);
-        $workOrder->delete();
+        $wo = WorkOrder::find($workOrder);
+
+        if ($wo) {
+            $this->soloLasQueVe($request, $wo);
+            $wo->delete();
+        }
 
         return response()->json(null, 204);
     }

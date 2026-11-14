@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuxilioAnulado;
 use App\Models\AuxilioTramo;
 use App\Models\User;
 use App\Services\AuxilioProductividad;
@@ -71,6 +72,14 @@ class AuxilioController extends Controller
             ? $this->deAuxiliares($mes, $tramos)
             : $this->deTecnicos($mes, $tramos);
 
+        // Auxilios anulados a mano: por defecto no salen; con ?anulados=1 salen solos, para
+        // poder restaurarlos.
+        $anuladas = AuxilioAnulado::where('tipo', $tipo)->where('mes', $mes)->pluck('clave')->all();
+        $verAnulados = filter_var($request->anulados, FILTER_VALIDATE_BOOLEAN);
+        $resultados = $resultados
+            ->map(fn ($r) => $r + ['anulado' => in_array($r['clave'], $anuladas, true)])
+            ->filter(fn ($r) => $r['anulado'] === $verAnulados);
+
         $usuario = $request->user();
         // El técnico solo ve lo suyo; el reporte completo es para los demás con permiso.
         if ($usuario->rol === 'tecnico') {
@@ -116,23 +125,30 @@ class AuxilioController extends Controller
         $personas = User::whereIn('id', $ids)->get(['id', 'name', 'cedula'])->keyBy('id');
         $porNombre = $this->empleadosPorNombre();
 
-        return $acompanamientos->map(function ($ordenes, $llave) use ($personas, $porNombre, $tramos) {
+        $porPersona = $acompanamientos->map(function ($ordenes, $llave) use ($personas, $porNombre) {
             $nombre = str_starts_with($llave, 'u-')
                 ? ($personas->get((int) substr($llave, 2))?->name ?: $ordenes->first()->auxiliar)
                 : $ordenes->first()->auxiliar;
             // Si el auxiliar se eligió del parámetro no hay id, pero casi siempre es un
             // empleado: se busca su cédula por el nombre antes de dejarla vacía.
-            $cedula = str_starts_with($llave, 'u-')
+            $cedula = (string) ((str_starts_with($llave, 'u-')
                 ? $personas->get((int) substr($llave, 2))?->cedula
-                : $porNombre->get($this->clave($nombre))?->cedula;
+                : $porNombre->get($this->clave($nombre))?->cedula) ?? '');
 
-            return $this->fila(
-                (string) ($cedula ?? ''),
-                $nombre,
-                AuxilioProductividad::ordenesPagadas($ordenes),
-                $tramos,
-            );
+            return ['cedula' => $cedula, 'nombre' => $nombre, 'ordenes' => $ordenes];
         });
+
+        // La misma persona pudo quedar una vez por su id y otra por su nombre (elegida del
+        // parámetro): sus acompañamientos se suman en una sola fila, y la escala sale del total.
+        return $porPersona
+            ->groupBy(fn ($p) => $p['cedula'] !== '' ? $p['cedula'] : 'n-' . $this->clave($p['nombre']))
+            ->map(fn ($grupo) => $this->fila(
+                $grupo->first()['cedula'],
+                $grupo->first()['nombre'],
+                AuxilioProductividad::ordenesPagadas($grupo->flatMap(fn ($p) => $p['ordenes'])),
+                $tramos,
+            ))
+            ->values();
     }
 
     /** Empleados activos con cédula, indexados por su nombre normalizado. */
@@ -153,11 +169,48 @@ class AuxilioController extends Controller
         return mb_strtolower(trim(preg_replace('/\s+/', ' ', $limpio)), 'UTF-8');
     }
 
+    /** "Eliminar" el auxilio de una persona en un mes: no se tocan sus Work Orders. */
+    public function anular(Request $request)
+    {
+        $datos = $request->validate([
+            'clave'  => 'required|string|max:190',
+            'nombre' => 'nullable|string|max:190',
+            'mes'    => 'required|date_format:Y-m',
+        ]);
+
+        AuxilioAnulado::firstOrCreate(
+            ['tipo' => $this->tipo($request), 'mes' => $datos['mes'], 'clave' => $datos['clave']],
+            ['nombre' => $datos['nombre'] ?? null, 'anulado_por' => $request->user()->id],
+        );
+
+        return response()->json(null, 204);
+    }
+
+    /** Devuelve al reporte un auxilio que se había anulado. */
+    public function restaurar(Request $request)
+    {
+        $datos = $request->validate([
+            'clave' => 'required|string|max:190',
+            'mes'   => 'required|date_format:Y-m',
+        ]);
+
+        AuxilioAnulado::where('tipo', $this->tipo($request))
+            ->where('mes', $datos['mes'])
+            ->where('clave', $datos['clave'])
+            ->get()
+            ->each->delete();
+
+        return response()->json(null, 204);
+    }
+
     private function fila(string $cedula, string $nombre, int $total, $tramos): array
     {
         $tramo = AuxilioProductividad::tramoDe($total, $tramos);
 
         return [
+            // Con qué se identifica la fila al anularla: la cédula, o el nombre si el
+            // auxiliar no es empleado del ERP y no tiene.
+            'clave'         => $cedula !== '' ? $cedula : 'n-' . $this->clave($nombre),
             'cedula'        => $cedula,
             'nombre'        => $nombre,
             'total_wo'      => $total,

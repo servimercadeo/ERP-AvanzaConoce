@@ -31,6 +31,9 @@ export default function AuxiliosCrud() {
     const [search, setSearch] = useState("");
     const debSearch = useDebounce(search, 300);
     const [tramosOpen, setTramosOpen] = useState(false);
+    // Los auxilios eliminados a mano se ven aparte, para poder devolverlos.
+    const [verAnulados, setVerAnulados] = useState(false);
+    const [anulando, setAnulando] = useState(null);
     const [toast, setToast] = useState(null);
 
     const showToast = (msg) => {
@@ -39,14 +42,42 @@ export default function AuxiliosCrud() {
     };
 
     const { data: resultado, isLoading } = useQuery({
-        queryKey: ["auxilios-reporte", tipo, mes, debSearch],
+        queryKey: ["auxilios-reporte", tipo, mes, debSearch, verAnulados],
         queryFn: () =>
-            api.get("/auxilios/reporte", { params: { tipo, mes, search: debSearch || undefined } }).then((r) => r.data),
+            api
+                .get("/auxilios/reporte", {
+                    params: { tipo, mes, search: debSearch || undefined, anulados: verAnulados ? 1 : undefined },
+                })
+                .then((r) => r.data),
         placeholderData: (prev) => prev,
         // Sin caché: una WO recién finalizada debe verse al entrar aquí.
         staleTime: 0,
     });
     const resultados = resultado?.resultados ?? [];
+
+    const refrescar = () => qc.invalidateQueries({ queryKey: ["auxilios-reporte"] });
+
+    const anular = async (fila) => {
+        try {
+            await api.post("/auxilios/anulados", { clave: fila.clave, nombre: fila.nombre, mes }, { params: { tipo } });
+            refrescar();
+            showToast("Auxilio de " + fila.nombre + " eliminado de " + mes + ".");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo eliminar el auxilio.");
+        } finally {
+            setAnulando(null);
+        }
+    };
+
+    const restaurar = async (fila) => {
+        try {
+            await api.delete("/auxilios/anulados", { params: { tipo }, data: { clave: fila.clave, mes } });
+            refrescar();
+            showToast("Auxilio de " + fila.nombre + " restaurado.");
+        } catch (err) {
+            showToast(err?.response?.data?.message ?? "No se pudo restaurar el auxilio.");
+        }
+    };
 
     return (
         <div style={{ width: "100%" }}>
@@ -56,7 +87,9 @@ export default function AuxiliosCrud() {
                 <div className="stats-row">
                     <div className="stat-card">
                         <div className="stat-num">{resultados.length}</div>
-                        <div className="stat-label">{esAuxiliar ? "Auxiliares" : "Técnicos"} con auxilio este mes</div>
+                        <div className="stat-label">
+                            {esAuxiliar ? "Auxiliares" : "Técnicos"} con auxilio {verAnulados ? "eliminado" : ""} este mes
+                        </div>
                     </div>
                 </div>
             )}
@@ -85,6 +118,11 @@ export default function AuxiliosCrud() {
                     value={mes}
                     onChange={(e) => setMes(e.target.value)}
                 />
+                {!esTecnico && (
+                    <button className="btn-secondary" onClick={() => setVerAnulados((v) => !v)}>
+                        {verAnulados ? "Ver auxilios activos" : "Ver eliminados"}
+                    </button>
+                )}
                 {puede.editar && (
                     <button className="btn-secondary" onClick={() => setTramosOpen(true)}>
                         Configurar escalas
@@ -99,11 +137,13 @@ export default function AuxiliosCrud() {
                     <div style={S.empty}>
                         <IconEmptySearch size={44} />
                         <p>
-                            {esTecnico
-                                ? "No tienes Work Orders que den auxilio en este mes."
-                                : esAuxiliar
-                                    ? "Ningún auxiliar acompañó Work Orders en este mes."
-                                    : "Ningún técnico directo cumple un tramo de auxilio en este mes."}
+                            {verAnulados
+                                ? "No hay auxilios eliminados en este mes."
+                                : esTecnico
+                                    ? "No tienes Work Orders que den auxilio en este mes."
+                                    : esAuxiliar
+                                        ? "Ningún auxiliar acompañó Work Orders en este mes."
+                                        : "Ningún técnico directo cumple un tramo de auxilio en este mes."}
                         </p>
                     </div>
                 ) : (
@@ -116,23 +156,62 @@ export default function AuxiliosCrud() {
                                 <th>Escala</th>
                                 <th>Valor por Orden</th>
                                 <th>Total Auxilio</th>
+                                {puede.eliminar && !esTecnico && <th style={{ width: 110 }}>Acciones</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {resultados.map((r) => (
-                                <tr key={r.cedula || `n-${r.nombre}`}>
+                                <tr key={r.clave}>
                                     <td style={{ color: "var(--text-muted)" }}>{r.cedula || "—"}</td>
                                     <td style={{ fontWeight: 700 }}>{r.nombre}</td>
                                     <td>{r.total_wo}</td>
                                     <td>{r.tramo ? `${r.tramo.desde} – ${r.tramo.hasta ?? "en adelante"}` : "—"}</td>
                                     <td>{r.tramo ? pesos.format(r.tramo.valor_por_orden) : "—"}</td>
                                     <td style={{ fontWeight: 700 }}>{pesos.format(r.total_auxilio)}</td>
+                                    {puede.eliminar && !esTecnico && (
+                                        <td>
+                                            {verAnulados ? (
+                                                <button className="btn-secondary" style={S.btnRestaurar} onClick={() => restaurar(r)}>
+                                                    Restaurar
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    style={S.actionBtn("#fce8e8", "#a33")}
+                                                    title="Eliminar este auxilio del mes"
+                                                    onClick={() => setAnulando(r)}
+                                                >
+                                                    <IconTrash size={15} />
+                                                </button>
+                                            )}
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 )}
             </div>
+
+            {anulando && (
+                <div style={S.overlay} onClick={() => setAnulando(null)}>
+                    <div style={{ ...S.modal, maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+                        <div style={S.modalHeader}>
+                            <span style={{ fontWeight: 800, color: "#c0392b" }}>Eliminar auxilio</span>
+                            <button style={S.btnIcon} onClick={() => setAnulando(null)}><IconClose size={16} /></button>
+                        </div>
+                        <div style={S.modalBody}>
+                            <p style={{ marginTop: 0 }}>
+                                ¿Eliminar el auxilio de <strong>{anulando.nombre}</strong> de {mes}? Sus Work Orders
+                                no se tocan: solo deja de cobrar ese mes, y lo puedes devolver desde "Ver eliminados".
+                            </p>
+                        </div>
+                        <div style={S.modalFooter}>
+                            <button className="btn-secondary" onClick={() => setAnulando(null)}>Cancelar</button>
+                            <button style={S.btnPeligro} onClick={() => anular(anulando)}>Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {tramosOpen && (
                 <TramosModal
@@ -289,6 +368,8 @@ const S = {
     input: { boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "0.88rem", fontFamily: "Nunito,sans-serif", color: "var(--text)", background: "var(--white)", outline: "none" },
     btnPrimary: { padding: "9px 20px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", fontFamily: "Nunito,sans-serif" },
     btnSecondary: { padding: "7px 14px", background: "var(--white)", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", fontFamily: "Nunito,sans-serif" },
+    btnPeligro: { padding: "9px 20px", background: "#c0392b", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", fontFamily: "Nunito,sans-serif" },
+    btnRestaurar: { padding: "5px 12px", fontSize: "0.78rem" },
     btnIcon: { display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-muted)", borderRadius: 6 },
     toast: { position: "fixed", bottom: 28, right: 28, background: "var(--primary)", color: "#fff", borderRadius: "var(--radius-sm)", padding: "13px 22px", fontWeight: 700, fontSize: "0.92rem", zIndex: 99999, boxShadow: "0 8px 28px rgba(26,155,140,0.35)" },
 };
